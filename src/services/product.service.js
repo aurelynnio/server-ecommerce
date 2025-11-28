@@ -192,7 +192,6 @@ class ProductService {
         }
       });
 
-      console.log("After boolean conversion:", allowedData);
 
       // Check if slug is being updated and if it already exists
       if (allowedData.slug) {
@@ -204,8 +203,6 @@ class ProductService {
           throw new Error("Product with this slug already exists");
         }
       }
-
-      console.log("Final data to update:", allowedData);
 
       const product = await Product.findByIdAndUpdate(id, allowedData, {
         new: true,
@@ -427,9 +424,12 @@ class ProductService {
   async getFeaturedProductsSimple(limit = 10) {
     const products = await Product.find({ isActive: true })
       .populate("category", "name slug")
-      .sort("-soldCount -createdAt") // Sắp xếp theo số lượng bán, sau đó theo thời gian tạo
+      .sort("-createdAt") 
       .limit(Number(limit))
       .lean();
+    if (!products) {
+      throw new Error("Products not found");
+    }
 
     return products;
   }
@@ -501,6 +501,8 @@ class ProductService {
 
     return products;
   }
+
+  
 }
 
 module.exports = new ProductService();
