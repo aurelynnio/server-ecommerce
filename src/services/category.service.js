@@ -56,7 +56,11 @@ class CategoryService {
     }
 
     if (parentCategory !== undefined) {
-      query.parentCategory = parentCategory;
+      if (parentCategory === "null" || parentCategory === null) {
+        query.parentCategory = null;
+      } else {
+        query.parentCategory = parentCategory;
+      }
     }
 
     if (search) {
@@ -80,16 +84,37 @@ class CategoryService {
       .limit(paginationParams.limit)
       .lean();
 
-    // Calculate product count for each category
+    // Calculate product count and get subcategories for each category
     const categoriesWithProductCount = await Promise.all(
       categories.map(async (category) => {
         const productCount = await Product.countDocuments({
           category: category._id,
           isActive: true,
         });
+
+        // Get subcategories
+        const subcategories = await Category.find({
+          parentCategory: category._id,
+        }).lean();
+
+        // Get product count for subcategories
+        const subcategoriesWithCount = await Promise.all(
+          subcategories.map(async (sub) => {
+            const subProductCount = await Product.countDocuments({
+              category: sub._id,
+              isActive: true,
+            });
+            return {
+              ...sub,
+              productCount: subProductCount,
+            };
+          })
+        );
+
         return {
           ...category,
           productCount,
+          subcategories: subcategoriesWithCount,
         };
       })
     );

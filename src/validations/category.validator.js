@@ -121,7 +121,7 @@ const getCategoriesQueryValidator = joi.object({
   isActive: joi.boolean().messages({
     "boolean.base": "isActive must be a boolean",
   }),
-  parentCategory: joi.string().hex().length(24).allow(null).messages({
+  parentCategory: joi.string().hex().length(24).allow(null, "null").messages({
     "string.base": "Parent category must be a string",
     "string.hex": "Parent category must be a valid hex string",
     "string.length": "Parent category must be 24 characters long",

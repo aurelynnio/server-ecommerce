@@ -146,10 +146,6 @@ class ProductService {
   // src/services/product.service.js
   async updateProduct(id, data) {
     try {
-      console.log("=== SERVICE UPDATE PRODUCT ===");
-      console.log("ID:", id);
-      console.log("Raw data:", data);
-
       // Only allow specific fields
       const allowedData = {};
       const allowedFields = [
@@ -175,8 +171,6 @@ class ProductService {
         }
       });
 
-      console.log("Filtered data:", allowedData);
-
       // Xử lý boolean fields từ string sang boolean
       const booleanFields = [
         "isActive",
@@ -192,8 +186,6 @@ class ProductService {
         }
       });
 
-
-      // Check if slug is being updated and if it already exists
       if (allowedData.slug) {
         const existingProduct = await Product.findOne({
           slug: allowedData.slug,

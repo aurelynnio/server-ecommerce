@@ -97,6 +97,7 @@ router.put(
   "/:id",
   verifyAccessToken,
   requireRole("admin"),
+  upload.array("images", 5),
   productController.updateProduct
 );
 

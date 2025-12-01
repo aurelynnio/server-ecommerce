@@ -147,9 +147,8 @@ class OrderService {
       discountId = discount._id;
     }
 
-    // Calculate shipping fee (simple logic, can be improved)
-    const shippingFee = subtotal >= 500000 ? 0 : 30000; // Free shipping for orders >= 500k VND
-    const totalAmount = subtotal + shippingFee - discountAmount;
+    // Calculate total amount
+    const totalAmount = subtotal - discountAmount;
 
     // Create order
     const order = await Order.create({
@@ -162,7 +161,6 @@ class OrderService {
       paymentMethod,
       paymentStatus: paymentMethod === "cod" ? "unpaid" : "unpaid",
       subtotal,
-      shippingFee,
       discountCode: validDiscountCode,
       discountAmount,
       totalAmount,

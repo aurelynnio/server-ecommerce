@@ -187,6 +187,60 @@ const ProductController = {
 
   // Trong controller, thêm debug cho validator error
   updateProduct: catchAsync(async (req, res) => {
+    // Parse JSON fields if they are strings (from FormData)
+    if (req.body) {
+      ["price", "variants", "tags"].forEach((field) => {
+        if (typeof req.body[field] === "string") {
+          try {
+            req.body[field] = JSON.parse(req.body[field]);
+          } catch (e) {
+            console.error(`Failed to parse ${field}:`, e);
+          }
+        }
+      });
+
+      // Handle existing images (if sent as JSON string)
+      let currentImages = [];
+      if (req.body.existingImages) {
+        try {
+          currentImages =
+            typeof req.body.existingImages === "string"
+              ? JSON.parse(req.body.existingImages)
+              : req.body.existingImages;
+        } catch (error) {
+          return sendFail(
+            res,
+            "Existing images must be a valid JSON array",
+            StatusCodes.BAD_REQUEST
+          );
+        }
+      }
+
+      // Handle new image files
+      let newImages = [];
+      if (req.files && req.files.length > 0) {
+        try {
+          const buffers = req.files.map((file) => file.buffer);
+          const uploads = await multiUpload(buffers);
+          newImages = uploads.map((upload) => upload.secure_url);
+        } catch (error) {
+          return sendFail(
+            res,
+            "Image upload failed: " + error.message,
+            StatusCodes.BAD_REQUEST
+          );
+        }
+      }
+
+      // Combine images if there are any changes
+      if (req.body.existingImages || (req.files && req.files.length > 0)) {
+        req.body.images = [...currentImages, ...newImages];
+      }
+
+      // Remove existingImages from body to avoid validation error
+      if (req.body.existingImages) delete req.body.existingImages;
+    }
+
     // Validate request body
     console.log(`Check req.body in controller: ${JSON.stringify(req.body)}`);
     const { error, value } = updateProductValidator.validate(req.body, {
@@ -461,16 +515,7 @@ const ProductController = {
     );
   }),
 
-  // Get featured products (simple - 10 items only)
-  getFeaturedProducts: catchAsync(async (req, res) => {
-    const result = await productService.getFeaturedProducts();
-    return sendSuccess(
-      res,
-      result,
-      "Featured products retrieved successfully",
-      StatusCodes.OK
-    );
-  }),
+
 
   // Get new arrival products (simple - 10 items only)
   getNewArrivalProducts: catchAsync(async (req, res) => {
