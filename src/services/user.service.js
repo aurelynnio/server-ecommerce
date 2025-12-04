@@ -3,8 +3,22 @@ const hashPassword = require("../utils/hashPasword");
 const comparePassword = require("../utils/comparePassword");
 const { getPaginationParams } = require("../utils/pagination");
 
+/**
+ * Service handling user management operations
+ * Manages user creation, profile updates, and retrieval
+ */
 class UserService {
-  // Admin: Create new user
+  /**
+   * Create a new user (Admin function)
+   * @param {Object} userData - User details
+   * @param {string} userData.username - Username
+   * @param {string} userData.email - Email address
+   * @param {string} [userData.roles="user"] - User role
+   * @param {string} [userData.phone] - Phone number
+   * @param {boolean} [userData.isVerifiedEmail=false] - Email verification status
+   * @returns {Promise<Object>} Created user object (without password)
+   * @throws {Error} If username or email already exists
+   */
   async createUser(userData) {
     const {
       username,
@@ -47,7 +61,13 @@ class UserService {
     return userResponse;
   }
 
-  // Upload avatar
+  /**
+   * Update user avatar URL
+   * @param {string} userId - User ID
+   * @param {string} url - New avatar URL
+   * @returns {Promise<Object>} Updated user object
+   * @throws {Error} If user not found
+   */
   async uploadAvatar(userId, url) {
     const user = await userModel.findByIdAndUpdate(
       userId,
@@ -62,7 +82,12 @@ class UserService {
     return user;
   }
 
-  // Get user profile by ID
+  /**
+   * Get user profile details
+   * @param {string} userId - User ID
+   * @returns {Promise<Object>} User profile object
+   * @throws {Error} If user not found
+   */
   async getUserProfile(userId) {
     const user = await userModel.findById(userId).select("-password");
 
@@ -73,7 +98,15 @@ class UserService {
     return user;
   }
 
-  // Update user profile
+  /**
+   * Update user profile information
+   * @param {string} userId - User ID
+   * @param {Object} data - Data to update
+   * @param {string} [data.username] - New username
+   * @param {string} [data.email] - New email
+   * @returns {Promise<Object>} Updated user object
+   * @throws {Error} If username or email already exists
+   */
   async updateProfile(userId, data) {
     // Only allow specific fields
     const allowedData = {};

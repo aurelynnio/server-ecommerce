@@ -4,8 +4,23 @@ const Product = require("../models/product.model");
 const Discount = require("../models/discount.model");
 const { getPaginationParams } = require("../utils/pagination");
 
+/**
+ * Service handling order processing
+ * Manages order creation, status updates, and retrieval
+ */
 class OrderService {
-  // Create order from cart
+  /**
+   * Create a new order from selected cart items
+   * @param {string} userId - The ID of the user placing the order
+   * @param {Object} orderData - Order details
+   * @param {string[]} orderData.cartItemIds - List of cart item IDs to checkout
+   * @param {Object} orderData.shippingAddress - Shipping address details
+   * @param {string} [orderData.paymentMethod] - Payment method (cod/vnpay)
+   * @param {string} [orderData.discountCode] - Discount code to apply
+   * @param {string} [orderData.note] - Order note
+   * @returns {Promise<Object>} Created order object
+   * @throws {Error} If cart is empty, items invalid, or stock insufficient
+   */
   async createOrder(userId, orderData) {
     const {
       cartItemIds,

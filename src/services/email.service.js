@@ -1,7 +1,8 @@
 const nodemailer = require("nodemailer");
 
 /**
- * Create email transporter
+ * Create email transporter configuration
+ * @returns {Object} Nodemailer transporter instance
  */
 const createTransporter = () => {
   return nodemailer.createTransport({
@@ -17,9 +18,9 @@ const createTransporter = () => {
 
 /**
  * Generate HTML template for verification code email
- * @param {String} code - Verification code
- * @param {String} type - Type of code: 'email_verification' or 'password_reset'
- * @returns {String} HTML template
+ * @param {string} code - Verification code
+ * @param {string} [type="email_verification"] - Type of code: 'email_verification' or 'password_reset'
+ * @returns {string} HTML template string
  */
 const getCodeEmailTemplate = (code, type = "email_verification") => {
   const title =

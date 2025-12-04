@@ -15,4 +15,9 @@ const categorySchema = new Schema(
   }
 );
 
+// Indexes
+categorySchema.index({ slug: 1 });
+categorySchema.index({ parentCategory: 1 });
+categorySchema.index({ isActive: 1 });
+
 module.exports = model("Category", categorySchema);

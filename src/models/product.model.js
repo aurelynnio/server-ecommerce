@@ -37,6 +37,28 @@ const productSchema = new Schema(
   { timestamps: true, collection: "products" }
 );
 
+// Indexes
+productSchema.index({ slug: 1 });
+productSchema.index({ category: 1 });
+productSchema.index({ brand: 1 });
+productSchema.index({ tags: 1 });
+productSchema.index({ isActive: 1 });
+productSchema.index({ "price.currentPrice": 1 });
+productSchema.index({ soldCount: -1 });
+productSchema.index(
+  { name: "text", description: "text", brand: "text" },
+  {
+    weights: {
+      name: 10,
+      brand: 5,
+      description: 1,
+    },
+    name: "TextIndex",
+  }
+);
+productSchema.index({ category: 1, isActive: 1 });
+productSchema.index({ brand: 1, isActive: 1 });
+
 // Auto-generate slug from name before validation
 productSchema.pre("validate", function (next) {
   if (this.name && !this.slug) {

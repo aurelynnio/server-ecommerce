@@ -3,8 +3,21 @@ const Product = require("../models/product.model");
 const Order = require("../models/order.model");
 const { getPaginationParams } = require("../utils/pagination");
 
+/**
+ * Service handling product reviews
+ * Manages review creation and retrieval
+ */
 class ReviewService {
-  // Create new review
+  /**
+   * Create a new review for a product
+   * @param {string} userId - ID of the user creating the review
+   * @param {Object} reviewData - Review details
+   * @param {string} reviewData.productId - ID of the product being reviewed
+   * @param {number} reviewData.rating - Rating value (1-5)
+   * @param {string} [reviewData.comment] - Review comment
+   * @returns {Promise<Object>} Created review object
+   * @throws {Error} If product not found, not purchased, or already reviewed
+   */
   async createReview(userId, reviewData) {
     const { productId, rating, comment } = reviewData;
 
@@ -54,7 +67,17 @@ class ReviewService {
     return review;
   }
 
-  // Get all reviews for a product
+  /**
+   * Get all reviews for a specific product
+   * @param {string} productId - Product ID
+   * @param {Object} filters - Filter and sort options
+   * @param {number} [filters.page=1] - Page number
+   * @param {number} [filters.limit=10] - Items per page
+   * @param {number} [filters.rating] - Filter by specific rating
+   * @param {string} [filters.sort="newest"] - Sort order (newest, oldest, highest, lowest)
+   * @returns {Promise<Object>} List of reviews with pagination
+   * @throws {Error} If product not found
+   */
   async getProductReviews(productId, filters = {}) {
     const { page = 1, limit = 10, rating, sort = "newest" } = filters;
 

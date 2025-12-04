@@ -1,8 +1,25 @@
 const Discount = require("../models/discount.model");
 const { getPaginationParams } = require("../utils/pagination");
 
+/**
+ * Service handling discount/coupon operations
+ * Manages discount creation, retrieval, and validation
+ */
 class DiscountService {
-  // Create new discount (Admin)
+  /**
+   * Create a new discount code (Admin only)
+   * @param {Object} discountData - Discount details
+   * @param {string} discountData.code - Unique discount code
+   * @param {string} discountData.discountType - Type of discount ('percent' or 'fixed')
+   * @param {number} discountData.discountValue - Value of discount
+   * @param {Date} discountData.startDate - Start date of validity
+   * @param {Date} discountData.endDate - End date of validity
+   * @param {string[]} [discountData.applicableProducts] - List of product IDs the discount applies to
+   * @param {number} [discountData.minOrderValue] - Minimum order value required
+   * @param {number} [discountData.usageLimit] - Maximum number of times code can be used
+   * @returns {Promise<Object>} Created discount object
+   * @throws {Error} If code exists or percentage value > 100
+   */
   async createDiscount(discountData) {
     // Check if code already exists
     const existingDiscount = await Discount.findOne({
@@ -30,7 +47,15 @@ class DiscountService {
     return discount;
   }
 
-  // Get all discounts with filters
+  /**
+   * Get all discounts with filters (Admin)
+   * @param {Object} filters - Filter options
+   * @param {number} [filters.page=1] - Page number
+   * @param {number} [filters.limit=10] - Items per page
+   * @param {boolean} [filters.isActive] - Filter by active status
+   * @param {string} [filters.discountType] - Filter by discount type
+   * @returns {Promise<Object>} List of discounts with pagination
+   */
   async getAllDiscounts(filters = {}) {
     const { page = 1, limit = 10, isActive, discountType } = filters;
 
@@ -73,7 +98,13 @@ class DiscountService {
     };
   }
 
-  // Get active discounts (for users)
+  /**
+   * Get currently active discounts available for users
+   * @param {Object} filters - Filter options
+   * @param {number} [filters.page=1] - Page number
+   * @param {number} [filters.limit=10] - Items per page
+   * @returns {Promise<Object>} List of active discounts
+   */
   async getActiveDiscounts(filters = {}) {
     const { page = 1, limit = 10 } = filters;
     const now = new Date();

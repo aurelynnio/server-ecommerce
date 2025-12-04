@@ -9,4 +9,11 @@ const reviewSchema = new Schema(
   },
   { timestamps: true }
 );
+
+// Indexes
+reviewSchema.index({ product: 1 });
+reviewSchema.index({ user: 1 });
+reviewSchema.index({ product: 1, createdAt: -1 }); // Reviews for a product, newest first
+reviewSchema.index({ product: 1, rating: -1 }); // Reviews for a product, highest rating first
+
 module.exports = model("Review", reviewSchema);

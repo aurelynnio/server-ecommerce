@@ -6,8 +6,27 @@ const {
 const Category = require("../models/category.model");
 const Review = require("../models/review.model");
 
+/**
+ * Service handling product operations
+ * Manages product retrieval, filtering, and search
+ */
 class ProductService {
-  // Get all products with filters and pagination
+  /**
+   * Get all products with advanced filtering, sorting, and pagination
+   * @param {Object} filters - Filter criteria
+   * @param {string} [filters.category] - Filter by category ID
+   * @param {string} [filters.brand] - Filter by brand
+   * @param {number} [filters.minPrice] - Minimum price
+   * @param {number} [filters.maxPrice] - Maximum price
+   * @param {string|string[]} [filters.tags] - Filter by tags
+   * @param {string} [filters.search] - Search term
+   * @param {boolean} [filters.isActive=true] - Filter by active status
+   * @param {Object} options - Pagination and sorting options
+   * @param {number} [options.page=1] - Page number
+   * @param {number} [options.limit=10] - Items per page
+   * @param {string} [options.sort="-createdAt"] - Sort field
+   * @returns {Promise<Object>} List of products with pagination metadata
+   */
   async getAllProducts(filters = {}, options = {}) {
     const {
       page = 1,
@@ -48,12 +67,9 @@ class ProductService {
       query.tags = { $in: tagArray };
     }
 
-    // Search by name or description
+    // Search by name, description, or brand using Text Index
     if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-      ];
+      query.$text = { $search: search };
     }
 
     // Get total count for pagination
@@ -63,9 +79,18 @@ class ProductService {
     const paginationParams = getPaginationParams(page, limit, total);
 
     // Execute query
-    const products = await Product.find(query)
-      .populate("category", "name slug")
-      .sort(sort)
+    let productsQuery = Product.find(query).populate("category", "name slug");
+
+    // If searching, sort by relevance score
+    if (search) {
+      productsQuery = productsQuery
+        .select({ score: { $meta: "textScore" } })
+        .sort({ score: { $meta: "textScore" } });
+    } else {
+      productsQuery = productsQuery.sort(sort);
+    }
+
+    const products = await productsQuery
       .skip(paginationParams.skip)
       .limit(paginationParams.limit)
       .lean();
@@ -85,7 +110,12 @@ class ProductService {
     };
   }
 
-  // Get single product by ID or slug
+  /**
+   * Get single product by ID
+   * @param {string} id - Product ID
+   * @returns {Promise<Object>} Product object with populated fields
+   * @throws {Error} If product not found
+   */
   async getProductById(id) {
     const product = await Product.findById(id)
       .populate("category", "name slug")

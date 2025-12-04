@@ -75,4 +75,10 @@ const userSchema = new Schema(
   }
 );
 
+// Indexes
+userSchema.index({ email: 1 });
+userSchema.index({ username: 1 });
+userSchema.index({ roles: 1 });
+userSchema.index({ isVerifiedEmail: 1 });
+
 module.exports = model("User", userSchema);

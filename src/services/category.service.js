@@ -3,8 +3,22 @@ const Product = require("../models/product.model");
 const slugify = require("slugify");
 const { getPaginationParams } = require("../utils/pagination");
 
+/**
+ * Service handling category operations
+ * Manages category creation, retrieval, and updates
+ */
 class CategoryService {
-  // Create new category
+  /**
+   * Create a new category
+   * @param {Object} categoryData - Category details
+   * @param {string} categoryData.name - Category name
+   * @param {string} [categoryData.slug] - Category slug (optional, auto-generated if missing)
+   * @param {string} [categoryData.description] - Category description
+   * @param {string} [categoryData.parentCategory] - ID of parent category
+   * @param {string[]} [categoryData.images] - Array of image URLs
+   * @returns {Promise<Object>} Created category object
+   * @throws {Error} If parent category not found
+   */
   async createCategory(categoryData) {
     // Generate slug if not provided
     if (!categoryData.slug) {
@@ -39,7 +53,17 @@ class CategoryService {
     return category;
   }
 
-  // Get all categories with filters
+  /**
+   * Get all categories with filtering and pagination
+   * @param {Object} filters - Filter options
+   * @param {number} filters.page - Page number
+   * @param {number} filters.limit - Items per page
+   * @param {boolean} [filters.isActive] - Filter by active status
+   * @param {string} [filters.parentCategory] - Filter by parent category ID
+   * @param {string} [filters.search] - Search term for name/description
+   * @returns {Promise<Object>} List of categories with pagination metadata
+   * @throws {Error} If page or limit are missing
+   */
   async getAllCategories(filters = {}) {
     const { page, limit, isActive, parentCategory, search } = filters;
 

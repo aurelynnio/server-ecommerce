@@ -1,14 +1,14 @@
 const express = require("express");
 const router = express.Router();
-const notificationController = require("../controllers/notification.controller");
-const {requireRole} =  require("../middlewares/auth.middleware.js")
+const notificationController = require("../controllers/notification.controller")
+const { verifyAccessToken } = require("../middlewares/auth.middleware");
 
-router.use(requireRole);
+router.use(verifyAccessToken);
 
-router.get("/", notificationController.getAllNotifications);
 router.post("/", notificationController.createNotification);
-router.put("/:notificationId/read", notificationController.markAsRead);
-router.get("/unread-count", notificationController.getUnreadCount);
-router.delete("/:notificationId", notificationController.deleteNotification);
+router.get("/", notificationController.getListNotification);
+router.patch("/read-all", notificationController.markReadAll);
+router.delete("/", notificationController.cleanNotification);
+router.get("/count", notificationController.countUnread);
 
 module.exports = router;

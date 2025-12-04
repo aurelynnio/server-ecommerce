@@ -2,6 +2,10 @@ const { VNPay, ProductCode, VnpLocale, dateFormat } = require('vnpay');
 const Payment = require("../models/payment.model");
 const Order = require("../models/order.model");
 
+/**
+ * Service handling payment operations
+ * Integrates with VNPay for payment processing
+ */
 class PaymentService {
 
     /**
@@ -9,7 +13,8 @@ class PaymentService {
      * @param {string} orderId - Order ID
      * @param {string} userId - User ID
      * @param {string} ipAddress - Client IP address
-     * @returns {Object} Payment record with payment URL
+     * @returns {Promise<Object>} Payment record with payment URL
+     * @throws {Error} If order invalid, unauthorized, or already paid
      */
     async createPaymentUrl(orderId, userId, ipAddress) {
         // Get order details
@@ -78,7 +83,8 @@ class PaymentService {
     /**
      * Verify VNPay return URL callback
      * @param {Object} vnpayParams - VNPay callback parameters
-     * @returns {Object} Verification result
+     * @returns {Promise<Object>} Verification result
+     * @throws {Error} If signature is invalid
      */
     async verifyReturnUrl(vnpayParams) {
         const vnpay = new VNPay({

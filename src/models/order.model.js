@@ -79,4 +79,11 @@ const orderSchema = new Schema(
   { timestamps: true, collection: "orders" }
 );
 
+// Indexes
+orderSchema.index({ userId: 1 });
+orderSchema.index({ status: 1 });
+orderSchema.index({ paymentStatus: 1 });
+orderSchema.index({ createdAt: -1 });
+orderSchema.index({ userId: 1, createdAt: -1 }); // Get user's orders sorted by date
+
 module.exports = model("Order", orderSchema);

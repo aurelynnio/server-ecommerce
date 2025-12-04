@@ -2,11 +2,11 @@ const { Schema, model, Types } = require("mongoose");
 
 const discountSchema = new Schema(
   {
-    code: { type: String, required: true, unique: true }, // Mã giảm giá
+    code: { type: String, required: true, unique: true }, 
     description: { type: String },
     discountType: {
       type: String,
-      enum: ["percent", "fixed"], // giảm theo % hoặc số tiền cụ thể
+      enum: ["percent", "fixed"], 
       required: true,
     },
     discountValue: { type: Number, required: true }, // ví dụ 10% hoặc 50000
@@ -23,5 +23,12 @@ const discountSchema = new Schema(
     collection: "discounts",
   }
 );
+
+// Indexes
+discountSchema.index({ code: 1 });
+discountSchema.index({ isActive: 1 });
+discountSchema.index({ startDate: 1 });
+discountSchema.index({ endDate: 1 });
+discountSchema.index({ code: 1, isActive: 1 });
 
 module.exports = model("Discount", discountSchema);

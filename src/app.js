@@ -8,15 +8,6 @@ const http = require("http")
 const app = ex();
 const server = http.createServer(app)
 
-const { Server } = require("socket.io")
-
-const io = new Server(server, {
-  cors: {
-    methods: ["POST", "GET"],
-    origin: process.env.FRONTEND_URL || "http://localhost:3000"
-  }
-})
-
 // Middlewares
 app.use(morgan("dev"));
 app.use(
@@ -45,7 +36,6 @@ app.use((err, req, res, next) => {
 });
 
 module.exports = {
-  io,
   server,
   app
-}
+};

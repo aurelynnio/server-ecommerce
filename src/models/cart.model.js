@@ -43,4 +43,8 @@ const cartSchema = new Schema(
   }
 );
 
+cartSchema.index({ userId: 1 }, { unique: true });
+cartSchema.index({ updatedAt: -1 });
+
+
 module.exports = model("Cart", cartSchema);

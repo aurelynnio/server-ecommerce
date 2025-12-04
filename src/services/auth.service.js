@@ -6,13 +6,30 @@ const {
   sendPasswordResetCode,
 } = require("./email.service");
 
+/**
+ * Service handling authentication logic
+ * Includes registration, login, password management, and email verification
+ */
 class AuthService {
-  // Generate 6-digit verification code
+  /**
+   * Generate a random 6-digit verification code
+   * @private
+   * @returns {string} 6-digit code
+   */
   _generateVerificationCode() {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  // Register new user
+  /**
+   * Register a new user
+   * @param {Object} data - User registration data
+   * @param {string} data.username - User's username
+   * @param {string} data.email - User's email
+   * @param {string} data.password - User's password
+   * @param {string} [data.provider] - Auth provider (local/google)
+   * @returns {Promise<Object>} Created user object (without sensitive data)
+   * @throws {Error} If email or username already exists
+   */
   async register(data) {
     // Check if email already exists
     const existingUser = await User.findOne({ email: data.email });
@@ -49,7 +66,13 @@ class AuthService {
     return userObj;
   }
 
-  // Login user
+  /**
+   * Authenticate user and generate tokens
+   * @param {string} email - User's email
+   * @param {string} password - User's password
+   * @returns {Promise<Object>} Object containing user info, access token, and refresh token
+   * @throws {Error} If credentials are invalid or email is not verified
+   */
   async login(email, password) {
     if (!email || !password) {
       throw new Error("Email and password are required");

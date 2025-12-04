@@ -1,13 +1,13 @@
-const { server, io } = require("./app");
+const { server } = require("./app");
 const connectDB = require("./db/connect.db");
 const dotenv = require("dotenv");
 dotenv.config();
 const cluster = require("cluster");
-const NotificationService = require("./services/notification.service");
+const { initSocket } = require("./socket");
 
 const PORT = process.env.PORT || 3000;
 
-NotificationService.setIO(io);
+initSocket(server);
 
 const startServer = () => {
   connectDB()

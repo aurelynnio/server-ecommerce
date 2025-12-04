@@ -52,5 +52,7 @@ const paymentSchema = new Schema({
 // Index for quick lookup by transaction ID
 paymentSchema.index({ transactionId: 1 });
 paymentSchema.index({ orderId: 1 });
+paymentSchema.index({ userId: 1 });
+paymentSchema.index({ status: 1 });
 
 module.exports = model("Payment", paymentSchema);

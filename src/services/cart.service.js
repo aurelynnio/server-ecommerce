@@ -1,8 +1,16 @@
 const Cart = require("../models/cart.model");
 const Product = require("../models/product.model");
 
+/**
+ * Service handling shopping cart operations
+ * Manages adding items, updating quantities, and retrieving cart details
+ */
 class CartService {
-  // Get user's cart
+  /**
+   * Retrieve user's shopping cart with full product details
+   * @param {string} userId - The ID of the user
+   * @returns {Promise<Object>} The populated cart object
+   */
   async getCart(userId) {
     let cart = await Cart.findOne({ userId })
       .populate({
@@ -51,7 +59,16 @@ class CartService {
     return cart;
   }
 
-  // Add item to cart
+  /**
+   * Add an item to the user's cart
+   * @param {string} userId - The ID of the user
+   * @param {Object} itemData - Item details
+   * @param {string} itemData.productId - Product ID
+   * @param {string} [itemData.variantId] - Variant ID (optional)
+   * @param {number} itemData.quantity - Quantity to add
+   * @returns {Promise<Object>} Updated cart object
+   * @throws {Error} If product/variant not found or out of stock
+   */
   async addToCart(userId, itemData) {
     let { productId, variantId, quantity } = itemData;
 

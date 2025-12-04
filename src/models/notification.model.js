@@ -21,4 +21,9 @@ const notificationSchema = new Schema(
   { timestamps: true, collection: "notifications" }
 );
 
+// Indexes
+notificationSchema.index({ userId: 1 });
+notificationSchema.index({ userId: 1, isRead: 1 }); // For counting unread
+notificationSchema.index({ userId: 1, createdAt: -1 }); // For fetching list
+
 module.exports = model("Notification", notificationSchema);

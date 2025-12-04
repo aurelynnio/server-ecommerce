@@ -1,102 +1,70 @@
 const notificationService = require("../services/notification.service");
+const catchAsync = require("../configs/catchAsync");
+const { formatResponse } = require("../shared/res/formatResponse");
+const notificationValidator = require("../validations/notification.validator");
 
 const notificationController = {
-  // 1. Lấy thông báo
-  getAllNotifications: async (req, res) => {
-    try {
-      const { limit = 20 } = req.query;
-      const result = await notificationService.getUserNotifications(req.user.id, limit);
-      res.status(200).json({
-        success: true,
-        ...result
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: error.message
-      });
+  createNotification: catchAsync(async (req, res) => {
+    const { error } = notificationValidator.createNotification.validate(req.body);
+    if (error) {
+      return res
+        .status(400)
+        .json(formatResponse(false, null, error.details[0].message));
     }
-  },
+    const notification = await notificationService.createNotification({
+      ...req.body,
+      userId: req.user.id,
+    });
+    res
+      .status(201)
+      .json(
+        formatResponse(true, notification, "Notification created successfully")
+      );
+  }),
 
-
-
-  // 2. Tạo thông báo
-  createNotification: async (req, res) => {
-    try {
-      const { userId, type, title, message } = req.body;
-      const result = await notificationService.createAndSendNotification({
-        userId,
-        type,
-        title,
-        message
-      });
-      res.status(201).json({
-        success: true,
-        data: result,
-        message: "Notification created"
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: error.message
-      });
+  getListNotification: catchAsync(async (req, res) => {
+    const { error } = notificationValidator.getListNotification.validate(
+      req.query
+    );
+    if (error) {
+      return res
+        .status(400)
+        .json(formatResponse(false, null, error.details[0].message));
     }
-  },
+    const { page, limit } = req.query;
+    const result = await notificationService.getListNotification(req.user.id, {
+      page,
+      limit,
+    });
+    res
+      .status(200)
+      .json(formatResponse(true, result, "Get list notification successfully"));
+  }),
 
-  // 3. Đánh dấu đã đọc
-  markAsRead: async (req, res) => {
-    try {
-      const { notificationId } = req.params;
-      const result = await notificationService.markAsRead(notificationId, req.user.id);
-      res.status(200).json({
-        success: true,
-        data: result,
-        message: "Marked as read"
-      });
-    } catch (error) {
-      res.status(404).json({
-        success: false,
-        message: error.message
-      });
-    }
-  },
+  markReadAll: catchAsync(async (req, res) => {
+    await notificationService.markReadAll(req.user.id);
+    res
+      .status(200)
+      .json(
+        formatResponse(true, null, "Mark all notifications as read successfully")
+      );
+  }),
 
-  // 4. Lấy số chưa đọc
-  getUnreadCount: async (req, res) => {
-    try {
-      const result = await notificationService.getUnreadCount(req.user.id);
-      res.status(200).json({
-        success: true,
-        ...result
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: error.message
-      });
-    }
-  },
+  cleanNotification: catchAsync(async (req, res) => {
+    await notificationService.cleanNotification(req.user.id);
+    res
+      .status(200)
+      .json(formatResponse(true, null, "Clean all notifications successfully"));
+  }),
 
-
-  // 5. Xóa thông báo
-  deleteNotification: async (req, res) => {
-    try {
-      const { notificationId } = req.params;
-      const result = await notificationService.deleteNotification(notificationId, req.user.id);
-      res.status(200).json({
-        success: true,
-        data: result,
-        message: "Notification deleted"
-      });
-    } catch (error) {
-      res.status(404).json({
-        success: false,
-        message: error.message
-      });
-    }
-  }
+  countUnread: catchAsync(async (req, res) => {
+    const count = await notificationService.countUnread(req.user.id);
+    res
+      .status(200)
+      .json(
+        formatResponse(true, { count }, "Count unread notifications successfully")
+      );
+  }),
 };
-
-
 
 module.exports = notificationController;
