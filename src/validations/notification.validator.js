@@ -13,6 +13,14 @@ const notificationValidator = {
     page: Joi.number().integer().min(1).default(1),
     limit: Joi.number().integer().min(1).max(100).default(10),
   }),
+
+  updateNotification: Joi.object({
+    title: Joi.string(),
+    message: Joi.string(),
+    type: Joi.string().valid("order_status", "promotion", "system"),
+    link: Joi.string().allow(""),
+    isRead: Joi.boolean(),
+  }),
 };
 
 module.exports = notificationValidator;

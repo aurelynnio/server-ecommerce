@@ -6,7 +6,7 @@ const notificationService = require("../services/notification.service");
  */
 const notificationSocket = (io, socket) => {
   const userId = socket.user.id; 
-
+  console.log(`🔌 [Socket] User ${userId} connected and joining room.`);
   socket.join(userId);
 
   socket.on("get_notifications", async ({ page = 1, limit = 10 } = {}) => {

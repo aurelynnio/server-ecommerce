@@ -7,7 +7,8 @@ const notificationSchema = new Schema(
       type: String,
       enum: [
         "order_status", 
-        "promotion", 
+        "promotion",
+        "system",
       ],
       default: "system",
     },

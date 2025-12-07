@@ -2,6 +2,10 @@ const Order = require("../models/order.model");
 const Cart = require("../models/cart.model");
 const Product = require("../models/product.model");
 const Discount = require("../models/discount.model");
+const User = require("../models/user.model"); // Added
+const Notification = require("../models/notification.model"); // Added
+const { getIO } = require("../socket/index"); // Added
+const notificationService = require("./notification.service");
 const { getPaginationParams } = require("../utils/pagination");
 
 /**
@@ -224,6 +228,36 @@ class OrderService {
 
     // Populate order data
     await order.populate("userId", "username email");
+
+    // Notify all Admins
+    try {
+        const admins = await User.find({ roles: "admin" }).select("_id");
+        if (admins.length > 0) {
+            const adminNotis = admins.map(admin => ({
+                userId: admin._id,
+                type: "order_status", 
+                title: "Đơn hàng mới",
+                message: `Khách hàng ${order.userId.username} vừa đặt đơn #${order._id.toString().slice(-6).toUpperCase()}`,
+                orderId: order._id,
+                link: `/admin/orders/${order._id}`
+            }));
+
+            await Notification.insertMany(adminNotis);
+            
+            const io = getIO();
+            admins.forEach(admin => {
+                 // For safety finding the specific noti obj
+                 const noti = adminNotis.find(n => n.userId.toString() === admin._id.toString());
+                 if (noti) {
+                    io.to(admin._id.toString()).emit("new_notification", {
+                        ...noti,
+                        createdAt: new Date(),
+                        isRead: false
+                    });
+                 }
+            });
+        }
+    } catch (e) { console.error("Admin alert error:", e.message); }
 
     return order;
   }
