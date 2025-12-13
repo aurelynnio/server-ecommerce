@@ -375,9 +375,9 @@ class OrderService {
 
     // Validate status transition
     const validTransitions = {
-      pending: ["confirmed", "cancelled"],
-      confirmed: ["processing", "cancelled"],
-      processing: ["shipped", "cancelled"],
+      pending: ["confirmed", "processing", "shipped", "delivered", "cancelled"],
+      confirmed: ["processing", "shipped", "delivered", "cancelled"],
+      processing: ["shipped", "delivered", "cancelled"],
       shipped: ["delivered", "cancelled"],
       delivered: [],
       cancelled: [],

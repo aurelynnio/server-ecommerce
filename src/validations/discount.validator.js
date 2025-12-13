@@ -155,12 +155,18 @@ const getDiscountsQueryValidator = joi.object({
     "number.min": "Limit must be at least 1",
     "number.max": "Limit must be at most 100",
   }),
-  isActive: joi.boolean().messages({
-    "boolean.base": "isActive must be a boolean",
+  isActive: joi.alternatives().try(
+    joi.boolean(), 
+    joi.string().valid("all", "", "true", "false")
+  ).messages({
+    "alternatives.match": "isActive must be a boolean or 'all'",
   }),
-  discountType: joi.string().valid("percent", "fixed").messages({
+  discountType: joi.string().valid("percent", "fixed", "all", "").messages({
     "string.base": "Discount type must be a string",
-    "any.only": "Discount type must be either 'percent' or 'fixed'",
+    "any.only": "Discount type must be 'percent', 'fixed', or 'all'",
+  }),
+  search: joi.string().allow("").optional().messages({
+    "string.base": "Search must be a string",
   }),
 });
 

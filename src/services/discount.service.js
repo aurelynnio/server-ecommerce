@@ -57,16 +57,25 @@ class DiscountService {
    * @returns {Promise<Object>} List of discounts with pagination
    */
   async getAllDiscounts(filters = {}) {
-    const { page = 1, limit = 10, isActive, discountType } = filters;
+    const { page = 1, limit = 10, isActive, discountType, search } = filters;
 
     // Build query
     const query = {};
 
-    if (typeof isActive === "boolean") {
-      query.isActive = isActive;
+    if (search) {
+      query.$or = [
+        { code: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ];
     }
 
-    if (discountType) {
+    if (isActive !== undefined && isActive !== null && isActive !== "all" && isActive !== "") {
+        if (isActive === "true") query.isActive = true;
+        else if (isActive === "false") query.isActive = false;
+        else query.isActive = isActive;
+    }
+
+    if (discountType && discountType !== "all" && discountType !== "") {
       query.discountType = discountType;
     }
 
@@ -278,7 +287,7 @@ class DiscountService {
       );
 
       if (!hasApplicableProduct) {
-        throw new Error("Discount not applicable to selected products");
+        throw new Error("Mã giảm giá không áp dụng cho các sản phẩm trong giỏ hàng");
       }
     }
 

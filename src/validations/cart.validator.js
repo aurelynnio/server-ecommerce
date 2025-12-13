@@ -14,6 +14,7 @@ const addToCartValidator = joi.object({
   variantId: joi
     .string()
     .pattern(/^[0-9a-fA-F]{24}$/)
+    .allow(null, "")
     .messages({
       "string.base": "Variant ID must be a string",
       "string.pattern.base": "Variant ID must be a valid MongoDB ObjectId",
