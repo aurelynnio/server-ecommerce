@@ -1,0 +1,1110 @@
+[
+  {
+    "_id": "690edbe44726a83ac9eb71db",
+    "name": "Premium Cotton Men's Polo Shirt",
+    "description": "Men's polo shirt made of 100% cotton, regular fit, good sweat absorption. Suitable for office environment and streetwear.",
+    "slug": "premium-cotton-mens-polo-shirt",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "PoloClub",
+    "images": [],
+    "price": {
+      "currentPrice": 299000,
+      "discountPrice": 249000,
+      "currency": "VND",
+      "_id": "690edbe44726a83ac9eb71dc"
+    },
+    "variants": [
+      {
+        "sku": "POLO-WHITE-M",
+        "color": "White",
+        "size": "M",
+        "stock": 50,
+        "images": [],
+        "price": {
+          "currentPrice": 299000,
+          "discountPrice": 249000,
+          "currency": "VND",
+          "_id": "690edbe44726a83ac9eb71de"
+        },
+        "_id": "690edbe44726a83ac9eb71dd"
+      },
+      {
+        "sku": "POLO-NAVY-L",
+        "color": "Navy Blue",
+        "size": "L",
+        "stock": 35,
+        "images": [],
+        "price": {
+          "currentPrice": 299000,
+          "discountPrice": 249000,
+          "currency": "VND",
+          "_id": "690edbe44726a83ac9eb71e0"
+        },
+        "_id": "690edbe44726a83ac9eb71df"
+      },
+      {
+        "sku": "POLO-BLACK-XL",
+        "color": "Black",
+        "size": "XL",
+        "stock": 20,
+        "images": [],
+        "price": {
+          "currentPrice": 299000,
+          "discountPrice": 249000,
+          "currency": "VND",
+          "_id": "690edbe44726a83ac9eb71e2"
+        },
+        "_id": "690edbe44726a83ac9eb71e1"
+      }
+    ],
+    "reviews": [],
+    "tags": [
+      "polo",
+      "men",
+      "cotton",
+      "office",
+      "casual"
+    ],
+    "soldCount": 0,
+    "isActive": true,
+    "isNewArrival": true,
+    "isFeatured": false,
+    "onSale": true,
+    "createdAt": "2025-11-08T05:57:56.333Z",
+    "updatedAt": "2025-12-16T17:52:32.669Z",
+    "__v": 1
+  },
+  {
+    "_id": "690edbf34726a83ac9eb71e6",
+    "name": "Elegant Women's Office Dress",
+    "description": "Elegant women's dress, high-quality fabric, fitted form. Suitable for office environment and light parties.",
+    "slug": "elegant-womens-office-dress",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "ElegantWear",
+    "images": [],
+    "price": {
+      "currentPrice": 589000,
+      "discountPrice": null,
+      "currency": "VND",
+      "_id": "690edbf34726a83ac9eb71e7"
+    },
+    "variants": [
+      {
+        "sku": "DRESS-RED-S",
+        "color": "Red",
+        "size": "S",
+        "stock": 25,
+        "images": [],
+        "price": {
+          "currentPrice": 589000,
+          "discountPrice": null,
+          "currency": "VND",
+          "_id": "690edbf34726a83ac9eb71e9"
+        },
+        "_id": "690edbf34726a83ac9eb71e8"
+      },
+      {
+        "sku": "DRESS-BLACK-M",
+        "color": "Black",
+        "size": "M",
+        "stock": 28,
+        "images": [],
+        "price": {
+          "currentPrice": 589000,
+          "discountPrice": null,
+          "currency": "VND",
+          "_id": "690edbf34726a83ac9eb71eb"
+        },
+        "_id": "690edbf34726a83ac9eb71ea"
+      },
+      {
+        "sku": "DRESS-BLUE-L",
+        "color": "Blue",
+        "size": "L",
+        "stock": 15,
+        "images": [],
+        "price": {
+          "currentPrice": 589000,
+          "discountPrice": null,
+          "currency": "VND",
+          "_id": "690edbf34726a83ac9eb71ed"
+        },
+        "_id": "690edbf34726a83ac9eb71ec"
+      }
+    ],
+    "reviews": [],
+    "tags": [
+      "dress",
+      "women",
+      "office",
+      "elegant",
+      "premium"
+    ],
+    "soldCount": 2,
+    "isActive": true,
+    "isNewArrival": false,
+    "isFeatured": true,
+    "onSale": false,
+    "createdAt": "2025-11-08T05:58:11.664Z",
+    "updatedAt": "2025-12-16T17:52:33.543Z",
+    "__v": 1
+  },
+  {
+    "_id": "690edc124726a83ac9eb71f1",
+    "name": "Basic White Women's Shirt",
+    "description": "Basic white women's shirt, soft cotton material, easy to coordinate. Essential item for every girl's wardrobe.",
+    "slug": "basic-white-womens-shirt",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "BasicShirt",
+    "images": [],
+    "price": {
+      "currentPrice": 199000,
+      "discountPrice": null,
+      "currency": "VND",
+      "_id": "690edc124726a83ac9eb71f2"
+    },
+    "variants": [],
+    "reviews": [],
+    "tags": [
+      "shirt",
+      "women",
+      "white",
+      "basic",
+      "cotton"
+    ],
+    "soldCount": 0,
+    "isActive": true,
+    "isNewArrival": false,
+    "isFeatured": false,
+    "onSale": false,
+    "createdAt": "2025-11-08T05:58:42.822Z",
+    "updatedAt": "2025-12-16T17:52:34.292Z",
+    "__v": 1
+  },
+  {
+    "_id": "690edd020b55c884676abd32",
+    "name": "Basic Round Neck Men's T-Shirt",
+    "description": "Men's round neck T-shirt made of 100% cotton, comfortable regular fit. Diverse colors, easy to coordinate for any occasion.",
+    "slug": "basic-round-neck-mens-t-shirt",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "ComfortTee",
+    "images": [],
+    "price": {
+      "currentPrice": 129000,
+      "discountPrice": 99000,
+      "currency": "VND",
+      "_id": "690edd020b55c884676abd33"
+    },
+    "variants": [
+      {
+        "sku": "TSHIRT-RED-S",
+        "color": "Red",
+        "size": "S",
+        "stock": 80,
+        "images": [],
+        "price": {
+          "currentPrice": 129000,
+          "discountPrice": 99000,
+          "currency": "VND",
+          "_id": "690edd020b55c884676abd35"
+        },
+        "_id": "690edd020b55c884676abd34"
+      },
+      {
+        "sku": "TSHIRT-BLUE-M",
+        "color": "Blue",
+        "size": "M",
+        "stock": 100,
+        "images": [],
+        "price": {
+          "currentPrice": 129000,
+          "discountPrice": 99000,
+          "currency": "VND",
+          "_id": "690edd020b55c884676abd37"
+        },
+        "_id": "690edd020b55c884676abd36"
+      },
+      {
+        "sku": "TSHIRT-WHITE-L",
+        "color": "White",
+        "size": "L",
+        "stock": 75,
+        "images": [],
+        "price": {
+          "currentPrice": 129000,
+          "discountPrice": 99000,
+          "currency": "VND",
+          "_id": "690edd020b55c884676abd39"
+        },
+        "_id": "690edd020b55c884676abd38"
+      }
+    ],
+    "reviews": [],
+    "tags": [
+      "t-shirt",
+      "men",
+      "round neck",
+      "cotton",
+      "basic"
+    ],
+    "soldCount": 0,
+    "isActive": true,
+    "isNewArrival": false,
+    "isFeatured": false,
+    "onSale": true,
+    "createdAt": "2025-11-08T06:02:42.448Z",
+    "updatedAt": "2025-12-16T17:52:34.977Z",
+    "__v": 1
+  },
+  {
+    "_id": "690edd090b55c884676abd3d",
+    "name": "Men's Poly Sports Shorts",
+    "description": "Men's shorts made of breathable polyester material, dynamic design. Suitable for gym, jogging and sports activities.",
+    "slug": "mens-poly-sports-shorts",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "SportActive",
+    "images": [],
+    "price": {
+      "currentPrice": 179000,
+      "discountPrice": null,
+      "currency": "VND",
+      "_id": "690edd090b55c884676abd3e"
+    },
+    "variants": [
+      {
+        "sku": "SHORT-BLACK-M",
+        "color": "Black",
+        "size": "M",
+        "stock": 60,
+        "images": [],
+        "price": {
+          "currentPrice": 179000,
+          "discountPrice": null,
+          "currency": "VND",
+          "_id": "690edd090b55c884676abd40"
+        },
+        "_id": "690edd090b55c884676abd3f"
+      },
+      {
+        "sku": "SHORT-NAVY-L",
+        "color": "Navy Blue",
+        "size": "L",
+        "stock": 45,
+        "images": [],
+        "price": {
+          "currentPrice": 179000,
+          "discountPrice": null,
+          "currency": "VND",
+          "_id": "690edd090b55c884676abd42"
+        },
+        "_id": "690edd090b55c884676abd41"
+      }
+    ],
+    "reviews": [],
+    "tags": [
+      "shorts",
+      "men",
+      "sports",
+      "polyester",
+      "gym"
+    ],
+    "soldCount": 0,
+    "isActive": true,
+    "isNewArrival": true,
+    "isFeatured": false,
+    "onSale": false,
+    "createdAt": "2025-11-08T06:02:49.135Z",
+    "updatedAt": "2025-12-16T17:52:35.593Z",
+    "__v": 1
+  },
+  {
+    "_id": "690edd100b55c884676abd46",
+    "name": "Vintage Long Sleeve Women's Blouse",
+    "description": "Vintage style long sleeve women's blouse, soft chiffon material. Feminine design with delicate small floral pattern.",
+    "slug": "vintage-long-sleeve-womens-blouse",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "VintageStyle",
+    "images": [],
+    "price": {
+      "currentPrice": 259000,
+      "discountPrice": 219000,
+      "currency": "VND",
+      "_id": "690edd100b55c884676abd47"
+    },
+    "variants": [
+      {
+        "sku": "BLOUSE-FLORAL-S",
+        "color": "Small Floral",
+        "size": "S",
+        "stock": 35,
+        "images": [],
+        "price": {
+          "currentPrice": 259000,
+          "discountPrice": 219000,
+          "currency": "VND",
+          "_id": "690edd100b55c884676abd49"
+        },
+        "_id": "690edd100b55c884676abd48"
+      },
+      {
+        "sku": "BLOUSE-FLORAL-M",
+        "color": "Small Floral",
+        "size": "M",
+        "stock": 40,
+        "images": [],
+        "price": {
+          "currentPrice": 259000,
+          "discountPrice": 219000,
+          "currency": "VND",
+          "_id": "690edd100b55c884676abd4b"
+        },
+        "_id": "690edd100b55c884676abd4a"
+      }
+    ],
+    "reviews": [],
+    "tags": [
+      "blouse",
+      "women",
+      "long sleeve",
+      "vintage",
+      "chiffon"
+    ],
+    "soldCount": 0,
+    "isActive": true,
+    "isNewArrival": false,
+    "isFeatured": true,
+    "onSale": true,
+    "createdAt": "2025-11-08T06:02:56.216Z",
+    "updatedAt": "2025-12-16T17:52:35.841Z",
+    "__v": 1
+  },
+  {
+    "_id": "690edd170b55c884676abd4f",
+    "name": "Slim Fit Men's Office Khaki Pants",
+    "description": "Slim fit men's khaki pants, stretchy cotton spandex material. Elegant design, suitable for office environment and meeting partners.",
+    "slug": "slim-fit-mens-office-khaki-pants",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "OfficeFit",
+    "images": [],
+    "price": {
+      "currentPrice": 399000,
+      "discountPrice": null,
+      "currency": "VND",
+      "_id": "690edd170b55c884676abd50"
+    },
+    "variants": [
+      {
+        "sku": "KAKI-BEIGE-30",
+        "color": "Beige",
+        "size": "30",
+        "stock": 50,
+        "images": [],
+        "price": {
+          "currentPrice": 399000,
+          "discountPrice": null,
+          "currency": "VND",
+          "_id": "690edd170b55c884676abd52"
+        },
+        "_id": "690edd170b55c884676abd51"
+      },
+      {
+        "sku": "KAKI-NAVY-32",
+        "color": "Navy Blue",
+        "size": "32",
+        "stock": 45,
+        "images": [],
+        "price": {
+          "currentPrice": 399000,
+          "discountPrice": null,
+          "currency": "VND",
+          "_id": "690edd170b55c884676abd54"
+        },
+        "_id": "690edd170b55c884676abd53"
+      },
+      {
+        "sku": "KAKI-BLACK-34",
+        "color": "Black",
+        "size": "34",
+        "stock": 30,
+        "images": [],
+        "price": {
+          "currentPrice": 399000,
+          "discountPrice": null,
+          "currency": "VND",
+          "_id": "690edd170b55c884676abd56"
+        },
+        "_id": "690edd170b55c884676abd55"
+      }
+    ],
+    "reviews": [],
+    "tags": [
+      "khaki",
+      "men",
+      "office",
+      "slim fit",
+      "cotton"
+    ],
+    "soldCount": 0,
+    "isActive": true,
+    "isNewArrival": false,
+    "isFeatured": true,
+    "onSale": false,
+    "createdAt": "2025-11-08T06:03:03.739Z",
+    "updatedAt": "2025-12-16T17:52:36.221Z",
+    "__v": 1
+  },
+  {
+    "_id": "690edd200b55c884676abd5a",
+    "name": "A-line Midi Women's Skirt",
+    "description": "A-line midi women's skirt, high-quality snow rain fabric. Elegant design, flattering for all body shapes.",
+    "slug": "a-line-midi-womens-skirt",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "ElegantSkirt",
+    "images": [],
+    "price": {
+      "currentPrice": 319000,
+      "discountPrice": 279000,
+      "currency": "VND",
+      "_id": "690edd200b55c884676abd5b"
+    },
+    "variants": [],
+    "reviews": [],
+    "tags": [
+      "skirt",
+      "women",
+      "a-line",
+      "midi",
+      "elegant"
+    ],
+    "soldCount": 1,
+    "isActive": true,
+    "isNewArrival": true,
+    "isFeatured": false,
+    "onSale": true,
+    "createdAt": "2025-11-08T06:03:12.916Z",
+    "updatedAt": "2025-12-16T17:52:36.516Z",
+    "__v": 1
+  },
+  {
+    "_id": "690edd270b55c884676abd5f",
+    "name": "Women's Office Blazer",
+    "description": "Women's blazer made of high-quality polyester, fitted form. Essential item for professional office style.",
+    "slug": "womens-office-blazer",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "ProfessionalWear",
+    "images": [],
+    "price": {
+      "currentPrice": 699000,
+      "discountPrice": 599000,
+      "currency": "VND",
+      "_id": "690edd270b55c884676abd60"
+    },
+    "variants": [
+      {
+        "sku": "BLAZER-BLACK-S",
+        "color": "Black",
+        "size": "S",
+        "stock": 24,
+        "images": [],
+        "price": {
+          "currentPrice": 699000,
+          "discountPrice": 599000,
+          "currency": "VND",
+          "_id": "690edd270b55c884676abd62"
+        },
+        "_id": "690edd270b55c884676abd61"
+      },
+      {
+        "sku": "BLAZER-GRAY-M",
+        "color": "Gray",
+        "size": "M",
+        "stock": 30,
+        "images": [],
+        "price": {
+          "currentPrice": 699000,
+          "discountPrice": 599000,
+          "currency": "VND",
+          "_id": "690edd270b55c884676abd64"
+        },
+        "_id": "690edd270b55c884676abd63"
+      }
+    ],
+    "reviews": [],
+    "tags": [
+      "blazer",
+      "women",
+      "office",
+      "professional",
+      "polyester"
+    ],
+    "soldCount": 1,
+    "isActive": true,
+    "isNewArrival": false,
+    "isFeatured": true,
+    "onSale": true,
+    "createdAt": "2025-11-08T06:03:19.576Z",
+    "updatedAt": "2025-12-16T17:52:36.625Z",
+    "__v": 1
+  },
+  {
+    "_id": "690edd2f0b55c884676abd68",
+    "name": "Women's Bikini Set",
+    "description": "Youthful women's bikini set, good stretch lycra material. UV resistant, quick drying, suitable for beach and pool.",
+    "slug": "womens-bikini-set",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "BeachWear",
+    "images": [],
+    "price": {
+      "currentPrice": 449000,
+      "discountPrice": 389000,
+      "currency": "VND",
+      "_id": "690edd2f0b55c884676abd69"
+    },
+    "variants": [
+      {
+        "sku": "BIKINI-RED-S",
+        "color": "Red",
+        "size": "S",
+        "stock": 20,
+        "images": [],
+        "price": {
+          "currentPrice": 449000,
+          "discountPrice": 389000,
+          "currency": "VND",
+          "_id": "690edd2f0b55c884676abd6b"
+        },
+        "_id": "690edd2f0b55c884676abd6a"
+      },
+      {
+        "sku": "BIKINI-BLUE-M",
+        "color": "Blue",
+        "size": "M",
+        "stock": 12,
+        "images": [],
+        "price": {
+          "currentPrice": 449000,
+          "discountPrice": 389000,
+          "currency": "VND",
+          "_id": "690edd2f0b55c884676abd6d"
+        },
+        "_id": "690edd2f0b55c884676abd6c"
+      }
+    ],
+    "reviews": [],
+    "tags": [
+      "swimwear",
+      "women",
+      "bikini",
+      "lycra",
+      "beach"
+    ],
+    "soldCount": 3,
+    "isActive": true,
+    "isNewArrival": true,
+    "isFeatured": false,
+    "onSale": true,
+    "createdAt": "2025-11-08T06:03:27.001Z",
+    "updatedAt": "2025-12-16T17:52:36.758Z",
+    "__v": 1
+  },
+  {
+    "_id": "690eddff0b55c884676abd71",
+    "name": "Premium Cotton Men's Socks",
+    "description": "Set of 5 pairs of men's socks made of natural cotton, good sweat absorption. Basic design suitable for all types of shoes and occasions.",
+    "slug": "premium-cotton-mens-socks",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "ComfortSock",
+    "images": [],
+    "price": {
+      "currentPrice": 89000,
+      "discountPrice": 69000,
+      "currency": "VND",
+      "_id": "690eddff0b55c884676abd72"
+    },
+    "variants": [],
+    "reviews": [],
+    "tags": [
+      "socks",
+      "men",
+      "cotton",
+      "basic",
+      "5 pairs"
+    ],
+    "soldCount": 0,
+    "isActive": true,
+    "isNewArrival": false,
+    "isFeatured": false,
+    "onSale": true,
+    "createdAt": "2025-11-08T06:06:55.711Z",
+    "updatedAt": "2025-12-16T17:52:36.935Z",
+    "__v": 1
+  },
+  {
+    "_id": "690ede060b55c884676abd76",
+    "name": "Men's Boxer Briefs",
+    "description": "Set of 3 men's boxer briefs made of premium modal, soft and breathable. Fitted form, comfortable all day.",
+    "slug": "mens-boxer-briefs",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "ComfortFit",
+    "images": [],
+    "price": {
+      "currentPrice": 159000,
+      "discountPrice": null,
+      "currency": "VND",
+      "_id": "690ede060b55c884676abd77"
+    },
+    "variants": [],
+    "reviews": [],
+    "tags": [
+      "underwear",
+      "men",
+      "boxer",
+      "modal",
+      "3 pieces"
+    ],
+    "soldCount": 0,
+    "isActive": true,
+    "isNewArrival": true,
+    "isFeatured": false,
+    "onSale": false,
+    "createdAt": "2025-11-08T06:07:02.211Z",
+    "updatedAt": "2025-12-16T17:52:37.077Z",
+    "__v": 1
+  },
+  {
+    "_id": "690ede0b0b55c884676abd7b",
+    "name": "Women's Wireless Bra",
+    "description": "Women's wireless bra made of cotton spandex, comfortable and natural. Seamless design, no visible lines under clothes.",
+    "slug": "womens-wireless-bra",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "SoftComfort",
+    "images": [],
+    "price": {
+      "currentPrice": 199000,
+      "discountPrice": 169000,
+      "currency": "VND",
+      "_id": "690ede0b0b55c884676abd7c"
+    },
+    "variants": [],
+    "reviews": [],
+    "tags": [
+      "bra",
+      "women",
+      "wireless",
+      "cotton",
+      "seamless"
+    ],
+    "soldCount": 0,
+    "isActive": true,
+    "isNewArrival": true,
+    "isFeatured": false,
+    "onSale": true,
+    "createdAt": "2025-11-08T06:07:07.791Z",
+    "updatedAt": "2025-12-16T17:52:42.775Z",
+    "__v": 1
+  },
+  {
+    "_id": "690ede110b55c884676abd80",
+    "name": "Men's Snapback Cap",
+    "description": "Snapback style men's cap, durable cotton twill material. Modern streetwear design with raised embroidered logo.",
+    "slug": "mens-snapback-cap",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "UrbanHat",
+    "images": [],
+    "price": {
+      "currentPrice": 149000,
+      "discountPrice": null,
+      "currency": "VND",
+      "_id": "690ede110b55c884676abd81"
+    },
+    "variants": [],
+    "reviews": [],
+    "tags": [
+      "cap",
+      "men",
+      "snapback",
+      "cotton",
+      "streetwear"
+    ],
+    "soldCount": 0,
+    "isActive": true,
+    "isNewArrival": false,
+    "isFeatured": false,
+    "onSale": false,
+    "createdAt": "2025-11-08T06:07:13.387Z",
+    "updatedAt": "2025-12-16T17:52:42.882Z",
+    "__v": 1
+  },
+  {
+    "_id": "690ede170b55c884676abd85",
+    "name": "Women's Silk Scarf",
+    "description": "Women's scarf made of premium silk, exquisite floral pattern. Perfect accessory for elegant and luxurious style.",
+    "slug": "womens-silk-scarf",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "SilkLux",
+    "images": [
+      "https://res.cloudinary.com/mobilestore/image/upload/v1764604418/avatar/file_ybf3kk.jpg",
+      "https://res.cloudinary.com/mobilestore/image/upload/v1764604557/avatar/file_m2ikih.jpg"
+    ],
+    "price": {
+      "currentPrice": 299000,
+      "discountPrice": 259000,
+      "currency": "VND",
+      "_id": "690ede170b55c884676abd86"
+    },
+    "variants": [],
+    "reviews": [],
+    "tags": [
+      "scarf",
+      "women",
+      "silk",
+      "premium",
+      "floral"
+    ],
+    "soldCount": 5,
+    "isActive": true,
+    "isNewArrival": true,
+    "isFeatured": true,
+    "onSale": true,
+    "createdAt": "2025-11-08T06:07:19.269Z",
+    "updatedAt": "2025-12-16T17:52:43.027Z",
+    "__v": 1
+  },
+  {
+    "_id": "690ede1d0b55c884676abd8a",
+    "name": "Women's Floral Chiffon Kimono",
+    "description": "Women's kimono made of light chiffon, beautiful floral pattern. Comfortable oversized design, suitable as a robe or beach cover-up.",
+    "slug": "womens-floral-chiffon-kimono",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "FloralStyle",
+    "images": [],
+    "price": {
+      "currentPrice": 189000,
+      "discountPrice": null,
+      "currency": "VND",
+      "_id": "690ede1d0b55c884676abd8b"
+    },
+    "variants": [],
+    "reviews": [],
+    "tags": [
+      "kimono",
+      "women",
+      "chiffon",
+      "floral",
+      "oversized"
+    ],
+    "soldCount": 0,
+    "isActive": true,
+    "isNewArrival": true,
+    "isFeatured": false,
+    "onSale": false,
+    "createdAt": "2025-11-08T06:07:25.118Z",
+    "updatedAt": "2025-12-16T17:52:43.135Z",
+    "__v": 1
+  },
+  {
+    "_id": "690ede980b55c884676abd99",
+    "name": "Women's Organic Cotton Tank Top",
+    "description": "Women's tank top made of eco-friendly organic cotton, fitted form. Suitable for layering or mixing and matching with other outfits.",
+    "slug": "womens-organic-cotton-tank-top",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "EcoWear",
+    "images": [],
+    "price": {
+      "currentPrice": 119000,
+      "discountPrice": 99000,
+      "currency": "VND",
+      "_id": "690ede980b55c884676abd9a"
+    },
+    "variants": [
+      {
+        "sku": "TANK-WHITE-S",
+        "color": "White",
+        "size": "S",
+        "stock": 60,
+        "images": [],
+        "price": {
+          "currentPrice": 119000,
+          "discountPrice": 99000,
+          "currency": "VND",
+          "_id": "690ede980b55c884676abd9c"
+        },
+        "_id": "690ede980b55c884676abd9b"
+      },
+      {
+        "sku": "TANK-BLACK-M",
+        "color": "Black",
+        "size": "M",
+        "stock": 55,
+        "images": [],
+        "price": {
+          "currentPrice": 119000,
+          "discountPrice": 99000,
+          "currency": "VND",
+          "_id": "690ede980b55c884676abd9e"
+        },
+        "_id": "690ede980b55c884676abd9d"
+      }
+    ],
+    "reviews": [],
+    "tags": [
+      "tank top",
+      "women",
+      "organic cotton",
+      "fitted",
+      "eco-friendly"
+    ],
+    "soldCount": 0,
+    "isActive": true,
+    "isNewArrival": true,
+    "isFeatured": false,
+    "onSale": true,
+    "createdAt": "2025-11-08T06:09:28.222Z",
+    "updatedAt": "2025-12-16T17:52:43.237Z",
+    "__v": 1
+  },
+  {
+    "_id": "690edea30b55c884676abda2",
+    "name": "Men's Pajama Set",
+    "description": "Men's pajama set made of soft, breathable cotton. Comfortable design with short sleeves and long pants, suitable for all seasons.",
+    "slug": "mens-pajama-set",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "SleepComfort",
+    "images": [],
+    "price": {
+      "currentPrice": 229000,
+      "discountPrice": null,
+      "currency": "VND",
+      "_id": "690edea30b55c884676abda3"
+    },
+    "variants": [
+      {
+        "sku": "PAJAMA-BLUE-L",
+        "color": "Blue",
+        "size": "L",
+        "stock": 40,
+        "images": [],
+        "price": {
+          "currentPrice": 229000,
+          "discountPrice": null,
+          "currency": "VND",
+          "_id": "690edea30b55c884676abda5"
+        },
+        "_id": "690edea30b55c884676abda4"
+      },
+      {
+        "sku": "PAJAMA-GRAY-XL",
+        "color": "Gray",
+        "size": "XL",
+        "stock": 35,
+        "images": [],
+        "price": {
+          "currentPrice": 229000,
+          "discountPrice": null,
+          "currency": "VND",
+          "_id": "690edea30b55c884676abda7"
+        },
+        "_id": "690edea30b55c884676abda6"
+      }
+    ],
+    "reviews": [],
+    "tags": [
+      "pajamas",
+      "men",
+      "pijama",
+      "cotton",
+      "set"
+    ],
+    "soldCount": 0,
+    "isActive": true,
+    "isNewArrival": false,
+    "isFeatured": false,
+    "onSale": false,
+    "createdAt": "2025-11-08T06:09:39.024Z",
+    "updatedAt": "2025-12-16T17:52:43.338Z",
+    "__v": 1
+  },
+  {
+    "_id": "690edeae0b55c884676abdab",
+    "name": "Unisex Crop Top Baby Tee",
+    "description": "Unisex crop top baby tee, slightly stretchy cotton material. Basic design with many trendy colors, suitable for gen Z style.",
+    "slug": "unisex-crop-top-baby-tee",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "GenZStyle",
+    "images": [],
+    "price": {
+      "currentPrice": 89000,
+      "discountPrice": 79000,
+      "currency": "VND",
+      "_id": "690edeae0b55c884676abdac"
+    },
+    "variants": [
+      {
+        "sku": "BABY-PINK-S",
+        "color": "Pink",
+        "size": "S",
+        "stock": 80,
+        "images": [],
+        "price": {
+          "currentPrice": 89000,
+          "discountPrice": 79000,
+          "currency": "VND",
+          "_id": "690edeae0b55c884676abdae"
+        },
+        "_id": "690edeae0b55c884676abdad"
+      },
+      {
+        "sku": "BABY-MINT-M",
+        "color": "Mint Green",
+        "size": "M",
+        "stock": 67,
+        "images": [],
+        "price": {
+          "currentPrice": 89000,
+          "discountPrice": 79000,
+          "currency": "VND",
+          "_id": "690edeae0b55c884676abdb0"
+        },
+        "_id": "690edeae0b55c884676abdaf"
+      }
+    ],
+    "reviews": [],
+    "tags": [
+      "baby tee",
+      "unisex",
+      "crop top",
+      "cotton",
+      "gen z"
+    ],
+    "soldCount": 3,
+    "isActive": true,
+    "isNewArrival": true,
+    "isFeatured": true,
+    "onSale": true,
+    "createdAt": "2025-11-08T06:09:50.696Z",
+    "updatedAt": "2025-12-16T17:52:43.440Z",
+    "__v": 0
+  },
+  {
+    "_id": "690edec90b55c884676abdbd",
+    "name": "High Waist Women's Yoga Leggings",
+    "description": "High waist women's yoga leggings made of 4-way stretch spandex. Body-hugging design, comfortable for yoga and gym.",
+    "slug": "high-waist-womens-yoga-leggings",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "YogaFit",
+    "images": [],
+    "price": {
+      "currentPrice": 199000,
+      "discountPrice": null,
+      "currency": "VND",
+      "_id": "690edec90b55c884676abdbe"
+    },
+    "variants": [
+      {
+        "sku": "LEGGING-BLACK-S",
+        "color": "Black",
+        "size": "S",
+        "stock": 64,
+        "images": [],
+        "price": {
+          "currentPrice": 199000,
+          "discountPrice": null,
+          "currency": "VND",
+          "_id": "690edec90b55c884676abdc0"
+        },
+        "_id": "690edec90b55c884676abdbf"
+      },
+      {
+        "sku": "LEGGING-NAVY-M",
+        "color": "Navy Blue",
+        "size": "M",
+        "stock": 68,
+        "images": [],
+        "price": {
+          "currentPrice": 199000,
+          "discountPrice": null,
+          "currency": "VND",
+          "_id": "690edec90b55c884676abdc2"
+        },
+        "_id": "690edec90b55c884676abdc1"
+      }
+    ],
+    "reviews": [],
+    "tags": [
+      "leggings",
+      "women",
+      "yoga",
+      "high waist",
+      "spandex"
+    ],
+    "soldCount": 3,
+    "isActive": true,
+    "isNewArrival": true,
+    "isFeatured": false,
+    "onSale": false,
+    "createdAt": "2025-11-08T06:10:17.138Z",
+    "updatedAt": "2025-12-16T17:52:43.541Z",
+    "__v": 1
+  },
+  {
+    "_id": "690eded00b55c884676abdc6",
+    "name": "Unisex Foam Comfort Slides",
+    "description": "Unisex slides made of ultra-light and soft foam, non-slip. Minimalist design, suitable for indoor and outdoor wear.",
+    "slug": "unisex-foam-comfort-slides",
+    "category": "690edf9877e640dd4254bcce",
+    "brand": "ComfortSlide",
+    "images": [],
+    "price": {
+      "currentPrice": 149000,
+      "discountPrice": 129000,
+      "currency": "VND",
+      "_id": "690eded00b55c884676abdc7"
+    },
+    "variants": [
+      {
+        "sku": "SLIDES-WHITE-39",
+        "color": "White",
+        "size": "39",
+        "stock": 45,
+        "images": [],
+        "price": {
+          "currentPrice": 149000,
+          "discountPrice": 129000,
+          "currency": "VND",
+          "_id": "690eded00b55c884676abdc9"
+        },
+        "_id": "690eded00b55c884676abdc8"
+      },
+      {
+        "sku": "SLIDES-BLACK-40",
+        "color": "Black",
+        "size": "40",
+        "stock": 45,
+        "images": [],
+        "price": {
+          "currentPrice": 149000,
+          "discountPrice": 129000,
+          "currency": "VND",
+          "_id": "690eded00b55c884676abdcb"
+        },
+        "_id": "690eded00b55c884676abdca"
+      }
+    ],
+    "reviews": [],
+    "tags": [
+      "slides",
+      "unisex",
+      "foam",
+      "comfort",
+      "minimalist"
+    ],
+    "soldCount": 5,
+    "isActive": true,
+    "isNewArrival": false,
+    "isFeatured": false,
+    "onSale": true,
+    "createdAt": "2025-11-08T06:10:25.000Z",
+    "updatedAt": "2025-12-16T17:52:43.646Z",
+    "__v": 1
+  }
+]

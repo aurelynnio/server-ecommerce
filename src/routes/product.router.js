@@ -93,7 +93,7 @@ router.post(
   "/",
   verifyAccessToken,
   requireRole("admin"),
-  upload.array("images", 5),
+  upload.any(), // Allow any files (images, variantImages_0, etc.)
   productController.createProduct
 );
 
@@ -106,7 +106,7 @@ router.put(
   "/:id",
   verifyAccessToken,
   requireRole("admin"),
-  upload.array("images", 5),
+  upload.any(), // Allow any files (images, variantImages_0, etc.)
   productController.updateProduct
 );
 
@@ -147,7 +147,7 @@ router.post(
   "/:id/variants",
   verifyAccessToken,
   requireRole("admin"),
-  upload.array("images", 5),
+  upload.array("images", 10),
   productController.addVariant
 );
 

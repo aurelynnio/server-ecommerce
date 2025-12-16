@@ -18,7 +18,7 @@ const {
   specialProductsQueryValidator,
   searchQueryValidator,
 } = require("../validations/product.validator");
-const { uploadImage, multiUpload } = require("../configs/cloudinary");
+
 
 const ProductController = {
   // Get all products with filters
@@ -125,7 +125,6 @@ const ProductController = {
       }
     }
 
-    // Handle variants array - optional, must be sent as JSON string if provided
     if (req.body.variants) {
       try {
         productData.variants = JSON.parse(req.body.variants);
@@ -151,21 +150,6 @@ const ProductController = {
       }
     }
 
-    // Handle image files from form data
-    if (req.files && req.files.length > 0) {
-      try {
-        const buffers = req.files.map((file) => file.buffer);
-        const uploads = await multiUpload(buffers);
-        productData.images = uploads.map((upload) => upload.secure_url);
-      } catch (error) {
-        return sendFail(
-          res,
-          "Image upload failed: " + error.message,
-          StatusCodes.BAD_REQUEST
-        );
-      }
-    }
-
     // Validate product data
     const { error, value } = createProductValidator.validate(productData, {
       abortEarly: false,
@@ -176,7 +160,8 @@ const ProductController = {
       return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
     }
 
-    const product = await productService.createProduct(value);
+    // Pass value (validated data) and req.files to service
+    const product = await productService.createProduct(value, req.files);
     return sendSuccess(
       res,
       product,
@@ -216,29 +201,12 @@ const ProductController = {
         }
       }
 
-      // Handle new image files
-      let newImages = [];
-      if (req.files && req.files.length > 0) {
-        try {
-          const buffers = req.files.map((file) => file.buffer);
-          const uploads = await multiUpload(buffers);
-          newImages = uploads.map((upload) => upload.secure_url);
-        } catch (error) {
-          return sendFail(
-            res,
-            "Image upload failed: " + error.message,
-            StatusCodes.BAD_REQUEST
-          );
-        }
-      }
+      // Handle new image files logic moved to service
+      // if (req.files && req.files.length > 0) ...
 
-      // Combine images if there are any changes
-      if (req.body.existingImages || (req.files && req.files.length > 0)) {
-        req.body.images = [...currentImages, ...newImages];
-      }
-
-      // Remove existingImages from body to avoid validation error
-      if (req.body.existingImages) delete req.body.existingImages;
+      // Remove existingImages from body to avoid validation error ?? 
+      // Actually service needs existingImages. Joi probably allows it if we parsed it.
+      // We keep it in body for Service.
     }
 
     // Validate request body
@@ -248,8 +216,6 @@ const ProductController = {
     });
 
     if (error) {
-      console.log("=== VALIDATION ERROR DETAILS ===");
-      console.log("Error details:", error.details);
       const errors = error.details.map((detail) => {
         console.log(
           `Field: ${detail.path}, Message: ${detail.message}, Value: ${detail.context?.value}`
@@ -263,7 +229,8 @@ const ProductController = {
     console.log("Validated value:", value);
 
     const { id } = req.params;
-    const product = await productService.updateProduct(id, value);
+    // Pass validation result (data) and req.files to service
+    const product = await productService.updateProduct(id, value, req.files);
     return sendSuccess(
       res,
       product,
@@ -342,23 +309,9 @@ const ProductController = {
       }
     }
 
-    // Handle image files from form data
-    if (req.files && req.files.length > 0) {
-      try {
-        const buffers = req.files.map((file) => file.buffer);
-        const uploads = await multiUpload(buffers);
-
-        // Extract URLs from cloudinary response
-        variantData.images = uploads.map((upload) => upload.secure_url);
-      } catch (error) {
-        return sendFail(
-          res,
-          "Image upload failed: " + error.message,
-          StatusCodes.BAD_REQUEST
-        );
-      }
-    }
-
+    // Handle image files from form data is now in service
+    // if (req.files && req.files.length > 0) ...
+            
     // Validate variant data
     const { error, value } = addVariantValidator.validate(variantData, {
       abortEarly: false,
@@ -369,7 +322,8 @@ const ProductController = {
       return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
     }
 
-    const product = await productService.addVariant(id, value);
+    // Pass logic to service with files
+    const product = await productService.addVariant(id, value, req.files);
     return sendSuccess(
       res,
       product,
