@@ -28,7 +28,7 @@ const productSchema = new Schema(
     variants: [variantSchema],
     reviews: [{ type: Types.ObjectId, ref: "Review" }],
     tags: { type: [String], default: [] },
-    soldCount: { type: Number, default: 0 }, // Số lượng đã bán
+    soldCount: { type: Number, default: 0 }, 
     isActive: { type: Boolean, default: true },
     isNewArrival: { type: Boolean, default: false },
     isFeatured: { type: Boolean, default: false },
@@ -63,9 +63,9 @@ productSchema.index({ brand: 1, isActive: 1 });
 productSchema.pre("validate", function (next) {
   if (this.name && !this.slug) {
     this.slug = slugify(this.name, {
-      lower: true, // Convert to lowercase
-      strict: true, // Remove special characters
-      locale: "vi", // Support Vietnamese characters
+      lower: true,
+      strict: true,
+      locale: "vi",
     });
   }
   next();
@@ -80,7 +80,6 @@ productSchema.pre("save", async function (next) {
     });
 
     if (existingProduct) {
-      // Add random suffix if slug already exists
       const randomSuffix = Math.random().toString(36).substring(2, 8);
       this.slug = `${this.slug}-${randomSuffix}`;
     }

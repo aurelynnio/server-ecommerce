@@ -559,6 +559,33 @@ const ProductController = {
       StatusCodes.OK
     );
   }),
+
+  // Get related products
+  getRelatedProducts: catchAsync(async (req, res) => {
+    const { id } = req.params;
+
+    const result = await productService.getRelatedProducts(id);
+
+    return sendSuccess(
+      res,
+      result,
+      "Related products retrieved successfully",
+      StatusCodes.OK
+    );
+  }),
+  // Delete variant
+  deleteVariant: catchAsync(async (req, res) => {
+    const { id, variantId } = req.params;
+
+    const result = await productService.deleteVariant(id, variantId);
+
+    return sendSuccess(
+      res,
+      result,
+      "Variant deleted successfully",
+      StatusCodes.OK
+    );
+  }),
 };
 
 module.exports = ProductController;

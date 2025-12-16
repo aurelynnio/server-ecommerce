@@ -524,7 +524,50 @@ class ProductService {
     return products;
   }
 
-  
+  // Get related products
+  async getRelatedProducts(productId) {
+    const limit = 10;
+    const currentProduct = await Product.findById(productId);
+    if (!currentProduct) {
+      throw new Error("Product not found");
+    }
+
+    const priceBuffer = 0.2; // 20% price difference
+    const currentPrice = currentProduct.price?.currentPrice || 0;
+    const minPrice = currentPrice * (1 - priceBuffer);
+    const maxPrice = currentPrice * (1 + priceBuffer);
+
+    const query = {
+      _id: { $ne: currentProduct._id },
+      category: currentProduct.category,
+      isActive: true,
+      "price.currentPrice": { $gte: minPrice, $lte: maxPrice },
+    };
+
+    const products = await Product.find(query)
+      .populate("category", "name slug")
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    return products;
+  }
+  // Delete variant
+  async deleteVariant(productId, variantId) {
+    const product = await Product.findByIdAndUpdate(
+      productId,
+      {
+        $pull: { variants: { _id: variantId } },
+      },
+      { new: true }
+    );
+
+    if (!product) {
+      throw new Error("Product not found");
+    }
+
+    return product;
+  }
 }
 
 module.exports = new ProductService();

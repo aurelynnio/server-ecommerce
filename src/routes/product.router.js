@@ -72,6 +72,15 @@ router.get("/category/:slug", productController.getProductsByCategorySlug);
 router.get("/:id", productController.getProductById);
 
 /**
+ * @route   GET /api/products/related/:id
+ * @desc    Get related products (same category)
+ * @access  Public
+ * @query   limit, type (random, newest, best-selling)
+ */
+router.get("/related/:id", productController.getRelatedProducts);
+router.delete("/:id/variant/:variantId", productController.deleteVariant);
+
+/**
  * Protected Routes - Admin Only
  */
 
