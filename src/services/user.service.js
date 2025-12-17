@@ -108,16 +108,6 @@ class UserService {
    * @throws {Error} If username or email already exists
    */
   async updateProfile(userId, data) {
-    // Only allow specific fields
-    const allowedData = {};
-    const allowedFields = ["username", "email"];
-
-    allowedFields.forEach((field) => {
-      if (data[field] !== undefined) {
-        allowedData[field] = data[field];
-      }
-    });
-
     // Check if username or email already exists
     if (data.username) {
       const existingUser = await userModel.findOne({
@@ -139,7 +129,7 @@ class UserService {
       }
     }
 
-    const user = await userModel.findByIdAndUpdate(userId, allowedData, {
+    const user = await userModel.findByIdAndUpdate(userId, data, {
       new: true,
       runValidators: true,
       select: "-password",
@@ -244,10 +234,7 @@ class UserService {
   async getAllUsers(query) {
     const { page, limit, search = "", role, isVerifiedEmail } = query;
 
-    // Validate required params
-    if (!page || !limit) {
-      throw new Error("Page and limit are required parameters");
-    }
+
 
     const filter = {};
 

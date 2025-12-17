@@ -2,29 +2,15 @@ const catchAsync = require("../configs/catchAsync");
 const reviewService = require("../services/review.service");
 const { StatusCodes } = require("http-status-codes");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
-const {
-  createReviewValidator,
-  updateReviewValidator,
-  reviewIdParamValidator,
-  productIdParamValidator,
-  getReviewsQueryValidator,
-} = require("../validations/review.validator");
+
 
 const ReviewController = {
   // Create review (User only - must have purchased product)
   createReview: catchAsync(async (req, res) => {
-    // Validate request body
-    const { error, value } = createReviewValidator.validate(req.body, {
-      abortEarly: false,
-    });
 
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
 
     const userId = req.user.userId;
-    const review = await reviewService.createReview(userId, value);
+    const review = await reviewService.createReview(userId, req.body);
 
     return sendSuccess(
       res,
@@ -36,30 +22,9 @@ const ReviewController = {
 
   // Get all reviews for a product (Public)
   getProductReviews: catchAsync(async (req, res) => {
-    // Validate params
-    const paramError = productIdParamValidator.validate(req.params, {
-      abortEarly: false,
-    });
-
-    if (paramError.error) {
-      const errors = paramError.error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    // Validate query
-    const queryError = getReviewsQueryValidator.validate(req.query, {
-      abortEarly: false,
-    });
-
-    if (queryError.error) {
-      const errors = queryError.error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const { productId } = paramError.value;
     const result = await reviewService.getProductReviews(
-      productId,
-      queryError.value
+      req.params.productId,
+      req.query
     );
 
     return sendSuccess(
@@ -72,18 +37,7 @@ const ReviewController = {
 
   // Get user's reviews (User only)
   getUserReviews: catchAsync(async (req, res) => {
-    // Validate query
-    const { error, value } = getReviewsQueryValidator.validate(req.query, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const userId = req.user.userId;
-    const result = await reviewService.getUserReviews(userId, value);
+    const result = await reviewService.getUserReviews(userId, req.query);
 
     return sendSuccess(
       res,
@@ -95,17 +49,7 @@ const ReviewController = {
 
   // Get single review by ID
   getReviewById: catchAsync(async (req, res) => {
-    // Validate params
-    const { error, value } = reviewIdParamValidator.validate(req.params, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const review = await reviewService.getReviewById(value.reviewId);
+    const review = await reviewService.getReviewById(req.params.reviewId);
 
     return sendSuccess(
       res,
@@ -117,32 +61,10 @@ const ReviewController = {
 
   // Update review (User only - own review)
   updateReview: catchAsync(async (req, res) => {
-    // Validate params
-    const paramError = reviewIdParamValidator.validate(req.params, {
-      abortEarly: false,
-    });
-
-    if (paramError.error) {
-      const errors = paramError.error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    // Validate body
-    const bodyError = updateReviewValidator.validate(req.body, {
-      abortEarly: false,
-    });
-
-    if (bodyError.error) {
-      const errors = bodyError.error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const userId = req.user.userId;
-    const { reviewId } = paramError.value;
     const review = await reviewService.updateReview(
-      reviewId,
+      req.params.reviewId,
       userId,
-      bodyError.value
+      req.body
     );
 
     return sendSuccess(
@@ -155,20 +77,8 @@ const ReviewController = {
 
   // Delete review (User - own review, Admin - any review)
   deleteReview: catchAsync(async (req, res) => {
-    // Validate params
-    const { error, value } = reviewIdParamValidator.validate(req.params, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const userId = req.user.userId;
-    const isAdmin = req.user.role === "admin";
     const result = await reviewService.deleteReview(
-      value.reviewId,
+      req.params.reviewId,
       userId,
       isAdmin
     );
@@ -178,18 +88,7 @@ const ReviewController = {
 
   // Check if user can review product (User only)
   canUserReview: catchAsync(async (req, res) => {
-    // Validate params
-    const { error, value } = productIdParamValidator.validate(req.params, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const userId = req.user.userId;
-    const result = await reviewService.canUserReview(userId, value.productId);
+    const result = await reviewService.canUserReview(userId, req.params.productId);
 
     return sendSuccess(
       res,

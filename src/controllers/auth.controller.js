@@ -1,25 +1,14 @@
 const catchAsync = require("../configs/catchAsync");
 const authService = require("../services/auth.service");
 const { sendFail, sendSuccess } = require("../shared/res/formatResponse");
-const {
-  loginValidator,
-  registerValidator,
-  sendVerificationCodeValidator,
-  verifyEmailValidator,
-  forgotPasswordValidator,
-  resetPasswordValidator,
-  changePasswordValidator,
-} = require("../validations/auth.validator");
+
 const { StatusCodes } = require("http-status-codes");
 const jwt = require("jsonwebtoken");
 
 const AuthController = {
   // Register new user
   register: catchAsync(async (req, res) => {
-    const { error } = registerValidator.validate(req.body);
-    if (error) {
-      return sendFail(res, error.details[0].message, StatusCodes.BAD_REQUEST);
-    }
+
 
     const result = await authService.register(req.body);
     return sendSuccess(
@@ -32,10 +21,7 @@ const AuthController = {
 
   // Login user
   login: catchAsync(async (req, res) => {
-    const { error } = loginValidator.validate(req.body);
-    if (error) {
-      return sendFail(res, error.details[0].message, StatusCodes.BAD_REQUEST);
-    }
+
 
     const { email, password } = req.body;
     const result = await authService.login(email, password);
@@ -67,10 +53,7 @@ const AuthController = {
 
   // Send verification code to email
   sendVerificationCode: catchAsync(async (req, res) => {
-    const { error } = sendVerificationCodeValidator.validate(req.body);
-    if (error) {
-      return sendFail(res, error.details[0].message, StatusCodes.BAD_REQUEST);
-    }
+
 
     const { email } = req.body;
     const result = await authService.sendVerificationCode(email);
@@ -84,10 +67,7 @@ const AuthController = {
 
   // Verify email with code only
   verifyEmail: catchAsync(async (req, res) => {
-    const { error } = verifyEmailValidator.validate(req.body);
-    if (error) {
-      return sendFail(res, error.details[0].message, StatusCodes.BAD_REQUEST);
-    }
+
 
     const { code } = req.body;
     const result = await authService.verifyEmailByCode(code);
@@ -101,10 +81,7 @@ const AuthController = {
 
   // Request password reset (forgot password)
   forgotPassword: catchAsync(async (req, res) => {
-    const { error } = forgotPasswordValidator.validate(req.body);
-    if (error) {
-      return sendFail(res, error.details[0].message, StatusCodes.BAD_REQUEST);
-    }
+
 
     const { email } = req.body;
     const result = await authService.forgotPassword(email);
@@ -118,10 +95,7 @@ const AuthController = {
 
   // Reset password with code
   resetPassword: catchAsync(async (req, res) => {
-    const { error } = resetPasswordValidator.validate(req.body);
-    if (error) {
-      return sendFail(res, error.details[0].message, StatusCodes.BAD_REQUEST);
-    }
+
     console.log("Reset password request body:", req.body);
     const { email, code, newPassword } = req.body;
     const result = await authService.resetPassword(email, code, newPassword);
@@ -201,10 +175,7 @@ const AuthController = {
 
   // Change password (for authenticated user)
   changePassword: catchAsync(async (req, res) => {
-    const { error } = changePasswordValidator.validate(req.body);
-    if (error) {
-      return sendFail(res, error.details[0].message, StatusCodes.BAD_REQUEST);
-    }
+
 
     const { currentPassword, newPassword } = req.body;
     const userId = req.user?.userId;

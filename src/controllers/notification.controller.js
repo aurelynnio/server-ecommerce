@@ -2,18 +2,11 @@ const notificationService = require("../services/notification.service");
 const catchAsync = require("../configs/catchAsync");
 const { StatusCodes } = require("http-status-codes");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
-const notificationValidator = require("../validations/notification.validator");
+
 
 const notificationController = {
   createNotification: catchAsync(async (req, res) => {
-    const { error } = notificationValidator.createNotification.validate(req.body, {
-      abortEarly: false,
-    });
-    
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
+
 
     const notification = await notificationService.createNotification({
       ...req.body,
@@ -29,20 +22,11 @@ const notificationController = {
   }),
 
   getListNotification: catchAsync(async (req, res) => {
-    const { error, value } = notificationValidator.getListNotification.validate(
-      req.query,
-      { abortEarly: false }
-    );
 
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
 
-    const { page, limit } = value;
     const result = await notificationService.getListNotification(req.user.userId, {
-      page,
-      limit,
+      page: req.query.page || 1,
+      limit: req.query.limit || 10,
     });
 
     // Transform result to match standard pagination structure
@@ -112,11 +96,7 @@ const notificationController = {
 
   updateNotification: catchAsync(async (req, res) => {
     const { id } = req.params;
-    const { error } = notificationValidator.updateNotification.validate(req.body);
-    if (error) {
-       const errors = error.details.map(d => d.message).join(", ");
-       return sendFail(res, errors, StatusCodes.BAD_REQUEST);
-    }
+
 
     const notification = await notificationService.updateNotification(id, req.user.userId, req.body);
     return sendSuccess(

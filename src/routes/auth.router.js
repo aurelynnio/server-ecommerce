@@ -2,20 +2,30 @@ const express = require("express");
 const router = express.Router();
 const authController = require("../controllers/auth.controller");
 const { verifyAccessToken } = require("../middlewares/auth.middleware");
+const validate = require("../middlewares/validate.middleware");
+const {
+  loginValidator,
+  registerValidator,
+  sendVerificationCodeValidator,
+  verifyEmailValidator,
+  forgotPasswordValidator,
+  resetPasswordValidator,
+  changePasswordValidator,
+} = require("../validations/auth.validator");
 
 /**
  * @route   POST /api/auth/register
  * @desc    Register a new user
  * @access  Public
  */
-router.post("/register", authController.register);
+router.post("/register", validate(registerValidator), authController.register);
 
 /**
  * @route   POST /api/auth/login
  * @desc    Login user and return tokens in cookies
  * @access  Public
  */
-router.post("/login", authController.login);
+router.post("/login", validate(loginValidator), authController.login);
 
 /**
  * @route   POST /api/auth/send-verification-code
@@ -23,7 +33,11 @@ router.post("/login", authController.login);
  * @access  Public
  * @body    { email }
  */
-router.post("/send-verification-code", authController.sendVerificationCode);
+router.post(
+  "/send-verification-code",
+  validate(sendVerificationCodeValidator),
+  authController.sendVerificationCode
+);
 
 /**
  * @route   POST /api/auth/verify-email
@@ -31,21 +45,29 @@ router.post("/send-verification-code", authController.sendVerificationCode);
  * @access  Public
  * @body    { code }
  */
-router.post("/verify-code", authController.verifyEmail);
+router.post("/verify-code", validate(verifyEmailValidator), authController.verifyEmail);
 
 /**
  * @route   POST /api/auth/forgot-password
  * @desc    Request password reset code
  * @access  Public
  */
-router.post("/forgot-password", authController.forgotPassword);
+router.post(
+  "/forgot-password",
+  validate(forgotPasswordValidator),
+  authController.forgotPassword
+);
 
 /**
  * @route   POST /api/auth/reset-password
  * @desc    Reset password with code
  * @access  Public
  */
-router.post("/reset-password", authController.resetPassword);
+router.post(
+  "/reset-password",
+  validate(resetPasswordValidator),
+  authController.resetPassword
+);
 
 /**
  * @route   POST /api/auth/refresh-token
@@ -69,7 +91,9 @@ router.post("/logout", authController.logout);
 router.post(
   "/change-password",
   verifyAccessToken,
+  validate(changePasswordValidator),
   authController.changePassword
 );
 
 module.exports = router;
+

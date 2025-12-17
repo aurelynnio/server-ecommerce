@@ -30,13 +30,7 @@ class DiscountService {
       throw new Error("Discount code already exists");
     }
 
-    // Validate discount value for percent type
-    if (
-      discountData.discountType === "percent" &&
-      discountData.discountValue > 100
-    ) {
-      throw new Error("Percent discount cannot exceed 100%");
-    }
+
 
     // Create discount
     const discount = await Discount.create({
@@ -208,12 +202,7 @@ class DiscountService {
       updateData.code = updateData.code.toUpperCase();
     }
 
-    // Validate discount value for percent type
-    if (updateData.discountType === "percent" && updateData.discountValue) {
-      if (updateData.discountValue > 100) {
-        throw new Error("Percent discount cannot exceed 100%");
-      }
-    }
+
 
     // Validate date range if updating dates
     if (updateData.startDate || updateData.endDate) {

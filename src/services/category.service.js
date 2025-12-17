@@ -67,10 +67,7 @@ class CategoryService {
   async getAllCategories(filters = {}) {
     const { page, limit, isActive, parentCategory, search } = filters;
 
-    // Validate required params
-    if (!page || !limit) {
-      throw new Error("Page and limit are required parameters");
-    }
+
 
     // Build query
     const query = {};

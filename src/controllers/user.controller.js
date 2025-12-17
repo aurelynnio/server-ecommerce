@@ -3,34 +3,12 @@ const { uploadImage } = require("../configs/cloudinary");
 const userService = require("../services/user.service");
 const { sendFail, sendSuccess } = require("../shared/res/formatResponse");
 const { StatusCodes } = require("http-status-codes");
-const {
-  createUserValidator,
-  updateUserValidator,
-  updateUserByIdValidator,
-  updateProfileValidator,
-  addAddressValidator,
-  updateAddressValidator,
-  changePasswordValidator,
-  mongoIdParamValidator,
-  addressIdParamValidator,
-  updateRoleValidator,
-  updatePermissionsValidator,
-  paginationQueryValidator,
-} = require("../validations/user.validator");
+
 
 const UserController = {
   // Admin: Create new user
   createUser: catchAsync(async (req, res) => {
-    const { error, value } = createUserValidator.validate(req.body, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const user = await userService.createUser(value);
+    const user = await userService.createUser(req.body);
     return sendSuccess(
       res,
       user,
@@ -41,17 +19,8 @@ const UserController = {
 
   // Admin: Update user (with ID in body)
   updateUser: catchAsync(async (req, res) => {
-    const { error, value } = updateUserValidator.validate(req.body, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
     // Extract id from validated data
-    const { id, ...updateData } = value;
+    const { id, ...updateData } = req.body;
 
     // Check if there's data to update
     if (!updateData || Object.keys(updateData).length === 0) {
@@ -107,17 +76,8 @@ const UserController = {
 
   // Update user profile
   updateProfile: catchAsync(async (req, res) => {
-    const { error, value } = updateProfileValidator.validate(req.body, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
     const userId = req.user.userId;
-    const user = await userService.updateProfile(userId, value);
+    const user = await userService.updateProfile(userId, req.body);
     return sendSuccess(
       res,
       user,
@@ -128,17 +88,8 @@ const UserController = {
 
   // Add new address
   addAddress: catchAsync(async (req, res) => {
-    const { error, value } = addAddressValidator.validate(req.body, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
     const userId = req.user.userId;
-    const user = await userService.addAddress(userId, value);
+    const user = await userService.addAddress(userId, req.body);
     return sendSuccess(
       res,
       user,
@@ -151,28 +102,11 @@ const UserController = {
   updateAddress: catchAsync(async (req, res) => {
     console.log(`Check data from user controller`, req.params);
     console.log(`Check data from user controller`, req.body);
-    const { error: paramError, value: paramValue } =
-      addressIdParamValidator.validate(req.params, { abortEarly: false });
-
-    if (paramError) {
-      const errors = paramError.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const { error, value } = updateAddressValidator.validate(req.body, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
     const userId = req.user.userId;
     const user = await userService.updateAddress(
       userId,
-      paramValue.addressId,
-      value
+      req.params.addressId,
+      req.body
     );
     return sendSuccess(
       res,
@@ -184,17 +118,8 @@ const UserController = {
 
   // Delete address
   deleteAddress: catchAsync(async (req, res) => {
-    const { error, value } = addressIdParamValidator.validate(req.params, {
-      abortEarly: false,
-    });
-    console.log(req.params)
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
     const userId = req.user.userId;
-    const user = await userService.deleteAddress(userId, value.id);
+    const user = await userService.deleteAddress(userId, req.params.addressId);
     if (!user) {
       throw new Error("Error")
     }
@@ -220,36 +145,18 @@ const UserController = {
 
   // Change password
   changePassword: catchAsync(async (req, res) => {
-    const { error, value } = changePasswordValidator.validate(req.body, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
     const userId = req.user.userId;
     const result = await userService.changePassword(
       userId,
-      value.oldPassword,
-      value.newPassword
+      req.body.oldPassword,
+      req.body.newPassword
     );
     return sendSuccess(res, result, result.message, StatusCodes.OK);
   }),
 
   // Admin: Get all users
   getAllUsers: catchAsync(async (req, res) => {
-    const { error, value } = paginationQueryValidator.validate(req.query, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const result = await userService.getAllUsers(value);
+    const result = await userService.getAllUsers(req.query);
     return sendSuccess(
       res,
       result,
@@ -260,16 +167,7 @@ const UserController = {
 
   // Admin: Get user by ID
   getUserById: catchAsync(async (req, res) => {
-    const { error, value } = mongoIdParamValidator.validate(req.params, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const user = await userService.getUserById(value.id);
+    const user = await userService.getUserById(req.params.id);
     return sendSuccess(
       res,
       user,
@@ -280,27 +178,7 @@ const UserController = {
 
   // Admin: Update user by ID
   updateUserById: catchAsync(async (req, res) => {
-    // Validate params
-    const { error: paramError, value: paramValue } =
-      mongoIdParamValidator.validate(req.params, {
-        abortEarly: false,
-      });
-
-    if (paramError) {
-      const errors = paramError.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    // Validate body
-    const { error: bodyError, value: bodyValue } =
-      updateUserByIdValidator.validate(req.body, {
-        abortEarly: false,
-      });
-
-    if (bodyError) {
-      const errors = bodyError.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
+    const bodyValue = req.body;
 
     // Check if there's data to update
     if (!bodyValue || Object.keys(bodyValue).length === 0) {
@@ -311,30 +189,13 @@ const UserController = {
       );
     }
 
-    const user = await userService.updateUserById(paramValue.id, bodyValue);
+    const user = await userService.updateUserById(req.params.id, bodyValue);
     return sendSuccess(res, user, "User updated successfully", StatusCodes.OK);
   }),
 
   // Admin: Update user role
   updateUserRole: catchAsync(async (req, res) => {
-    const { error: paramError, value: paramValue } =
-      mongoIdParamValidator.validate(req.params, { abortEarly: false });
-
-    if (paramError) {
-      const errors = paramError.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const { error, value } = updateRoleValidator.validate(req.body, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const user = await userService.updateUserRole(paramValue.id, value.roles);
+    const user = await userService.updateUserRole(req.params.id, req.body.roles);
     return sendSuccess(
       res,
       user,
@@ -345,26 +206,9 @@ const UserController = {
 
   // Admin: Update user permissions
   updateUserPermissions: catchAsync(async (req, res) => {
-    const { error: paramError, value: paramValue } =
-      mongoIdParamValidator.validate(req.params, { abortEarly: false });
-
-    if (paramError) {
-      const errors = paramError.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const { error, value } = updatePermissionsValidator.validate(req.body, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
     const user = await userService.updateUserPermissions(
-      paramValue.id,
-      value.permissions
+      req.params.id,
+      req.body.permissions
     );
     return sendSuccess(
       res,
@@ -376,16 +220,7 @@ const UserController = {
 
   // Admin: Delete user
   deleteUser: catchAsync(async (req, res) => {
-    const { error, value } = mongoIdParamValidator.validate(req.params, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const result = await userService.deleteUser(value.id);
+    const result = await userService.deleteUser(req.params.id);
     return sendSuccess(res, result, result.message, StatusCodes.OK);
   }),
 };

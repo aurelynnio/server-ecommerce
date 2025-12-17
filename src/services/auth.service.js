@@ -74,9 +74,7 @@ class AuthService {
    * @throws {Error} If credentials are invalid or email is not verified
    */
   async login(email, password) {
-    if (!email || !password) {
-      throw new Error("Email and password are required");
-    }
+
 
     // Find user by email
     const user = await User.findOne({ email }).lean();

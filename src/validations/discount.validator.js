@@ -17,9 +17,15 @@ const createDiscountValidator = joi.object({
     "any.only": "Discount type must be either 'percent' or 'fixed'",
     "any.required": "Discount type is required",
   }),
-  discountValue: joi.number().positive().required().messages({
+  discountValue: joi.number().positive().required()
+    .when('discountType', {
+      is: 'percent',
+      then: joi.number().max(100)
+    })
+    .messages({
     "number.base": "Discount value must be a number",
     "number.positive": "Discount value must be a positive number",
+    "number.max": "Percent discount cannot exceed 100%",
     "any.required": "Discount value is required",
   }),
   startDate: joi.date().iso().required().messages({
@@ -69,9 +75,15 @@ const updateDiscountValidator = joi.object({
     "string.base": "Discount type must be a string",
     "any.only": "Discount type must be either 'percent' or 'fixed'",
   }),
-  discountValue: joi.number().positive().messages({
+  discountValue: joi.number().positive()
+    .when('discountType', {
+      is: 'percent',
+      then: joi.number().max(100)
+    })
+    .messages({
     "number.base": "Discount value must be a number",
     "number.positive": "Discount value must be a positive number",
+    "number.max": "Percent discount cannot exceed 100%",
   }),
   startDate: joi.date().iso().messages({
     "date.base": "Start date must be a valid date",

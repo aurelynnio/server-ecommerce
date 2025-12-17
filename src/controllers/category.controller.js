@@ -2,28 +2,12 @@ const catchAsync = require("../configs/catchAsync");
 const categoryService = require("../services/category.service");
 const { StatusCodes } = require("http-status-codes");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
-const {
-  createCategoryValidator,
-  updateCategoryValidator,
-  categoryIdParamValidator,
-  categorySlugParamValidator,
-  getCategoriesQueryValidator,
-} = require("../validations/category.validator");
+
 
 const CategoryController = {
   // Create category (Admin only)
   createCategory: catchAsync(async (req, res) => {
-    // Validate request body
-    const { error, value } = createCategoryValidator.validate(req.body, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const category = await categoryService.createCategory(value);
+    const category = await categoryService.createCategory(req.body);
 
     return sendSuccess(
       res,
@@ -35,17 +19,7 @@ const CategoryController = {
 
   // Get all categories (Admin)
   getAllCategories: catchAsync(async (req, res) => {
-    // Validate query params
-    const { error, value } = getCategoriesQueryValidator.validate(req.query, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const result = await categoryService.getAllCategories(value);
+    const result = await categoryService.getAllCategories(req.query);
 
     return sendSuccess(
       res,
@@ -57,17 +31,7 @@ const CategoryController = {
 
   // Get active categories (Public/User)
   getActiveCategories: catchAsync(async (req, res) => {
-    // Validate query params
-    const { error, value } = getCategoriesQueryValidator.validate(req.query, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const result = await categoryService.getActiveCategories(value);
+    const result = await categoryService.getActiveCategories(req.query);
 
     return sendSuccess(
       res,
@@ -91,17 +55,7 @@ const CategoryController = {
 
   // Get category by ID
   getCategoryById: catchAsync(async (req, res) => {
-    // Validate params
-    const { error, value } = categoryIdParamValidator.validate(req.params, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const category = await categoryService.getCategoryById(value.categoryId);
+    const category = await categoryService.getCategoryById(req.params.categoryId);
 
     return sendSuccess(
       res,
@@ -113,17 +67,7 @@ const CategoryController = {
 
   // Get category by slug
   getCategoryBySlug: catchAsync(async (req, res) => {
-    // Validate params
-    const { error, value } = categorySlugParamValidator.validate(req.params, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const category = await categoryService.getCategoryBySlug(value.slug);
+    const category = await categoryService.getCategoryBySlug(req.params.slug);
 
     return sendSuccess(
       res,
@@ -135,18 +79,8 @@ const CategoryController = {
 
   // Get category with subcategories
   getCategoryWithSubcategories: catchAsync(async (req, res) => {
-    // Validate params
-    const { error, value } = categoryIdParamValidator.validate(req.params, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
     const result = await categoryService.getCategoryWithSubcategories(
-      value.categoryId
+      req.params.categoryId
     );
 
     return sendSuccess(
@@ -159,30 +93,9 @@ const CategoryController = {
 
   // Update category (Admin only)
   updateCategory: catchAsync(async (req, res) => {
-    // Validate params
-    const paramError = categoryIdParamValidator.validate(req.params, {
-      abortEarly: false,
-    });
-
-    if (paramError.error) {
-      const errors = paramError.error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    // Validate body
-    const bodyError = updateCategoryValidator.validate(req.body, {
-      abortEarly: false,
-    });
-
-    if (bodyError.error) {
-      const errors = bodyError.error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const { categoryId } = paramError.value;
     const category = await categoryService.updateCategory(
-      categoryId,
-      bodyError.value
+      req.params.categoryId,
+      req.body
     );
 
     return sendSuccess(
@@ -195,17 +108,7 @@ const CategoryController = {
 
   // Delete category (Admin only)
   deleteCategory: catchAsync(async (req, res) => {
-    // Validate params
-    const { error, value } = categoryIdParamValidator.validate(req.params, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const result = await categoryService.deleteCategory(value.categoryId);
+    const result = await categoryService.deleteCategory(req.params.categoryId);
 
     return sendSuccess(res, result, result.message, StatusCodes.OK);
   }),

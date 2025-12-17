@@ -104,7 +104,6 @@ class NotificationService {
    * @throws {Error} If userId is missing
    */
   async getListNotification(userId, { page = 1, limit = 10 } = {}) {
-    if(!userId) throw new Error("userId is required");
     const skip = (page - 1) * limit;
 
     const notifications = await Notification.find({ userId })
@@ -164,7 +163,6 @@ class NotificationService {
    * @param {String} userId
    */
   async cleanNotification(userId) {
-    if(!userId) throw new Error("userId is required");
     const result = await Notification.deleteMany({ userId });
     
     // Update real-time count
@@ -182,7 +180,6 @@ class NotificationService {
    * @param {String} userId
    */
   async countUnread(userId) {
-    if(!userId) throw new Error("userId is required");
     const count = await Notification.countDocuments({ userId, isRead: false });
     return count || 0;
   }

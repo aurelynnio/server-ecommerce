@@ -142,21 +142,8 @@ class ProductService {
   }
   // Create new product
   async createProduct(data, files) {
-    // Only allow specific fields
-    const allowedData = {
-      name: data.name,
-      description: data.description,
-      slug: data.slug,
-      category: data.category,
-      brand: data.brand,
-      price: data.price,
-      variants: data.variants,
-      tags: data.tags,
-      isActive: data.isActive,
-      isNewArrival: data.isNewArrival,
-      isFeatured: data.isFeatured,
-      onSale: data.onSale,
-    };
+    // Use data directly as it's already validated
+    const productData = { ...data };
 
     // Check if slug already exists
     if (data.slug) {
@@ -186,12 +173,12 @@ class ProductService {
         // Process main product images
         const mainImages = uploads.filter(u => u.fieldname === "images");
         if(mainImages.length > 0) {
-             allowedData.images = mainImages.map(u => u.secure_url);
+             productData.images = mainImages.map(u => u.secure_url);
         }
 
         // Process variant images
-        if (allowedData.variants && Array.isArray(allowedData.variants)) {
-            allowedData.variants = allowedData.variants.map((variant, index) => {
+        if (productData.variants && Array.isArray(productData.variants)) {
+            productData.variants = productData.variants.map((variant, index) => {
                 const variantImages = uploads.filter(u => u.fieldname === `variantImages_${index}`);
                 if (variantImages.length > 0) {
                      return { ...variant, images: variantImages.map(u => u.secure_url) };
@@ -201,7 +188,7 @@ class ProductService {
         }
     }
 
-    const product = new Product(allowedData);
+    const product = new Product(productData);
     await product.save();
 
     return product;
@@ -210,49 +197,12 @@ class ProductService {
   // Update product
   async updateProduct(id, data, files) {
     try {
-      // Only allow specific fields
-      const allowedData = {};
-      const allowedFields = [
-        "name",
-        "description",
-        "slug",
-        "category",
-        "brand",
-        "images",
-        "price",
-        "variants",
-        "tags",
-        "isActive",
-        "isNewArrival",
-        "isFeatured",
-        "onSale",
-      ];
+      const updateData = { ...data };
 
-      // Filter only allowed fields
-      allowedFields.forEach((field) => {
-        if (data[field] !== undefined) {
-          allowedData[field] = data[field];
-        }
-      });
 
-      // Handle boolean fields from string to boolean (often needed for FormData)
-      const booleanFields = [
-        "isActive",
-        "isNewArrival",
-        "isFeatured",
-        "onSale",
-      ];
-      booleanFields.forEach((field) => {
-        if (allowedData[field] !== undefined) {
-          if (typeof allowedData[field] === "string") {
-            allowedData[field] = allowedData[field] === "true";
-          }
-        }
-      });
-
-      if (allowedData.slug) {
+      if (updateData.slug) {
         const existingProduct = await Product.findOne({
-          slug: allowedData.slug,
+          slug: updateData.slug,
           _id: { $ne: id },
         });
         if (existingProduct) {
@@ -260,9 +210,8 @@ class ProductService {
         }
       }
 
-      // Handle file uploads
       let newImages = [];
-      const variantUploadMap = {}; // { index: [urls] }
+      const variantUploadMap = {};
 
       if (files && files.length > 0) {
           const buffers = files.map((file) => file.buffer);
@@ -279,32 +228,21 @@ class ProductService {
            });
       }
 
-      // Combine images if there are any changes
-      // NOTE: `data.existingImages` should be passed into the service if it was in the body
-      let currentImages = [];
-      if (data.existingImages) {
-          currentImages = typeof data.existingImages === "string" 
-             ? JSON.parse(data.existingImages) 
-             : data.existingImages;
-      }
-      
-      // If we have new images or are managing existing ones
+      let currentImages = data.existingImages || [];
+
       if (data.existingImages || (files && files.length > 0)) {
            if(currentImages.length > 0 || newImages.length > 0) {
-                allowedData.images = [...currentImages, ...newImages];
+                updateData.images = [...currentImages, ...newImages];
            }
       }
       
-      // Update variants with new images
-      if (allowedData.variants && Array.isArray(allowedData.variants)) {
-           allowedData.variants = allowedData.variants.map((variant, index) => {
-               // Clean up temporary IDs
+      if (updateData.variants && Array.isArray(updateData.variants)) {
+           updateData.variants = updateData.variants.map((variant, index) => {
                const variantData = { ...variant };
                if (variantData._id && variantData._id.startsWith("temp-")) {
                    delete variantData._id;
                }
 
-               // If this variant has new uploaded images
                if (variantUploadMap[index]) {
                     const existingVariantImages = variantData.images || [];
                     variantData.images = [...existingVariantImages, ...variantUploadMap[index]];
@@ -314,7 +252,8 @@ class ProductService {
        }
 
 
-      const product = await Product.findByIdAndUpdate(id, allowedData, {
+
+      const product = await Product.findByIdAndUpdate(id, updateData, {
         new: true,
         runValidators: true,
       }).populate("category", "name slug");
@@ -358,27 +297,16 @@ class ProductService {
 
   // Add variant to product
   async addVariant(productId, variantData, files) {
-    // Only allow specific variant fields
-    const allowedVariantData = {
-      sku: variantData.sku,
-      color: variantData.color,
-      size: variantData.size,
-      stock: variantData.stock,
-      price: variantData.price,
-      // images: variantData.images, // Will be handled below if files present
-    };
+    const allowedVariantData = { ...variantData };
 
-    // Handle image files
     if (files && files.length > 0) {
         const buffers = files.map((file) => file.buffer);
         const uploads = await multiUpload(buffers);
         allowedVariantData.images = uploads.map((upload) => upload.secure_url);
     } else if (variantData.images) {
-        // If images passed as array of strings (urls)
         allowedVariantData.images = variantData.images;
     }
 
-    // Check if SKU already exists
     const existingProduct = await Product.findOne({
       "variants.sku": allowedVariantData.sku,
     });
@@ -402,17 +330,10 @@ class ProductService {
 
   // Update variant
   async updateVariant(productId, variantId, variantData) {
-    // Only allow specific variant fields
-    const allowedVariantData = {
-      _id: variantId, // Keep the variant ID
+    const allowedVariantData = { 
+        ...variantData,
+        _id: variantId 
     };
-
-    const allowedFields = ["sku", "color", "size", "stock", "images", "price"];
-    allowedFields.forEach((field) => {
-      if (variantData[field] !== undefined) {
-        allowedVariantData[field] = variantData[field];
-      }
-    });
 
     const product = await Product.findOneAndUpdate(
       { _id: productId, "variants._id": variantId },

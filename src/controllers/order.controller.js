@@ -2,28 +2,15 @@ const catchAsync = require("../configs/catchAsync");
 const orderService = require("../services/order.service");
 const { StatusCodes } = require("http-status-codes");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
-const {
-  createOrderValidator,
-  updateOrderStatusValidator,
-  orderIdParamValidator,
-  getOrdersQueryValidator,
-} = require("../validations/order.validator");
+
 
 const OrderController = {
   // Create order from cart
   createOrder: catchAsync(async (req, res) => {
-    // Validate request body
-    const { error, value } = createOrderValidator.validate(req.body, {
-      abortEarly: false,
-    });
 
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
 
     const userId = req.user.userId;
-    const order = await orderService.createOrder(userId, value);
+    const order = await orderService.createOrder(userId, req.body);
 
     return sendSuccess(
       res,
@@ -35,17 +22,7 @@ const OrderController = {
 
   // Get all orders (Admin only)
   getAllOrders: catchAsync(async (req, res) => {
-    // Validate query params
-    const { error, value } = getOrdersQueryValidator.validate(req.query, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const result = await orderService.getAllOrders(value);
+    const result = await orderService.getAllOrders(req.query);
 
     return sendSuccess(
       res,
@@ -57,18 +34,7 @@ const OrderController = {
 
   // Get user's orders
   getUserOrders: catchAsync(async (req, res) => {
-    // Validate query params
-    const { error, value } = getOrdersQueryValidator.validate(req.query, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const userId = req.user.userId;
-    const result = await orderService.getUserOrders(userId, value);
+    const result = await orderService.getUserOrders(userId, req.query);
 
     return sendSuccess(
       res,
@@ -80,20 +46,8 @@ const OrderController = {
 
   // Get single order by ID
   getOrderById: catchAsync(async (req, res) => {
-    // Validate params
-    const { error, value } = orderIdParamValidator.validate(req.params, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const userId = req.user.userId;
-    const isAdmin = req.user.role === "admin";
     const order = await orderService.getOrderById(
-      value.orderId,
+      req.params.orderId,
       userId,
       isAdmin
     );
@@ -108,30 +62,7 @@ const OrderController = {
 
   // Update order status (Admin only)
   updateOrderStatus: catchAsync(async (req, res) => {
-    // Validate params
-    const paramError = orderIdParamValidator.validate(req.params, {
-      abortEarly: false,
-    });
-
-    if (paramError.error) {
-      const errors = paramError.error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    // Validate body
-    const bodyError = updateOrderStatusValidator.validate(req.body, {
-      abortEarly: false,
-    });
-
-    if (bodyError.error) {
-      const errors = bodyError.error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const { orderId } = paramError.value;
-    const { status } = bodyError.value;
-
-    const order = await orderService.updateOrderStatus(orderId, status);
+    const order = await orderService.updateOrderStatus(req.params.orderId, req.body.status);
 
     return sendSuccess(
       res,
@@ -143,20 +74,8 @@ const OrderController = {
 
   // Cancel order
   cancelOrder: catchAsync(async (req, res) => {
-    // Validate params
-    const { error, value } = orderIdParamValidator.validate(req.params, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const userId = req.user.userId;
-    const isAdmin = req.user.role === "admin";
     const order = await orderService.cancelOrder(
-      value.orderId,
+      req.params.orderId,
       userId,
       isAdmin
     );

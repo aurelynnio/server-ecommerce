@@ -2,11 +2,7 @@ const catchAsync = require("../configs/catchAsync");
 const cartService = require("../services/cart.service");
 const { StatusCodes } = require("http-status-codes");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
-const {
-  addToCartValidator,
-  updateCartItemValidator,
-  cartItemIdValidator,
-} = require("../validations/cart.validator");
+
 
 const CartController = {
   // Get user's cart
@@ -24,18 +20,10 @@ const CartController = {
 
   // Add item to cart
   addToCart: catchAsync(async (req, res) => {
-    // Validate request body
-    const { error, value } = addToCartValidator.validate(req.body, {
-      abortEarly: false,
-    });
 
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
 
     const userId = req.user.userId;
-    const cart = await cartService.addToCart(userId, value);
+    const cart = await cartService.addToCart(userId, req.body);
 
     return sendSuccess(
       res,
@@ -47,31 +35,10 @@ const CartController = {
 
   // Update cart item quantity
   updateCartItem: catchAsync(async (req, res) => {
-    // Validate params
-    const paramError = cartItemIdValidator.validate(req.params, {
-      abortEarly: false,
-    });
 
-    if (paramError.error) {
-      const errors = paramError.error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    // Validate body
-    const bodyError = updateCartItemValidator.validate(req.body, {
-      abortEarly: false,
-    });
-
-    if (bodyError.error) {
-      const errors = bodyError.error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
 
     const userId = req.user.userId;
-    const { itemId } = paramError.value;
-    const { quantity } = bodyError.value;
-
-    const cart = await cartService.updateCartItem(userId, itemId, quantity);
+    const cart = await cartService.updateCartItem(userId, req.params.itemId, req.body.quantity);
 
     return sendSuccess(
       res,
@@ -83,18 +50,7 @@ const CartController = {
 
   // Remove item from cart
   removeCartItem: catchAsync(async (req, res) => {
-    // Validate params
-    const { error, value } = cartItemIdValidator.validate(req.params, {
-      abortEarly: false,
-    });
-
-    if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
-    }
-
-    const userId = req.user.userId;
-    const { itemId } = value;
+    const { itemId } = req.params;
 
     const cart = await cartService.removeCartItem(userId, itemId);
 

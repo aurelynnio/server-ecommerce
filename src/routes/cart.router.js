@@ -2,6 +2,12 @@ const express = require("express");
 const router = express.Router();
 const cartController = require("../controllers/cart.controller");
 const { verifyAccessToken } = require("../middlewares/auth.middleware");
+const validate = require("../middlewares/validate.middleware");
+const {
+  addToCartValidator,
+  updateCartItemValidator,
+  cartItemIdValidator,
+} = require("../validations/cart.validator");
 
 // All cart routes require authentication
 router.use(verifyAccessToken);
@@ -26,7 +32,7 @@ router.get("/count", cartController.getCartItemCount);
  * @access  Private (Authenticated users)
  * @body    { productId, variantId?, quantity }
  */
-router.post("/", cartController.addToCart);
+router.post("/", validate(addToCartValidator), cartController.addToCart);
 
 /**
  * @route   PUT /api/cart/:itemId
@@ -34,14 +40,22 @@ router.post("/", cartController.addToCart);
  * @access  Private (Authenticated users)
  * @body    { quantity }
  */
-router.put("/:itemId", cartController.updateCartItem);
+router.put(
+  "/:itemId",
+  validate({ params: cartItemIdValidator, body: updateCartItemValidator }),
+  cartController.updateCartItem
+);
 
 /**
  * @route   DELETE /api/cart/:itemId
  * @desc    Remove item from cart
  * @access  Private (Authenticated users)
  */
-router.delete("/:itemId", cartController.removeCartItem);
+router.delete(
+  "/:itemId",
+  validate({ params: cartItemIdValidator }),
+  cartController.removeCartItem
+);
 
 /**
  * @route   DELETE /api/cart
@@ -51,3 +65,4 @@ router.delete("/:itemId", cartController.removeCartItem);
 router.delete("/", cartController.clearCart);
 
 module.exports = router;
+

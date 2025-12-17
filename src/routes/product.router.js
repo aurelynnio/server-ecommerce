@@ -6,6 +6,24 @@ const {
   requireRole,
 } = require("../middlewares/auth.middleware");
 const upload = require("../configs/upload");
+const validate = require("../middlewares/validate.middleware");
+const parseJsonFields = require("../middlewares/parseJsonFields.middleware");
+const {
+  createProductValidator,
+  updateProductValidator,
+  addVariantValidator,
+  updateVariantValidator,
+  getProductsQueryValidator,
+  mongoIdParamValidator,
+  slugParamValidator,
+  categoryIdParamValidator,
+  categorySlugParamValidator,
+  variantIdsParamValidator,
+  paginationQueryValidator,
+  limitQueryValidator,
+  specialProductsQueryValidator,
+  searchQueryValidator,
+} = require("../validations/product.validator");
 
 /**
  * Public Routes
@@ -17,7 +35,7 @@ const upload = require("../configs/upload");
  * @access  Public
  * @query   page, limit, sort, category, brand, minPrice, maxPrice, tags, search
  */
-router.get("/", productController.getAllProducts);
+router.get("/", validate({ query: getProductsQueryValidator }), productController.getAllProducts);
 
 /**
  * @route   GET /api/products/search
@@ -25,7 +43,7 @@ router.get("/", productController.getAllProducts);
  * @access  Public
  * @query   q, limit
  */
-router.get("/search", productController.searchProducts);
+router.get("/search", validate({ query: searchQueryValidator }), productController.searchProducts);
 
 /**
  * @route   GET /api/products/featured
@@ -33,7 +51,7 @@ router.get("/search", productController.searchProducts);
  * @access  Public
  * @query   limit
  */
-router.get("/featured", productController.getFeaturedProducts);
+router.get("/featured", validate({ query: limitQueryValidator }), productController.getFeaturedProducts);
 
 /**
  * @route   GET /api/products/new-arrivals
@@ -54,7 +72,7 @@ router.get("/on-sale", productController.getOnSaleProducts);
  * @desc    Get product by slug
  * @access  Public
  */
-router.get("/slug/:slug", productController.getProductBySlug);
+router.get("/slug/:slug", validate({ params: slugParamValidator }), productController.getProductBySlug);
 
 /**
  * @route   GET /api/products/category/:slug
@@ -62,14 +80,18 @@ router.get("/slug/:slug", productController.getProductBySlug);
  * @access  Public
  * @query   page, limit, sort
  */
-router.get("/category/:slug", productController.getProductsByCategorySlug);
+router.get(
+  "/category/:slug",
+  validate({ params: categorySlugParamValidator, query: paginationQueryValidator }),
+  productController.getProductsByCategorySlug
+);
 
 /**
  * @route   GET /api/products/:id
  * @desc    Get product by ID
  * @access  Public
  */
-router.get("/:id", productController.getProductById);
+router.get("/:id", validate({ params: mongoIdParamValidator }), productController.getProductById);
 
 /**
  * @route   GET /api/products/related/:id
@@ -77,8 +99,7 @@ router.get("/:id", productController.getProductById);
  * @access  Public
  * @query   limit, type (random, newest, best-selling)
  */
-router.get("/related/:id", productController.getRelatedProducts);
-router.delete("/:id/variant/:variantId", productController.deleteVariant);
+router.get("/related/:id", validate({ params: mongoIdParamValidator }), productController.getRelatedProducts);
 
 /**
  * Protected Routes - Admin Only
@@ -94,6 +115,8 @@ router.post(
   verifyAccessToken,
   requireRole("admin"),
   upload.any(), // Allow any files (images, variantImages_0, etc.)
+  parseJsonFields(["price", "variants", "tags"]),
+  validate(createProductValidator),
   productController.createProduct
 );
 
@@ -107,6 +130,8 @@ router.put(
   verifyAccessToken,
   requireRole("admin"),
   upload.any(), // Allow any files (images, variantImages_0, etc.)
+  parseJsonFields(["price", "variants", "tags", "existingImages"]),
+  validate({ params: mongoIdParamValidator, body: updateProductValidator }),
   productController.updateProduct
 );
 
@@ -119,6 +144,7 @@ router.delete(
   "/:id",
   verifyAccessToken,
   requireRole("admin"),
+  validate({ params: mongoIdParamValidator }),
   productController.deleteProduct
 );
 
@@ -131,6 +157,7 @@ router.delete(
   "/:id/permanent",
   verifyAccessToken,
   requireRole("admin"),
+  validate({ params: mongoIdParamValidator }),
   productController.permanentDeleteProduct
 );
 
@@ -148,6 +175,8 @@ router.post(
   verifyAccessToken,
   requireRole("admin"),
   upload.array("images", 10),
+  parseJsonFields(["price"]),
+  validate({ params: mongoIdParamValidator, body: addVariantValidator }), // Note: req.body here will be validated
   productController.addVariant
 );
 
@@ -160,6 +189,7 @@ router.put(
   "/:id/variants/:variantId",
   verifyAccessToken,
   requireRole("admin"),
+  validate({ params: variantIdsParamValidator, body: updateVariantValidator }),
   productController.updateVariant
 );
 
@@ -172,7 +202,9 @@ router.delete(
   "/:id/variants/:variantId",
   verifyAccessToken,
   requireRole("admin"),
+  validate({ params: variantIdsParamValidator }),
   productController.deleteVariant
 );
 
 module.exports = router;
+

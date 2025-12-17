@@ -1,0 +1,31 @@
+const { StatusCodes } = require("http-status-codes");
+const { sendFail } = require("../shared/res/formatResponse");
+
+/**
+ * Middleware to parse JSON string fields from multipart/form-data
+ * @param {string[]} fields - Array of field names that need parsing
+ * @returns {Function} Express middleware
+ */
+const parseJsonFields = (fields = []) => (req, res, next) => {
+  if (!req.body) return next();
+
+  const errors = [];
+
+  fields.forEach((field) => {
+    if (req.body[field] && typeof req.body[field] === "string") {
+      try {
+        req.body[field] = JSON.parse(req.body[field]);
+      } catch (error) {
+        errors.push(`Invalid JSON format for field '${field}'`);
+      }
+    }
+  });
+
+  if (errors.length > 0) {
+    return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
+  }
+
+  next();
+};
+
+module.exports = parseJsonFields;
