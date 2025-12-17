@@ -6,6 +6,7 @@ const {
 const Category = require("../models/category.model");
 const Review = require("../models/review.model");
 const { multiUpload } = require("../configs/cloudinary");
+const { getIO } = require("../socket/index");
 
 /**
  * Service handling product operations
@@ -190,6 +191,15 @@ class ProductService {
 
     const product = new Product(productData);
     await product.save();
+
+    // Emit socket event
+    const io = getIO();
+    if(io) {
+      io.emit("new_product", {
+        name: product.name,
+        _id: product._id
+      });
+    }
 
     return product;
   }

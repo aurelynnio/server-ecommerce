@@ -157,7 +157,6 @@ const AuthController = {
 
   // Logout
   logout: catchAsync(async (req, res) => {
-    // Xóa cả 2 cookies
     res.clearCookie("accessToken", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

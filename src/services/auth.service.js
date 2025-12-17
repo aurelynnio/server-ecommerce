@@ -1,6 +1,7 @@
 const User = require("../models/user.model");
 const comparePassword = require("../utils/comparePassword");
 const hashPassword = require("../utils/hashPasword");
+const { getIO } = require("../socket/index");
 const {
   sendEmailVerificationCode,
   sendPasswordResetCode,
@@ -56,6 +57,15 @@ class AuthService {
     });
 
     await newUser.save();
+
+    // Emit socket event
+    const io = getIO();
+    if(io) {
+      io.emit("new_user", {
+        username: newUser.username,
+        _id: newUser._id
+      });
+    }
 
     // Remove sensitive data
     const userObj = newUser.toObject();

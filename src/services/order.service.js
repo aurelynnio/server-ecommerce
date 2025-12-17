@@ -245,8 +245,15 @@ class OrderService {
             await Notification.insertMany(adminNotis);
             
             const io = getIO();
+            
+            // Emit generic new_order event for dashboards
+            io.emit("new_order", {
+                orderId: order._id,
+                totalAmount: order.totalAmount,
+                createdAt: order.createdAt
+            });
+
             admins.forEach(admin => {
-                 // For safety finding the specific noti obj
                  const noti = adminNotis.find(n => n.userId.toString() === admin._id.toString());
                  if (noti) {
                     io.to(admin._id.toString()).emit("new_notification", {

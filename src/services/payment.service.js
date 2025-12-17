@@ -1,6 +1,7 @@
 const { VNPay, ProductCode, VnpLocale, dateFormat } = require('vnpay');
 const Payment = require("../models/payment.model");
 const Order = require("../models/order.model");
+const { getIO } = require("../socket/index");
 
 /**
  * Service handling payment operations
@@ -131,6 +132,18 @@ class PaymentService {
             order.paymentStatus = 'paid';
             order.status = 'confirmed';
             await order.save();
+
+            // Emit socket event to update dashboard
+            try {
+                const io = getIO();
+                io.emit("new_order", {
+                    orderId: order._id,
+                    totalAmount: order.totalAmount,
+                    createdAt: order.createdAt
+                });
+            } catch (error) {
+                console.error("Socket emit error:", error.message);
+            }
         }
 
         return {
