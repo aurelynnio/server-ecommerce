@@ -342,11 +342,11 @@ const categorySlugParamValidator = joi.object({
     .string()
     .min(1)
     .max(100)
-    .pattern(/^[a-z0-9-]+$/)
+    .pattern(/^[a-z0-9-']+$/)
     .required()
     .messages({
       "string.pattern.base":
-        "Category slug must contain only lowercase letters, numbers, and hyphens",
+        "Category slug must contain only lowercase letters, numbers, hyphens, and apostrophes",
       "string.min": "Category slug must be at least 1 character long",
       "string.max": "Category slug must not exceed 100 characters",
       "any.required": "Category slug is required",

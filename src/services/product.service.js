@@ -41,9 +41,13 @@ class ProductService {
       tags,
       search,
       isActive = true,
+      colors,
+      sizes,
+      rating,
     } = { ...filters, ...options };
 
     // Build query
+    console.log("getAllProducts Filters:", { filters, options });
     const query = { isActive };
 
     // Filter by category
@@ -69,10 +73,37 @@ class ProductService {
       query.tags = { $in: tagArray };
     }
 
+    // Filter by colors
+    if (colors) {
+      const colorArray = Array.isArray(colors) ? colors : colors.split(",");
+      // Using regex for case-insensitive matching
+      const colorRegexArray = colorArray.map((c) => new RegExp(`^${c}$`, "i"));
+      query["variants.color"] = { $in: colorRegexArray };
+    }
+
+    // Filter by sizes
+    if (sizes) {
+      const sizeArray = Array.isArray(sizes) ? sizes : sizes.split(",");
+      query["variants.size"] = { $in: sizeArray };
+    }
+
+    // Filter by rating
+    if (rating) {
+      const ratingArray = Array.isArray(rating)
+        ? rating
+        : rating.split(",").map(Number);
+      const minRating = Math.min(...ratingArray);
+      if (!isNaN(minRating)) {
+        query.averageRating = { $gte: minRating };
+      }
+    }
+
     // Search by name, description, or brand using Text Index
     if (search) {
       query.$text = { $search: search };
     }
+
+    console.log("Built Query:", JSON.stringify(query, null, 2));
 
     // Get total count for pagination
     const total = await Product.countDocuments(query);

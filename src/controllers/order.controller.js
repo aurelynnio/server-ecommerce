@@ -34,6 +34,7 @@ const OrderController = {
 
   // Get user's orders
   getUserOrders: catchAsync(async (req, res) => {
+    const userId = req.user.userId;
     const result = await orderService.getUserOrders(userId, req.query);
 
     return sendSuccess(
@@ -46,6 +47,8 @@ const OrderController = {
 
   // Get single order by ID
   getOrderById: catchAsync(async (req, res) => {
+    const userId = req.user.userId;
+    const isAdmin = req.user.role === "admin";
     const order = await orderService.getOrderById(
       req.params.orderId,
       userId,
@@ -74,6 +77,8 @@ const OrderController = {
 
   // Cancel order
   cancelOrder: catchAsync(async (req, res) => {
+    const userId = req.user.userId;
+    const isAdmin = req.user.role === "admin";
     const order = await orderService.cancelOrder(
       req.params.orderId,
       userId,
