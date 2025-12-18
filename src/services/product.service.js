@@ -194,7 +194,7 @@ class ProductService {
         }));
         
         // Upload all files concurrently
-        const uploadResults = await multiUpload(filesToUpload.map(f => f.buffer));
+        const uploadResults = await multiUpload(filesToUpload.map(f => f.buffer), "products");
         
         // Map uploads back to their original fields
         const uploads = uploadResults.map((result, index) => ({
@@ -256,7 +256,7 @@ class ProductService {
 
       if (files && files.length > 0) {
           const buffers = files.map((file) => file.buffer);
-          const uploads = await multiUpload(buffers);
+          const uploads = await multiUpload(buffers, "products");
           
           files.forEach((file, idx) => {
                if(file.fieldname === "images") {
@@ -342,7 +342,7 @@ class ProductService {
 
     if (files && files.length > 0) {
         const buffers = files.map((file) => file.buffer);
-        const uploads = await multiUpload(buffers);
+        const uploads = await multiUpload(buffers, "products");
         allowedVariantData.images = uploads.map((upload) => upload.secure_url);
     } else if (variantData.images) {
         allowedVariantData.images = variantData.images;

@@ -44,7 +44,7 @@ const UserController = {
       return sendFail(res, "No file uploaded", StatusCodes.BAD_REQUEST);
     }
 
-    const result = await uploadImage(file.buffer);
+    const result = await uploadImage(file.buffer, "avatar");
     if (!result) {
       return sendFail(
         res,

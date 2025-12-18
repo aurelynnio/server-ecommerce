@@ -9,6 +9,7 @@ const cartRouter = require("./cart.router");
 const discountRouter = require("./discount.router");
 const statisticsRouter = require("./statistics.router");
 const paymentRouter = require("./payment.router");
+const bannerRouter = require("./banner.router");
 
 
 const initRoutes = (app) => {
@@ -23,6 +24,7 @@ const initRoutes = (app) => {
   app.use("/api/discounts", discountRouter);
   app.use("/api/statistics", statisticsRouter);
   app.use("/api/payment", paymentRouter);
+  app.use("/api/banners", bannerRouter);
 
 };
 

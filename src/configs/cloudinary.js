@@ -6,12 +6,12 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const uploadImage = async (fileBuffer) => {
+const uploadImage = async (fileBuffer, folder = "avatar") => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
         use_filename: true,
-        folder: "avatar",
+        folder: folder,
         unique_filename: true,
         overwrite: true,
       },
@@ -24,11 +24,11 @@ const uploadImage = async (fileBuffer) => {
   });
 };
 
-const multiUpload = async (fileBuffers) => {
+const multiUpload = async (fileBuffers, folder = "avatar") => {
   if (!Array.isArray(fileBuffers)) {
     throw new Error("Input must be an array of file buffers");
   }
-  const uploadPromises = fileBuffers.map((buffer) => uploadImage(buffer));
+  const uploadPromises = fileBuffers.map((buffer) => uploadImage(buffer, folder));
   const results = await Promise.all(uploadPromises);
 
   return results;
