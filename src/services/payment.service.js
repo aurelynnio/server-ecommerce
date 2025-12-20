@@ -59,7 +59,7 @@ class PaymentService {
 
     // Build payment URL
     const paymentUrl = vnpay.buildPaymentUrl({
-      vnp_Amount: order.totalAmount * 100, // VNPay requires amount * 100
+      vnp_Amount: order.totalAmount, // Library vnpayjs already handles multiplication by 100 internally
       vnp_IpAddr: ipAddress,
       vnp_TxnRef: transactionId,
       vnp_OrderInfo: `Thanh toan don hang ${order._id}`,
