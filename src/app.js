@@ -4,15 +4,16 @@ const cors = require("cors");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const initRoutes = require("./routes");
-const http = require("http")
+const http = require("http");
 const app = ex();
-const server = http.createServer(app)
+const server = http.createServer(app);
 
 // Middlewares
 app.use(morgan("dev"));
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin:
+      process.env.FRONTEND_URL || "https://client-ecommerce-eight.vercel.app/",
     credentials: true,
     allowedHeaders: ["Authorization", "Content-Type"],
   })
@@ -37,5 +38,5 @@ app.use((err, req, res, next) => {
 
 module.exports = {
   server,
-  app
+  app,
 };
