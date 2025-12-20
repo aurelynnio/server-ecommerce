@@ -13,7 +13,8 @@ app.use(morgan("dev"));
 app.use(
   cors({
     origin:
-      process.env.FRONTEND_URL || "https://client-ecommerce-eight.vercel.app/",
+      process.env.FRONTEND_URL ||
+      "https://client-ecommerce-git-main-cyhink4s-projects.vercel.app",
     credentials: true,
     allowedHeaders: ["Authorization", "Content-Type"],
   })
