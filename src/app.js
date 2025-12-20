@@ -12,11 +12,11 @@ const server = http.createServer(app);
 app.use(morgan("dev"));
 app.use(
   cors({
-    // origin:
-    //   process.env.FRONTEND_URL ||
-    //   "https://client-ecommerce-git-main-cyhink4s-projects.vercel.app",
-    // credentials: true,
-    // allowedHeaders: ["Authorization", "Content-Type"],
+    origin:
+      process.env.FRONTEND_URL ||
+      "https://client-ecommerce-git-main-cyhink4s-projects.vercel.app",
+    credentials: true,
+    allowedHeaders: ["Authorization", "Content-Type"],
   })
 );
 app.use(ex.json());
