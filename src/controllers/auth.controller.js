@@ -8,8 +8,6 @@ const jwt = require("jsonwebtoken");
 const AuthController = {
   // Register new user
   register: catchAsync(async (req, res) => {
-
-
     const result = await authService.register(req.body);
     return sendSuccess(
       res,
@@ -21,8 +19,6 @@ const AuthController = {
 
   // Login user
   login: catchAsync(async (req, res) => {
-
-
     const { email, password } = req.body;
     const result = await authService.login(email, password);
     const { accessToken, refreshToken, user } = result;
@@ -53,8 +49,6 @@ const AuthController = {
 
   // Send verification code to email
   sendVerificationCode: catchAsync(async (req, res) => {
-
-
     const { email } = req.body;
     const result = await authService.sendVerificationCode(email);
     return sendSuccess(
@@ -67,8 +61,6 @@ const AuthController = {
 
   // Verify email with code only
   verifyEmail: catchAsync(async (req, res) => {
-
-
     const { code } = req.body;
     const result = await authService.verifyEmailByCode(code);
     return sendSuccess(
@@ -81,8 +73,6 @@ const AuthController = {
 
   // Request password reset (forgot password)
   forgotPassword: catchAsync(async (req, res) => {
-
-
     const { email } = req.body;
     const result = await authService.forgotPassword(email);
     return sendSuccess(
@@ -95,7 +85,6 @@ const AuthController = {
 
   // Reset password with code
   resetPassword: catchAsync(async (req, res) => {
-
     console.log("Reset password request body:", req.body);
     const { email, code, newPassword } = req.body;
     const result = await authService.resetPassword(email, code, newPassword);
@@ -110,7 +99,7 @@ const AuthController = {
   // Refresh access token
   refreshToken: catchAsync(async (req, res) => {
     // Lấy refresh token từ cookie (ưu tiên) hoặc body (fallback)
-    const refreshToken = req.cookies?.refreshToken || req.body.refreshToken;
+    const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
 
     if (!refreshToken) {
       return sendFail(
@@ -174,8 +163,6 @@ const AuthController = {
 
   // Change password (for authenticated user)
   changePassword: catchAsync(async (req, res) => {
-
-
     const { currentPassword, newPassword } = req.body;
     const userId = req.user?.userId;
 

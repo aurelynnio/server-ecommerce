@@ -45,7 +45,11 @@ router.post(
  * @access  Public
  * @body    { code }
  */
-router.post("/verify-code", validate(verifyEmailValidator), authController.verifyEmail);
+router.post(
+  "/verify-code",
+  validate(verifyEmailValidator),
+  authController.verifyEmail
+);
 
 /**
  * @route   POST /api/auth/forgot-password
@@ -96,4 +100,3 @@ router.post(
 );
 
 module.exports = router;
-
