@@ -1,4 +1,4 @@
-const User = require("../models/user.model");
+﻿const User = require("../models/user.model");
 const comparePassword = require("../utils/comparePassword");
 const hashPassword = require("../utils/hashPasword");
 const { getIO } = require("../socket/index");
@@ -6,6 +6,7 @@ const {
   sendEmailVerificationCode,
   sendPasswordResetCode,
 } = require("./email.service");
+const cacheService = require("./cache.service");
 
 /**
  * Service handling authentication logic
@@ -60,10 +61,10 @@ class AuthService {
 
     // Emit socket event
     const io = getIO();
-    if(io) {
+    if (io) {
       io.emit("new_user", {
         username: newUser.username,
-        _id: newUser._id
+        _id: newUser._id,
       });
     }
 
@@ -84,8 +85,6 @@ class AuthService {
    * @throws {Error} If credentials are invalid or email is not verified
    */
   async login(email, password) {
-
-
     // Find user by email
     const user = await User.findOne({ email }).lean();
     if (!user) {
@@ -141,17 +140,12 @@ class AuthService {
       throw new Error("Email already verified");
     }
 
-    // Check if code matches
-    if (user.codeVerifiEmail !== code) {
-      throw new Error("Invalid verification code");
-    }
+    // Check code in Redis
+    const cacheKey = `otp:email:${email}`;
+    const storedCode = await cacheService.get(cacheKey);
 
-    // Check if code expired
-    if (
-      user.expiresCodeVerifiEmail &&
-      user.expiresCodeVerifiEmail < new Date()
-    ) {
-      throw new Error("Verification code has expired");
+    if (!storedCode || storedCode !== code) {
+      throw new Error("Invalid or expired verification code");
     }
 
     // Update user
@@ -219,18 +213,16 @@ class AuthService {
 
     // Generate new code
     const verificationCode = this._generateVerificationCode();
-    const codeExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    user.codeVerifiEmail = verificationCode;
-    user.expiresCodeVerifiEmail = codeExpiry;
-    await user.save();
+    // Save to Redis (expire in 10 minutes)
+    await cacheService.set(`otp:email:${email}`, verificationCode, 600);
 
     // Send verification email
     try {
       // In development, log code to console
       if (process.env.NODE_ENV === "development") {
-        console.log("📧 Email Verification Code:", verificationCode);
-        console.log("📧 Code expires in 10 minutes");
+        console.log("ðŸ“§ Email Verification Code:", verificationCode);
+        console.log("ðŸ“§ Code expires in 10 minutes");
       }
       await sendEmailVerificationCode(email, verificationCode);
     } catch (error) {
@@ -238,7 +230,7 @@ class AuthService {
       // In development, still log the code
       if (process.env.NODE_ENV === "development") {
         console.log(
-          "⚠️  Email failed but you can use this code:",
+          "âš ï¸  Email failed but you can use this code:",
           verificationCode
         );
       }
@@ -261,11 +253,9 @@ class AuthService {
 
     // Generate password reset code
     const resetCode = this._generateVerificationCode();
-    const codeExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-    user.codeVerifiPassword = resetCode;
-    user.expiresCodeVerifiPassword = codeExpiry;
-    await user.save();
+    // Save to Redis (expire in 1 hour)
+    await cacheService.set(`otp:reset-password:${email}`, resetCode, 3600);
 
     // Send reset code via email
     try {
@@ -285,17 +275,12 @@ class AuthService {
       throw new Error("User not found");
     }
 
-    // Check if code matches
-    if (user.codeVerifiPassword !== code) {
-      throw new Error("Invalid reset code");
-    }
+    // Check code in Redis
+    const cacheKey = `otp:reset-password:${email}`;
+    const storedCode = await cacheService.get(cacheKey);
 
-    // Check if code expired
-    if (
-      user.expiresCodeVerifiPassword &&
-      user.expiresCodeVerifiPassword < new Date()
-    ) {
-      throw new Error("Reset code has expired");
+    if (!storedCode || storedCode !== code) {
+      throw new Error("Invalid or expired reset code");
     }
 
     // Hash new password
@@ -303,9 +288,10 @@ class AuthService {
 
     // Update password and clear reset code
     user.password = hashedPassword;
-    user.codeVerifiPassword = undefined;
-    user.expiresCodeVerifiPassword = undefined;
     await user.save();
+
+    // Clear Redis OTP
+    await cacheService.del(cacheKey);
 
     return { email: user.email };
   }

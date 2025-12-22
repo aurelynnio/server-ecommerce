@@ -1,4 +1,4 @@
-const Product = require("../models/product.model");
+﻿const Product = require("../models/product.model");
 const {
   getPaginationParams,
   buildPaginationResponse,
@@ -7,6 +7,7 @@ const Category = require("../models/category.model");
 const Review = require("../models/review.model");
 const { multiUpload } = require("../configs/cloudinary");
 const { getIO } = require("../socket/index");
+const cacheService = require("./cache.service");
 
 /**
  * Service handling product operations
@@ -45,6 +46,11 @@ class ProductService {
       sizes,
       rating,
     } = { ...filters, ...options };
+
+    // Redis Cache Key
+    const cacheKey = `products:all:${JSON.stringify({ filters, options })}`;
+    const cachedData = await cacheService.get(cacheKey);
+    if (cachedData) return cachedData;
 
     // Build query
     console.log("getAllProducts Filters:", { filters, options });
@@ -150,6 +156,10 @@ class ProductService {
    * @throws {Error} If product not found
    */
   async getProductById(id) {
+    const cacheKey = `products:id:${id}`;
+    const cachedProduct = await cacheService.get(cacheKey);
+    if (cachedProduct) return cachedProduct;
+
     const product = await Product.findById(id)
       .populate("category", "name slug")
       .populate("reviews");
@@ -158,10 +168,15 @@ class ProductService {
       throw new Error("Product not found");
     }
 
+    await cacheService.set(cacheKey, product, 3600); // 1 hour cache
     return product;
   }
 
   async getProductBySlug(slug) {
+    const cacheKey = `products:slug:${slug}`;
+    const cachedProduct = await cacheService.get(cacheKey);
+    if (cachedProduct) return cachedProduct;
+
     const product = await Product.findOne({ slug })
       .populate("category", "name slug")
       .populate("reviews");
@@ -170,6 +185,7 @@ class ProductService {
       throw new Error("Product not found");
     }
 
+    await cacheService.set(cacheKey, product, 3600);
     return product;
   }
   // Create new product
@@ -187,48 +203,59 @@ class ProductService {
 
     // Handle image files
     if (files && files.length > 0) {
-        // Collect all buffers to upload
-        const filesToUpload = files.map((file) => ({
-            buffer: file.buffer,
-            fieldname: file.fieldname
-        }));
-        
-        // Upload all files concurrently
-        const uploadResults = await multiUpload(filesToUpload.map(f => f.buffer), "products");
-        
-        // Map uploads back to their original fields
-        const uploads = uploadResults.map((result, index) => ({
-            ...result,
-            fieldname: filesToUpload[index].fieldname
-        }));
+      // Collect all buffers to upload
+      const filesToUpload = files.map((file) => ({
+        buffer: file.buffer,
+        fieldname: file.fieldname,
+      }));
 
-        // Process main product images
-        const mainImages = uploads.filter(u => u.fieldname === "images");
-        if(mainImages.length > 0) {
-             productData.images = mainImages.map(u => u.secure_url);
-        }
+      // Upload all files concurrently
+      const uploadResults = await multiUpload(
+        filesToUpload.map((f) => f.buffer),
+        "products"
+      );
 
-        // Process variant images
-        if (productData.variants && Array.isArray(productData.variants)) {
-            productData.variants = productData.variants.map((variant, index) => {
-                const variantImages = uploads.filter(u => u.fieldname === `variantImages_${index}`);
-                if (variantImages.length > 0) {
-                     return { ...variant, images: variantImages.map(u => u.secure_url) };
-                }
-                return variant;
-            });
-        }
+      // Map uploads back to their original fields
+      const uploads = uploadResults.map((result, index) => ({
+        ...result,
+        fieldname: filesToUpload[index].fieldname,
+      }));
+
+      // Process main product images
+      const mainImages = uploads.filter((u) => u.fieldname === "images");
+      if (mainImages.length > 0) {
+        productData.images = mainImages.map((u) => u.secure_url);
+      }
+
+      // Process variant images
+      if (productData.variants && Array.isArray(productData.variants)) {
+        productData.variants = productData.variants.map((variant, index) => {
+          const variantImages = uploads.filter(
+            (u) => u.fieldname === `variantImages_${index}`
+          );
+          if (variantImages.length > 0) {
+            return {
+              ...variant,
+              images: variantImages.map((u) => u.secure_url),
+            };
+          }
+          return variant;
+        });
+      }
     }
 
     const product = new Product(productData);
     await product.save();
 
+    // Invalidate cache
+    await cacheService.delByPattern("products:*");
+
     // Emit socket event
     const io = getIO();
-    if(io) {
+    if (io) {
       io.emit("new_product", {
         name: product.name,
-        _id: product._id
+        _id: product._id,
       });
     }
 
@@ -239,7 +266,6 @@ class ProductService {
   async updateProduct(id, data, files) {
     try {
       const updateData = { ...data };
-
 
       if (updateData.slug) {
         const existingProduct = await Product.findOne({
@@ -255,44 +281,46 @@ class ProductService {
       const variantUploadMap = {};
 
       if (files && files.length > 0) {
-          const buffers = files.map((file) => file.buffer);
-          const uploads = await multiUpload(buffers, "products");
-          
-          files.forEach((file, idx) => {
-               if(file.fieldname === "images") {
-                   newImages.push(uploads[idx].secure_url);
-               } else if (file.fieldname.startsWith("variantImages_")) {
-                   const variantIndex = parseInt(file.fieldname.split("_")[1]);
-                    if (!variantUploadMap[variantIndex]) variantUploadMap[variantIndex] = [];
-                    variantUploadMap[variantIndex].push(uploads[idx].secure_url);
-               }
-           });
+        const buffers = files.map((file) => file.buffer);
+        const uploads = await multiUpload(buffers, "products");
+
+        files.forEach((file, idx) => {
+          if (file.fieldname === "images") {
+            newImages.push(uploads[idx].secure_url);
+          } else if (file.fieldname.startsWith("variantImages_")) {
+            const variantIndex = parseInt(file.fieldname.split("_")[1]);
+            if (!variantUploadMap[variantIndex])
+              variantUploadMap[variantIndex] = [];
+            variantUploadMap[variantIndex].push(uploads[idx].secure_url);
+          }
+        });
       }
 
       let currentImages = data.existingImages || [];
 
       if (data.existingImages || (files && files.length > 0)) {
-           if(currentImages.length > 0 || newImages.length > 0) {
-                updateData.images = [...currentImages, ...newImages];
-           }
+        if (currentImages.length > 0 || newImages.length > 0) {
+          updateData.images = [...currentImages, ...newImages];
+        }
       }
-      
+
       if (updateData.variants && Array.isArray(updateData.variants)) {
-           updateData.variants = updateData.variants.map((variant, index) => {
-               const variantData = { ...variant };
-               if (variantData._id && variantData._id.startsWith("temp-")) {
-                   delete variantData._id;
-               }
+        updateData.variants = updateData.variants.map((variant, index) => {
+          const variantData = { ...variant };
+          if (variantData._id && variantData._id.startsWith("temp-")) {
+            delete variantData._id;
+          }
 
-               if (variantUploadMap[index]) {
-                    const existingVariantImages = variantData.images || [];
-                    variantData.images = [...existingVariantImages, ...variantUploadMap[index]];
-               }
-               return variantData;
-           });
-       }
-
-
+          if (variantUploadMap[index]) {
+            const existingVariantImages = variantData.images || [];
+            variantData.images = [
+              ...existingVariantImages,
+              ...variantUploadMap[index],
+            ];
+          }
+          return variantData;
+        });
+      }
 
       const product = await Product.findByIdAndUpdate(id, updateData, {
         new: true,
@@ -302,6 +330,9 @@ class ProductService {
       if (!product) {
         throw new Error("Product not found");
       }
+
+      // Invalidate cache
+      await cacheService.delByPattern("products:*");
 
       return product;
     } catch (error) {
@@ -322,6 +353,8 @@ class ProductService {
       throw new Error("Product not found");
     }
 
+    await cacheService.delByPattern("products:*");
+
     return product;
   }
 
@@ -333,6 +366,8 @@ class ProductService {
       throw new Error("Product not found");
     }
 
+    await cacheService.delByPattern("products:*");
+
     return product;
   }
 
@@ -341,11 +376,11 @@ class ProductService {
     const allowedVariantData = { ...variantData };
 
     if (files && files.length > 0) {
-        const buffers = files.map((file) => file.buffer);
-        const uploads = await multiUpload(buffers, "products");
-        allowedVariantData.images = uploads.map((upload) => upload.secure_url);
+      const buffers = files.map((file) => file.buffer);
+      const uploads = await multiUpload(buffers, "products");
+      allowedVariantData.images = uploads.map((upload) => upload.secure_url);
     } else if (variantData.images) {
-        allowedVariantData.images = variantData.images;
+      allowedVariantData.images = variantData.images;
     }
 
     const existingProduct = await Product.findOne({
@@ -371,9 +406,9 @@ class ProductService {
 
   // Update variant
   async updateVariant(productId, variantId, variantData) {
-    const allowedVariantData = { 
-        ...variantData,
-        _id: variantId 
+    const allowedVariantData = {
+      ...variantData,
+      _id: variantId,
     };
 
     const product = await Product.findOneAndUpdate(
@@ -506,7 +541,7 @@ class ProductService {
   async getFeaturedProductsSimple(limit = 10) {
     const products = await Product.find({ isActive: true })
       .populate("category", "name slug")
-      .sort("-createdAt") 
+      .sort("-createdAt")
       .limit(Number(limit))
       .lean();
     if (!products) {
@@ -518,6 +553,10 @@ class ProductService {
 
   // Get featured products (simple - 10 items only)
   async getFeaturedProducts(query) {
+    const cacheKey = "products:featured";
+    const cachedProducts = await cacheService.get(cacheKey);
+    if (cachedProducts) return cachedProducts;
+
     const filter = {
       isActive: true,
       isFeatured: true,
@@ -529,11 +568,16 @@ class ProductService {
       .limit(10)
       .lean();
 
+    await cacheService.set(cacheKey, products, 1800); // 30 mins cache
     return products;
   }
 
   // Get new arrival products (simple - 10 items only)
   async getNewArrivalProducts(query) {
+    const cacheKey = "products:new-arrivals";
+    const cachedProducts = await cacheService.get(cacheKey);
+    if (cachedProducts) return cachedProducts;
+
     const filter = {
       isActive: true,
       isNewArrival: true,
@@ -545,15 +589,20 @@ class ProductService {
       .limit(10)
       .lean();
 
+    await cacheService.set(cacheKey, products, 1800);
     return products;
   }
 
   // Get products on sale (simple - 10 items only)
   async getOnSaleProducts(query) {
+    const cacheKey = "products:on-sale";
+    const cachedProducts = await cacheService.get(cacheKey);
+    if (cachedProducts) return cachedProducts;
+
     const filter = {
       isActive: true,
       onSale: true,
-      "price.discountPrice": { $ne: null }, // Chỉ lấy sản phẩm có giá giảm
+      "price.discountPrice": { $ne: null },
     };
 
     const products = await Product.find(filter)
@@ -562,10 +611,15 @@ class ProductService {
       .limit(10)
       .lean();
 
+    await cacheService.set(cacheKey, products, 1800);
     return products;
   }
   // Search products (optimized for search bar/autocomplete)
   async searchProducts(keyword, limit = 10) {
+    const cacheKey = `products:search:${keyword}:${limit}`;
+    const cachedProducts = await cacheService.get(cacheKey);
+    if (cachedProducts) return cachedProducts;
+
     const query = {
       isActive: true,
       $or: [
@@ -581,6 +635,7 @@ class ProductService {
       .limit(Number(limit))
       .lean();
 
+    await cacheService.set(cacheKey, products, 600); // 10 mins cache
     return products;
   }
 

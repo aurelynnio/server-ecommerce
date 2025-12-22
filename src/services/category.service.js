@@ -2,6 +2,7 @@ const Category = require("../models/category.model");
 const Product = require("../models/product.model");
 const slugify = require("slugify");
 const { getPaginationParams } = require("../utils/pagination");
+const cacheService = require("./cache.service");
 
 /**
  * Service handling category operations
@@ -50,6 +51,7 @@ class CategoryService {
     }
 
     const category = await Category.create(categoryData);
+    await cacheService.delByPattern("categories:*");
     return category;
   }
 
@@ -66,8 +68,6 @@ class CategoryService {
    */
   async getAllCategories(filters = {}) {
     const { page, limit, isActive, parentCategory, search } = filters;
-
-
 
     // Build query
     const query = {};
@@ -255,6 +255,8 @@ class CategoryService {
     Object.assign(category, updateData);
     await category.save();
 
+    await cacheService.delByPattern("categories:*");
+
     return category;
   }
 
@@ -288,11 +290,17 @@ class CategoryService {
 
     await category.deleteOne();
 
+    await cacheService.delByPattern("categories:*");
+
     return { message: "Category deleted successfully" };
   }
 
   // Get category tree (hierarchical structure)
   async getCategoryTree() {
+    const cacheKey = "categories:tree";
+    const cachedTree = await cacheService.get(cacheKey);
+    if (cachedTree) return cachedTree;
+
     // Get all root categories (no parent)
     const rootCategories = await Category.find({
       parentCategory: null,
@@ -341,6 +349,7 @@ class CategoryService {
       return result;
     });
 
+    await cacheService.set(cacheKey, tree, 86400); // 24 hours
     return tree;
   }
 

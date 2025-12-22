@@ -9,29 +9,36 @@ const PORT = process.env.PORT || 3000;
 
 initSocket(server);
 
-const startServer = () => {
-  connectDB()
-    .then(() => {
-      console.log("Database connected successfully");
-    })
-    .catch((error) => {
-      console.error("Failed to connect to the database:", error);
-    });
+const { connectRabbitMQ } = require("./configs/rabbitmq.config");
+const redis = require("./configs/redis.config");
 
-  server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-  });
+const startServer = async () => {
+  try {
+    await connectDB();
+    console.log("Database connected successfully");
+
+    await connectRabbitMQ();
+
+    server.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
 };
 
 if (cluster.isPrimary) {
-  const numWorkers = require('os').cpus().length;
-  console.log(`Primary ${process.pid} is running. Forking ${numWorkers} workers...`);
+  const numWorkers = require("os").cpus().length;
+  console.log(
+    `Primary ${process.pid} is running. Forking ${numWorkers} workers...`
+  );
 
   for (let i = 0; i < numWorkers; i++) {
     cluster.fork();
   }
 
-  cluster.on('exit', (worker, code, signal) => {
+  cluster.on("exit", (worker, code, signal) => {
     console.log(`Worker ${worker.process.pid} died. Forking a new worker...`);
     cluster.fork();
   });
