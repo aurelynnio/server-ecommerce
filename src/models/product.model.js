@@ -1,11 +1,14 @@
 const { Schema, model, Types } = require("mongoose");
 const slugify = require("slugify");
 
-const priceSchema = new Schema({
-  currentPrice: { type: Number, required: true },
-  discountPrice: { type: Number, default: null },
-  currency: { type: String, required: true, default: "VND" },
-});
+const priceSchema = new Schema(
+  {
+    currentPrice: { type: Number, required: true },
+    discountPrice: { type: Number, default: null },
+    currency: { type: String, required: true, default: "VND" },
+  },
+  { _id: false }
+);
 
 const variantSchema = new Schema({
   sku: { type: String, required: true, unique: true, sparse: true },
@@ -28,7 +31,7 @@ const productSchema = new Schema(
     variants: [variantSchema],
     reviews: [{ type: Types.ObjectId, ref: "Review" }],
     tags: { type: [String], default: [] },
-    soldCount: { type: Number, default: 0 }, 
+    soldCount: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true },
     isNewArrival: { type: Boolean, default: false },
     isFeatured: { type: Boolean, default: false },

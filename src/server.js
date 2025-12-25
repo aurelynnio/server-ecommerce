@@ -1,7 +1,6 @@
+require("dotenv").config();
 const { server } = require("./app");
 const connectDB = require("./db/connect.db");
-const dotenv = require("dotenv");
-dotenv.config();
 const cluster = require("cluster");
 const { initSocket } = require("./socket");
 
@@ -28,10 +27,10 @@ const startServer = async () => {
   }
 };
 
-if (cluster.isPrimary) {
+if (cluster.isPrimary && process.env.NODE_ENV === "production") {
   const numWorkers = require("os").cpus().length;
   console.log(
-    `Primary ${process.pid} is running. Forking ${numWorkers} workers...`
+    `Primary ${process.pid} is running in production mode. Forking ${numWorkers} workers...`
   );
 
   for (let i = 0; i < numWorkers; i++) {
@@ -43,5 +42,9 @@ if (cluster.isPrimary) {
     cluster.fork();
   });
 } else {
+  // In development, we don't need cluster
+  if (cluster.isPrimary) {
+    console.log(`Server starting in ${process.env.NODE_ENV} mode...`);
+  }
   startServer();
 }

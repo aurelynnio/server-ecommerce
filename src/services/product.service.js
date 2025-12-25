@@ -296,12 +296,8 @@ class ProductService {
         });
       }
 
-      let currentImages = data.existingImages || [];
-
-      if (data.existingImages || (files && files.length > 0)) {
-        if (currentImages.length > 0 || newImages.length > 0) {
-          updateData.images = [...currentImages, ...newImages];
-        }
+      if (data.existingImages !== undefined || newImages.length > 0) {
+        updateData.images = [...(data.existingImages || []), ...newImages];
       }
 
       if (updateData.variants && Array.isArray(updateData.variants)) {
