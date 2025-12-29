@@ -129,8 +129,8 @@ router.put(
   "/:id",
   verifyAccessToken,
   requireRole("admin"),
-  upload.any(), // Allow any files (images, variantImages_0, etc.)
-  parseJsonFields(["price", "variants", "tags", "existingImages"]),
+  upload.any(), // Allow any files (variantImages_0, etc.)
+  parseJsonFields(["price", "variants", "tags"]),
   validate({ params: mongoIdParamValidator, body: updateProductValidator }),
   productController.updateProduct
 );

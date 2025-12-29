@@ -33,7 +33,6 @@ const consumeFromQueue = async (queueName, callback) => {
           channel.ack(msg);
         } catch (error) {
           console.error("Error processing message:", error);
-          // Optionally nack to requeue
           channel.nack(msg, false, true);
         }
       }

@@ -26,7 +26,6 @@ const productSchema = new Schema(
     slug: { type: String, unique: true, lowercase: true },
     category: { type: Types.ObjectId, ref: "Category" },
     brand: { type: String },
-    images: { type: [String], default: [] },
     price: priceSchema,
     variants: [variantSchema],
     reviews: [{ type: Types.ObjectId, ref: "Review" }],

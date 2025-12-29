@@ -53,4 +53,12 @@ const sensitiveLimiter = createLimiter({
   prefix: "sensitive",
 });
 
-module.exports = { globalLimiter, authLimiter, sensitiveLimiter };
+// 4. Limiter for Chatbot - Prevent spam
+const chatbotLimiter = createLimiter({
+  minutes: 1,
+  max: 30,
+  message: "Bạn đang gửi tin nhắn quá nhanh. Vui lòng chờ một chút.",
+  prefix: "chatbot",
+});
+
+module.exports = { globalLimiter, authLimiter, sensitiveLimiter, chatbotLimiter };

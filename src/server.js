@@ -42,7 +42,6 @@ if (cluster.isPrimary && process.env.NODE_ENV === "production") {
     cluster.fork();
   });
 } else {
-  // In development, we don't need cluster
   if (cluster.isPrimary) {
     console.log(`Server starting in ${process.env.NODE_ENV} mode...`);
   }

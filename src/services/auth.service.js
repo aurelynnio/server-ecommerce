@@ -219,21 +219,8 @@ class AuthService {
 
     // Send verification email
     try {
-      // In development, log code to console
-      if (process.env.NODE_ENV === "development") {
-        console.log("ðŸ“§ Email Verification Code:", verificationCode);
-        console.log("ðŸ“§ Code expires in 10 minutes");
-      }
       await sendEmailVerificationCode(email, verificationCode);
     } catch (error) {
-      console.error("Failed to send verification email:", error);
-      // In development, still log the code
-      if (process.env.NODE_ENV === "development") {
-        console.log(
-          "âš ï¸  Email failed but you can use this code:",
-          verificationCode
-        );
-      }
       throw new Error("Failed to send verification email. Please try again.");
     }
 

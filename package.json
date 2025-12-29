@@ -16,6 +16,9 @@
     "express": "^5.1.0"
   },
   "dependencies": {
+    "@langchain/core": "^1.1.8",
+    "@langchain/mistralai": "^1.0.2",
+    "@langchain/mongodb": "^1.1.0",
     "amqplib": "^0.10.9",
     "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
@@ -29,6 +32,7 @@
     "ioredis": "^5.8.2",
     "joi": "^18.0.1",
     "jsonwebtoken": "^9.0.2",
+    "langchain": "^1.2.3",
     "mongoose": "^8.19.3",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
@@ -37,6 +41,7 @@
     "rate-limit-redis": "^4.3.1",
     "slugify": "^1.6.6",
     "socket.io": "^4.8.1",
-    "vnpay": "^2.4.4"
+    "vnpay": "^2.4.4",
+    "zod": "^4.2.1"
   }
 }

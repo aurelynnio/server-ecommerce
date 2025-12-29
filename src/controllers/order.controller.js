@@ -3,12 +3,9 @@ const orderService = require("../services/order.service");
 const { StatusCodes } = require("http-status-codes");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 
-
 const OrderController = {
   // Create order from cart
   createOrder: catchAsync(async (req, res) => {
-
-
     const userId = req.user.userId;
     const order = await orderService.createOrder(userId, req.body);
 
@@ -65,7 +62,10 @@ const OrderController = {
 
   // Update order status (Admin only)
   updateOrderStatus: catchAsync(async (req, res) => {
-    const order = await orderService.updateOrderStatus(req.params.orderId, req.body.status);
+    const order = await orderService.updateOrderStatus(
+      req.params.orderId,
+      req.body.status
+    );
 
     return sendSuccess(
       res,

@@ -91,10 +91,11 @@ class OrderService {
       subtotal += itemPrice * item.quantity;
 
       // Add product to order
+      const productImage = variant?.images?.[0] || product.variants?.[0]?.images?.[0] || "";
       orderProducts.push({
         productId: product._id,
         name: product.name,
-        image: product.images[0] || "",
+        image: productImage,
         quantity: item.quantity,
         price: item.price,
         ...variantInfo,

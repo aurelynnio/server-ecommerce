@@ -1,6 +1,5 @@
 const { consumeFromQueue } = require("../utils/rabbitmq.util");
-// Assuming there's a notification service to actually send emails/messages
-// const notificationService = require('./notification.service');
+
 
 const initNotificationWorker = async () => {
   console.log("Notification Worker initialized");

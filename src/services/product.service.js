@@ -221,12 +221,6 @@ class ProductService {
         fieldname: filesToUpload[index].fieldname,
       }));
 
-      // Process main product images
-      const mainImages = uploads.filter((u) => u.fieldname === "images");
-      if (mainImages.length > 0) {
-        productData.images = mainImages.map((u) => u.secure_url);
-      }
-
       // Process variant images
       if (productData.variants && Array.isArray(productData.variants)) {
         productData.variants = productData.variants.map((variant, index) => {
@@ -277,27 +271,20 @@ class ProductService {
         }
       }
 
-      let newImages = [];
-      const variantUploadMap = {};
+      let variantUploadMap = {};
 
       if (files && files.length > 0) {
         const buffers = files.map((file) => file.buffer);
         const uploads = await multiUpload(buffers, "products");
 
         files.forEach((file, idx) => {
-          if (file.fieldname === "images") {
-            newImages.push(uploads[idx].secure_url);
-          } else if (file.fieldname.startsWith("variantImages_")) {
+          if (file.fieldname.startsWith("variantImages_")) {
             const variantIndex = parseInt(file.fieldname.split("_")[1]);
             if (!variantUploadMap[variantIndex])
               variantUploadMap[variantIndex] = [];
             variantUploadMap[variantIndex].push(uploads[idx].secure_url);
           }
         });
-      }
-
-      if (data.existingImages !== undefined || newImages.length > 0) {
-        updateData.images = [...(data.existingImages || []), ...newImages];
       }
 
       if (updateData.variants && Array.isArray(updateData.variants)) {

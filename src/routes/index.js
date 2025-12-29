@@ -10,6 +10,7 @@ const discountRouter = require("./discount.router");
 const statisticsRouter = require("./statistics.router");
 const paymentRouter = require("./payment.router");
 const bannerRouter = require("./banner.router");
+const chatbotRouter = require("./chatbot.router");
 
 
 const initRoutes = (app) => {
@@ -25,6 +26,7 @@ const initRoutes = (app) => {
   app.use("/api/statistics", statisticsRouter);
   app.use("/api/payment", paymentRouter);
   app.use("/api/banners", bannerRouter);
+  app.use("/api/chatbot", chatbotRouter);
 
 };
 
