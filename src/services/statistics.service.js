@@ -30,7 +30,7 @@ class StatisticsService {
     const topProducts = await Product.find()
       .sort({ soldCount: -1 })
       .limit(5)
-      .select("name price soldCount images slug")
+      .select("name price soldCount variants slug")
       .lean();
     
     // 4. Monthly Revenue & Orders (Last 6 months) for Chart
