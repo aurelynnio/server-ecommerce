@@ -12,7 +12,7 @@ const server = http.createServer(app);
 app.use(morgan("dev"));
 app.use(
   cors({
-    origin: "http://localhost:3000",
+    origin: "https://etiso.me" || "http://localhost:3000",
     credentials: true,
     allowedHeaders: ["Authorization", "Content-Type"],
   })
