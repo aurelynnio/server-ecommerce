@@ -3,11 +3,8 @@ const catchAsync = require("../configs/catchAsync");
 const { StatusCodes } = require("http-status-codes");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 
-
 const notificationController = {
   createNotification: catchAsync(async (req, res) => {
-
-
     const notification = await notificationService.createNotification({
       ...req.body,
       userId: req.user.userId,
@@ -22,12 +19,13 @@ const notificationController = {
   }),
 
   getListNotification: catchAsync(async (req, res) => {
-
-
-    const result = await notificationService.getListNotification(req.user.userId, {
-      page: req.query.page || 1,
-      limit: req.query.limit || 10,
-    });
+    const result = await notificationService.getListNotification(
+      req.user.userId,
+      {
+        page: req.query.page || 1,
+        limit: req.query.limit || 10,
+      }
+    );
 
     // Transform result to match standard pagination structure
     const response = {
@@ -39,7 +37,7 @@ const notificationController = {
         totalPages: result.meta.totalPages,
       },
       // Keep unreadCount accessible
-      unreadCount: result.meta.unreadCount
+      unreadCount: result.meta.unreadCount,
     };
 
     return sendSuccess(
@@ -52,7 +50,7 @@ const notificationController = {
 
   markReadAll: catchAsync(async (req, res) => {
     await notificationService.markReadAll(req.user.userId);
-    
+
     return sendSuccess(
       res,
       null,
@@ -63,7 +61,7 @@ const notificationController = {
 
   cleanNotification: catchAsync(async (req, res) => {
     await notificationService.cleanNotification(req.user.userId);
-    
+
     return sendSuccess(
       res,
       null,
@@ -74,7 +72,7 @@ const notificationController = {
 
   countUnread: catchAsync(async (req, res) => {
     const count = await notificationService.countUnread(req.user.userId);
-    
+
     return sendSuccess(
       res,
       { count },
@@ -85,10 +83,13 @@ const notificationController = {
 
   getNotificationById: catchAsync(async (req, res) => {
     const { id } = req.params;
-    const notification = await notificationService.getNotificationById(id, req.user.userId);
+    const notification = await notificationService.getNotificationById(
+      id,
+      req.user.userId
+    );
     return sendSuccess(
-      res, 
-      notification, 
+      res,
+      notification,
       "Get notification details successfully",
       StatusCodes.OK
     );
@@ -97,11 +98,14 @@ const notificationController = {
   updateNotification: catchAsync(async (req, res) => {
     const { id } = req.params;
 
-
-    const notification = await notificationService.updateNotification(id, req.user.userId, req.body);
+    const notification = await notificationService.updateNotification(
+      id,
+      req.user.userId,
+      req.body
+    );
     return sendSuccess(
-      res, 
-      notification, 
+      res,
+      notification,
       "Update notification successfully",
       StatusCodes.OK
     );

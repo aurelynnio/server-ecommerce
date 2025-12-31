@@ -3,7 +3,6 @@ const discountService = require("../services/discount.service");
 const { StatusCodes } = require("http-status-codes");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 
-
 const DiscountController = {
   // Create discount (Admin only)
   createDiscount: catchAsync(async (req, res) => {
@@ -20,7 +19,7 @@ const DiscountController = {
   // Get all discounts (Admin only)
   getAllDiscounts: catchAsync(async (req, res) => {
     const result = await discountService.getAllDiscounts(req.query);
-    console.log(`Data tu controller discount`, result)
+    console.log(`Data tu controller discount`, result);
 
     return sendSuccess(
       res,
@@ -44,7 +43,9 @@ const DiscountController = {
 
   // Get discount by ID
   getDiscountById: catchAsync(async (req, res) => {
-    const discount = await discountService.getDiscountById(req.params.discountId);
+    const discount = await discountService.getDiscountById(
+      req.params.discountId
+    );
 
     return sendSuccess(
       res,
