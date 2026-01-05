@@ -13,25 +13,53 @@ const {
   getOrdersQueryValidator,
 } = require("../validations/order.validator");
 
-// User routes (require authentication)
+/**
+ * User Routes (Authenticated)
+ */
+
+/**
+ * @route   POST /api/orders
+ * @desc    Create a new order from cart items
+ * @access  Private (Authenticated users)
+ * @body    { cartItemIds, shippingAddress, paymentMethod, discountCode?, note? }
+ */
 router.post(
   "/",
   verifyAccessToken,
   validate(createOrderValidator),
   orderController.createOrder
 );
+
+/**
+ * @route   GET /api/orders
+ * @desc    Get current user's orders with pagination
+ * @access  Private (Authenticated users)
+ * @query   page, limit, status, paymentStatus, paymentMethod
+ */
 router.get(
   "/",
   verifyAccessToken,
   validate({ query: getOrdersQueryValidator }),
   orderController.getUserOrders
 );
+
+/**
+ * @route   GET /api/orders/:orderId
+ * @desc    Get order details by ID
+ * @access  Private (Authenticated users - own orders, Admin - all orders)
+ */
 router.get(
   "/:orderId",
   verifyAccessToken,
   validate({ params: orderIdParamValidator }),
   orderController.getOrderById
 );
+
+/**
+ * @route   DELETE /api/orders/:orderId/cancel
+ * @desc    Cancel an order
+ * @access  Private (Authenticated users - own orders, Admin - all orders)
+ */
 router.delete(
   "/:orderId/cancel",
   verifyAccessToken,
@@ -39,7 +67,16 @@ router.delete(
   orderController.cancelOrder
 );
 
-// Admin routes (require admin role)
+/**
+ * Admin Routes
+ */
+
+/**
+ * @route   GET /api/orders/all/list
+ * @desc    Get all orders with filters (Admin)
+ * @access  Private (Admin only)
+ * @query   page, limit, status, paymentStatus, paymentMethod, userId, search, startDate, endDate
+ */
 router.get(
   "/all/list",
   verifyAccessToken,
@@ -47,6 +84,13 @@ router.get(
   validate({ query: getOrdersQueryValidator }),
   orderController.getAllOrders
 );
+
+/**
+ * @route   PUT /api/orders/:orderId/status
+ * @desc    Update order status
+ * @access  Private (Admin only)
+ * @body    { status }
+ */
 router.put(
   "/:orderId/status",
   verifyAccessToken,
@@ -57,6 +101,12 @@ router.put(
   }),
   orderController.updateOrderStatus
 );
+
+/**
+ * @route   GET /api/orders/statistics/overview
+ * @desc    Get order statistics overview
+ * @access  Private (Admin only)
+ */
 router.get(
   "/statistics/overview",
   verifyAccessToken,
@@ -65,4 +115,3 @@ router.get(
 );
 
 module.exports = router;
-

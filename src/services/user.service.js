@@ -208,6 +208,38 @@ class UserService {
     return user.addresses;
   }
 
+  /**
+   * Set an address as the default address
+   * @param {string} userId - User ID
+   * @param {string} addressId - Address ID to set as default
+   * @returns {Promise<Array>} Updated addresses array
+   * @throws {Error} If user or address not found
+   */
+  async setDefaultAddress(userId, addressId) {
+    const user = await userModel.findById(userId);
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const address = user.addresses.id(addressId);
+    if (!address) {
+      throw new Error("Address not found");
+    }
+
+    // Reset all addresses to non-default
+    user.addresses.forEach((addr) => {
+      addr.isDefault = false;
+    });
+
+    // Set the selected address as default
+    address.isDefault = true;
+
+    await user.save();
+
+    return user.addresses;
+  }
+
   // Change password
   async changePassword(userId, oldPassword, newPassword) {
     const user = await userModel.findById(userId);

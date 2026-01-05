@@ -143,6 +143,24 @@ const UserController = {
     );
   }),
 
+  /**
+   * Set an address as the default address
+   * @route PUT /api/users/address/:addressId/default
+   */
+  setDefaultAddress: catchAsync(async (req, res) => {
+    const userId = req.user.userId;
+    const addresses = await userService.setDefaultAddress(
+      userId,
+      req.params.addressId
+    );
+    return sendSuccess(
+      res,
+      addresses,
+      "Default address set successfully",
+      StatusCodes.OK
+    );
+  }),
+
   // Change password
   changePassword: catchAsync(async (req, res) => {
     const userId = req.user.userId;

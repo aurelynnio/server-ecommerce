@@ -3,7 +3,14 @@ const catchAsync = require("../configs/catchAsync");
 const { StatusCodes } = require("http-status-codes");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 
-const notificationController = {
+/**
+ * Controller for handling notification operations
+ */
+const NotificationController = {
+  /**
+   * Create a new notification
+   * @route POST /api/notifications
+   */
   createNotification: catchAsync(async (req, res) => {
     const notification = await notificationService.createNotification({
       ...req.body,
@@ -18,6 +25,10 @@ const notificationController = {
     );
   }),
 
+  /**
+   * Get list of notifications for current user
+   * @route GET /api/notifications
+   */
   getListNotification: catchAsync(async (req, res) => {
     const result = await notificationService.getListNotification(
       req.user.userId,
@@ -48,6 +59,10 @@ const notificationController = {
     );
   }),
 
+  /**
+   * Mark all notifications as read
+   * @route PATCH /api/notifications/read-all
+   */
   markReadAll: catchAsync(async (req, res) => {
     await notificationService.markReadAll(req.user.userId);
 
@@ -59,6 +74,10 @@ const notificationController = {
     );
   }),
 
+  /**
+   * Delete all notifications for current user
+   * @route DELETE /api/notifications
+   */
   cleanNotification: catchAsync(async (req, res) => {
     await notificationService.cleanNotification(req.user.userId);
 
@@ -70,6 +89,10 @@ const notificationController = {
     );
   }),
 
+  /**
+   * Count unread notifications
+   * @route GET /api/notifications/count
+   */
   countUnread: catchAsync(async (req, res) => {
     const count = await notificationService.countUnread(req.user.userId);
 
@@ -81,6 +104,10 @@ const notificationController = {
     );
   }),
 
+  /**
+   * Get notification by ID
+   * @route GET /api/notifications/:id
+   */
   getNotificationById: catchAsync(async (req, res) => {
     const { id } = req.params;
     const notification = await notificationService.getNotificationById(
@@ -95,6 +122,10 @@ const notificationController = {
     );
   }),
 
+  /**
+   * Update notification by ID
+   * @route PATCH /api/notifications/:id
+   */
   updateNotification: catchAsync(async (req, res) => {
     const { id } = req.params;
 
@@ -112,4 +143,4 @@ const notificationController = {
   }),
 };
 
-module.exports = notificationController;
+module.exports = NotificationController;

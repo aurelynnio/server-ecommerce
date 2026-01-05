@@ -18,6 +18,10 @@ const startServer = async () => {
 
     await connectRabbitMQ();
 
+    // Initialize Workers
+    const { initWorkers } = require("./workers");
+    await initWorkers();
+
     server.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
     });

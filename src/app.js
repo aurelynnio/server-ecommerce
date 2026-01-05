@@ -10,9 +10,24 @@ const server = http.createServer(app);
 
 // Middlewares
 app.use(morgan("dev"));
+
+// CORS Configuration
+const allowedOrigins = process.env.NODE_ENV === "production"
+  ? [process.env.FRONTEND_URL]
+  : ["http://localhost:3000", "http://localhost:3001", "https://etiso.me"];
+
 app.use(
   cors({
-    origin: "https://etiso.me" || "http://localhost:3000",
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
     allowedHeaders: ["Authorization", "Content-Type"],
   })

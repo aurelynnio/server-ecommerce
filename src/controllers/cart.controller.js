@@ -3,9 +3,14 @@ const cartService = require("../services/cart.service");
 const { StatusCodes } = require("http-status-codes");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 
-
+/**
+ * Controller for handling shopping cart operations
+ */
 const CartController = {
-  // Get user's cart
+  /**
+   * Get user's shopping cart
+   * @route GET /api/cart
+   */
   getCart: catchAsync(async (req, res) => {
     const userId = req.user.userId;
     const cart = await cartService.getCart(userId);
@@ -18,10 +23,11 @@ const CartController = {
     );
   }),
 
-  // Add item to cart
+  /**
+   * Add item to cart
+   * @route POST /api/cart
+   */
   addToCart: catchAsync(async (req, res) => {
-
-
     const userId = req.user.userId;
     const cart = await cartService.addToCart(userId, req.body);
 
@@ -33,12 +39,17 @@ const CartController = {
     );
   }),
 
-  // Update cart item quantity
+  /**
+   * Update cart item quantity
+   * @route PUT /api/cart/:itemId
+   */
   updateCartItem: catchAsync(async (req, res) => {
-
-
     const userId = req.user.userId;
-    const cart = await cartService.updateCartItem(userId, req.params.itemId, req.body.quantity);
+    const cart = await cartService.updateCartItem(
+      userId,
+      req.params.itemId,
+      req.body.quantity
+    );
 
     return sendSuccess(
       res,
@@ -48,8 +59,12 @@ const CartController = {
     );
   }),
 
-  // Remove item from cart
+  /**
+   * Remove item from cart
+   * @route DELETE /api/cart/:itemId
+   */
   removeCartItem: catchAsync(async (req, res) => {
+    const userId = req.user.userId;
     const { itemId } = req.params;
 
     const cart = await cartService.removeCartItem(userId, itemId);
@@ -62,7 +77,10 @@ const CartController = {
     );
   }),
 
-  // Clear cart
+  /**
+   * Clear all items from cart
+   * @route DELETE /api/cart
+   */
   clearCart: catchAsync(async (req, res) => {
     const userId = req.user.userId;
     const cart = await cartService.clearCart(userId);
@@ -70,7 +88,10 @@ const CartController = {
     return sendSuccess(res, cart, "Cart cleared successfully", StatusCodes.OK);
   }),
 
-  // Get cart item count
+  /**
+   * Get cart item count
+   * @route GET /api/cart/count
+   */
   getCartItemCount: catchAsync(async (req, res) => {
     const userId = req.user.userId;
     const count = await cartService.getCartItemCount(userId);
