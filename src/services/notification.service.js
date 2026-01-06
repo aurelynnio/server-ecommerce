@@ -62,7 +62,7 @@ class NotificationService {
                isRead: false
              });
           });
-          console.log(`[Notification] Broadcast emitted to ${users.length} users. Targets:`, targetedIds);
+          // Broadcast completed silently
         } catch (error) {
            console.error("Socket broadcast error:", error.message);
         }
@@ -83,7 +83,6 @@ class NotificationService {
 
     try {
       const io = getIO();
-      console.log(`[Notification] Emitting single to ${userId}`);
       io.to(userId).emit("new_notification", notification);
       const unreadCount = await this.countUnread(userId);
       io.to(userId).emit("unread_count", unreadCount);

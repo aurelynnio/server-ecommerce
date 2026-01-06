@@ -21,7 +21,7 @@ const {
  * @route   POST /api/orders
  * @desc    Create a new order from cart items
  * @access  Private (Authenticated users)
- * @body    { cartItemIds, shippingAddress, paymentMethod, discountCode?, note? }
+ * @body    { cartItemIds, shippingAddress, paymentMethod, shopVouchers?, platformVoucher?, note? }
  */
 router.post(
   "/",

@@ -1,14 +1,15 @@
 const joi = require("joi");
+const { sanitizedString, searchString } = require("./sanitize");
 
 
 // Update user profile validator
 const updateProfileValidator = joi.object({
-  username: joi.string().min(3).max(50).messages({
+  username: sanitizedString().min(3).max(50).messages({
     "string.base": "Username must be a string",
     "string.min": "Username must be at least 3 characters long",
     "string.max": "Username must be at most 50 characters long",
   }),
-  email: joi.string().email().messages({
+  email: sanitizedString().email().messages({
     "string.base": "Email must be a string",
     "string.email": "Email must be a valid email address",
   }),
@@ -20,7 +21,7 @@ const updateProfileValidator = joi.object({
 
 // Add address validator
 const addAddressValidator = joi.object({
-  fullName: joi.string().min(2).max(100).required().messages({
+  fullName: sanitizedString().min(2).max(100).required().messages({
     "string.base": "Full name must be a string",
     "string.min": "Full name must be at least 2 characters long",
     "string.max": "Full name must be at most 100 characters long",
@@ -33,19 +34,19 @@ const addAddressValidator = joi.object({
       "string.base": "Phone must be a string",
       "string.pattern.base": "Phone must be 10-11 digits",
     }),
-  address: joi.string().messages({
+  address: sanitizedString().messages({
     "string.base": "Address must be a string",
     "any.required": "Address is required",
   }),
-  city: joi.string().required().messages({
+  city: sanitizedString().required().messages({
     "string.base": "City must be a string",
     "any.required": "City is required",
   }),
-  district: joi.string().required().messages({
+  district: sanitizedString().required().messages({
     "string.base": "District must be a string",
     "any.required": "District is required",
   }),
-  ward: joi.string().required().messages({
+  ward: sanitizedString().required().messages({
     "string.base": "Ward must be a string",
     "any.required": "Ward is required",
   }),
@@ -56,7 +57,7 @@ const addAddressValidator = joi.object({
 
 // Update address validator
 const updateAddressValidator = joi.object({
-  fullName: joi.string().min(2).max(100).messages({
+  fullName: sanitizedString().min(2).max(100).messages({
     "string.base": "Full name must be a string",
     "string.min": "Full name must be at least 2 characters long",
     "string.max": "Full name must be at most 100 characters long",
@@ -68,16 +69,16 @@ const updateAddressValidator = joi.object({
       "string.base": "Phone must be a string",
       "string.pattern.base": "Phone must be 10-11 digits",
     }),
-  address: joi.string().optional().messages({
+  address: sanitizedString().optional().messages({
     "string.base": "Address must be a string",
   }),
-  city: joi.string().optional().messages({
+  city: sanitizedString().optional().messages({
     "string.base": "City must be a string",
   }),
-  district: joi.string().optional().messages({
+  district: sanitizedString().optional().messages({
     "string.base": "District must be a string",
   }),
-  ward: joi.string().optional().messages({
+  ward: sanitizedString().optional().messages({
     "string.base": "Ward must be a string",
   }),
   isDefault: joi.boolean().optional().messages({
@@ -198,13 +199,13 @@ const updatePermissionsValidator = joi.object({
 
 // Create user validator (Admin only)
 const createUserValidator = joi.object({
-  username: joi.string().min(3).max(50).required().messages({
+  username: sanitizedString().min(3).max(50).required().messages({
     "string.base": "Username must be a string",
     "string.min": "Username must be at least 3 characters long",
     "string.max": "Username must be at most 50 characters long",
     "any.required": "Username is required",
   }),
-  email: joi.string().email().required().messages({
+  email: sanitizedString().email().required().messages({
     "string.base": "Email must be a string",
     "string.email": "Email must be a valid email address",
     "any.required": "Email is required",
@@ -237,7 +238,7 @@ const paginationQueryValidator = joi.object({
     "number.max": "Limit cannot exceed 100",
     "any.required": "Limit is required",
   }),
-  search: joi.string().allow("").messages({
+  search: searchString().allow("").messages({
     "string.base": "Search must be a string",
   }),
   role: joi.string().valid("user", "admin").allow("").messages({

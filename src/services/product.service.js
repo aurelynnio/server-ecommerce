@@ -53,7 +53,6 @@ class ProductService {
     if (cachedData) return cachedData;
 
     // Build query
-    console.log("getAllProducts Filters:", { filters, options });
     const query = { isActive };
 
     // Filter by category
@@ -64,6 +63,11 @@ class ProductService {
     // Filter by brand
     if (brand) {
       query.brand = brand;
+    }
+
+    // Filter by Shop
+    if (filters.shop) {
+      query.shop = filters.shop;
     }
 
     // Filter by price range
@@ -108,8 +112,6 @@ class ProductService {
     if (search) {
       query.$text = { $search: search };
     }
-
-    console.log("Built Query:", JSON.stringify(query, null, 2));
 
     // Get total count for pagination
     const total = await Product.countDocuments(query);
@@ -172,6 +174,12 @@ class ProductService {
     return product;
   }
 
+  /**
+   * Get single product by slug
+   * @param {string} slug - Product slug
+   * @returns {Promise<Object>} Product object with populated fields
+   * @throws {Error} If product not found
+   */
   async getProductBySlug(slug) {
     const cacheKey = `products:slug:${slug}`;
     const cachedProduct = await cacheService.get(cacheKey);
@@ -188,10 +196,20 @@ class ProductService {
     await cacheService.set(cacheKey, product, 3600);
     return product;
   }
-  // Create new product
-  async createProduct(data, files) {
-    // Use data directly as it's already validated
-    const productData = { ...data };
+
+  /**
+   * Create a new product
+   * @param {Object} data - Product data
+   * @param {string} data.name - Product name
+   * @param {string} [data.slug] - Product slug (optional)
+   * @param {Object} data.price - Price information
+   * @param {Array} [files] - Image files to upload
+   * @param {string} shopId - Shop ID creating the product
+   * @returns {Promise<Object>} Created product object
+   * @throws {Error} If slug already exists
+   */
+  async createProduct(data, files, shopId) {
+    const productData = { ...data, shop: shopId };
 
     // Check if slug already exists
     if (data.slug) {
@@ -203,60 +221,71 @@ class ProductService {
 
     // Handle image files
     if (files && files.length > 0) {
-      // Collect all buffers to upload
       const filesToUpload = files.map((file) => ({
         buffer: file.buffer,
         fieldname: file.fieldname,
       }));
 
-      // Upload all files concurrently
       const uploadResults = await multiUpload(
         filesToUpload.map((f) => f.buffer),
         "products"
       );
 
-      // Map uploads back to their original fields
       const uploads = uploadResults.map((result, index) => ({
         ...result,
         fieldname: filesToUpload[index].fieldname,
       }));
 
-      // Process variant images
-      if (productData.variants && Array.isArray(productData.variants)) {
-        productData.variants = productData.variants.map((variant, index) => {
-          const variantImages = uploads.filter(
-            (u) => u.fieldname === `variantImages_${index}`
-          );
-          if (variantImages.length > 0) {
-            return {
-              ...variant,
-              images: variantImages.map((u) => u.secure_url),
-            };
+      // 1. Main Product Images
+      const mainImages = uploads.filter((u) => u.fieldname === "images");
+      if (mainImages.length > 0) {
+        productData.images = mainImages.map((u) => u.secure_url);
+      }
+
+      // 2. Tier Variation Images
+      // Expect fieldname: "tierImages_0", "tierImages_1" (index of tierVariation)
+      if (
+        productData.tierVariations &&
+        Array.isArray(productData.tierVariations)
+      ) {
+        productData.tierVariations = productData.tierVariations.map(
+          (tier, tIndex) => {
+            // For each option in this tier, we might have images?
+            // Taobao usually has images for the first tier (e.g. Color).
+            // Simple implementation: "tierImages_{tIndex}" maps to the options of that tier
+            // This part depends heavily on how Frontend sends data.
+            // Assuming parsed data or simple image array mapping for key property.
+            return tier;
           }
-          return variant;
-        });
+        );
       }
     }
 
     const product = new Product(productData);
     await product.save();
 
-    // Invalidate cache
     await cacheService.delByPattern("products:*");
 
-    // Emit socket event
     const io = getIO();
     if (io) {
       io.emit("new_product", {
         name: product.name,
         _id: product._id,
+        shop: shopId,
       });
     }
 
     return product;
   }
 
-  // Update product
+  /**
+   * Update an existing product
+   * @param {string} id - Product ID
+   * @param {Object} data - Data to update
+   * @param {Array} [files] - New image files to upload
+   * @returns {Promise<Object>} Updated product object
+   * @throws {Error} If product not found or slug already exists
+   */
   async updateProduct(id, data, files) {
     try {
       const updateData = { ...data };
@@ -324,7 +353,12 @@ class ProductService {
     }
   }
 
-  // Delete product (soft delete)
+  /**
+   * Soft delete a product (sets isActive to false)
+   * @param {string} id - Product ID
+   * @returns {Promise<Object>} Deleted product object
+   * @throws {Error} If product not found
+   */
   async deleteProduct(id) {
     const product = await Product.findByIdAndUpdate(
       id,
@@ -341,7 +375,12 @@ class ProductService {
     return product;
   }
 
-  // Permanently delete product
+  /**
+   * Permanently delete a product from database
+   * @param {string} id - Product ID
+   * @returns {Promise<Object>} Deleted product object
+   * @throws {Error} If product not found
+   */
   async permanentDeleteProduct(id) {
     const product = await Product.findByIdAndDelete(id);
 
@@ -354,7 +393,14 @@ class ProductService {
     return product;
   }
 
-  // Add variant to product
+  /**
+   * Add a new variant to a product
+   * @param {string} productId - Product ID
+   * @param {Object} variantData - Variant details (sku, color, size, price, stock)
+   * @param {Array} [files] - Variant image files
+   * @returns {Promise<Object>} Updated product with new variant
+   * @throws {Error} If product not found or SKU already exists
+   */
   async addVariant(productId, variantData, files) {
     const allowedVariantData = { ...variantData };
 
@@ -387,7 +433,14 @@ class ProductService {
     return product;
   }
 
-  // Update variant
+  /**
+   * Update an existing variant
+   * @param {string} productId - Product ID
+   * @param {string} variantId - Variant ID
+   * @param {Object} variantData - Data to update
+   * @returns {Promise<Object>} Updated product
+   * @throws {Error} If product or variant not found
+   */
   async updateVariant(productId, variantId, variantData) {
     const allowedVariantData = {
       ...variantData,
@@ -407,7 +460,13 @@ class ProductService {
     return product;
   }
 
-  // Delete variant
+  /**
+   * Delete a variant from a product
+   * @param {string} productId - Product ID
+   * @param {string} variantId - Variant ID to delete
+   * @returns {Promise<Object>} Updated product
+   * @throws {Error} If product not found
+   */
   async deleteVariant(productId, variantId) {
     const product = await Product.findByIdAndUpdate(
       productId,
@@ -422,7 +481,15 @@ class ProductService {
     return product;
   }
 
-  // Get products by category
+  /**
+   * Get products by category ID
+   * @param {string} categoryId - Category ID
+   * @param {Object} [options] - Pagination and sorting options
+   * @param {number} [options.page=1] - Page number
+   * @param {number} [options.limit=10] - Items per page
+   * @param {string} [options.sort="-createdAt"] - Sort field
+   * @returns {Promise<Object>} Products with pagination metadata
+   */
   async getProductsByCategory(categoryId, options = {}) {
     const { page = 1, limit = 10, sort = "-createdAt" } = options;
 
@@ -459,7 +526,16 @@ class ProductService {
     };
   }
 
-  // Get products by category slug
+  /**
+   * Get products by category slug (includes child categories)
+   * @param {string} slug - Category slug
+   * @param {Object} [options] - Pagination and sorting options
+   * @param {number} [options.page=1] - Page number
+   * @param {number} [options.limit=10] - Items per page
+   * @param {string} [options.sort="-createdAt"] - Sort field
+   * @returns {Promise<Object>} Products with category info and pagination
+   * @throws {Error} If category not found
+   */
   async getProductsByCategorySlug(slug, options = {}) {
     const { page = 1, limit = 10, sort = "-createdAt" } = options;
 
@@ -520,7 +596,12 @@ class ProductService {
     };
   }
 
-  // Get featured products (based on sales count)
+  /**
+   * Get featured products (simple version, sorted by creation date)
+   * @param {number} [limit=10] - Maximum number of products to return
+   * @returns {Promise<Array>} List of featured products
+   * @throws {Error} If no products found
+   */
   async getFeaturedProductsSimple(limit = 10) {
     const products = await Product.find({ isActive: true })
       .populate("category", "name slug")
@@ -534,7 +615,11 @@ class ProductService {
     return products;
   }
 
-  // Get featured products (simple - 10 items only)
+  /**
+   * Get featured products (with caching)
+   * @param {Object} [query] - Query parameters (unused, for API compatibility)
+   * @returns {Promise<Array>} List of featured products (max 10)
+   */
   async getFeaturedProducts(query) {
     const cacheKey = "products:featured";
     const cachedProducts = await cacheService.get(cacheKey);
@@ -555,7 +640,11 @@ class ProductService {
     return products;
   }
 
-  // Get new arrival products (simple - 10 items only)
+  /**
+   * Get new arrival products (with caching)
+   * @param {Object} [query] - Query parameters (unused, for API compatibility)
+   * @returns {Promise<Array>} List of new arrival products (max 10)
+   */
   async getNewArrivalProducts(query) {
     const cacheKey = "products:new-arrivals";
     const cachedProducts = await cacheService.get(cacheKey);
@@ -576,7 +665,11 @@ class ProductService {
     return products;
   }
 
-  // Get products on sale (simple - 10 items only)
+  /**
+   * Get products currently on sale (with caching)
+   * @param {Object} [query] - Query parameters (unused, for API compatibility)
+   * @returns {Promise<Array>} List of on-sale products (max 10)
+   */
   async getOnSaleProducts(query) {
     const cacheKey = "products:on-sale";
     const cachedProducts = await cacheService.get(cacheKey);
@@ -597,7 +690,13 @@ class ProductService {
     await cacheService.set(cacheKey, products, 1800);
     return products;
   }
-  // Search products (optimized for search bar/autocomplete)
+
+  /**
+   * Search products by keyword (optimized for autocomplete)
+   * @param {string} keyword - Search keyword
+   * @param {number} [limit=10] - Maximum results to return
+   * @returns {Promise<Array>} Matching products with basic info
+   */
   async searchProducts(keyword, limit = 10) {
     const cacheKey = `products:search:${keyword}:${limit}`;
     const cachedProducts = await cacheService.get(cacheKey);
@@ -622,7 +721,12 @@ class ProductService {
     return products;
   }
 
-  // Get related products
+  /**
+   * Get related products based on category and price range
+   * @param {string} productId - Current product ID
+   * @returns {Promise<Array>} List of related products (max 10)
+   * @throws {Error} If product not found
+   */
   async getRelatedProducts(productId) {
     const limit = 10;
     const currentProduct = await Product.findById(productId);
@@ -649,22 +753,6 @@ class ProductService {
       .lean();
 
     return products;
-  }
-  // Delete variant
-  async deleteVariant(productId, variantId) {
-    const product = await Product.findByIdAndUpdate(
-      productId,
-      {
-        $pull: { variants: { _id: variantId } },
-      },
-      { new: true }
-    );
-
-    if (!product) {
-      throw new Error("Product not found");
-    }
-
-    return product;
   }
 }
 

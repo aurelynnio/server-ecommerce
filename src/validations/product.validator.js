@@ -1,4 +1,5 @@
 const joi = require("joi");
+const { sanitizedString, searchString, objectId } = require("./sanitize");
 
 // Validate price object
 const priceSchema = joi.object({
@@ -66,13 +67,13 @@ const variantSchema = joi.object({
 
 // Create product validator
 const createProductValidator = joi.object({
-  name: joi.string().min(3).max(200).required().messages({
+  name: sanitizedString().min(3).max(200).required().messages({
     "string.base": "Product name must be a string",
     "string.min": "Product name must be at least 3 characters long",
     "string.max": "Product name must be at most 200 characters long",
     "any.required": "Product name is required",
   }),
-  description: joi.string().min(10).required().messages({
+  description: sanitizedString().min(10).required().messages({
     "string.base": "Description must be a string",
     "string.min": "Description must be at least 10 characters long",
     "any.required": "Description is required",
@@ -94,7 +95,7 @@ const createProductValidator = joi.object({
       "string.pattern.base": "Category must be a valid MongoDB ObjectId",
       "any.required": "Category is required",
     }),
-  brand: joi.string().allow("").messages({
+  brand: sanitizedString().allow("").messages({
     "string.base": "Brand must be a string",
   }),
   images: joi.array().items(joi.string().uri()).optional().messages({
@@ -107,7 +108,7 @@ const createProductValidator = joi.object({
   variants: joi.array().items(variantSchema).messages({
     "array.base": "Variants must be an array",
   }),
-  tags: joi.array().items(joi.string()).messages({
+  tags: joi.array().items(sanitizedString()).messages({
     "array.base": "Tags must be an array",
     "string.base": "Each tag must be a string",
   }),
@@ -292,7 +293,7 @@ const getProductsQueryValidator = joi.object({
     .messages({
       "alternatives.base": "Tags must be a string or array of strings",
     }),
-  search: joi.string().allow("").messages({
+  search: searchString().allow("").messages({
     "string.base": "Search must be a string",
   }),
   isActive: joi.boolean().default(true).messages({
@@ -447,7 +448,7 @@ const specialProductsQueryValidator = joi.object({
 
 
 const searchQueryValidator = joi.object({
-  q: joi.string().required().min(1).messages({
+  q: searchString().required().min(1).messages({
     "string.base": "Search query must be a string",
     "string.min": "Search query must be at least 1 character long",
     "any.required": "Search query is required",

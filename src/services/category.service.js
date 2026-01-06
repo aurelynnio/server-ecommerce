@@ -97,51 +97,74 @@ class CategoryService {
     // Get pagination params with total count
     const paginationParams = getPaginationParams(page, limit, total);
 
-    // Execute query
-    const categories = await Category.find(query)
-      .populate("parentCategory", "name slug")
-      .sort({ createdAt: -1 })
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit)
-      .lean();
-
-    // Calculate product count and get subcategories for each category
-    const categoriesWithProductCount = await Promise.all(
-      categories.map(async (category) => {
-        const productCount = await Product.countDocuments({
-          category: category._id,
-          isActive: true,
-        });
-
-        // Get subcategories
-        const subcategories = await Category.find({
-          parentCategory: category._id,
-        }).lean();
-
-        // Get product count for subcategories
-        const subcategoriesWithCount = await Promise.all(
-          subcategories.map(async (sub) => {
-            const subProductCount = await Product.countDocuments({
-              category: sub._id,
-              isActive: true,
-            });
-            return {
-              ...sub,
-              productCount: subProductCount,
-            };
-          })
-        );
-
-        return {
-          ...category,
-          productCount,
-          subcategories: subcategoriesWithCount,
-        };
-      })
-    );
+    // Use aggregation to get categories with product counts and subcategories in one query
+    const categoriesWithData = await Category.aggregate([
+      { $match: query },
+      { $sort: { createdAt: -1 } },
+      { $skip: paginationParams.skip },
+      { $limit: paginationParams.limit },
+      // Lookup parent category
+      {
+        $lookup: {
+          from: "categories",
+          localField: "parentCategory",
+          foreignField: "_id",
+          as: "parentCategoryData",
+          pipeline: [{ $project: { name: 1, slug: 1 } }]
+        }
+      },
+      // Lookup product count
+      {
+        $lookup: {
+          from: "products",
+          let: { categoryId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $and: [{ $eq: ["$category", "$$categoryId"] }, { $eq: ["$isActive", true] }] } } },
+            { $count: "count" }
+          ],
+          as: "productCountData"
+        }
+      },
+      // Lookup subcategories with their product counts
+      {
+        $lookup: {
+          from: "categories",
+          let: { parentId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$parentCategory", "$$parentId"] } } },
+            {
+              $lookup: {
+                from: "products",
+                let: { subCategoryId: "$_id" },
+                pipeline: [
+                  { $match: { $expr: { $and: [{ $eq: ["$category", "$$subCategoryId"] }, { $eq: ["$isActive", true] }] } } },
+                  { $count: "count" }
+                ],
+                as: "subProductCount"
+              }
+            },
+            {
+              $addFields: {
+                productCount: { $ifNull: [{ $arrayElemAt: ["$subProductCount.count", 0] }, 0] }
+              }
+            },
+            { $project: { subProductCount: 0 } }
+          ],
+          as: "subcategories"
+        }
+      },
+      // Transform the result
+      {
+        $addFields: {
+          parentCategory: { $arrayElemAt: ["$parentCategoryData", 0] },
+          productCount: { $ifNull: [{ $arrayElemAt: ["$productCountData.count", 0] }, 0] }
+        }
+      },
+      { $project: { parentCategoryData: 0, productCountData: 0 } }
+    ]);
 
     return {
-      data: categoriesWithProductCount,
+      data: categoriesWithData,
       pagination: {
         currentPage: paginationParams.currentPage,
         pageSize: paginationParams.pageSize,
@@ -157,10 +180,9 @@ class CategoryService {
 
   // Get category by ID
   async getCategoryById(categoryId) {
-    const category = await Category.findById(categoryId).populate(
-      "parentCategory",
-      "name slug"
-    );
+    const category = await Category.findById(categoryId)
+      .populate("parentCategory", "name slug")
+      .lean();
 
     if (!category) {
       throw new Error("Category not found");
@@ -169,12 +191,16 @@ class CategoryService {
     return category;
   }
 
-  // Get category by slug
+  /**
+   * Get category by slug
+   * @param {string} slug - Category slug
+   * @returns {Promise<Object>} Category object with parent info
+   * @throws {Error} If category not found
+   */
   async getCategoryBySlug(slug) {
-    const category = await Category.findOne({ slug }).populate(
-      "parentCategory",
-      "name slug"
-    );
+    const category = await Category.findOne({ slug })
+      .populate("parentCategory", "name slug")
+      .lean();
 
     if (!category) {
       throw new Error("Category not found");
@@ -183,7 +209,12 @@ class CategoryService {
     return category;
   }
 
-  // Get category with subcategories
+  /**
+   * Get category with its subcategories
+   * @param {string} categoryId - Category ID
+   * @returns {Promise<Object>} Category with subcategories array
+   * @throws {Error} If category not found
+   */
   async getCategoryWithSubcategories(categoryId) {
     const category = await Category.findById(categoryId);
 
@@ -203,7 +234,16 @@ class CategoryService {
     };
   }
 
-  // Update category
+  /**
+   * Update a category
+   * @param {string} categoryId - Category ID
+   * @param {Object} updateData - Data to update
+   * @param {string} [updateData.name] - New name
+   * @param {string} [updateData.slug] - New slug
+   * @param {string} [updateData.parentCategory] - New parent category ID
+   * @returns {Promise<Object>} Updated category
+   * @throws {Error} If category not found, slug exists, or circular reference
+   */
   async updateCategory(categoryId, updateData) {
     const category = await Category.findById(categoryId);
 
@@ -260,7 +300,12 @@ class CategoryService {
     return category;
   }
 
-  // Delete category
+  /**
+   * Delete a category
+   * @param {string} categoryId - Category ID
+   * @returns {Promise<Object>} Deletion confirmation message
+   * @throws {Error} If category not found, has subcategories, or has products
+   */
   async deleteCategory(categoryId) {
     const category = await Category.findById(categoryId);
 
@@ -295,7 +340,10 @@ class CategoryService {
     return { message: "Category deleted successfully" };
   }
 
-  // Get category tree (hierarchical structure)
+  /**
+   * Get hierarchical category tree (with caching)
+   * @returns {Promise<Array>} Tree structure of categories with nested subcategories
+   */
   async getCategoryTree() {
     const cacheKey = "categories:tree";
     const cachedTree = await cacheService.get(cacheKey);
@@ -353,7 +401,14 @@ class CategoryService {
     return tree;
   }
 
-  // Get active categories (for public)
+  /**
+   * Get active categories for public display
+   * @param {Object} [filters] - Filter options
+   * @param {number} [filters.page=1] - Page number
+   * @param {number} [filters.limit=10] - Items per page
+   * @param {string} [filters.parentCategory] - Filter by parent category
+   * @returns {Promise<Object>} Categories with pagination
+   */
   async getActiveCategories(filters = {}) {
     const { page = 1, limit = 10, parentCategory } = filters;
 
@@ -374,7 +429,8 @@ class CategoryService {
         .select("-__v")
         .sort({ name: 1 })
         .skip(skip)
-        .limit(pageLimit),
+        .limit(pageLimit)
+        .lean(),
       Category.countDocuments(query),
     ]);
 
@@ -389,7 +445,10 @@ class CategoryService {
     };
   }
 
-  // Get category statistics (Admin)
+  /**
+   * Get category statistics for admin dashboard
+   * @returns {Promise<Object>} Statistics including counts and top categories
+   */
   async getCategoryStatistics() {
     const totalCategories = await Category.countDocuments();
     const activeCategories = await Category.countDocuments({ isActive: true });

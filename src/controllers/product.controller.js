@@ -3,13 +3,25 @@ const productService = require("../services/product.service");
 const { StatusCodes } = require("http-status-codes");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 
-
-
+/**
+ * Product Controller
+ * Handles product CRUD operations, variants, and product queries
+ */
 const ProductController = {
-  // Get all products with filters
+  /**
+   * Get all products with filtering, sorting, and pagination
+   * @route GET /api/products
+   * @access Public
+   * @query {number} [page=1] - Page number
+   * @query {number} [limit=10] - Items per page
+   * @query {string} [category] - Filter by category ID
+   * @query {string} [brand] - Filter by brand
+   * @query {number} [minPrice] - Minimum price
+   * @query {number} [maxPrice] - Maximum price
+   * @query {string} [search] - Search term
+   * @returns {Object} Products with pagination metadata
+   */
   getAllProducts: catchAsync(async (req, res) => {
-
-
     const result = await productService.getAllProducts(req.query);
     return sendSuccess(
       res,
@@ -19,10 +31,14 @@ const ProductController = {
     );
   }),
 
-  // Get single product by ID
+  /**
+   * Get single product by ID
+   * @route GET /api/products/:id
+   * @access Public
+   * @param {string} id - Product ID
+   * @returns {Object} Product object with populated fields
+   */
   getProductById: catchAsync(async (req, res) => {
-
-
     const product = await productService.getProductById(req.params.id);
     return sendSuccess(
       res,
@@ -32,10 +48,14 @@ const ProductController = {
     );
   }),
 
-  // Get single product by slug
+  /**
+   * Get single product by slug
+   * @route GET /api/products/slug/:slug
+   * @access Public
+   * @param {string} slug - Product slug
+   * @returns {Object} Product object
+   */
   getProductBySlug: catchAsync(async (req, res) => {
-
-
     const product = await productService.getProductBySlug(req.params.slug);
     return sendSuccess(
       res,
@@ -45,9 +65,30 @@ const ProductController = {
     );
   }),
 
-  // Create new product
+  /**
+   * Create a new product
+   * @route POST /api/products
+   * @access Private (Seller only)
+   * @body {string} name - Product name
+   * @body {Object} price - Price information
+   * @body {string} [description] - Product description
+   * @files {Array} [images] - Product images
+   * @returns {Object} Created product
+   */
   createProduct: catchAsync(async (req, res) => {
-    const product = await productService.createProduct(req.body, req.files);
+    // Ensure shopId is present (User must be a seller)
+    // Assuming middleware populates req.user.shop or we fetch it
+    // For safety, let's fetch if missing (or assume auth middleware handles it)
+    const shopId = req.user.shop;
+    if (!shopId) {
+      throw new Error("User does not have a shop");
+    }
+
+    const product = await productService.createProduct(
+      req.body,
+      req.files,
+      shopId
+    );
     return sendSuccess(
       res,
       product,
@@ -56,11 +97,18 @@ const ProductController = {
     );
   }),
 
-  // Trong controller, thêm debug cho validator error
+  /**
+   * Update an existing product
+   * @route PUT /api/products/:id
+   * @access Private (Seller/Admin)
+   * @param {string} id - Product ID
+   * @body {Object} updateData - Fields to update
+   * @files {Array} [images] - New product images
+   * @returns {Object} Updated product
+   */
   updateProduct: catchAsync(async (req, res) => {
     // Parse JSON fields handled by middleware
     // Validate request body handled by middleware
-
 
     const { id } = req.params;
     const product = await productService.updateProduct(id, req.body, req.files);
@@ -72,10 +120,15 @@ const ProductController = {
     );
   }),
 
-  // Delete product (soft delete)
+  /**
+   * Soft delete a product
+   * @route DELETE /api/products/:id
+   * @access Private (Seller/Admin)
+   * @param {string} id - Product ID
+   * @returns {Object} Deleted product
+   */
   deleteProduct: catchAsync(async (req, res) => {
     // Validate params
-
 
     const product = await productService.deleteProduct(req.params.id);
     return sendSuccess(
@@ -86,10 +139,15 @@ const ProductController = {
     );
   }),
 
-  // Permanently delete product
+  /**
+   * Permanently delete a product
+   * @route DELETE /api/products/:id/permanent
+   * @access Private (Admin only)
+   * @param {string} id - Product ID
+   * @returns {Object} Success message
+   */
   permanentDeleteProduct: catchAsync(async (req, res) => {
     // Validate params
-
 
     await productService.permanentDeleteProduct(req.params.id);
     return sendSuccess(
@@ -100,10 +158,20 @@ const ProductController = {
     );
   }),
 
-  // Add variant to product
+  /**
+   * Add a variant to a product
+   * @route POST /api/products/:id/variants
+   * @access Private (Seller/Admin)
+   * @param {string} id - Product ID
+   * @body {string} sku - Variant SKU
+   * @body {string} [color] - Variant color
+   * @body {string} [size] - Variant size
+   * @body {number} price - Variant price
+   * @body {number} stock - Variant stock
+   * @returns {Object} Updated product with new variant
+   */
   addVariant: catchAsync(async (req, res) => {
     const { id } = req.params;
-
 
     const product = await productService.addVariant(id, req.body, req.files);
     return sendSuccess(
@@ -114,10 +182,16 @@ const ProductController = {
     );
   }),
 
-  // Update variant
+  /**
+   * Update a product variant
+   * @route PUT /api/products/:id/variants/:variantId
+   * @access Private (Seller/Admin)
+   * @param {string} id - Product ID
+   * @param {string} variantId - Variant ID
+   * @body {Object} variantData - Variant fields to update
+   * @returns {Object} Updated product
+   */
   updateVariant: catchAsync(async (req, res) => {
-
-
     const { id, variantId } = req.params;
     const product = await productService.updateVariant(id, variantId, req.body);
     return sendSuccess(
@@ -128,10 +202,15 @@ const ProductController = {
     );
   }),
 
-  // Delete variant
+  /**
+   * Delete a product variant
+   * @route DELETE /api/products/:id/variants/:variantId
+   * @access Private (Seller/Admin)
+   * @param {string} id - Product ID
+   * @param {string} variantId - Variant ID
+   * @returns {Object} Updated product
+   */
   deleteVariant: catchAsync(async (req, res) => {
-
-
     const product = await productService.deleteVariant(
       req.params.id,
       req.params.variantId
@@ -144,7 +223,15 @@ const ProductController = {
     );
   }),
 
-  // Get products by category
+  /**
+   * Get products by category ID
+   * @route GET /api/products/category/:categoryId
+   * @access Public
+   * @param {string} categoryId - Category ID
+   * @query {number} [page=1] - Page number
+   * @query {number} [limit=10] - Items per page
+   * @returns {Object} Products with pagination
+   */
   getProductsByCategory: catchAsync(async (req, res) => {
     const result = await productService.getProductsByCategory(
       req.params.categoryId,
@@ -158,7 +245,15 @@ const ProductController = {
     );
   }),
 
-  // Get products by category slug
+  /**
+   * Get products by category slug
+   * @route GET /api/products/category/slug/:slug
+   * @access Public
+   * @param {string} slug - Category slug
+   * @query {number} [page=1] - Page number
+   * @query {number} [limit=10] - Items per page
+   * @returns {Object} Products with category info and pagination
+   */
   getProductsByCategorySlug: catchAsync(async (req, res) => {
     const result = await productService.getProductsByCategorySlug(
       req.params.slug,
@@ -172,7 +267,13 @@ const ProductController = {
     );
   }),
 
-  // Get featured products
+  /**
+   * Get featured products
+   * @route GET /api/products/featured
+   * @access Public
+   * @query {number} [limit=10] - Maximum products to return
+   * @returns {Array} Featured products
+   */
   getFeaturedProducts: catchAsync(async (req, res) => {
     const products = await productService.getFeaturedProductsSimple(
       req.query.limit
@@ -185,9 +286,12 @@ const ProductController = {
     );
   }),
 
-
-
-  // Get new arrival products (simple - 10 items only)
+  /**
+   * Get new arrival products
+   * @route GET /api/products/new-arrivals
+   * @access Public
+   * @returns {Array} New arrival products (max 10)
+   */
   getNewArrivalProducts: catchAsync(async (req, res) => {
     const result = await productService.getNewArrivalProducts();
     return sendSuccess(
@@ -198,7 +302,12 @@ const ProductController = {
     );
   }),
 
-  // Get products on sale (simple - 10 items only)
+  /**
+   * Get products on sale
+   * @route GET /api/products/on-sale
+   * @access Public
+   * @returns {Array} On-sale products (max 10)
+   */
   getOnSaleProducts: catchAsync(async (req, res) => {
     const result = await productService.getOnSaleProducts();
     return sendSuccess(
@@ -209,9 +318,19 @@ const ProductController = {
     );
   }),
 
-  // Search products
+  /**
+   * Search products by keyword
+   * @route GET /api/products/search
+   * @access Public
+   * @query {string} q - Search keyword
+   * @query {number} [limit=10] - Maximum results
+   * @returns {Array} Matching products
+   */
   searchProducts: catchAsync(async (req, res) => {
-    const result = await productService.searchProducts(req.query.q, req.query.limit);
+    const result = await productService.searchProducts(
+      req.query.q,
+      req.query.limit
+    );
     return sendSuccess(
       res,
       result,
@@ -220,7 +339,13 @@ const ProductController = {
     );
   }),
 
-  // Get related products
+  /**
+   * Get related products
+   * @route GET /api/products/:id/related
+   * @access Public
+   * @param {string} id - Product ID
+   * @returns {Array} Related products (max 10)
+   */
   getRelatedProducts: catchAsync(async (req, res) => {
     const { id } = req.params;
 
@@ -233,7 +358,6 @@ const ProductController = {
       StatusCodes.OK
     );
   }),
-
 };
 
 module.exports = ProductController;

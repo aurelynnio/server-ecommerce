@@ -4,7 +4,9 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js"
   },
@@ -13,7 +15,9 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "fast-check": "^4.5.3",
+    "vitest": "^4.0.16"
   },
   "dependencies": {
     "@langchain/core": "^1.1.8",

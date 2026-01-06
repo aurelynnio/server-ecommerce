@@ -11,7 +11,7 @@ const addressSchema = new Schema({
   city: String,
   district: String,
   ward: String,
-  isDefault: Boolean
+  isDefault: Boolean,
 });
 
 const userSchema = new Schema(
@@ -32,8 +32,13 @@ const userSchema = new Schema(
     },
     roles: {
       type: String,
-      enum: ["user", "admin"],
+      enum: ["user", "admin", "seller"],
       default: "user",
+    },
+    shop: {
+      type: Schema.Types.ObjectId,
+      ref: "Shop",
+      default: null,
     },
     permissions: {
       type: [String],

@@ -14,7 +14,17 @@ const {
   getReviewsQueryValidator,
 } = require("../validations/review.validator");
 
-// Public routes (no authentication required)
+/**
+ * Public Routes
+ */
+
+/**
+ * @route   GET /api/reviews/product/:productId
+ * @desc    Get all reviews for a specific product
+ * @access  Public
+ * @param   productId - Product ID to get reviews for
+ * @query   page, limit, rating, sort
+ */
 router.get(
   "/product/:productId",
   validate({
@@ -23,31 +33,69 @@ router.get(
   }),
   reviewController.getProductReviews
 );
+
+/**
+ * @route   GET /api/reviews/:reviewId
+ * @desc    Get a single review by ID
+ * @access  Public
+ * @param   reviewId - Review ID
+ */
 router.get(
   "/:reviewId",
   validate({ params: reviewIdParamValidator }),
   reviewController.getReviewById
 );
 
-// User routes (require authentication)
+/**
+ * User Routes (Authenticated)
+ */
+
+/**
+ * @route   POST /api/reviews
+ * @desc    Create a new review for a product
+ * @access  Private (Authenticated users - must have purchased product)
+ * @body    { productId, rating, comment, images? }
+ */
 router.post(
   "/",
   verifyAccessToken,
   validate(createReviewValidator),
   reviewController.createReview
 );
+
+/**
+ * @route   GET /api/reviews/user/me
+ * @desc    Get current user's reviews
+ * @access  Private (Authenticated users)
+ * @query   page, limit
+ */
 router.get(
   "/user/me",
   verifyAccessToken,
   validate({ query: getReviewsQueryValidator }),
   reviewController.getUserReviews
 );
+
+/**
+ * @route   GET /api/reviews/check/:productId
+ * @desc    Check if current user can review a product
+ * @access  Private (Authenticated users)
+ * @param   productId - Product ID to check
+ */
 router.get(
   "/check/:productId",
   verifyAccessToken,
   validate({ params: productIdParamValidator }),
   reviewController.canUserReview
 );
+
+/**
+ * @route   PUT /api/reviews/:reviewId
+ * @desc    Update an existing review
+ * @access  Private (Authenticated users - own review only)
+ * @param   reviewId - Review ID to update
+ * @body    { rating?, comment?, images? }
+ */
 router.put(
   "/:reviewId",
   verifyAccessToken,
@@ -57,6 +105,13 @@ router.put(
   }),
   reviewController.updateReview
 );
+
+/**
+ * @route   DELETE /api/reviews/:reviewId
+ * @desc    Delete a review
+ * @access  Private (Owner or Admin)
+ * @param   reviewId - Review ID to delete
+ */
 router.delete(
   "/:reviewId",
   verifyAccessToken,
@@ -64,7 +119,15 @@ router.delete(
   reviewController.deleteReview
 );
 
-// Admin routes (require admin role)
+/**
+ * Admin Routes
+ */
+
+/**
+ * @route   GET /api/reviews/statistics/overview
+ * @desc    Get review statistics overview
+ * @access  Private (Admin only)
+ */
 router.get(
   "/statistics/overview",
   verifyAccessToken,

@@ -4,10 +4,17 @@ const PaymentService = require("../services/payment.service");
 const { VNPay } = require("vnpay");
 const { StatusCodes } = require("http-status-codes");
 
+/**
+ * Payment Controller
+ * Handles VNPay payment operations including creation, callbacks, and retrieval
+ */
 const PaymentController = {
   /**
    * Create payment URL for VNPay
-   * POST /api/payment/create
+   * @route POST /api/payment/create
+   * @access Private (Authenticated users)
+   * @body {string} orderId - Order ID to create payment for
+   * @returns {Object} Payment URL, transaction ID, and amount
    */
   createPayment: catchAsync(async (req, res) => {
     const { orderId } = req.body;
@@ -40,7 +47,10 @@ const PaymentController = {
 
   /**
    * Handle VNPay return callback (user redirect after payment)
-   * GET /api/payment/vnpay-return
+   * @route GET /api/payment/vnpay-return
+   * @access Public
+   * @query {Object} vnpayParams - VNPay response parameters
+   * @returns {Redirect} Redirects to frontend with payment result
    */
   handleVnpayReturn: catchAsync(async (req, res) => {
     const vnpayParams = req.query;
@@ -67,7 +77,10 @@ const PaymentController = {
 
   /**
    * Handle VNPay IPN (Instant Payment Notification)
-   * GET /api/payment/vnpay-ipn
+   * @route GET /api/payment/vnpay-ipn
+   * @access Public
+   * @query {Object} vnpayParams - VNPay IPN parameters
+   * @returns {Object} IPN response for VNPay
    */
   handleVnpayIPN: catchAsync(async (req, res) => {
     const vnpayParams = req.query;
@@ -81,7 +94,10 @@ const PaymentController = {
 
   /**
    * Get payment details by order ID
-   * GET /api/payment/order/:orderId
+   * @route GET /api/payment/order/:orderId
+   * @access Private (Owner or Admin)
+   * @param {string} orderId - Order ID
+   * @returns {Object} Payment details
    */
   getPaymentByOrder: catchAsync(async (req, res) => {
     const { orderId } = req.params;

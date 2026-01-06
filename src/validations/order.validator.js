@@ -1,8 +1,9 @@
 const joi = require("joi");
+const { sanitizedString } = require("./sanitize");
 
 // Shipping address schema
 const shippingAddressSchema = joi.object({
-  fullName: joi.string().min(2).max(100).required().messages({
+  fullName: sanitizedString().min(2).max(100).required().messages({
     "string.base": "Full name must be a string",
     "string.min": "Full name must be at least 2 characters long",
     "string.max": "Full name must be at most 100 characters long",
@@ -17,22 +18,22 @@ const shippingAddressSchema = joi.object({
       "string.pattern.base": "Phone must be 10-11 digits",
       "any.required": "Phone is required",
     }),
-  address: joi.string().min(5).required().messages({
+  address: sanitizedString().min(5).required().messages({
     "string.base": "Address must be a string",
     "string.min": "Address must be at least 5 characters long",
     "any.required": "Address is required",
   }),
-  city: joi.string().required().messages({
+  city: sanitizedString().required().messages({
     "string.base": "City must be a string",
     "any.required": "City is required",
   }),
-  district: joi.string().allow("").messages({
+  district: sanitizedString().allow("").messages({
     "string.base": "District must be a string",
   }),
-  ward: joi.string().allow("").messages({
+  ward: sanitizedString().allow("").messages({
     "string.base": "Ward must be a string",
   }),
-  note: joi.string().allow("").messages({
+  note: sanitizedString().allow("").messages({
     "string.base": "Note must be a string",
   }),
 });
@@ -59,16 +60,40 @@ const createOrderValidator = joi.object({
     "string.base": "Payment method must be a string",
     "any.only": "Payment method must be either 'cod' or 'vnpay'",
   }),
-  discountCode: joi
+  discountCode: joi.forbidden().messages({
+    "any.unknown":
+      "discountCode is deprecated, please use platformVoucher instead",
+  }),
+  platformVoucher: joi
     .string()
     .uppercase()
     .trim()
     .allow("")
     .default(null)
     .messages({
-      "string.base": "Discount code must be a string",
+      "string.base": "Platform voucher code must be a string",
     }),
-  note: joi.string().allow("").messages({
+  shopVouchers: joi
+    .array()
+    .items(
+      joi.object({
+        shopId: joi.string().hex().length(24).required().messages({
+          "string.base": "Shop ID must be a string",
+          "string.hex": "Shop ID must be a valid hex string",
+          "string.length": "Shop ID must be 24 characters long",
+          "any.required": "Shop ID is required for shop voucher",
+        }),
+        code: joi.string().uppercase().trim().required().messages({
+          "string.base": "Voucher code must be a string",
+          "any.required": "Voucher code is required",
+        }),
+      })
+    )
+    .default([])
+    .messages({
+      "array.base": "Shop vouchers must be an array",
+    }),
+  note: sanitizedString().allow("").messages({
     "string.base": "Note must be a string",
   }),
 });
@@ -112,12 +137,19 @@ const getOrdersQueryValidator = joi.object({
     "number.integer": "Page must be an integer",
     "number.min": "Page must be at least 1",
   }),
-  limit: joi.number().integer().min(1).max(100).default(10).optional().messages({
-    "number.base": "Limit must be a number",
-    "number.integer": "Limit must be an integer",
-    "number.min": "Limit must be at least 1",
-    "number.max": "Limit cannot exceed 100",
-  }),
+  limit: joi
+    .number()
+    .integer()
+    .min(1)
+    .max(100)
+    .default(10)
+    .optional()
+    .messages({
+      "number.base": "Limit must be a number",
+      "number.integer": "Limit must be an integer",
+      "number.min": "Limit must be at least 1",
+      "number.max": "Limit cannot exceed 100",
+    }),
   status: joi
     .string()
     .valid(
@@ -131,7 +163,8 @@ const getOrdersQueryValidator = joi.object({
     .optional()
     .messages({
       "string.base": "Status must be a string",
-      "any.only": "Status must be one of: pending, confirmed, processing, shipped, delivered, cancelled",
+      "any.only":
+        "Status must be one of: pending, confirmed, processing, shipped, delivered, cancelled",
     }),
   paymentStatus: joi
     .string()
@@ -141,19 +174,15 @@ const getOrdersQueryValidator = joi.object({
       "string.base": "Payment status must be a string",
       "any.only": "Payment status must be one of: unpaid, paid, refunded",
     }),
-  paymentMethod: joi
-    .string()
-    .valid("cod", "vnpay")
-    .optional()
-    .messages({
-      "string.base": "Payment method must be a string",
-      "any.only": "Payment method must be one of: cod, vnpay",
-    }),
+  paymentMethod: joi.string().valid("cod", "vnpay").optional().messages({
+    "string.base": "Payment method must be a string",
+    "any.only": "Payment method must be one of: cod, vnpay",
+  }),
   userId: joi.string().hex().length(24).optional().messages({
     "string.base": "User ID must be a string",
     "string.hex": "User ID must be a valid hex string",
     "string.length": "User ID must be 24 characters long",
-  })
+  }),
 });
 
 module.exports = {

@@ -2,9 +2,19 @@ const { Schema, model, Types } = require("mongoose");
 
 const orderSchema = new Schema(
   {
+    // Grouping for finding all orders in one checkout transaction
+    orderGroupId: { type: Types.ObjectId, index: true },
+
     userId: {
       type: Types.ObjectId,
       ref: "User",
+      required: true,
+    },
+
+    // Critical for Multi-Vendor: Which shop does this order belong to?
+    shopId: {
+      type: Types.ObjectId,
+      ref: "Shop",
       required: true,
     },
 
@@ -15,22 +25,17 @@ const orderSchema = new Schema(
           ref: "Product",
           required: true,
         },
-        variantId: {
-          type: Types.ObjectId,
-          required: false,
-          ref: "Variant",
-        },
+        // For Tier Variations
+        sku: { type: String }, // specific sku code
+        modelId: { type: Types.ObjectId }, // maps to product.models._id
+
         name: { type: String, required: true },
-        sku: { type: String },
-        color: { type: String },
-        size: { type: String },
         image: { type: String },
+        tierIndex: { type: [Number] }, // e.g. [0, 1] for Blue, M
+
         quantity: { type: Number, required: true, min: 1 },
-        price: {
-          currentPrice: { type: Number, required: true },
-          discountPrice: { type: Number, default: null },
-          currency: { type: String, default: "VND" },
-        },
+        price: { type: Number, required: true }, // Snapshot price at purchase
+        totalPrice: { type: Number, required: true }, // quantity * price
       },
     ],
 
@@ -46,7 +51,7 @@ const orderSchema = new Schema(
 
     paymentMethod: {
       type: String,
-      enum: ["cod", "vnpay"],
+      enum: ["cod", "vnpay", "momo"],
       default: "cod",
     },
 
@@ -56,34 +61,43 @@ const orderSchema = new Schema(
       default: "unpaid",
     },
 
+    // Financials
     subtotal: { type: Number, required: true, min: 0 },
-    discountCode: { type: String, default: null },
-    discountAmount: { type: Number, default: 0, min: 0 },
+    shippingFee: { type: Number, default: 0 }, // Calculated via ShippingTemplate
+    discountShop: { type: Number, default: 0 }, // Shop voucher
+    discountPlatform: { type: Number, default: 0 }, // Platform voucher
     totalAmount: { type: Number, required: true, min: 0 },
 
     status: {
       type: String,
       enum: [
-        "pending", // chờ xác nhận
-        "confirmed", // đã xác nhận
-        "processing", // đang xử lý
-        "shipped", // đã gửi hàng
-        "delivered", // giao thành công
-        "cancelled", // đã hủy
+        "pending",
+        "confirmed",
+        "processing", // Shop packing
+        "shipped", // Handed to carrier
+        "delivered",
+        "cancelled",
+        "returned",
       ],
       default: "pending",
     },
 
+    // Tracking
+    trackingNumber: { type: String },
+    carrier: { type: String },
+
     deliveredAt: { type: Date },
+    cancelledAt: { type: Date },
+    cancelReason: { type: String },
   },
   { timestamps: true, collection: "orders" }
 );
 
 // Indexes
 orderSchema.index({ userId: 1 });
+orderSchema.index({ shopId: 1 }); // Shop owner identifying their orders
+orderSchema.index({ orderGroupId: 1 }); // User finding their "checkout history"
 orderSchema.index({ status: 1 });
 orderSchema.index({ paymentStatus: 1 });
-orderSchema.index({ createdAt: -1 });
-orderSchema.index({ userId: 1, createdAt: -1 }); // Get user's orders sorted by date
 
 module.exports = model("Order", orderSchema);

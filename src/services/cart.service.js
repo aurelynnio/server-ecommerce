@@ -15,11 +15,11 @@ class CartService {
     let cart = await Cart.findOne({ userId })
       .populate({
         path: "items.productId",
-        select: "name slug images price isActive variants",
-        populate: {
-          path: "category",
-          select: "name slug",
-        },
+        select: "name slug images price isActive tierVariations models shop",
+        populate: [
+          { path: "category", select: "name slug" },
+          { path: "shop", select: "name logo" },
+        ],
       })
       .lean();
 
@@ -28,32 +28,52 @@ class CartService {
       cart = await Cart.create({ userId, items: [], totalAmount: 0 });
     }
 
-    // Populate variant details for each item
+    // Populate variation details for each item
     if (cart && cart.items && cart.items.length > 0) {
       cart.items = cart.items.map((item) => {
-        if (item.variantId && item.productId && item.productId.variants) {
-          // Find the specific variant from product's variants array
-          const variant = item.productId.variants.find(
-            (v) => v._id.toString() === item.variantId.toString()
+        const product = item.productId;
+
+        // Handle Tier Variations (SKU)
+        if (item.modelId && product && product.models) {
+          const model = product.models.find(
+            (m) => m._id.toString() === item.modelId.toString()
           );
-          if (variant) {
-            item.variant = {
-              _id: variant._id,
-              sku: variant.sku,
-              color: variant.color,
-              size: variant.size,
-              stock: variant.stock,
-              price: variant.price,
-              images: variant.images,
+          if (model) {
+            // Map tierIndex to actual names (e.g., [0, 0] -> "Red", "S")
+            const variationOptions = model.tierIndex.map((tIdx, i) => {
+              return product.tierVariations[i]?.options[tIdx] || "";
+            });
+
+            item.model = {
+              _id: model._id,
+              sku: model.sku,
+              price: model.price,
+              stock: model.stock,
+              // human readable variation
+              name: variationOptions.join(" - "),
             };
+
+            // Override visible price/image if needed
+            item.price = { currentPrice: model.price, currency: "VND" };
           }
         }
-        // Remove variants array from product to keep response clean
+
+        // Denormalized Shop Info (if not populated deep enough)
+        if (!item.shopId && product.shop) {
+          item.shopId = product.shop._id;
+        }
+
+        // Clean up large objects
         if (item.productId) {
-          delete item.productId.variants;
+          delete item.productId.models;
+          delete item.productId.tierVariations;
         }
         return item;
       });
+
+      // Group by Shop (optional, logic can be in Frontend or mapped here)
+      // Frontend often expects flat list, but grouped is better.
+      // Keeping flat list for now to minimize breaking changes, Frontend can group by shopId.
     }
 
     return cart;
@@ -70,40 +90,38 @@ class CartService {
    * @throws {Error} If product/variant not found or out of stock
    */
   async addToCart(userId, itemData) {
-    let { productId, variantId, quantity } = itemData;
+    let { productId, modelId, quantity } = itemData;
 
     // Check if product exists and is active
     const product = await Product.findById(productId);
-    if (!product) {
-      throw new Error("Product not found");
-    }
-    if (!product.isActive) {
-      throw new Error("Product is not available");
-    }
+    if (!product) throw new Error("Product not found");
+    if (!product.isActive) throw new Error("Product is not available");
 
-    // Auto-select first variant if not specified and product has variants
-    if (!variantId && product.variants && product.variants.length > 0) {
-      variantId = product.variants[0]._id.toString();
-    }
+    // Get Shop ID
+    const shopId = product.shop;
 
-    // Get price (from variant or product)
-    let price;
-    let selectedVariant = null;
+    // Determine Price & Model
+    let price = product.price.currentPrice;
+    let selectedModel = null;
 
-    if (variantId) {
-      const variant = product.variants.id(variantId);
-      if (!variant) {
-        throw new Error("Variant not found");
+    if (modelId) {
+      // Find model in product.models
+      const model = product.models.find((m) => m._id.toString() === modelId);
+      if (!model) throw new Error("Model variation not found");
+
+      if (model.stock < quantity) {
+        throw new Error(`Only ${model.stock} item(s) available`);
       }
-      if (variant.stock < quantity) {
-        throw new Error(`Only ${variant.stock} items available in stock`);
-      }
-      price = variant.price;
-      selectedVariant = variantId;
-    } else {
-      // No variants, use product price
-      price = product.price;
-      selectedVariant = null;
+      price = model.price;
+      selectedModel = modelId;
+    } else if (product.models && product.models.length > 0) {
+      // If product has variations but user didn't select one
+      // Default to first capable model? Or throw error?
+      // Taobao requires selection. For now, default to first.
+      const model = product.models[0];
+      if (model.stock < quantity) throw new Error(`Out of stock`);
+      price = model.price;
+      selectedModel = model._id.toString();
     }
 
     // Find or create cart
@@ -112,41 +130,37 @@ class CartService {
       cart = new Cart({ userId, items: [] });
     }
 
-    // Check if item already exists in cart
+    // Check if item exists
     const existingItemIndex = cart.items.findIndex(
       (item) =>
         item.productId.toString() === productId &&
-        (selectedVariant
-          ? item.variantId?.toString() === selectedVariant
-          : !item.variantId)
+        (selectedModel
+          ? item.modelId?.toString() === selectedModel.toString()
+          : !item.modelId)
     );
 
     if (existingItemIndex > -1) {
-      // Update quantity if item exists
       cart.items[existingItemIndex].quantity += quantity;
-      cart.items[existingItemIndex].price = price;
+      // Update price if changed
+      cart.items[existingItemIndex].price = {
+        currentPrice: price,
+        currency: "VND",
+      };
     } else {
-      // Add new item
       cart.items.push({
         productId,
-        variantId: selectedVariant,
+        shopId,
+        modelId: selectedModel,
         quantity,
-        price,
+        price: { currentPrice: price, currency: "VND" },
       });
     }
 
-    // Calculate total amount
+    // Calculate total
     cart.totalAmount = this.calculateTotal(cart.items);
-
     await cart.save();
 
-    // Populate and return
-    await cart.populate({
-      path: "items.productId",
-      select: "name slug images price isActive",
-    });
-
-    return cart;
+    return this.getCart(userId); // Return full populated cart
   }
 
   // Update cart item quantity
@@ -167,10 +181,24 @@ class CartService {
       throw new Error("Product is not available");
     }
 
-    if (item.variantId) {
-      const variant = product.variants.id(item.variantId);
-      if (!variant || variant.stock < quantity) {
-        throw new Error(`Only ${variant?.stock || 0} items available in stock`);
+    if (item.modelId) {
+      // Validate against Model (Tier Variation)
+      if (!product.models) throw new Error("Product structure changed");
+
+      const model = product.models.find(
+        (m) => m._id.toString() === item.modelId.toString()
+      );
+      if (!model) {
+        throw new Error("Product variation not found");
+      }
+
+      if (model.stock < quantity) {
+        throw new Error(`Only ${model.stock} item(s) available`);
+      }
+    } else {
+      // Simple Product stock
+      if (product.stock < quantity) {
+        throw new Error(`Only ${product.stock} item(s) available`);
       }
     }
 
@@ -182,12 +210,7 @@ class CartService {
 
     await cart.save();
 
-    await cart.populate({
-      path: "items.productId",
-      select: "name slug images price isActive",
-    });
-
-    return cart;
+    return this.getCart(userId);
   }
 
   // Remove item from cart

@@ -5,6 +5,7 @@ const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const initRoutes = require("./routes");
 const http = require("http");
+const { errorHandler, notFoundHandler } = require("./middlewares/errorHandler.middleware");
 const app = ex();
 const server = http.createServer(app);
 
@@ -43,12 +44,11 @@ app.get("/", (req, res) => {
   res.status(200).json({ status: "API OK" });
 });
 
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res
-    .status(500)
-    .json({ status: "Internal Server Error", message: err.message });
-});
+// 404 handler for undefined routes
+app.use(notFoundHandler);
+
+// Global error handler - must be last middleware
+app.use(errorHandler);
 
 module.exports = {
   server,

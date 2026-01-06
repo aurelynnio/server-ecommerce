@@ -142,7 +142,13 @@ class UserService {
     return user;
   }
 
-  // Add new address
+  /**
+   * Add a new address to user's address book
+   * @param {string} userId - User ID
+   * @param {Object} addressData - Address details
+   * @returns {Promise<Object>} Updated user with new address
+   * @throws {Error} If user not found
+   */
   async addAddress(userId, addressData) {
     const user = await userModel.findByIdAndUpdate(
       userId,
@@ -157,7 +163,14 @@ class UserService {
     return user;
   }
 
-  // Update address
+  /**
+   * Update an existing address
+   * @param {string} userId - User ID
+   * @param {string} addressId - Address ID to update
+   * @param {Object} addressData - New address data
+   * @returns {Promise<Object>} Updated user object
+   * @throws {Error} If user or address not found
+   */
   async updateAddress(userId, addressId, addressData) {
     const user = await userModel.findById(userId);
 
@@ -182,6 +195,13 @@ class UserService {
     return user.toObject({ transform: true, versionKey: false });
   }
 
+  /**
+   * Delete an address from user's address book
+   * @param {string} userId - User ID
+   * @param {string} addressId - Address ID to delete
+   * @returns {Promise<Object>} Updated user object
+   * @throws {Error} If user not found
+   */
   async deleteAddress(userId, addressId) {
     // Thực hiện xóa
     const userAfter = await userModel.findByIdAndUpdate(
@@ -197,7 +217,12 @@ class UserService {
     return userAfter;
   }
 
-  // Get all addresses
+  /**
+   * Get all addresses for a user
+   * @param {string} userId - User ID
+   * @returns {Promise<Array>} User's addresses
+   * @throws {Error} If user not found
+   */
   async getAddresses(userId) {
     const user = await userModel.findById(userId).select("addresses");
 
@@ -240,7 +265,14 @@ class UserService {
     return user.addresses;
   }
 
-  // Change password
+  /**
+   * Change user's password
+   * @param {string} userId - User ID
+   * @param {string} oldPassword - Current password
+   * @param {string} newPassword - New password
+   * @returns {Promise<Object>} Success message
+   * @throws {Error} If user not found or old password incorrect
+   */
   async changePassword(userId, oldPassword, newPassword) {
     const user = await userModel.findById(userId);
 
@@ -262,7 +294,16 @@ class UserService {
     return { message: "Password changed successfully" };
   }
 
-  // Admin: Get all users with pagination
+  /**
+   * Get all users with pagination and filtering (Admin)
+   * @param {Object} query - Query parameters
+   * @param {number} query.page - Page number
+   * @param {number} query.limit - Items per page
+   * @param {string} [query.search] - Search by username or email
+   * @param {string} [query.role] - Filter by role
+   * @param {boolean} [query.isVerifiedEmail] - Filter by email verification status
+   * @returns {Promise<Object>} Users with pagination metadata
+   */
   async getAllUsers(query) {
     const { page, limit, search = "", role, isVerifiedEmail } = query;
 
@@ -317,7 +358,12 @@ class UserService {
     };
   }
 
-  // Admin: Get user by ID
+  /**
+   * Get user by ID (Admin)
+   * @param {string} userId - User ID
+   * @returns {Promise<Object>} User object without password
+   * @throws {Error} If user not found
+   */
   async getUserById(userId) {
     const user = await userModel.findById(userId).select("-password");
 
@@ -328,7 +374,13 @@ class UserService {
     return user;
   }
 
-  // Admin: Update user by ID
+  /**
+   * Update user by ID (Admin)
+   * @param {string} userId - User ID
+   * @param {Object} updateData - Data to update
+   * @returns {Promise<Object>} Updated user object
+   * @throws {Error} If user not found or username/email already exists
+   */
   async updateUserById(userId, updateData) {
     // Check if user exists
     const user = await userModel.findById(userId);
@@ -368,7 +420,13 @@ class UserService {
     return updatedUser;
   }
 
-  // Admin: Update user role
+  /**
+   * Update user role (Admin)
+   * @param {string} userId - User ID
+   * @param {string} roles - New role
+   * @returns {Promise<Object>} Updated user object
+   * @throws {Error} If user not found
+   */
   async updateUserRole(userId, roles) {
     const user = await userModel.findByIdAndUpdate(
       userId,
@@ -383,7 +441,13 @@ class UserService {
     return user;
   }
 
-  // Admin: Update user permissions
+  /**
+   * Update user permissions (Admin)
+   * @param {string} userId - User ID
+   * @param {Array} permissions - New permissions array
+   * @returns {Promise<Object>} Updated user object
+   * @throws {Error} If user not found
+   */
   async updateUserPermissions(userId, permissions) {
     const user = await userModel.findByIdAndUpdate(
       userId,
@@ -398,7 +462,12 @@ class UserService {
     return user;
   }
 
-  // Admin: Delete user (soft delete or permanent)
+  /**
+   * Delete user permanently (Admin)
+   * @param {string} userId - User ID
+   * @returns {Promise<Object>} Deletion confirmation message
+   * @throws {Error} If user not found
+   */
   async deleteUser(userId) {
     const user = await userModel.findByIdAndDelete(userId);
 

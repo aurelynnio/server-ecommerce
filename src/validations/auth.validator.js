@@ -1,7 +1,8 @@
 const joi = require("joi");
+const { sanitizedString } = require("./sanitize");
 
 const loginValidator = joi.object({
-  email: joi.string().email().required().messages({
+  email: sanitizedString().email().required().messages({
     "string.email": "Please provide a valid email address",
     "any.required": "Email is required",
   }),
@@ -12,12 +13,12 @@ const loginValidator = joi.object({
 });
 
 const registerValidator = joi.object({
-  username: joi.string().min(3).max(30).required().messages({
+  username: sanitizedString().min(3).max(30).required().messages({
     "string.min": "Username must be at least 3 characters long",
     "string.max": "Username must be at most 30 characters long",
     "any.required": "Username is required",
   }),
-  email: joi.string().email().required().messages({
+  email: sanitizedString().email().required().messages({
     "string.email": "Please provide a valid email address",
     "any.required": "Email is required",
   }),
@@ -32,14 +33,14 @@ const registerValidator = joi.object({
 });
 
 const sendVerificationCodeValidator = joi.object({
-  email: joi.string().email().required().messages({
+  email: sanitizedString().email().required().messages({
     "string.email": "Please provide a valid email address",
     "any.required": "Email is required",
   }),
 });
 
 const verifyEmailValidator = joi.object({
-  code: joi.string().length(6).pattern(/^\d+$/).required().messages({
+  code: sanitizedString().length(6).pattern(/^\d+$/).required().messages({
     "string.length": "Verification code must be 6 digits",
     "string.pattern.base": "Verification code must contain only numbers",
     "any.required": "Verification code is required",
@@ -47,18 +48,18 @@ const verifyEmailValidator = joi.object({
 });
 
 const forgotPasswordValidator = joi.object({
-  email: joi.string().email().required().messages({
+  email: sanitizedString().email().required().messages({
     "string.email": "Please provide a valid email address",
     "any.required": "Email is required",
   }),
 });
 
 const resetPasswordValidator = joi.object({
-  email: joi.string().email().required().messages({
+  email: sanitizedString().email().required().messages({
     "string.email": "Please provide a valid email address",
     "any.required": "Email is required",
   }),
-  code: joi.string().length(6).pattern(/^\d+$/).required().messages({
+  code: sanitizedString().length(6).pattern(/^\d+$/).required().messages({
     "string.length": "Reset code must be 6 digits",
     "string.pattern.base": "Reset code must contain only numbers",
     "any.required": "Reset code is required",

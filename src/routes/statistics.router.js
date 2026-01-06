@@ -6,6 +6,12 @@ const { verifyAccessToken, requireRole } = require("../middlewares/auth.middlewa
 // All routes require admin permission
 router.use(verifyAccessToken, requireRole("admin"));
 
+/**
+ * @route   GET /api/statistics/dashboard
+ * @desc    Get dashboard statistics overview
+ * @access  Private (Admin only)
+ * @returns {Object} Dashboard statistics (users, orders, revenue, products, etc.)
+ */
 router.get("/dashboard", statisticsController.getDashboardStats);
 
 module.exports = router;

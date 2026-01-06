@@ -5,8 +5,20 @@ const { sendFail, sendSuccess } = require("../shared/res/formatResponse");
 const { StatusCodes } = require("http-status-codes");
 const jwt = require("jsonwebtoken");
 
+/**
+ * Authentication Controller
+ * Handles user registration, login, password management, and token operations
+ */
 const AuthController = {
-  // Register new user
+  /**
+   * Register a new user
+   * @route POST /api/auth/register
+   * @access Public
+   * @body {string} username - User's username
+   * @body {string} email - User's email
+   * @body {string} password - User's password
+   * @returns {Object} Created user object
+   */
   register: catchAsync(async (req, res) => {
     const result = await authService.register(req.body);
     return sendSuccess(
@@ -17,7 +29,14 @@ const AuthController = {
     );
   }),
 
-  // Login user
+  /**
+   * Authenticate user and return tokens
+   * @route POST /api/auth/login
+   * @access Public
+   * @body {string} email - User's email
+   * @body {string} password - User's password
+   * @returns {Object} User info with access and refresh tokens
+   */
   login: catchAsync(async (req, res) => {
     const { email, password } = req.body;
     const result = await authService.login(email, password);
@@ -47,7 +66,13 @@ const AuthController = {
     );
   }),
 
-  // Send verification code to email
+  /**
+   * Send email verification code
+   * @route POST /api/auth/send-verification
+   * @access Public
+   * @body {string} email - User's email
+   * @returns {Object} Success message with expiration info
+   */
   sendVerificationCode: catchAsync(async (req, res) => {
     const { email } = req.body;
     const result = await authService.sendVerificationCode(email);
@@ -59,7 +84,13 @@ const AuthController = {
     );
   }),
 
-  // Verify email with code only
+  /**
+   * Verify email with verification code
+   * @route POST /api/auth/verify-email
+   * @access Public
+   * @body {string} code - 6-digit verification code
+   * @returns {Object} Verified user object
+   */
   verifyEmail: catchAsync(async (req, res) => {
     const { code } = req.body;
     const result = await authService.verifyEmailByCode(code);
@@ -71,7 +102,13 @@ const AuthController = {
     );
   }),
 
-  // Request password reset (forgot password)
+  /**
+   * Request password reset (forgot password)
+   * @route POST /api/auth/forgot-password
+   * @access Public
+   * @body {string} email - User's email
+   * @returns {Object} Success message
+   */
   forgotPassword: catchAsync(async (req, res) => {
     const { email } = req.body;
     const result = await authService.forgotPassword(email);
@@ -83,9 +120,16 @@ const AuthController = {
     );
   }),
 
-  // Reset password with code
+  /**
+   * Reset password with verification code
+   * @route POST /api/auth/reset-password
+   * @access Public
+   * @body {string} email - User's email
+   * @body {string} code - Reset verification code
+   * @body {string} newPassword - New password
+   * @returns {Object} Success message
+   */
   resetPassword: catchAsync(async (req, res) => {
-    console.log("Reset password request body:", req.body);
     const { email, code, newPassword } = req.body;
     const result = await authService.resetPassword(email, code, newPassword);
     return sendSuccess(
@@ -96,7 +140,14 @@ const AuthController = {
     );
   }),
 
-  // Refresh access token
+  /**
+   * Refresh access token using refresh token
+   * @route POST /api/auth/refresh-token
+   * @access Public (requires valid refresh token)
+   * @cookie refreshToken - HTTP-only refresh token
+   * @body {string} [refreshToken] - Fallback refresh token in body
+   * @returns {Object} New access token
+   */
   refreshToken: catchAsync(async (req, res) => {
     // Lấy refresh token từ cookie (ưu tiên) hoặc body (fallback)
     const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
@@ -144,7 +195,12 @@ const AuthController = {
     );
   }),
 
-  // Logout
+  /**
+   * Logout user and clear tokens
+   * @route POST /api/auth/logout
+   * @access Private (requires authentication)
+   * @returns {Object} Success message
+   */
   logout: catchAsync(async (req, res) => {
     res.clearCookie("accessToken", {
       httpOnly: true,
@@ -161,7 +217,14 @@ const AuthController = {
     return sendSuccess(res, null, "Logged out successfully", StatusCodes.OK);
   }),
 
-  // Change password (for authenticated user)
+  /**
+   * Change password for authenticated user
+   * @route POST /api/auth/change-password
+   * @access Private (requires authentication)
+   * @body {string} currentPassword - Current password
+   * @body {string} newPassword - New password
+   * @returns {Object} Success message
+   */
   changePassword: catchAsync(async (req, res) => {
     const { currentPassword, newPassword } = req.body;
     const userId = req.user?.userId;

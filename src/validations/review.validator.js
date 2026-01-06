@@ -1,4 +1,5 @@
 const joi = require("joi");
+const { escapedString } = require("./sanitize");
 
 // Create review validator
 const createReviewValidator = joi.object({
@@ -15,7 +16,7 @@ const createReviewValidator = joi.object({
     "number.max": "Rating must be at most 5",
     "any.required": "Rating is required",
   }),
-  comment: joi.string().max(1000).allow("").messages({
+  comment: escapedString().max(1000).allow("").messages({
     "string.base": "Comment must be a string",
     "string.max": "Comment must be at most 1000 characters long",
   }),
@@ -29,7 +30,7 @@ const updateReviewValidator = joi.object({
     "number.min": "Rating must be at least 1",
     "number.max": "Rating must be at most 5",
   }),
-  comment: joi.string().max(1000).allow("").messages({
+  comment: escapedString().max(1000).allow("").messages({
     "string.base": "Comment must be a string",
     "string.max": "Comment must be at most 1000 characters long",
   }),

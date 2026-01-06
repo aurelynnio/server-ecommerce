@@ -1,28 +1,34 @@
 const { Schema, model, Types } = require("mongoose");
 
-const items = Schema({
-  productId: {
-    type: Types.ObjectId,
-    ref: "Product",
-    required: true,
+const itemSchema = new Schema(
+  {
+    productId: {
+      type: Types.ObjectId,
+      ref: "Product",
+      required: true,
+    },
+    shopId: {
+      // Denormalized for easier grouping
+      type: Types.ObjectId,
+      ref: "Shop",
+      required: true,
+    },
+    modelId: {
+      // Replaces old variantId, refers to product.models._id
+      type: Types.ObjectId,
+      required: false, // if no variation
+    },
+    quantity: {
+      type: Number,
+      required: true,
+      min: 1,
+      default: 1,
+    },
+    // Cached info (optional)
+    price: { type: Number }, // current price
   },
-  variantId: {
-    type: Types.ObjectId,
-    required: false,
-    ref: "Variant",
-  },
-  quantity: {
-    type: Number,
-    required: true,
-    min: 1,
-    default: 1,
-  },
-  price: {
-    currentPrice: { type: Number, required: true },
-    discountPrice: { type: Number, default: null },
-    currency: { type: String, default: "VND" },
-  },
-});
+  { _id: false }
+);
 
 const cartSchema = new Schema(
   {
@@ -30,21 +36,16 @@ const cartSchema = new Schema(
       type: Types.ObjectId,
       ref: "User",
       required: true,
+      unique: true,
     },
-    items: [items],
-    totalAmount: {
-      type: Number,
-      default: 0,
-    },
+    items: [itemSchema],
+    // Total amount is usually calculated on fly, but can cache here
+    cartCount: { type: Number, default: 0 },
   },
   {
     timestamps: true,
     collection: "carts",
   }
 );
-
-cartSchema.index({ userId: 1 }, { unique: true });
-cartSchema.index({ updatedAt: -1 });
-
 
 module.exports = model("Cart", cartSchema);
