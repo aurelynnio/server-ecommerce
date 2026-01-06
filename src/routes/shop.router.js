@@ -10,6 +10,7 @@ const {
   createShopValidator,
   updateShopValidator,
 } = require("../validations/shop.validator");
+const upload = require("../configs/upload");
 
 /**
  * @route   POST /api/shops/register
@@ -25,29 +26,56 @@ router.post(
 );
 
 /**
+ * @route   POST /api/shops/upload-register-image
+ * @desc    Upload image for shop registration (logo or banner)
+ * @access  Private (Authenticated users - for registration)
+ * @body    { type: "logo" | "banner" }
+ */
+router.post(
+  "/upload-register-image",
+  verifyAccessToken,
+  upload.single("image"),
+  shopController.uploadImage
+);
+
+/**
  * @route   GET /api/shops/me
  * @desc    Get current user's shop information
- * @access  Private (Seller only)
+ * @access  Private (Seller or Admin)
  */
 router.get(
   "/me",
   verifyAccessToken,
-  requireRole("seller"),
+  requireRole("seller", "admin"),
   shopController.getMyShop
 );
 
 /**
  * @route   PUT /api/shops
  * @desc    Update current user's shop information
- * @access  Private (Seller only)
+ * @access  Private (Seller or Admin)
  * @body    { name?, description?, logo?, address?, phone?, email?, isActive? }
  */
 router.put(
   "/",
   verifyAccessToken,
-  requireRole("seller"),
+  requireRole("seller", "admin"),
   validate(updateShopValidator),
   shopController.updateShop
+);
+
+/**
+ * @route   POST /api/shops/upload-image
+ * @desc    Upload shop image (logo or banner)
+ * @access  Private (Seller or Admin)
+ * @body    { type: "logo" | "banner" }
+ */
+router.post(
+  "/upload-image",
+  verifyAccessToken,
+  requireRole("seller", "admin"),
+  upload.single("image"),
+  shopController.uploadImage
 );
 
 /**

@@ -175,30 +175,41 @@ class CartService {
       throw new Error("Item not found in cart");
     }
 
+    // If quantity is 0 or less, remove the item
+    if (quantity <= 0) {
+      return this.removeCartItem(userId, itemId);
+    }
+
     // Check product stock
     const product = await Product.findById(item.productId);
     if (!product || !product.isActive) {
       throw new Error("Product is not available");
     }
 
-    if (item.modelId) {
-      // Validate against Model (Tier Variation)
-      if (!product.models) throw new Error("Product structure changed");
+    // Only validate stock when INCREASING quantity
+    const isIncreasing = quantity > item.quantity;
+    
+    if (isIncreasing) {
+      if (item.modelId) {
+        // Validate against Model (Tier Variation)
+        if (!product.models) throw new Error("Product structure changed");
 
-      const model = product.models.find(
-        (m) => m._id.toString() === item.modelId.toString()
-      );
-      if (!model) {
-        throw new Error("Product variation not found");
-      }
+        const model = product.models.find(
+          (m) => m._id.toString() === item.modelId.toString()
+        );
+        if (!model) {
+          throw new Error("Product variation not found");
+        }
 
-      if (model.stock < quantity) {
-        throw new Error(`Only ${model.stock} item(s) available`);
-      }
-    } else {
-      // Simple Product stock
-      if (product.stock < quantity) {
-        throw new Error(`Only ${product.stock} item(s) available`);
+        if (model.stock < quantity) {
+          throw new Error(`Only ${model.stock} item(s) available`);
+        }
+      } else {
+        // Simple Product stock
+        const availableStock = product.stock ?? product.quantity ?? 999;
+        if (availableStock < quantity) {
+          throw new Error(`Only ${availableStock} item(s) available`);
+        }
       }
     }
 
@@ -254,8 +265,8 @@ class CartService {
   // Calculate total amount helper
   calculateTotal(items) {
     return items.reduce((total, item) => {
-      const price = item.price.discountPrice || item.price.currentPrice;
-      return total + price * item.quantity;
+      const price = item.price?.discountPrice || item.price?.currentPrice || 0;
+      return total + price * (item.quantity || 0);
     }, 0);
   }
 

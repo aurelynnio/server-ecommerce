@@ -1,6 +1,7 @@
 const shopService = require("../services/shop.service");
 const catchAsync = require("../configs/catchAsync");
-const { sendSuccess } = require("../shared/res/formatResponse");
+const { uploadImage } = require("../configs/cloudinary");
+const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const { StatusCodes } = require("http-status-codes");
 
 /**
@@ -69,6 +70,41 @@ const ShopController = {
   updateShop: catchAsync(async (req, res) => {
     const updatedShop = await shopService.updateShop(req.user.userId, req.body);
     return sendSuccess(res, updatedShop, "Update shop success", StatusCodes.OK);
+  }),
+
+  /**
+   * Upload shop image (logo or banner)
+   * @route POST /api/shops/upload-image
+   * @access Private (Seller or Admin)
+   * @body {string} type - Image type ("logo" or "banner")
+   * @files {File} image - Image file
+   * @returns {Object} Uploaded image URL
+   */
+  uploadImage: catchAsync(async (req, res) => {
+    const file = req.file;
+    const { type } = req.body;
+
+    if (!file) {
+      return sendFail(res, "No file uploaded", StatusCodes.BAD_REQUEST);
+    }
+
+    if (!type || !["logo", "banner"].includes(type)) {
+      return sendFail(res, "Invalid image type. Must be 'logo' or 'banner'", StatusCodes.BAD_REQUEST);
+    }
+
+    const folder = type === "logo" ? "shop-logos" : "shop-banners";
+    const result = await uploadImage(file.buffer, folder);
+
+    if (!result) {
+      return sendFail(res, "Image upload failed", StatusCodes.INTERNAL_SERVER_ERROR);
+    }
+
+    return sendSuccess(
+      res,
+      { url: result.secure_url, type },
+      "Image uploaded successfully",
+      StatusCodes.OK
+    );
   }),
 };
 
