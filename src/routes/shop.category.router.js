@@ -12,21 +12,20 @@ const {
 } = require("../validations/shop.category.validator");
 
 /**
- * Public Routes
+ * Protected Routes (Seller only) - Define specific routes FIRST
  */
 
 /**
- * @route   GET /api/shop-categories/:shopId
- * @desc    Get all categories for a specific shop
- * @access  Public
- * @param   shopId - Shop ID
+ * @route   GET /api/shop-categories/my
+ * @desc    Get all categories for current seller's shop
+ * @access  Private (Seller only)
  */
-router.get("/:shopId", shopCategoryController.getShopCategories);
-
-/**
- * Protected Routes (Seller only)
- */
-router.use(verifyAccessToken, requireRole("seller"));
+router.get(
+  "/my",
+  verifyAccessToken,
+  requireRole("seller"),
+  shopCategoryController.getMyShopCategories
+);
 
 /**
  * @route   POST /api/shop-categories
@@ -36,6 +35,8 @@ router.use(verifyAccessToken, requireRole("seller"));
  */
 router.post(
   "/",
+  verifyAccessToken,
+  requireRole("seller"),
   validate(createCategoryValidator),
   shopCategoryController.createCategory
 );
@@ -49,6 +50,8 @@ router.post(
  */
 router.put(
   "/:categoryId",
+  verifyAccessToken,
+  requireRole("seller"),
   validate(updateCategoryValidator),
   shopCategoryController.updateCategory
 );
@@ -59,6 +62,23 @@ router.put(
  * @access  Private (Seller only - own categories)
  * @param   categoryId - Category ID to delete
  */
-router.delete("/:categoryId", shopCategoryController.deleteCategory);
+router.delete(
+  "/:categoryId",
+  verifyAccessToken,
+  requireRole("seller"),
+  shopCategoryController.deleteCategory
+);
+
+/**
+ * Public Routes - Define param routes LAST
+ */
+
+/**
+ * @route   GET /api/shop-categories/:shopId
+ * @desc    Get all categories for a specific shop
+ * @access  Public
+ * @param   shopId - Shop ID
+ */
+router.get("/:shopId", shopCategoryController.getShopCategories);
 
 module.exports = router;

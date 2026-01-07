@@ -32,6 +32,24 @@ const ShopCategoryController = {
   }),
 
   /**
+   * Get all categories for current seller's shop
+   * @route GET /api/shop-categories
+   * @access Private (Seller only)
+   * @returns {Array} Shop categories
+   */
+  getMyShopCategories: catchAsync(async (req, res) => {
+    const categories = await shopCategoryService.getMyShopCategories(
+      req.user.userId
+    );
+    return sendSuccess(
+      res,
+      categories,
+      "Get my shop categories success",
+      StatusCodes.OK
+    );
+  }),
+
+  /**
    * Get all categories for a specific shop
    * @route GET /api/shop-categories/:shopId
    * @access Public

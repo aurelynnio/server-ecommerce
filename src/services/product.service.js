@@ -52,8 +52,8 @@ class ProductService {
     const cachedData = await cacheService.get(cacheKey);
     if (cachedData) return cachedData;
 
-    // Build query
-    const query = { status };
+    // Build query - if status is "all", don't filter by status (for seller dashboard)
+    const query = status === "all" ? { status: { $ne: "deleted" } } : { status };
 
     // Filter by category
     if (category) {
@@ -211,6 +211,18 @@ class ProductService {
   async createProduct(data, files, shopId) {
     const productData = { ...data, shop: shopId };
 
+    // Clean up temp _id from models (client uses temp-0, temp-1, etc.)
+    if (productData.models && Array.isArray(productData.models)) {
+      productData.models = productData.models.map(model => {
+        const { _id, ...rest } = model;
+        // Only keep _id if it's a valid ObjectId (24 hex chars)
+        if (_id && /^[0-9a-fA-F]{24}$/.test(_id)) {
+          return model;
+        }
+        return rest; // Remove temp _id
+      });
+    }
+
     // Check if slug already exists
     if (data.slug) {
       const existingProduct = await Product.findOne({ slug: data.slug });
@@ -242,22 +254,44 @@ class ProductService {
         productData.images = mainImages.map((u) => u.secure_url);
       }
 
-      // 2. Tier Variation Images
-      // Expect fieldname: "tierImages_0", "tierImages_1" (index of tierVariation)
-      if (
-        productData.tierVariations &&
-        Array.isArray(productData.tierVariations)
-      ) {
-        productData.tierVariations = productData.tierVariations.map(
-          (tier, tIndex) => {
-            // For each option in this tier, we might have images?
-            // Taobao usually has images for the first tier (e.g. Color).
-            // Simple implementation: "tierImages_{tIndex}" maps to the options of that tier
-            // This part depends heavily on how Frontend sends data.
-            // Assuming parsed data or simple image array mapping for key property.
-            return tier;
+      // 2. Variant Images (variantImages_0, variantImages_1, etc.)
+      // Group uploads by option index
+      const variantImageMap = {};
+      uploads.forEach((upload) => {
+        if (upload.fieldname.startsWith("variantImages_")) {
+          const optionIndex = parseInt(upload.fieldname.split("_")[1]);
+          if (!variantImageMap[optionIndex]) {
+            variantImageMap[optionIndex] = [];
           }
-        );
+          variantImageMap[optionIndex].push(upload.secure_url);
+        }
+      });
+
+      // 3. Update tierVariations with uploaded images
+      if (productData.tierVariations && Array.isArray(productData.tierVariations) && productData.tierVariations.length > 0) {
+        // First tier gets the images (usually Color)
+        const firstTier = productData.tierVariations[0];
+        if (firstTier && firstTier.options) {
+          // Build images array where each index corresponds to an option
+          // Store as 2D array: images[optionIndex] = [url1, url2, ...]
+          const imagesPerOption = firstTier.options.map((_, optIdx) => {
+            return variantImageMap[optIdx] || [];
+          });
+          
+          // Store as 2D array so client knows which images belong to which option
+          firstTier.images = imagesPerOption;
+          
+          // Also set product main images from first option's images
+          if (imagesPerOption[0] && imagesPerOption[0].length > 0 && !productData.images?.length) {
+            productData.images = imagesPerOption[0];
+          }
+        }
+      }
+
+      // 4. Description Images
+      const descImages = uploads.filter((u) => u.fieldname === "descriptionImages");
+      if (descImages.length > 0) {
+        productData.descriptionImages = descImages.map((u) => u.secure_url);
       }
     }
 
@@ -301,6 +335,7 @@ class ProductService {
       }
 
       let variantUploadMap = {};
+      let newDescriptionImages = [];
 
       if (files && files.length > 0) {
         const buffers = files.map((file) => file.buffer);
@@ -312,8 +347,21 @@ class ProductService {
             if (!variantUploadMap[variantIndex])
               variantUploadMap[variantIndex] = [];
             variantUploadMap[variantIndex].push(uploads[idx].secure_url);
+          } else if (file.fieldname === "descriptionImages") {
+            newDescriptionImages.push(uploads[idx].secure_url);
           }
         });
+      }
+
+      // Handle description images update
+      if (updateData.existingDescriptionImages !== undefined || newDescriptionImages.length > 0) {
+        const existingImages = updateData.existingDescriptionImages 
+          ? (Array.isArray(updateData.existingDescriptionImages) 
+              ? updateData.existingDescriptionImages 
+              : JSON.parse(updateData.existingDescriptionImages))
+          : [];
+        updateData.descriptionImages = [...existingImages, ...newDescriptionImages];
+        delete updateData.existingDescriptionImages;
       }
 
       if (updateData.variants && Array.isArray(updateData.variants)) {
@@ -332,6 +380,51 @@ class ProductService {
           }
           return variantData;
         });
+      }
+
+      // Handle models (new tier-based structure) - remove temp _id for new models
+      if (updateData.models && Array.isArray(updateData.models)) {
+        updateData.models = updateData.models.map((model) => {
+          const modelData = { ...model };
+          // Remove temp _id - MongoDB will generate real ObjectId
+          if (modelData._id && (typeof modelData._id === 'string' && modelData._id.startsWith("temp-"))) {
+            delete modelData._id;
+          }
+          return modelData;
+        });
+      }
+
+      // Handle tierVariations images update (new structure)
+      if (updateData.tierVariations && Array.isArray(updateData.tierVariations) && updateData.tierVariations.length > 0) {
+        const firstTier = updateData.tierVariations[0];
+        if (firstTier && firstTier.options) {
+          // Parse existing variant images mapping if provided
+          let existingImagesMap = {};
+          if (updateData.existingVariantImages) {
+            const mapping = typeof updateData.existingVariantImages === 'string' 
+              ? JSON.parse(updateData.existingVariantImages) 
+              : updateData.existingVariantImages;
+            mapping.forEach(item => {
+              existingImagesMap[item.optionIndex] = item.existing || [];
+            });
+          }
+          delete updateData.existingVariantImages;
+
+          // Build images array: combine existing + new uploaded images per option
+          const imagesPerOption = firstTier.options.map((_, optIdx) => {
+            const existing = existingImagesMap[optIdx] || [];
+            const newUploads = variantUploadMap[optIdx] || [];
+            return [...existing, ...newUploads];
+          });
+
+          // Store as 2D array
+          firstTier.images = imagesPerOption;
+
+          // Update product main images from first option if needed
+          if (imagesPerOption[0] && imagesPerOption[0].length > 0) {
+            updateData.images = imagesPerOption[0];
+          }
+        }
       }
 
       const product = await Product.findByIdAndUpdate(id, updateData, {

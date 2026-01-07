@@ -108,14 +108,14 @@ router.get("/:id", validate({ params: mongoIdParamValidator }), productControlle
 /**
  * @route   POST /api/products
  * @desc    Create new product
- * @access  Private (Admin only)
+ * @access  Private (Seller only)
  */
 router.post(
   "/",
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole("seller", "admin"),
   upload.any(), // Allow any files (images, variantImages_0, etc.)
-  parseJsonFields(["price", "variants", "tags"]),
+  parseJsonFields(["price", "variants", "tags", "tierVariations", "models", "attributes", "dimensions", "variantImageMapping"]),
   validate(createProductValidator),
   productController.createProduct
 );
@@ -130,7 +130,7 @@ router.put(
   verifyAccessToken,
   requireRole("admin"),
   upload.any(), // Allow any files (variantImages_0, etc.)
-  parseJsonFields(["price", "variants", "tags"]),
+  parseJsonFields(["price", "variants", "tags", "tierVariations", "models", "attributes", "dimensions", "variantImageMapping", "existingDescriptionImages", "existingVariantImages"]),
   validate({ params: mongoIdParamValidator, body: updateProductValidator }),
   productController.updateProduct
 );

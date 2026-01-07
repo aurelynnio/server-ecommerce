@@ -110,6 +110,14 @@ router.post(
 );
 
 /**
+ * @route   GET /api/shops/slug/:slug
+ * @desc    Get shop information by slug
+ * @access  Public
+ * @param   slug - Shop slug
+ */
+router.get("/slug/:slug", shopController.getShopBySlug);
+
+/**
  * @route   GET /api/shops/:shopId
  * @desc    Get shop information by ID
  * @access  Public

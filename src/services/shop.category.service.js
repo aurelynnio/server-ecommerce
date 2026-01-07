@@ -14,6 +14,17 @@ class ShopCategoryService {
     return newCategory;
   }
 
+  async getMyShopCategories(userId) {
+    const shop = await Shop.findOne({ owner: userId });
+    if (!shop) throw new Error("Shop not found");
+
+    const categories = await ShopCategory.find({ shopId: shop._id, isActive: true }).sort(
+      { displayOrder: 1 }
+    );
+
+    return categories;
+  }
+
   async getShopCategories(userId, shopIdParam) {
     let shopId = shopIdParam;
 

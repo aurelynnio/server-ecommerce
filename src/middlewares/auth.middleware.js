@@ -145,29 +145,51 @@ const requireRole = (...allowedRoles) => {
   // Flatten in case allowedRoles is passed as array
   const flatRoles = allowedRoles.flat();
   
-  return (req, res, next) => {
-    // Check if user is authenticated first
-    if (!req.user) {
-      return sendFail(res, "Authentication required", StatusCodes.UNAUTHORIZED);
-    }
+  return async (req, res, next) => {
+    try {
+      // Check if user is authenticated first
+      if (!req.user) {
+        return sendFail(res, "Authentication required", StatusCodes.UNAUTHORIZED);
+      }
 
-    // Support both single role string and roles array
-    const userRoles = Array.isArray(req.user.role) 
-      ? req.user.role 
-      : [req.user.role];
-    
-    // Check if user has one of the allowed roles
-    const hasRole = flatRoles.some((role) => userRoles.includes(role));
-    
-    if (!hasRole) {
-      return sendFail(
-        res,
-        `Access denied. Required role: ${flatRoles.join(" or ")}`,
-        StatusCodes.FORBIDDEN
-      );
-    }
+      // Support both 'role' and 'roles' field (string or array)
+      let userRoles = [];
+      if (req.user.role) {
+        userRoles = Array.isArray(req.user.role) ? req.user.role : [req.user.role];
+      }
+      if (req.user.roles) {
+        const roles = Array.isArray(req.user.roles) ? req.user.roles : [req.user.roles];
+        userRoles = [...userRoles, ...roles];
+      }
+      
+      // If checking for seller role and user has a shop, treat them as seller
+      if (flatRoles.includes("seller")) {
+        try {
+          const Shop = require("../models/shop.model");
+          const shop = await Shop.findOne({ owner: req.user.userId });
+          if (shop) {
+            userRoles.push("seller");
+          }
+        } catch (err) {
+          // Ignore error, continue with role check
+        }
+      }
+      
+      // Check if user has one of the allowed roles
+      const hasRole = flatRoles.some((role) => userRoles.includes(role));
+      
+      if (!hasRole) {
+        return sendFail(
+          res,
+          `Access denied. Required role: ${flatRoles.join(" or ")}`,
+          StatusCodes.FORBIDDEN
+        );
+      }
 
-    next();
+      next();
+    } catch (error) {
+      return sendFail(res, "Authorization check failed", StatusCodes.INTERNAL_SERVER_ERROR);
+    }
   };
 };
 

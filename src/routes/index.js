@@ -6,7 +6,6 @@ const categoryRouter = require("./category.router");
 const notificationRouter = require("./notification.router");
 const reviewRouter = require("./review.router");
 const cartRouter = require("./cart.router");
-// const discountRouter = require("./discount.router"); // Removed
 const statisticsRouter = require("./statistics.router");
 const paymentRouter = require("./payment.router");
 const bannerRouter = require("./banner.router");
@@ -34,7 +33,6 @@ const initRoutes = (app) => {
   app.use("/api/notifications", notificationRouter);
   app.use("/api/reviews", reviewRouter);
   app.use("/api/cart", cartRouter);
-  // app.use("/api/discounts", discountRouter); // Removed
   app.use("/api/statistics", statisticsRouter);
   app.use("/api/payment", paymentRouter);
   app.use("/api/banners", bannerRouter);

@@ -32,9 +32,9 @@ class ShopService {
       ...otherDetails,
     });
 
-    // Update User Role to Seller
+    // Update User Role to Seller and link shop
     await User.findByIdAndUpdate(userId, {
-      $addToSet: { roles: "seller" },
+      roles: "seller",
       shop: newShop._id,
     });
 

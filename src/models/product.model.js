@@ -12,12 +12,14 @@ const priceSchema = new Schema(
 );
 
 // Tier Variation Definition (e.g., Color bucket)
-// Example: { name: "Color", options: ["Red", "Blue"], images: ["url1", "url2"] }
+// Example: { name: "Color", options: ["Red", "Blue"], images: [["url1", "url2"], ["url3"]] }
 const tierVariationSchema = new Schema(
   {
     name: { type: String, required: true }, // e.g. "Color", "Size"
     options: { type: [String], required: true },
-    images: { type: [String], default: [] }, // Optional images for each option (e.g. color swatches)
+    // Images per option - 2D array: images[optionIndex] = [url1, url2, ...]
+    // Using Mixed type to support both flat array (legacy) and 2D array (new)
+    images: { type: Schema.Types.Mixed, default: [] },
   },
   { _id: false }
 );

@@ -76,12 +76,25 @@ const ProductController = {
    * @returns {Object} Created product
    */
   createProduct: catchAsync(async (req, res) => {
-    // Ensure shopId is present (User must be a seller)
-    // Assuming middleware populates req.user.shop or we fetch it
-    // For safety, let's fetch if missing (or assume auth middleware handles it)
-    const shopId = req.user.shop;
+    // Fetch user from database to get shop ID
+    const User = require("../models/user.model");
+    const Shop = require("../models/shop.model");
+    
+    const user = await User.findById(req.user.userId);
+    let shopId = user?.shop;
+    
+    // If user doesn't have shop field set, try to find shop by owner
     if (!shopId) {
-      throw new Error("User does not have a shop");
+      const shop = await Shop.findOne({ owner: req.user.userId });
+      if (shop) {
+        // Fix the user's shop field
+        await User.findByIdAndUpdate(req.user.userId, { shop: shop._id });
+        shopId = shop._id;
+      }
+    }
+    
+    if (!shopId) {
+      throw new Error("User does not have a shop. Please register a shop first.");
     }
 
     const product = await productService.createProduct(

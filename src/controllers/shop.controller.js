@@ -75,6 +75,18 @@ const ShopController = {
   }),
 
   /**
+   * Get shop information by slug
+   * @route GET /api/shops/slug/:slug
+   * @access Public
+   * @param {string} slug - Shop slug
+   * @returns {Object} Shop information
+   */
+  getShopBySlug: catchAsync(async (req, res) => {
+    const shop = await shopService.getShopBySlug(req.params.slug);
+    return sendSuccess(res, shop, "Get shop info success", StatusCodes.OK);
+  }),
+
+  /**
    * Get current user's shop information
    * @route GET /api/shops/me
    * @access Private (Seller only)
