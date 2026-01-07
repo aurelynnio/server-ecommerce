@@ -15,7 +15,7 @@ class CartService {
     let cart = await Cart.findOne({ userId })
       .populate({
         path: "items.productId",
-        select: "name slug images price isActive tierVariations models shop",
+        select: "name slug images price status tierVariations models shop",
         populate: [
           { path: "category", select: "name slug" },
           { path: "shop", select: "name logo" },
@@ -92,10 +92,10 @@ class CartService {
   async addToCart(userId, itemData) {
     let { productId, modelId, quantity } = itemData;
 
-    // Check if product exists and is active
+    // Check if product exists and is published
     const product = await Product.findById(productId);
     if (!product) throw new Error("Product not found");
-    if (!product.isActive) throw new Error("Product is not available");
+    if (product.status !== "published") throw new Error("Product is not available");
 
     // Get Shop ID
     const shopId = product.shop;
@@ -182,7 +182,7 @@ class CartService {
 
     // Check product stock
     const product = await Product.findById(item.productId);
-    if (!product || !product.isActive) {
+    if (!product || product.status !== "published") {
       throw new Error("Product is not available");
     }
 
@@ -241,7 +241,7 @@ class CartService {
 
     await cart.populate({
       path: "items.productId",
-      select: "name slug images price isActive",
+      select: "name slug images price status",
     });
 
     return cart;

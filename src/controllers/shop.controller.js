@@ -10,6 +10,37 @@ const { StatusCodes } = require("http-status-codes");
  */
 const ShopController = {
   /**
+   * Get all shops (Admin)
+   * @route GET /api/shops/admin/all
+   * @access Private (Admin only)
+   * @query {number} page - Page number
+   * @query {number} limit - Items per page
+   * @query {string} status - Filter by status
+   * @query {string} search - Search by name
+   * @returns {Object} Shops with pagination
+   */
+  getAllShops: catchAsync(async (req, res) => {
+    const { page, limit, status, search, sort } = req.query;
+    const result = await shopService.getAllShops({ page, limit, status, search, sort });
+    return sendSuccess(res, result, "Get all shops success", StatusCodes.OK);
+  }),
+
+  /**
+   * Update shop status (Admin)
+   * @route PUT /api/shops/admin/:shopId/status
+   * @access Private (Admin only)
+   * @param {string} shopId - Shop ID
+   * @body {string} status - New status
+   * @returns {Object} Updated shop
+   */
+  updateShopStatus: catchAsync(async (req, res) => {
+    const { shopId } = req.params;
+    const { status } = req.body;
+    const shop = await shopService.updateShopStatus(shopId, status);
+    return sendSuccess(res, shop, "Shop status updated", StatusCodes.OK);
+  }),
+
+  /**
    * Register a new shop (become a seller)
    * @route POST /api/shops/register
    * @access Private (Authenticated users)

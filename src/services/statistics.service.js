@@ -17,7 +17,7 @@ class StatisticsService {
 
     const totalOrders = await Order.countDocuments();
     const totalUsers = await User.countDocuments({ roles: "user" });
-    const totalProducts = await Product.countDocuments({ isActive: true });
+    const totalProducts = await Product.countDocuments({ status: "published" });
 
     // 2. Recent Orders (5)
     const recentOrders = await Order.find()

@@ -52,6 +52,16 @@ const userSchema = new Schema(
       type: String,
       default: null,
     },
+    // Wishlist - favorite products
+    wishlist: {
+      type: [{ type: Schema.Types.ObjectId, ref: "Product" }],
+      default: [],
+    },
+    // Following shops
+    followingShops: {
+      type: [{ type: Schema.Types.ObjectId, ref: "Shop" }],
+      default: [],
+    },
     codeVerifiEmail: {
       type: String,
     },

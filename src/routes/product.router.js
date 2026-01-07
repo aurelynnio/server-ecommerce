@@ -87,19 +87,19 @@ router.get(
 );
 
 /**
- * @route   GET /api/products/:id
- * @desc    Get product by ID
- * @access  Public
- */
-router.get("/:id", validate({ params: mongoIdParamValidator }), productController.getProductById);
-
-/**
  * @route   GET /api/products/related/:id
  * @desc    Get related products (same category)
  * @access  Public
  * @query   limit, type (random, newest, best-selling)
  */
 router.get("/related/:id", validate({ params: mongoIdParamValidator }), productController.getRelatedProducts);
+
+/**
+ * @route   GET /api/products/:id
+ * @desc    Get product by ID
+ * @access  Public
+ */
+router.get("/:id", validate({ params: mongoIdParamValidator }), productController.getProductById);
 
 /**
  * Protected Routes - Admin Only

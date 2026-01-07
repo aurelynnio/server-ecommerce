@@ -28,9 +28,9 @@ const errorResponse = (message, code, status = "error") => {
  * @param {Object} res - Express response object
  * @param {*} data - Response data
  * @param {String} message - Success message
- * @param {Number} code - HTTP status code
+ * @param {Number} code - HTTP status code (default: 200)
  */
-const sendSuccess = (res, data, message, code) => {
+const sendSuccess = (res, data, message, code = 200) => {
   res.status(code);
   return res.json(successResponse(data, message, code));
 };

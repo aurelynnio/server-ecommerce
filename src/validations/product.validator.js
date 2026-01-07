@@ -112,17 +112,15 @@ const createProductValidator = joi.object({
     "array.base": "Tags must be an array",
     "string.base": "Each tag must be a string",
   }),
-  isActive: joi.boolean().default(true).messages({
-    "boolean.base": "isActive must be a boolean",
+  status: joi.string().valid("draft", "published", "suspended").default("published").messages({
+    "string.base": "Status must be a string",
+    "any.only": "Status must be one of: draft, published, suspended",
   }),
   isNewArrival: joi.boolean().default(false).messages({
     "boolean.base": "isNewArrival must be a boolean",
   }),
   isFeatured: joi.boolean().default(false).messages({
     "boolean.base": "isFeatured must be a boolean",
-  }),
-  onSale: joi.boolean().default(false).messages({
-    "boolean.base": "onSale must be a boolean",
   }),
 });
 
@@ -172,8 +170,9 @@ const updateProductValidator = joi
       "array.base": "Tags must be an array",
       "string.base": "Each tag must be a string",
     }),
-    isActive: joi.boolean().truthy("true").falsy("false").optional().messages({
-      "boolean.base": "isActive must be a boolean",
+    status: joi.string().valid("draft", "published", "suspended").optional().messages({
+      "string.base": "Status must be a string",
+      "any.only": "Status must be one of: draft, published, suspended",
     }),
     isNewArrival: joi
       .boolean()
@@ -191,9 +190,6 @@ const updateProductValidator = joi
       .messages({
         "boolean.base": "isFeatured must be a boolean",
       }),
-    onSale: joi.boolean().truthy("true").falsy("false").optional().messages({
-      "boolean.base": "onSale must be a boolean",
-    }),
   })
   .min(1);
 
@@ -296,8 +292,9 @@ const getProductsQueryValidator = joi.object({
   search: searchString().allow("").messages({
     "string.base": "Search must be a string",
   }),
-  isActive: joi.boolean().default(true).messages({
-    "boolean.base": "isActive must be a boolean",
+  status: joi.string().valid("draft", "published", "suspended").default("published").messages({
+    "string.base": "Status must be a string",
+    "any.only": "Status must be one of: draft, published, suspended",
   }),
 });
 

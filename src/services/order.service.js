@@ -88,7 +88,7 @@ class OrderService {
         // Verify Stock & Price
         for (const item of items) {
           const product = await Product.findById(item.productId._id).session(session);
-          if (!product || !product.isActive)
+          if (!product || product.status !== "published")
             throw new Error(`${item.productId.name} unavailable`);
 
           let price = product.price.currentPrice;

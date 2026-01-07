@@ -13,6 +13,37 @@ const {
 const upload = require("../configs/upload");
 
 /**
+ * Admin Routes (must be before :shopId route)
+ */
+
+/**
+ * @route   GET /api/shops/admin/all
+ * @desc    Get all shops with pagination (Admin)
+ * @access  Private (Admin only)
+ * @query   page, limit, status, search, sort
+ */
+router.get(
+  "/admin/all",
+  verifyAccessToken,
+  requireRole(["admin"]),
+  shopController.getAllShops
+);
+
+/**
+ * @route   PUT /api/shops/admin/:shopId/status
+ * @desc    Update shop status (Admin)
+ * @access  Private (Admin only)
+ * @param   shopId - Shop ID
+ * @body    { status }
+ */
+router.put(
+  "/admin/:shopId/status",
+  verifyAccessToken,
+  requireRole(["admin"]),
+  shopController.updateShopStatus
+);
+
+/**
  * @route   POST /api/shops/register
  * @desc    Register a new shop (become a seller)
  * @access  Private (Authenticated users)

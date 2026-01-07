@@ -19,6 +19,12 @@ const voucherRouter = require("./voucher.router");
 const chatRouter = require("./chat.router");
 const shopCategoryRouter = require("./shop.category.router");
 
+// Additional Feature Routers
+const wishlistRouter = require("./wishlist.router");
+const searchRouter = require("./search.router");
+const flashSaleRouter = require("./flash-sale.router");
+const recommendationRouter = require("./recommendation.router");
+
 const initRoutes = (app) => {
   app.use("/api/users", userRouter);
   app.use("/api/products", productRouter);
@@ -40,6 +46,12 @@ const initRoutes = (app) => {
   app.use("/api/vouchers", voucherRouter);
   app.use("/api/chat", chatRouter);
   app.use("/api/shop-categories", shopCategoryRouter);
+
+  // Additional Feature Routes
+  app.use("/api/wishlist", wishlistRouter);
+  app.use("/api/search", searchRouter);
+  app.use("/api/flash-sale", flashSaleRouter);
+  app.use("/api/recommendations", recommendationRouter);
 };
 
 module.exports = initRoutes;

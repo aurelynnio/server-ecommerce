@@ -23,7 +23,7 @@ class ProductService {
    * @param {number} [filters.maxPrice] - Maximum price
    * @param {string|string[]} [filters.tags] - Filter by tags
    * @param {string} [filters.search] - Search term
-   * @param {boolean} [filters.isActive=true] - Filter by active status
+   * @param {string} [filters.status="published"] - Filter by status
    * @param {Object} options - Pagination and sorting options
    * @param {number} [options.page=1] - Page number
    * @param {number} [options.limit=10] - Items per page
@@ -41,7 +41,7 @@ class ProductService {
       maxPrice,
       tags,
       search,
-      isActive = true,
+      status = "published",
       colors,
       sizes,
       rating,
@@ -53,7 +53,7 @@ class ProductService {
     if (cachedData) return cachedData;
 
     // Build query
-    const query = { isActive };
+    const query = { status };
 
     // Filter by category
     if (category) {
@@ -164,7 +164,7 @@ class ProductService {
 
     const product = await Product.findById(id)
       .populate("category", "name slug")
-      .populate("reviews");
+      .populate("shop", "name logo");
 
     if (!product) {
       throw new Error("Product not found");
@@ -187,7 +187,7 @@ class ProductService {
 
     const product = await Product.findOne({ slug })
       .populate("category", "name slug")
-      .populate("reviews");
+      .populate("shop", "name logo");
 
     if (!product) {
       throw new Error("Product not found");
@@ -354,7 +354,7 @@ class ProductService {
   }
 
   /**
-   * Soft delete a product (sets isActive to false)
+   * Soft delete a product (sets status to "deleted")
    * @param {string} id - Product ID
    * @returns {Promise<Object>} Deleted product object
    * @throws {Error} If product not found
@@ -362,7 +362,7 @@ class ProductService {
   async deleteProduct(id) {
     const product = await Product.findByIdAndUpdate(
       id,
-      { isActive: false },
+      { status: "deleted" },
       { new: true }
     );
 
@@ -495,7 +495,7 @@ class ProductService {
 
     const query = {
       category: categoryId,
-      isActive: true,
+      status: "published",
     };
 
     // Get total count for pagination
@@ -559,7 +559,7 @@ class ProductService {
 
     const query = {
       category: { $in: categoryIds },
-      isActive: true,
+      status: "published",
     };
 
     // Get total count for pagination
@@ -603,7 +603,7 @@ class ProductService {
    * @throws {Error} If no products found
    */
   async getFeaturedProductsSimple(limit = 10) {
-    const products = await Product.find({ isActive: true })
+    const products = await Product.find({ status: "published" })
       .populate("category", "name slug")
       .sort("-createdAt")
       .limit(Number(limit))
@@ -626,7 +626,7 @@ class ProductService {
     if (cachedProducts) return cachedProducts;
 
     const filter = {
-      isActive: true,
+      status: "published",
       isFeatured: true,
     };
 
@@ -651,7 +651,7 @@ class ProductService {
     if (cachedProducts) return cachedProducts;
 
     const filter = {
-      isActive: true,
+      status: "published",
       isNewArrival: true,
     };
 
@@ -667,6 +667,7 @@ class ProductService {
 
   /**
    * Get products currently on sale (with caching)
+   * Uses virtual onSale field or checks discountPrice/flashSale
    * @param {Object} [query] - Query parameters (unused, for API compatibility)
    * @returns {Promise<Array>} List of on-sale products (max 10)
    */
@@ -675,10 +676,17 @@ class ProductService {
     const cachedProducts = await cacheService.get(cacheKey);
     if (cachedProducts) return cachedProducts;
 
+    const now = new Date();
     const filter = {
-      isActive: true,
-      onSale: true,
-      "price.discountPrice": { $ne: null },
+      status: "published",
+      $or: [
+        { "price.discountPrice": { $ne: null, $gt: 0 } },
+        { 
+          "flashSale.isActive": true,
+          "flashSale.startTime": { $lte: now },
+          "flashSale.endTime": { $gt: now }
+        }
+      ],
     };
 
     const products = await Product.find(filter)
@@ -703,7 +711,7 @@ class ProductService {
     if (cachedProducts) return cachedProducts;
 
     const query = {
-      isActive: true,
+      status: "published",
       $or: [
         { name: { $regex: keyword, $options: "i" } },
         { description: { $regex: keyword, $options: "i" } },
@@ -742,7 +750,7 @@ class ProductService {
     const query = {
       _id: { $ne: currentProduct._id },
       category: currentProduct.category,
-      isActive: true,
+      status: "published",
       "price.currentPrice": { $gte: minPrice, $lte: maxPrice },
     };
 
