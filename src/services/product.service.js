@@ -793,9 +793,10 @@ class ProductService {
    * @returns {Promise<Array>} Matching products with basic info
    */
   async searchProducts(keyword, limit = 10) {
-    const cacheKey = `products:search:${keyword}:${limit}`;
-    const cachedProducts = await cacheService.get(cacheKey);
-    if (cachedProducts) return cachedProducts;
+    // Skip cache temporarily to ensure fresh data
+    // const cacheKey = `products:search:${keyword}:${limit}`;
+    // const cachedProducts = await cacheService.get(cacheKey);
+    // if (cachedProducts) return cachedProducts;
 
     const query = {
       status: "published",
@@ -807,13 +808,20 @@ class ProductService {
     };
 
     const products = await Product.find(query)
-      .select("name slug images price category")
+      .select("name slug price category variants")
       .populate("category", "name slug")
       .limit(Number(limit))
       .lean();
 
-    await cacheService.set(cacheKey, products, 600); // 10 mins cache
-    return products;
+    // Map products to include first variant image
+    const productsWithImages = products.map(product => ({
+      ...product,
+      image: product.variants?.[0]?.images?.[0] || null,
+    }));
+
+    // Skip cache temporarily
+    // await cacheService.set(cacheKey, productsWithImages, 600); // 10 mins cache
+    return productsWithImages;
   }
 
   /**

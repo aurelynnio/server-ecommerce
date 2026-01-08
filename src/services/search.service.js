@@ -19,13 +19,14 @@ class SearchService {
       return { products: [], categories: [], shops: [] };
     }
 
-    const cacheKey = `search:suggestions:${keyword.toLowerCase()}`;
-    const cached = await cacheService.get(cacheKey);
-    if (cached) return cached;
+    // Temporarily skip cache to ensure fresh data with variants
+    // const cacheKey = `search:suggestions:${keyword.toLowerCase()}`;
+    // const cached = await cacheService.get(cacheKey);
+    // if (cached) return cached;
 
     const regex = new RegExp(keyword, "i");
 
-    // Search products
+    // Search products - Note: images are in variants[].images, not root level
     const products = await Product.find({
       status: "published",
       $or: [
@@ -33,9 +34,19 @@ class SearchService {
         { "tags": regex },
       ],
     })
-      .select("name slug images price variants")
+      .select("name slug price variants")
       .limit(limit)
       .lean();
+    
+    // Map products to include first variant image for display
+    const productsWithImages = products.map(product => {
+      const image = product.variants?.[0]?.images?.[0] || null;
+      console.log(`[Search] Product: ${product.name}, Variants: ${product.variants?.length || 0}, Image: ${image}`);
+      return {
+        ...product,
+        image,
+      };
+    });
 
     // Search categories
     const categories = await Category.find({
@@ -55,8 +66,9 @@ class SearchService {
       .limit(5)
       .lean();
 
-    const result = { products, categories, shops };
-    await cacheService.set(cacheKey, result, 300); // 5 mins cache
+    const result = { products: productsWithImages, categories, shops };
+    // Temporarily skip cache
+    // await cacheService.set(cacheKey, result, 300); // 5 mins cache
 
     return result;
   }
