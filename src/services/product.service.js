@@ -120,7 +120,9 @@ class ProductService {
     const paginationParams = getPaginationParams(page, limit, total);
 
     // Execute query
-    let productsQuery = Product.find(query).populate("category", "name slug");
+    let productsQuery = Product.find(query)
+      .populate("category", "name slug")
+      .populate("shopCategory", "name slug");
 
     // If searching, sort by relevance score
     if (search) {
@@ -164,7 +166,8 @@ class ProductService {
 
     const product = await Product.findById(id)
       .populate("category", "name slug")
-      .populate("shop", "name logo");
+      .populate("shop", "name logo")
+      .populate("shopCategory", "name slug");
 
     if (!product) {
       throw new Error("Product not found");
@@ -187,7 +190,8 @@ class ProductService {
 
     const product = await Product.findOne({ slug })
       .populate("category", "name slug")
-      .populate("shop", "name logo");
+      .populate("shop", "name logo")
+      .populate("shopCategory", "name slug");
 
     if (!product) {
       throw new Error("Product not found");
@@ -195,6 +199,19 @@ class ProductService {
 
     await cacheService.set(cacheKey, product, 3600);
     return product;
+  }
+
+  /**
+   * Generate SKU from slug and color
+   * @param {string} slug - Product slug
+   * @param {string} color - Variant color
+   * @param {number} index - Variant index
+   * @returns {string} Generated SKU
+   */
+  generateSku(slug, color, index) {
+    const slugPart = slug ? slug.substring(0, 20).toUpperCase().replace(/-/g, '') : 'PROD';
+    const colorPart = color ? color.substring(0, 10).toUpperCase().replace(/\s+/g, '') : 'DEFAULT';
+    return `${slugPart}-${colorPart}-${String(index + 1).padStart(3, '0')}`;
   }
 
   /**
@@ -211,15 +228,30 @@ class ProductService {
   async createProduct(data, files, shopId) {
     const productData = { ...data, shop: shopId };
 
-    // Clean up temp _id from models (client uses temp-0, temp-1, etc.)
-    if (productData.models && Array.isArray(productData.models)) {
-      productData.models = productData.models.map(model => {
-        const { _id, ...rest } = model;
-        // Only keep _id if it's a valid ObjectId (24 hex chars)
-        if (_id && /^[0-9a-fA-F]{24}$/.test(_id)) {
-          return model;
-        }
-        return rest; // Remove temp _id
+    // Generate slug if not provided
+    if (!productData.slug && productData.name) {
+      const slugify = require('slugify');
+      productData.slug = slugify(productData.name, { lower: true, strict: true, locale: 'vi' });
+    }
+
+    // Clean up and process variants
+    if (productData.variants && Array.isArray(productData.variants)) {
+      productData.variants = productData.variants.map((variant, index) => {
+        const { _id, attributes, ...rest } = variant;
+        
+        // Extract color from old attributes structure if present
+        const color = variant.color || attributes?.color || '';
+        
+        // Auto-generate SKU
+        const sku = this.generateSku(productData.slug, color, index);
+        
+        return {
+          ...rest,
+          color,
+          sku,
+          // Only keep _id if it's a valid ObjectId (24 hex chars)
+          ...(_id && /^[0-9a-fA-F]{24}$/.test(_id) ? { _id } : {})
+        };
       });
     }
 
@@ -233,6 +265,8 @@ class ProductService {
 
     // Handle image files
     if (files && files.length > 0) {
+      console.log("[ProductService] Processing files:", files.map(f => ({ fieldname: f.fieldname, size: f.size })));
+      
       const filesToUpload = files.map((file) => ({
         buffer: file.buffer,
         fieldname: file.fieldname,
@@ -248,47 +282,34 @@ class ProductService {
         fieldname: filesToUpload[index].fieldname,
       }));
 
-      // 1. Main Product Images
-      const mainImages = uploads.filter((u) => u.fieldname === "images");
-      if (mainImages.length > 0) {
-        productData.images = mainImages.map((u) => u.secure_url);
+      console.log("[ProductService] Upload results:", uploads.map(u => ({ fieldname: u.fieldname, url: u.secure_url?.substring(0, 50) + "..." })));
+
+      // 1. Variant Images (variantImages_0, variantImages_1, etc.)
+      // Product images are stored in variants[].images, not product.images
+      if (productData.variants && Array.isArray(productData.variants)) {
+        const variantImageMap = {};
+        uploads.forEach((upload) => {
+          if (upload.fieldname.startsWith("variantImages_")) {
+            const variantIndex = parseInt(upload.fieldname.split("_")[1]);
+            if (!variantImageMap[variantIndex]) {
+              variantImageMap[variantIndex] = [];
+            }
+            variantImageMap[variantIndex].push(upload.secure_url);
+          }
+        });
+
+        console.log("[ProductService] Variant image map:", variantImageMap);
+
+        // Assign images to variants
+        productData.variants = productData.variants.map((variant, idx) => ({
+          ...variant,
+          images: [...(variant.images || []), ...(variantImageMap[idx] || [])],
+        }));
+
+        console.log("[ProductService] Variants after image assignment:", productData.variants.map(v => ({ name: v.name, images: v.images })));
       }
 
-      // 2. Variant Images (variantImages_0, variantImages_1, etc.)
-      // Group uploads by option index
-      const variantImageMap = {};
-      uploads.forEach((upload) => {
-        if (upload.fieldname.startsWith("variantImages_")) {
-          const optionIndex = parseInt(upload.fieldname.split("_")[1]);
-          if (!variantImageMap[optionIndex]) {
-            variantImageMap[optionIndex] = [];
-          }
-          variantImageMap[optionIndex].push(upload.secure_url);
-        }
-      });
-
-      // 3. Update tierVariations with uploaded images
-      if (productData.tierVariations && Array.isArray(productData.tierVariations) && productData.tierVariations.length > 0) {
-        // First tier gets the images (usually Color)
-        const firstTier = productData.tierVariations[0];
-        if (firstTier && firstTier.options) {
-          // Build images array where each index corresponds to an option
-          // Store as 2D array: images[optionIndex] = [url1, url2, ...]
-          const imagesPerOption = firstTier.options.map((_, optIdx) => {
-            return variantImageMap[optIdx] || [];
-          });
-          
-          // Store as 2D array so client knows which images belong to which option
-          firstTier.images = imagesPerOption;
-          
-          // Also set product main images from first option's images
-          if (imagesPerOption[0] && imagesPerOption[0].length > 0 && !productData.images?.length) {
-            productData.images = imagesPerOption[0];
-          }
-        }
-      }
-
-      // 4. Description Images
+      // 2. Description Images
       const descImages = uploads.filter((u) => u.fieldname === "descriptionImages");
       if (descImages.length > 0) {
         productData.descriptionImages = descImages.map((u) => u.secure_url);
@@ -364,66 +385,39 @@ class ProductService {
         delete updateData.existingDescriptionImages;
       }
 
+      // Handle variants update - simple structure with attributes
       if (updateData.variants && Array.isArray(updateData.variants)) {
+        // Parse existing variant images if provided
+        let existingVariantImagesMap = {};
+        if (updateData.existingVariantImages) {
+          const mapping = typeof updateData.existingVariantImages === 'string' 
+            ? JSON.parse(updateData.existingVariantImages) 
+            : updateData.existingVariantImages;
+          mapping.forEach(item => {
+            existingVariantImagesMap[item.variantIndex] = item.existing || [];
+          });
+        }
+        delete updateData.existingVariantImages;
+
         updateData.variants = updateData.variants.map((variant, index) => {
           const variantData = { ...variant };
-          if (variantData._id && variantData._id.startsWith("temp-")) {
+          
+          // Remove temp _id - MongoDB will generate real ObjectId
+          if (variantData._id && (typeof variantData._id === 'string' && variantData._id.startsWith("temp-"))) {
             delete variantData._id;
           }
 
-          if (variantUploadMap[index]) {
-            const existingVariantImages = variantData.images || [];
-            variantData.images = [
-              ...existingVariantImages,
-              ...variantUploadMap[index],
-            ];
-          }
+          // Combine existing + new uploaded images
+          const existingImages = existingVariantImagesMap[index] || variantData.images || [];
+          const newImages = variantUploadMap[index] || [];
+          variantData.images = [...existingImages, ...newImages];
+
           return variantData;
         });
-      }
 
-      // Handle models (new tier-based structure) - remove temp _id for new models
-      if (updateData.models && Array.isArray(updateData.models)) {
-        updateData.models = updateData.models.map((model) => {
-          const modelData = { ...model };
-          // Remove temp _id - MongoDB will generate real ObjectId
-          if (modelData._id && (typeof modelData._id === 'string' && modelData._id.startsWith("temp-"))) {
-            delete modelData._id;
-          }
-          return modelData;
-        });
-      }
-
-      // Handle tierVariations images update (new structure)
-      if (updateData.tierVariations && Array.isArray(updateData.tierVariations) && updateData.tierVariations.length > 0) {
-        const firstTier = updateData.tierVariations[0];
-        if (firstTier && firstTier.options) {
-          // Parse existing variant images mapping if provided
-          let existingImagesMap = {};
-          if (updateData.existingVariantImages) {
-            const mapping = typeof updateData.existingVariantImages === 'string' 
-              ? JSON.parse(updateData.existingVariantImages) 
-              : updateData.existingVariantImages;
-            mapping.forEach(item => {
-              existingImagesMap[item.optionIndex] = item.existing || [];
-            });
-          }
-          delete updateData.existingVariantImages;
-
-          // Build images array: combine existing + new uploaded images per option
-          const imagesPerOption = firstTier.options.map((_, optIdx) => {
-            const existing = existingImagesMap[optIdx] || [];
-            const newUploads = variantUploadMap[optIdx] || [];
-            return [...existing, ...newUploads];
-          });
-
-          // Store as 2D array
-          firstTier.images = imagesPerOption;
-
-          // Update product main images from first option if needed
-          if (imagesPerOption[0] && imagesPerOption[0].length > 0) {
-            updateData.images = imagesPerOption[0];
-          }
+        // Update product main images from first variant if needed
+        if (updateData.variants[0]?.images?.length > 0) {
+          updateData.images = updateData.variants[0].images;
         }
       }
 
@@ -854,6 +848,68 @@ class ProductService {
       .lean();
 
     return products;
+  }
+
+  /**
+   * Update product by seller (with ownership verification)
+   * Seller cannot change certain fields like status
+   * @param {string} productId - Product ID
+   * @param {string} shopId - Shop ID (for verification)
+   * @param {Object} data - Data to update
+   * @param {Array} [files] - New image files to upload
+   * @returns {Promise<Object>} Updated product object
+   * @throws {Error} If product not found or not owned by shop
+   */
+  async updateProductBySeller(productId, shopId, data, files) {
+    // Verify ownership
+    const existingProduct = await Product.findOne({
+      _id: productId,
+      shop: shopId,
+    });
+
+    if (!existingProduct) {
+      throw new Error("Product not found or you don't have permission to update it");
+    }
+
+    // Remove fields that seller shouldn't modify
+    const updateData = { ...data };
+    delete updateData.shop; // Cannot change shop
+    delete updateData.status; // Only admin can change status
+    delete updateData.soldCount; // System managed
+    delete updateData.averageRating; // System managed
+    delete updateData.reviewCount; // System managed
+
+    // Use the existing updateProduct method for the actual update
+    return this.updateProduct(productId, updateData, files);
+  }
+
+  /**
+   * Delete product by seller (soft delete with ownership verification)
+   * @param {string} productId - Product ID
+   * @param {string} shopId - Shop ID (for verification)
+   * @returns {Promise<Object>} Deleted product object
+   * @throws {Error} If product not found or not owned by shop
+   */
+  async deleteProductBySeller(productId, shopId) {
+    // Verify ownership and soft delete
+    const product = await Product.findOneAndUpdate(
+      { _id: productId, shop: shopId },
+      { 
+        isActive: false,
+        deletedAt: new Date(),
+        deletedBy: 'seller'
+      },
+      { new: true }
+    );
+
+    if (!product) {
+      throw new Error("Product not found or you don't have permission to delete it");
+    }
+
+    // Invalidate cache
+    await cacheService.delByPattern("products:*");
+
+    return product;
   }
 }
 

@@ -304,17 +304,301 @@ class OrderService {
   }
 
   /**
+   * Get orders for a specific shop with pagination and filters
+   * @param {string} shopId - Shop ID
+   * @param {Object} filters - Query filters
+   * @param {number} [filters.page=1] - Page number
+   * @param {number} [filters.limit=10] - Items per page
+   * @param {string} [filters.status] - Filter by status
+   * @param {string} [filters.paymentStatus] - Filter by payment status
+   * @returns {Promise<Object>} Paginated orders
+   */
+  async getOrdersByShop(shopId, filters = {}) {
+    const { page = 1, limit = 10, status, paymentStatus } = filters;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const query = { shopId };
+
+    if (status && status !== "all") {
+      query.status = status;
+    }
+
+    if (paymentStatus && paymentStatus !== "all") {
+      query.paymentStatus = paymentStatus;
+    }
+
+    const [orders, total] = await Promise.all([
+      Order.find(query)
+        .populate("userId", "username email avatar")
+        .populate("products.productId", "name slug images")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      Order.countDocuments(query),
+    ]);
+
+    return {
+      data: orders,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / parseInt(limit)),
+      },
+    };
+  }
+
+  /**
+   * Update order status by seller
+   * Seller can only update: pending -> confirmed -> processing -> shipped
+   * @param {string} orderId - Order ID
+   * @param {string} shopId - Seller's shop ID
+   * @param {string} newStatus - New status
+   * @returns {Promise<Object>} Updated order
+   * @throws {Error} If invalid status transition
+   */
+  async updateOrderStatusBySeller(orderId, shopId, newStatus) {
+    const order = await Order.findOne({ _id: orderId, shopId });
+
+    if (!order) {
+      throw new Error("Order not found or doesn't belong to your shop");
+    }
+
+    // Seller allowed transitions (more restricted than admin)
+    const allowedTransitions = {
+      pending: ["confirmed", "cancelled"],
+      confirmed: ["processing", "cancelled"],
+      processing: ["shipped"],
+      shipped: ["delivered"],
+      delivered: [],
+      cancelled: [],
+      returned: [],
+    };
+
+    if (!allowedTransitions[order.status]?.includes(newStatus)) {
+      throw new Error(
+        `Cannot change status from "${order.status}" to "${newStatus}"`
+      );
+    }
+
+    order.status = newStatus;
+
+    if (newStatus === "cancelled") {
+      order.cancelledAt = new Date();
+      // Restore stock when seller cancels
+      await this.restoreOrderStock(order);
+    }
+
+    if (newStatus === "delivered") {
+      order.deliveredAt = new Date();
+      // Mark as paid for COD orders
+      if (order.paymentMethod === "cod" && order.paymentStatus === "unpaid") {
+        order.paymentStatus = "paid";
+      }
+    }
+
+    await order.save();
+    return order;
+  }
+
+  /**
+   * Restore stock when order is cancelled
+   * @param {Object} order - Order object
+   */
+  async restoreOrderStock(order) {
+    for (const item of order.products) {
+      const product = await Product.findById(item.productId);
+      if (product) {
+        if (item.modelId) {
+          const model = product.models.find(
+            (m) => m._id.toString() === item.modelId.toString()
+          );
+          if (model) {
+            model.stock += item.quantity;
+            model.sold = Math.max(0, (model.sold || 0) - item.quantity);
+          }
+        } else {
+          product.stock += item.quantity;
+        }
+        product.soldCount = Math.max(0, product.soldCount - item.quantity);
+        await product.save();
+      }
+    }
+  }
+
+  /**
+   * Get order statistics for a specific shop
+   * @param {string} shopId - Shop ID
+   * @returns {Promise<Object>} Shop's order statistics
+   */
+  async getSellerOrderStatistics(shopId) {
+    const shopObjectId = new Types.ObjectId(shopId);
+
+    // 1. Orders count by status
+    const ordersByStatus = await Order.aggregate([
+      { $match: { shopId: shopObjectId } },
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 },
+          totalAmount: { $sum: "$totalAmount" },
+        },
+      },
+    ]);
+
+    const statusStats = {};
+    ordersByStatus.forEach((item) => {
+      statusStats[item._id] = {
+        count: item.count,
+        totalAmount: item.totalAmount,
+      };
+    });
+
+    // 2. Revenue statistics (only paid orders)
+    const revenueStats = await Order.aggregate([
+      {
+        $match: {
+          shopId: shopObjectId,
+          paymentStatus: "paid",
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: "$totalAmount" },
+          totalOrders: { $sum: 1 },
+          avgOrderValue: { $avg: "$totalAmount" },
+        },
+      },
+    ]);
+
+    // 3. Daily orders for last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const dailyOrders = await Order.aggregate([
+      {
+        $match: {
+          shopId: shopObjectId,
+          createdAt: { $gte: thirtyDaysAgo },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" },
+            day: { $dayOfMonth: "$createdAt" },
+          },
+          orders: { $sum: 1 },
+          revenue: {
+            $sum: {
+              $cond: [{ $eq: ["$paymentStatus", "paid"] }, "$totalAmount", 0],
+            },
+          },
+        },
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 } },
+    ]);
+
+    // 4. Top selling products
+    const topProducts = await Order.aggregate([
+      {
+        $match: {
+          shopId: shopObjectId,
+          status: { $ne: "cancelled" },
+        },
+      },
+      { $unwind: "$products" },
+      {
+        $group: {
+          _id: "$products.productId",
+          productName: { $first: "$products.name" },
+          totalQuantity: { $sum: "$products.quantity" },
+          totalRevenue: { $sum: "$products.totalPrice" },
+        },
+      },
+      { $sort: { totalQuantity: -1 } },
+      { $limit: 10 },
+    ]);
+
+    // 5. Summary counts
+    const totalOrders = await Order.countDocuments({ shopId: shopObjectId });
+    const pendingOrders = await Order.countDocuments({
+      shopId: shopObjectId,
+      status: "pending",
+    });
+    const completedOrders = await Order.countDocuments({
+      shopId: shopObjectId,
+      status: "delivered",
+    });
+    const cancelledOrders = await Order.countDocuments({
+      shopId: shopObjectId,
+      status: "cancelled",
+    });
+
+    return {
+      summary: {
+        totalOrders,
+        pendingOrders,
+        completedOrders,
+        cancelledOrders,
+        totalRevenue: revenueStats[0]?.totalRevenue || 0,
+        avgOrderValue: Math.round(revenueStats[0]?.avgOrderValue || 0),
+      },
+      ordersByStatus: statusStats,
+      dailyOrders: dailyOrders.map((item) => ({
+        date: `${item._id.year}-${String(item._id.month).padStart(2, "0")}-${String(item._id.day).padStart(2, "0")}`,
+        orders: item.orders,
+        revenue: item.revenue,
+      })),
+      topProducts,
+    };
+  }
+
+  /**
    * Get all orders in the system (Admin only)
-   * @param {Object} [filters] - Optional filters (unused, for future expansion)
-   * @returns {Promise<Object>} All orders
+   * @param {Object} [filters] - Optional filters
+   * @param {string} [filters.shop] - Filter by shop ID
+   * @param {string} [filters.status] - Filter by order status
+   * @param {number} [filters.page=1] - Page number
+   * @param {number} [filters.limit=20] - Items per page
+   * @returns {Promise<Object>} All orders with pagination
    */
   async getAllOrders(filters = {}) {
-    const orders = await Order.find({})
-      .populate("userId", "username")
-      .populate("shopId", "name")
-      .sort({ createdAt: -1 })
-      .lean();
-    return { data: orders };
+    const { shop, status, page = 1, limit = 20 } = filters;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build query
+    const query = {};
+    if (shop) {
+      query.shopId = shop;
+    }
+    if (status && status !== "all") {
+      query.status = status;
+    }
+
+    const [orders, total] = await Promise.all([
+      Order.find(query)
+        .populate("userId", "username email")
+        .populate("shopId", "name logo slug") // Added logo and slug for admin panel
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      Order.countDocuments(query),
+    ]);
+
+    return {
+      data: orders,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / parseInt(limit)),
+      },
+    };
   }
 
   /**
@@ -327,7 +611,7 @@ class OrderService {
    */
   async getOrderById(orderId, userId, isAdmin = false) {
     const order = await Order.findById(orderId)
-      .populate("shopId", "name logo")
+      .populate("shopId", "name logo slug") // Added slug for admin panel
       .populate("products.productId", "name slug images")
       .lean();
 

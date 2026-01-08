@@ -11,6 +11,24 @@ const addToCartValidator = joi.object({
       "string.pattern.base": "Product ID must be a valid MongoDB ObjectId",
       "any.required": "Product ID is required",
     }),
+  shopId: joi
+    .string()
+    .pattern(/^[0-9a-fA-F]{24}$/)
+    .allow(null, "")
+    .messages({
+      "string.base": "Shop ID must be a string",
+      "string.pattern.base": "Shop ID must be a valid MongoDB ObjectId",
+    }),
+  // NEW: modelId for new variant structure (color variants)
+  modelId: joi
+    .string()
+    .pattern(/^[0-9a-fA-F]{24}$/)
+    .allow(null, "")
+    .messages({
+      "string.base": "Model ID must be a string",
+      "string.pattern.base": "Model ID must be a valid MongoDB ObjectId",
+    }),
+  // DEPRECATED: variantId kept for backward compatibility
   variantId: joi
     .string()
     .pattern(/^[0-9a-fA-F]{24}$/)
@@ -19,10 +37,20 @@ const addToCartValidator = joi.object({
       "string.base": "Variant ID must be a string",
       "string.pattern.base": "Variant ID must be a valid MongoDB ObjectId",
     }),
-  quantity: joi.number().integer().min(1).required().messages({
+  // NEW: size for product-level size selection
+  size: joi
+    .string()
+    .max(20)
+    .allow(null, "")
+    .messages({
+      "string.base": "Size must be a string",
+      "string.max": "Size must be at most 20 characters",
+    }),
+  quantity: joi.number().integer().min(1).max(99).required().messages({
     "number.base": "Quantity must be a number",
     "number.integer": "Quantity must be an integer",
     "number.min": "Quantity must be at least 1",
+    "number.max": "Quantity must be at most 99",
     "any.required": "Quantity is required",
   }),
 });

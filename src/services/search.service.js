@@ -33,7 +33,7 @@ class SearchService {
         { "tags": regex },
       ],
     })
-      .select("name slug images price")
+      .select("name slug images price variants")
       .limit(limit)
       .lean();
 

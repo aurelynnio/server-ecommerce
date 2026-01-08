@@ -5,6 +5,10 @@ const {
   verifyAccessToken,
   requireRole,
 } = require("../middlewares/auth.middleware");
+const {
+  verifyShopOwnership,
+  verifyProductOwnership,
+} = require("../middlewares/ownership.middleware");
 const upload = require("../configs/upload");
 const validate = require("../middlewares/validate.middleware");
 const parseJsonFields = require("../middlewares/parseJsonFields.middleware");
@@ -93,6 +97,42 @@ router.get(
  * @query   limit, type (random, newest, best-selling)
  */
 router.get("/related/:id", validate({ params: mongoIdParamValidator }), productController.getRelatedProducts);
+
+/**
+ * Seller Routes - Must be before /:id routes
+ */
+
+/**
+ * @route   PUT /api/products/seller/:id
+ * @desc    Update product by seller (own shop only)
+ * @access  Private (Seller or Admin)
+ */
+router.put(
+  "/seller/:id",
+  verifyAccessToken,
+  requireRole("seller", "admin"),
+  verifyShopOwnership,
+  verifyProductOwnership,
+  upload.any(),
+  parseJsonFields(["price", "variants", "tags", "tierVariations", "models", "attributes", "dimensions", "variantImageMapping", "existingDescriptionImages", "existingVariantImages"]),
+  validate({ params: mongoIdParamValidator, body: updateProductValidator }),
+  productController.updateProductBySeller
+);
+
+/**
+ * @route   DELETE /api/products/seller/:id
+ * @desc    Delete product by seller (own shop only, soft delete)
+ * @access  Private (Seller or Admin)
+ */
+router.delete(
+  "/seller/:id",
+  verifyAccessToken,
+  requireRole("seller", "admin"),
+  verifyShopOwnership,
+  verifyProductOwnership,
+  validate({ params: mongoIdParamValidator }),
+  productController.deleteProductBySeller
+);
 
 /**
  * @route   GET /api/products/:id

@@ -15,11 +15,15 @@ class CartService {
     let cart = await Cart.findOne({ userId })
       .populate({
         path: "items.productId",
-        select: "name slug images price status tierVariations models shop",
+        select: "name slug images price status tierVariations models shop variants sizes",
         populate: [
           { path: "category", select: "name slug" },
           { path: "shop", select: "name logo" },
         ],
+      })
+      .populate({
+        path: "items.shopId",
+        select: "name logo",
       })
       .lean();
 
@@ -32,16 +36,68 @@ class CartService {
     if (cart && cart.items && cart.items.length > 0) {
       cart.items = cart.items.map((item) => {
         const product = item.productId;
+        if (!product) return item;
 
-        // Handle Tier Variations (SKU)
-        if (item.modelId && product && product.models) {
+        // NEW: Handle new variant structure (color variants)
+        if (item.variantId && product.variants && product.variants.length > 0) {
+          const variant = product.variants.find(
+            (v) => v._id.toString() === item.variantId.toString()
+          );
+          if (variant) {
+            item.variant = {
+              _id: variant._id,
+              name: variant.name,
+              color: variant.color,
+              images: variant.images,
+              price: variant.price,
+              stock: variant.stock,
+            };
+            // Override price from variant
+            item.price = { currentPrice: variant.price, currency: "VND" };
+            
+            // Build variationInfo string
+            const parts = [];
+            if (variant.color) parts.push(variant.color);
+            if (item.size) parts.push(`Size: ${item.size}`);
+            if (parts.length > 0) {
+              item.variationInfo = parts.join(', ');
+            }
+          }
+        }
+        // Also check modelId for new variants (backward compatibility)
+        else if (item.modelId && product.variants && product.variants.length > 0) {
+          const variant = product.variants.find(
+            (v) => v._id.toString() === item.modelId.toString()
+          );
+          if (variant) {
+            item.variant = {
+              _id: variant._id,
+              name: variant.name,
+              color: variant.color,
+              images: variant.images,
+              price: variant.price,
+              stock: variant.stock,
+            };
+            item.variantId = variant._id;
+            item.price = { currentPrice: variant.price, currency: "VND" };
+            
+            const parts = [];
+            if (variant.color) parts.push(variant.color);
+            if (item.size) parts.push(`Size: ${item.size}`);
+            if (parts.length > 0) {
+              item.variationInfo = parts.join(', ');
+            }
+          }
+        }
+        // OLD: Handle Tier Variations (SKU) - backward compatibility
+        else if (item.modelId && product.models) {
           const model = product.models.find(
             (m) => m._id.toString() === item.modelId.toString()
           );
           if (model) {
             // Map tierIndex to actual names (e.g., [0, 0] -> "Red", "S")
             const variationOptions = model.tierIndex.map((tIdx, i) => {
-              return product.tierVariations[i]?.options[tIdx] || "";
+              return product.tierVariations?.[i]?.options[tIdx] || "";
             });
 
             item.model = {
@@ -49,31 +105,33 @@ class CartService {
               sku: model.sku,
               price: model.price,
               stock: model.stock,
-              // human readable variation
               name: variationOptions.join(" - "),
             };
 
-            // Override visible price/image if needed
+            item.variationInfo = variationOptions.join(" - ");
             item.price = { currentPrice: model.price, currency: "VND" };
           }
         }
 
         // Denormalized Shop Info (if not populated deep enough)
         if (!item.shopId && product.shop) {
-          item.shopId = product.shop._id;
+          item.shopId = product.shop._id || product.shop;
         }
 
-        // Clean up large objects
+        // Clean up large objects to reduce payload
         if (item.productId) {
           delete item.productId.models;
           delete item.productId.tierVariations;
+          // Keep variants for image fallback but remove detailed info
+          if (item.productId.variants) {
+            item.productId.variants = item.productId.variants.map(v => ({
+              _id: v._id,
+              images: v.images,
+            }));
+          }
         }
         return item;
       });
-
-      // Group by Shop (optional, logic can be in Frontend or mapped here)
-      // Frontend often expects flat list, but grouped is better.
-      // Keeping flat list for now to minimize breaking changes, Frontend can group by shopId.
     }
 
     return cart;
@@ -84,44 +142,79 @@ class CartService {
    * @param {string} userId - The ID of the user
    * @param {Object} itemData - Item details
    * @param {string} itemData.productId - Product ID
-   * @param {string} [itemData.variantId] - Variant ID (optional)
+   * @param {string} [itemData.modelId] - Model/Variant ID (optional)
+   * @param {string} [itemData.size] - Size selection (optional)
    * @param {number} itemData.quantity - Quantity to add
    * @returns {Promise<Object>} Updated cart object
    * @throws {Error} If product/variant not found or out of stock
    */
   async addToCart(userId, itemData) {
-    let { productId, modelId, quantity } = itemData;
+    let { productId, modelId, size, quantity } = itemData;
+
+    // Validate quantity
+    if (!quantity || quantity < 1) {
+      throw new Error("Quantity must be at least 1");
+    }
 
     // Check if product exists and is published
     const product = await Product.findById(productId);
     if (!product) throw new Error("Product not found");
     if (product.status !== "published") throw new Error("Product is not available");
 
+    // Validate size selection if product has sizes
+    if (product.sizes && product.sizes.length > 0) {
+      if (!size) {
+        throw new Error("Please select a size");
+      }
+      if (!product.sizes.includes(size)) {
+        throw new Error("Invalid size selected");
+      }
+    }
+
     // Get Shop ID
     const shopId = product.shop;
 
-    // Determine Price & Model
-    let price = product.price.currentPrice;
-    let selectedModel = null;
+    // Determine Price & Variant
+    let price = product.price?.currentPrice || 0;
+    let selectedVariantId = null;
 
-    if (modelId) {
-      // Find model in product.models
-      const model = product.models.find((m) => m._id.toString() === modelId);
-      if (!model) throw new Error("Model variation not found");
+    // NEW: Handle new variant structure (color variants)
+    if (product.variants && product.variants.length > 0) {
+      if (modelId) {
+        // Find variant by ID
+        const variant = product.variants.find((v) => v._id.toString() === modelId);
+        if (!variant) throw new Error("Variant not found");
 
-      if (model.stock < quantity) {
-        throw new Error(`Only ${model.stock} item(s) available`);
+        if (variant.stock < quantity) {
+          throw new Error(`Only ${variant.stock} item(s) available`);
+        }
+        price = variant.price;
+        selectedVariantId = modelId;
+      } else {
+        // Default to first variant if not specified
+        const variant = product.variants[0];
+        if (variant.stock < quantity) throw new Error(`Out of stock`);
+        price = variant.price;
+        selectedVariantId = variant._id.toString();
       }
-      price = model.price;
-      selectedModel = modelId;
-    } else if (product.models && product.models.length > 0) {
-      // If product has variations but user didn't select one
-      // Default to first capable model? Or throw error?
-      // Taobao requires selection. For now, default to first.
-      const model = product.models[0];
-      if (model.stock < quantity) throw new Error(`Out of stock`);
-      price = model.price;
-      selectedModel = model._id.toString();
+    }
+    // OLD: Handle tier variations (backward compatibility)
+    else if (product.models && product.models.length > 0) {
+      if (modelId) {
+        const model = product.models.find((m) => m._id.toString() === modelId);
+        if (!model) throw new Error("Model variation not found");
+
+        if (model.stock < quantity) {
+          throw new Error(`Only ${model.stock} item(s) available`);
+        }
+        price = model.price;
+        selectedVariantId = modelId;
+      } else {
+        const model = product.models[0];
+        if (model.stock < quantity) throw new Error(`Out of stock`);
+        price = model.price;
+        selectedVariantId = model._id.toString();
+      }
     }
 
     // Find or create cart
@@ -130,13 +223,15 @@ class CartService {
       cart = new Cart({ userId, items: [] });
     }
 
-    // Check if item exists
+    // Check if item exists (same product + variant + size)
     const existingItemIndex = cart.items.findIndex(
       (item) =>
         item.productId.toString() === productId &&
-        (selectedModel
-          ? item.modelId?.toString() === selectedModel.toString()
-          : !item.modelId)
+        (selectedVariantId
+          ? (item.modelId?.toString() === selectedVariantId.toString() || 
+             item.variantId?.toString() === selectedVariantId.toString())
+          : (!item.modelId && !item.variantId)) &&
+        (size ? item.size === size : !item.size)
     );
 
     if (existingItemIndex > -1) {
@@ -150,7 +245,9 @@ class CartService {
       cart.items.push({
         productId,
         shopId,
-        modelId: selectedModel,
+        modelId: selectedVariantId,
+        variantId: selectedVariantId,
+        size: size || null,
         quantity,
         price: { currentPrice: price, currency: "VND" },
       });
@@ -190,17 +287,26 @@ class CartService {
     const isIncreasing = quantity > item.quantity;
     
     if (isIncreasing) {
-      if (item.modelId) {
-        // Validate against Model (Tier Variation)
-        if (!product.models) throw new Error("Product structure changed");
-
+      // NEW: Check variantId first (new variant structure)
+      if (item.variantId && product.variants && product.variants.length > 0) {
+        const variant = product.variants.find(
+          (v) => v._id.toString() === item.variantId.toString()
+        );
+        if (!variant) {
+          throw new Error("Product variant not found");
+        }
+        if (variant.stock < quantity) {
+          throw new Error(`Only ${variant.stock} item(s) available`);
+        }
+      }
+      // OLD: Check modelId for tier variations (backward compatibility)
+      else if (item.modelId && product.models && product.models.length > 0) {
         const model = product.models.find(
           (m) => m._id.toString() === item.modelId.toString()
         );
         if (!model) {
           throw new Error("Product variation not found");
         }
-
         if (model.stock < quantity) {
           throw new Error(`Only ${model.stock} item(s) available`);
         }

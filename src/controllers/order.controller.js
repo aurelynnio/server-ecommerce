@@ -161,6 +161,69 @@ const OrderController = {
       StatusCodes.OK
     );
   }),
+
+  /**
+   * Get orders for seller's shop
+   * @route GET /api/orders/seller/list
+   * @access Private (Seller only)
+   * @returns {Object} Shop's orders
+   */
+  getSellerOrders: catchAsync(async (req, res) => {
+    const shopId = req.shop._id;
+    const result = await orderService.getOrdersByShop(shopId, req.query);
+
+    return sendSuccess(
+      res,
+      result,
+      "Orders retrieved successfully",
+      StatusCodes.OK
+    );
+  }),
+
+  /**
+   * Update order status by seller
+   * @route PUT /api/orders/seller/:orderId/status
+   * @access Private (Seller only)
+   * @param {string} orderId - Order ID
+   * @body {string} status - New status
+   * @returns {Object} Updated order
+   */
+  updateOrderStatusBySeller: catchAsync(async (req, res) => {
+    const shopId = req.shop._id;
+    const { orderId } = req.params;
+    const { status } = req.body;
+
+    const order = await orderService.updateOrderStatusBySeller(
+      orderId,
+      shopId,
+      status
+    );
+
+    return sendSuccess(
+      res,
+      order,
+      "Order status updated successfully",
+      StatusCodes.OK
+    );
+  }),
+
+  /**
+   * Get order statistics for seller's shop
+   * @route GET /api/orders/seller/statistics
+   * @access Private (Seller only)
+   * @returns {Object} Shop's order statistics
+   */
+  getSellerOrderStatistics: catchAsync(async (req, res) => {
+    const shopId = req.shop._id;
+    const stats = await orderService.getSellerOrderStatistics(shopId);
+
+    return sendSuccess(
+      res,
+      stats,
+      "Order statistics retrieved successfully",
+      StatusCodes.OK
+    );
+  }),
 };
 
 module.exports = OrderController;

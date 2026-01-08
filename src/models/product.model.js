@@ -11,27 +11,18 @@ const priceSchema = new Schema(
   { _id: false }
 );
 
-// Tier Variation Definition (e.g., Color bucket)
-// Example: { name: "Color", options: ["Red", "Blue"], images: [["url1", "url2"], ["url3"]] }
-const tierVariationSchema = new Schema(
+// Variant Schema - Simplified: only color differentiation
+// SKU is auto-generated, size is at product level, material is in attributes
+// Example: { name: "Xanh", color: "Xanh", price: 100000, stock: 10, images: ["url1", "url2"] }
+const variantSchema = new Schema(
   {
-    name: { type: String, required: true }, // e.g. "Color", "Size"
-    options: { type: [String], required: true },
-    // Images per option - 2D array: images[optionIndex] = [url1, url2, ...]
-    // Using Mixed type to support both flat array (legacy) and 2D array (new)
-    images: { type: Schema.Types.Mixed, default: [] },
-  },
-  { _id: false }
-);
-
-// Specific SKU/Model variation
-const variationModelSchema = new Schema(
-  {
-    sku: { type: String, sparse: true },
-    tierIndex: { type: [Number], required: true }, // e.g. [0, 1] means Color[0], Size[1]
-    price: { type: Number, required: true },
-    stock: { type: Number, required: true, min: 0 },
+    name: { type: String, required: true },           // Display name (usually same as color)
+    sku: { type: String, sparse: true },              // Auto-generated: {slug}-{color}-{index}
+    color: { type: String },                          // Color value (e.g., "Đỏ", "Xanh", "Đen")
+    price: { type: Number, required: true, min: 0 },
+    stock: { type: Number, required: true, min: 0, default: 0 },
     sold: { type: Number, default: 0 },
+    images: { type: [String], default: [] },          // Variant-specific images
   },
   { _id: true }
 );
@@ -60,12 +51,11 @@ const productSchema = new Schema(
     brand: { type: String, maxlength: 100 },
     tags: { type: [String], default: [], index: true },
     
-    // Media - Limit array sizes for performance
-    images: { 
-      type: [String], 
-      default: [],
-      validate: [arr => arr.length <= 10, 'Maximum 10 images allowed']
-    },
+    // Sizes - Product level (applies to all variants)
+    // Example: ["S", "M", "L", "XL"] or ["36", "37", "38", "39", "40"]
+    sizes: { type: [String], default: [] },
+    
+    // Media - Description images only (variant images are in variants[].images)
     descriptionImages: { 
       type: [String], 
       default: [],
@@ -79,14 +69,10 @@ const productSchema = new Schema(
     stock: { type: Number, default: 0, min: 0 },
     soldCount: { type: Number, default: 0, min: 0 },
 
-    // Advanced Variations (Taobao Style)
-    tierVariations: {
-      type: [tierVariationSchema],
-      validate: [arr => arr.length <= 3, 'Maximum 3 tier variations allowed']
-    },
-    models: {
-      type: [variationModelSchema],
-      validate: [arr => arr.length <= 100, 'Maximum 100 SKU models allowed']
+    // Variants - Color variants only (size is at product level)
+    variants: {
+      type: [variantSchema],
+      validate: [arr => arr.length <= 100, 'Maximum 100 variants allowed']
     },
 
     // Shipping
@@ -213,11 +199,11 @@ productSchema.pre("save", async function (next) {
   next();
 });
 
-// Sync stock/soldCount from models before save
+// Sync stock/soldCount from variants before save
 productSchema.pre("save", function (next) {
-  if (this.models && this.models.length > 0) {
-    this.stock = this.models.reduce((sum, m) => sum + (m.stock || 0), 0);
-    this.soldCount = this.models.reduce((sum, m) => sum + (m.sold || 0), 0);
+  if (this.variants && this.variants.length > 0) {
+    this.stock = this.variants.reduce((sum, v) => sum + (v.stock || 0), 0);
+    this.soldCount = this.variants.reduce((sum, v) => sum + (v.sold || 0), 0);
   }
   next();
 });

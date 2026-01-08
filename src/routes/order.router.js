@@ -5,6 +5,10 @@ const {
   verifyAccessToken,
   requireRole,
 } = require("../middlewares/auth.middleware");
+const {
+  verifyShopOwnership,
+  verifyOrderOwnership,
+} = require("../middlewares/ownership.middleware");
 const validate = require("../middlewares/validate.middleware");
 const {
   createOrderValidator,
@@ -83,6 +87,57 @@ router.get(
   requireRole("admin"),
   validate({ query: getOrdersQueryValidator }),
   orderController.getAllOrders
+);
+
+/**
+ * Seller Routes
+ */
+
+/**
+ * @route   GET /api/orders/seller/list
+ * @desc    Get orders for seller's shop
+ * @access  Private (Seller only)
+ * @query   page, limit, status
+ */
+router.get(
+  "/seller/list",
+  verifyAccessToken,
+  requireRole("seller", "admin"),
+  verifyShopOwnership,
+  validate({ query: getOrdersQueryValidator }),
+  orderController.getSellerOrders
+);
+
+/**
+ * @route   GET /api/orders/seller/statistics
+ * @desc    Get order statistics for seller's shop
+ * @access  Private (Seller only)
+ */
+router.get(
+  "/seller/statistics",
+  verifyAccessToken,
+  requireRole("seller", "admin"),
+  verifyShopOwnership,
+  orderController.getSellerOrderStatistics
+);
+
+/**
+ * @route   PUT /api/orders/seller/:orderId/status
+ * @desc    Update order status by seller
+ * @access  Private (Seller only)
+ * @body    { status }
+ */
+router.put(
+  "/seller/:orderId/status",
+  verifyAccessToken,
+  requireRole("seller", "admin"),
+  verifyShopOwnership,
+  verifyOrderOwnership,
+  validate({
+    params: orderIdParamValidator,
+    body: updateOrderStatusValidator,
+  }),
+  orderController.updateOrderStatusBySeller
 );
 
 /**

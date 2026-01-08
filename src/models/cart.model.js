@@ -23,9 +23,19 @@ const itemSchema = new Schema(
       required: false, // Changed to false for backward compatibility
     },
     modelId: {
-      // Replaces old variantId, refers to product.models._id
+      // OLD: Replaces old variantId, refers to product.models._id
       type: Types.ObjectId,
       required: false, // if no variation
+    },
+    variantId: {
+      // NEW: Refers to product.variants._id (color variant)
+      type: Types.ObjectId,
+      required: false,
+    },
+    size: {
+      // NEW: Product-level size selection
+      type: String,
+      required: false,
     },
     quantity: {
       type: Number,

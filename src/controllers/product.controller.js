@@ -371,6 +371,53 @@ const ProductController = {
       StatusCodes.OK
     );
   }),
+
+  /**
+   * Update product by seller (own shop only)
+   * @route PUT /api/products/seller/:id
+   * @access Private (Seller or Admin)
+   * @param {string} id - Product ID
+   * @body {Object} updateData - Fields to update
+   * @files {Array} [images] - New product images
+   * @returns {Object} Updated product
+   */
+  updateProductBySeller: catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const shopId = req.shop._id;
+
+    const product = await productService.updateProductBySeller(
+      id,
+      shopId,
+      req.body,
+      req.files
+    );
+    return sendSuccess(
+      res,
+      product,
+      "Product updated successfully",
+      StatusCodes.OK
+    );
+  }),
+
+  /**
+   * Delete product by seller (own shop only, soft delete)
+   * @route DELETE /api/products/seller/:id
+   * @access Private (Seller or Admin)
+   * @param {string} id - Product ID
+   * @returns {Object} Deleted product
+   */
+  deleteProductBySeller: catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const shopId = req.shop._id;
+
+    const product = await productService.deleteProductBySeller(id, shopId);
+    return sendSuccess(
+      res,
+      product,
+      "Product deleted successfully",
+      StatusCodes.OK
+    );
+  }),
 };
 
 module.exports = ProductController;
