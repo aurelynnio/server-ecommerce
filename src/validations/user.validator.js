@@ -143,9 +143,9 @@ const updateUserValidator = joi.object({
     "string.base": "Email must be a string",
     "string.email": "Email must be a valid email address",
   }),
-  roles: joi.string().valid("user", "admin").messages({
+  roles: joi.string().valid("user", "admin", "seller").messages({
     "string.base": "Role must be a string",
-    "any.only": "Role must be either 'user' or 'admin'",
+    "any.only": "Role must be one of: user, admin, seller",
   }),
   isVerifiedEmail: joi.boolean().messages({
     "boolean.base": "isVerifiedEmail must be a boolean",
@@ -153,6 +153,10 @@ const updateUserValidator = joi.object({
   avatar: joi.string().uri().allow(null, "").messages({
     "string.base": "Avatar must be a string",
     "string.uri": "Avatar must be a valid URL",
+  }),
+  permissions: joi.array().items(joi.string()).messages({
+    "array.base": "Permissions must be an array",
+    "string.base": "Each permission must be a string",
   }),
 });
 
@@ -166,9 +170,9 @@ const updateUserByIdValidator = joi.object({
     "string.base": "Email must be a string",
     "string.email": "Email must be a valid email address",
   }),
-  roles: joi.string().valid("user", "admin").messages({
+  roles: joi.string().valid("user", "admin", "seller").messages({
     "string.base": "Role must be a string",
-    "any.only": "Role must be either 'user' or 'admin'",
+    "any.only": "Role must be one of: user, admin, seller",
   }),
   isVerifiedEmail: joi.boolean().messages({
     "boolean.base": "isVerifiedEmail must be a boolean",
@@ -181,9 +185,9 @@ const updateUserByIdValidator = joi.object({
 
 // Update user role validator (Admin only)
 const updateRoleValidator = joi.object({
-  roles: joi.string().valid("user", "admin").required().messages({
+  roles: joi.string().valid("user", "admin", "seller").required().messages({
     "string.base": "Role must be a string",
-    "any.only": "Role must be either 'user' or 'admin'",
+    "any.only": "Role must be one of: user, admin, seller",
     "any.required": "Role is required",
   }),
 });
@@ -210,9 +214,9 @@ const createUserValidator = joi.object({
     "string.email": "Email must be a valid email address",
     "any.required": "Email is required",
   }),
-  roles: joi.string().valid("user", "admin").default("user").messages({
+  roles: joi.string().valid("user", "admin", "seller").default("user").messages({
     "string.base": "Role must be a string",
-    "any.only": "Role must be either 'user' or 'admin'",
+    "any.only": "Role must be one of: user, admin, seller",
   }),
   isVerifiedEmail: joi.boolean().default(false).messages({
     "boolean.base": "isVerifiedEmail must be a boolean",
@@ -241,9 +245,9 @@ const paginationQueryValidator = joi.object({
   search: searchString().allow("").messages({
     "string.base": "Search must be a string",
   }),
-  role: joi.string().valid("user", "admin").allow("").messages({
+  role: joi.string().valid("user", "admin", "seller").allow("").messages({
     "string.base": "Role must be a string",
-    "any.only": "Role must be either 'user' or 'admin'",
+    "any.only": "Role must be one of: user, admin, seller",
   }),
   isVerifiedEmail: joi.boolean().allow("").messages({
     "boolean.base": "isVerifiedEmail must be a boolean",

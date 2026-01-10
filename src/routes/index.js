@@ -23,6 +23,7 @@ const wishlistRouter = require("./wishlist.router");
 const searchRouter = require("./search.router");
 const flashSaleRouter = require("./flash-sale.router");
 const recommendationRouter = require("./recommendation.router");
+const permissionRouter = require("./permission.router");
 
 const initRoutes = (app) => {
   app.use("/api/users", userRouter);
@@ -50,6 +51,7 @@ const initRoutes = (app) => {
   app.use("/api/search", searchRouter);
   app.use("/api/flash-sale", flashSaleRouter);
   app.use("/api/recommendations", recommendationRouter);
+  app.use("/api/permissions", permissionRouter);
 };
 
 module.exports = initRoutes;

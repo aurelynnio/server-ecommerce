@@ -68,6 +68,18 @@ class AuthService {
       });
     }
 
+    // Send verification email
+    try {
+      console.log(
+        `[AuthService] Attempting to send verification email to ${data.email}`
+      );
+      await this.sendVerificationCode(data.email);
+      console.log(`[AuthService] Verification email sent successfully`);
+    } catch (error) {
+      console.error("[AuthService] Failed to send verification email:", error);
+      // Do not block registration if email fails, user can resend later
+    }
+
     // Remove sensitive data
     const userObj = newUser.toObject();
     delete userObj.password;
@@ -102,17 +114,25 @@ class AuthService {
       throw new Error("Please verify your email before logging in");
     }
 
-    // Generate tokens
+    // Generate tokens with permissions
     const tokenService = require("./token.service");
+    const permissionService = require("./permission.service");
+
+    // Get user permissions
+    const permissions = permissionService.getUserPermissions(user);
+
     const payload = {
       userId: user._id,
       username: user.username,
       email: user.email,
       role: user.roles,
+      permissions: permissions,
     };
 
     const accessToken = tokenService.generateAccessToken(payload);
-    const refreshToken = tokenService.generateRefreshToken(payload);
+    const refreshToken = tokenService.generateRefreshToken({
+      userId: user._id,
+    });
 
     // Remove sensitive data
     const {
@@ -123,7 +143,10 @@ class AuthService {
     } = user;
 
     return {
-      user: userWithoutPassword,
+      user: {
+        ...userWithoutPassword,
+        permissions: permissions,
+      },
       accessToken,
       refreshToken,
     };
@@ -217,10 +240,19 @@ class AuthService {
     // Save to Redis (expire in 10 minutes)
     await cacheService.set(`otp:email:${email}`, verificationCode, 600);
 
+    // Save to User document for verifyEmailByCode
+    user.codeVerifiEmail = verificationCode;
+    user.expiresCodeVerifiEmail = Date.now() + 10 * 60 * 1000; // 10 minutes
+    await user.save();
+
     // Send verification email
     try {
       await sendEmailVerificationCode(email, verificationCode);
     } catch (error) {
+      // Rollback user update if email fails
+      user.codeVerifiEmail = undefined;
+      user.expiresCodeVerifiEmail = undefined;
+      await user.save();
       throw new Error("Failed to send verification email. Please try again.");
     }
 

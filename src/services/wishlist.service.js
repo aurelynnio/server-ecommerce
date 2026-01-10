@@ -25,18 +25,24 @@ class WishlistService {
     // Get paginated product IDs
     const paginatedIds = wishlistIds.slice(skip, skip + limit);
 
-    // Fetch products with details
+    // Fetch products with details - Note: images are in variants[].images
     const products = await Product.find({
       _id: { $in: paginatedIds },
       status: "published",
     })
-      .select("name slug images price ratingAverage reviewCount soldCount shop")
+      .select("name slug price ratingAverage reviewCount soldCount shop variants.images variants.name variants.color")
       .populate("shop", "name logo")
       .populate("category", "name slug")
       .lean();
 
+    // Map products to include first variant image
+    const productsWithImages = products.map(product => ({
+      ...product,
+      image: product.variants?.[0]?.images?.[0] || null,
+    }));
+
     return {
-      data: products,
+      data: productsWithImages,
       pagination: {
         currentPage: page,
         pageSize: limit,

@@ -16,6 +16,7 @@ class UserService {
    * @param {string} [userData.roles="user"] - User role
    * @param {string} [userData.phone] - Phone number
    * @param {boolean} [userData.isVerifiedEmail=false] - Email verification status
+   * @param {Array} [userData.permissions=[]] - User permissions
    * @returns {Promise<Object>} Created user object (without password)
    * @throws {Error} If username or email already exists
    */
@@ -26,6 +27,7 @@ class UserService {
       roles = "user",
       phone,
       isVerifiedEmail = false,
+      permissions = [],
     } = userData;
 
     // Check if username already exists
@@ -52,6 +54,7 @@ class UserService {
       roles,
       phone: phone || undefined,
       isVerifiedEmail,
+      permissions,
     });
 
     // Remove password from response

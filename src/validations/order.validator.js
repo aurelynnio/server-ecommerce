@@ -108,13 +108,14 @@ const updateOrderStatusValidator = joi.object({
       "processing",
       "shipped",
       "delivered",
-      "cancelled"
+      "cancelled",
+      "returned"
     )
     .required()
     .messages({
       "string.base": "Status must be a string",
       "any.only":
-        "Status must be one of: pending, confirmed, processing, shipped, delivered, cancelled",
+        "Status must be one of: pending, confirmed, processing, shipped, delivered, cancelled, returned",
       "any.required": "Status is required",
     }),
 });
@@ -158,13 +159,14 @@ const getOrdersQueryValidator = joi.object({
       "processing",
       "shipped",
       "delivered",
-      "cancelled"
+      "cancelled",
+      "returned"
     )
     .optional()
     .messages({
       "string.base": "Status must be a string",
       "any.only":
-        "Status must be one of: pending, confirmed, processing, shipped, delivered, cancelled",
+        "Status must be one of: pending, confirmed, processing, shipped, delivered, cancelled, returned",
     }),
   paymentStatus: joi
     .string()
@@ -174,9 +176,9 @@ const getOrdersQueryValidator = joi.object({
       "string.base": "Payment status must be a string",
       "any.only": "Payment status must be one of: unpaid, paid, refunded",
     }),
-  paymentMethod: joi.string().valid("cod", "vnpay").optional().messages({
+  paymentMethod: joi.string().valid("cod", "vnpay", "momo").optional().messages({
     "string.base": "Payment method must be a string",
-    "any.only": "Payment method must be one of: cod, vnpay",
+    "any.only": "Payment method must be one of: cod, vnpay, momo",
   }),
   userId: joi.string().hex().length(24).optional().messages({
     "string.base": "User ID must be a string",

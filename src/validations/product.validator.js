@@ -18,21 +18,8 @@ const priceSchema = joi.object({
   }),
 });
 
-// NEW: Simple variant schema with attributes
-const variantAttributesSchema = joi.object({
-  color: joi.string().optional().allow("").messages({
-    "string.base": "Color must be a string",
-  }),
-  size: joi.string().optional().allow("").messages({
-    "string.base": "Size must be a string",
-  }),
-  material: joi.string().optional().allow("").messages({
-    "string.base": "Material must be a string",
-  }),
-});
-
-// Update product validator (all fields optional)
-// Trong file validator của bạn
+// Variant schema - Simplified: only color differentiation
+// Matches product.model.js variantSchema
 const variantSchema = joi.object({
   _id: joi.string().optional().allow(""),
   name: joi.string().required().messages({
@@ -42,8 +29,8 @@ const variantSchema = joi.object({
   sku: joi.string().optional().allow("").messages({
     "string.base": "SKU must be a string",
   }),
-  attributes: variantAttributesSchema.optional().messages({
-    "object.base": "Attributes must be an object",
+  color: joi.string().optional().allow("").messages({
+    "string.base": "Color must be a string",
   }),
   price: joi.number().min(0).required().messages({
     "number.base": "Price must be a number",
@@ -61,53 +48,12 @@ const variantSchema = joi.object({
     "number.integer": "Sold must be an integer",
     "number.min": "Sold cannot be negative",
   }),
-  images: joi.array().items(joi.string().uri()).optional().messages({
-    "array.base": "Images must be an array",
-    "string.uri": "Each image must be a valid URL",
-  }),
-});
-
-// TierVariation schema for Shopee-style variants
-const tierVariationSchema = joi.object({
-  name: joi.string().required().messages({
-    "string.base": "Tier variation name must be a string",
-    "any.required": "Tier variation name is required",
-  }),
-  options: joi.array().items(joi.string()).required().messages({
-    "array.base": "Options must be an array",
-    "any.required": "Options are required",
-  }),
   images: joi.array().items(joi.string()).optional().messages({
     "array.base": "Images must be an array",
   }),
 });
 
-// Model schema for SKU combinations
-const modelSchema = joi.object({
-  _id: joi.string().optional(),
-  tierIndex: joi.array().items(joi.number()).required().messages({
-    "array.base": "Tier index must be an array",
-    "any.required": "Tier index is required",
-  }),
-  price: joi.number().min(0).required().messages({
-    "number.base": "Model price must be a number",
-    "number.min": "Model price cannot be negative",
-    "any.required": "Model price is required",
-  }),
-  stock: joi.number().integer().min(0).default(0).messages({
-    "number.base": "Model stock must be a number",
-    "number.integer": "Model stock must be an integer",
-    "number.min": "Model stock cannot be negative",
-  }),
-  sold: joi.number().integer().min(0).default(0).messages({
-    "number.base": "Model sold must be a number",
-  }),
-  sku: joi.string().optional().allow("").messages({
-    "string.base": "SKU must be a string",
-  }),
-});
-
-// Attribute schema
+// Attribute schema for product specifications
 const attributeSchema = joi.object({
   name: joi.string().required().messages({
     "string.base": "Attribute name must be a string",
@@ -174,12 +120,29 @@ const createProductValidator = joi.object({
       "string.base": "Shop category must be a string",
       "string.pattern.base": "Shop category must be a valid MongoDB ObjectId",
     }),
-  brand: sanitizedString().allow("").messages({
+  brand: sanitizedString().max(100).allow("").messages({
     "string.base": "Brand must be a string",
+    "string.max": "Brand must be at most 100 characters",
   }),
-  images: joi.array().items(joi.string().uri()).optional().messages({
-    "array.base": "Images must be an array",
-    "string.uri": "Each image must be a valid URL",
+  tags: joi.array().items(sanitizedString()).messages({
+    "array.base": "Tags must be an array",
+    "string.base": "Each tag must be a string",
+  }),
+  // Sizes - Product level (applies to all variants)
+  sizes: joi.alternatives().try(
+    joi.array().items(joi.string()),
+    joi.string()
+  ).optional().messages({
+    "array.base": "Sizes must be an array",
+  }),
+  // Description images only (variant images are in variants[].images)
+  descriptionImages: joi.array().items(joi.string()).max(20).optional().messages({
+    "array.base": "Description images must be an array",
+    "array.max": "Maximum 20 description images allowed",
+  }),
+  video: joi.string().uri().allow("", null).optional().messages({
+    "string.base": "Video must be a string",
+    "string.uri": "Video must be a valid URL",
   }),
   price: priceSchema.required().messages({
     "any.required": "Price is required",
@@ -189,6 +152,21 @@ const createProductValidator = joi.object({
     "number.integer": "Stock must be an integer",
     "number.min": "Stock cannot be negative",
   }),
+  // Variants - Color variants only
+  variants: joi.array().items(variantSchema).max(100).messages({
+    "array.base": "Variants must be an array",
+    "array.max": "Maximum 100 variants allowed",
+  }),
+  // Shipping
+  shippingTemplate: joi
+    .string()
+    .pattern(/^[0-9a-fA-F]{24}$/)
+    .allow("")
+    .optional()
+    .messages({
+      "string.base": "Shipping template must be a string",
+      "string.pattern.base": "Shipping template must be a valid MongoDB ObjectId",
+    }),
   weight: joi.number().min(0).optional().messages({
     "number.base": "Weight must be a number",
     "number.min": "Weight cannot be negative",
@@ -196,47 +174,27 @@ const createProductValidator = joi.object({
   dimensions: dimensionsSchema.optional().messages({
     "object.base": "Dimensions must be an object",
   }),
-  tierVariations: joi.array().items(tierVariationSchema).optional().messages({
-    "array.base": "Tier variations must be an array",
-  }),
-  models: joi.array().items(modelSchema).optional().messages({
-    "array.base": "Models must be an array",
-  }),
-  attributes: joi.array().items(attributeSchema).optional().messages({
+  // Attributes/Specifications
+  attributes: joi.array().items(attributeSchema).max(30).optional().messages({
     "array.base": "Attributes must be an array",
+    "array.max": "Maximum 30 attributes allowed",
   }),
-  variants: joi.array().items(variantSchema).messages({
-    "array.base": "Variants must be an array",
+  // Flags
+  isFeatured: joi.boolean().default(false).messages({
+    "boolean.base": "isFeatured must be a boolean",
   }),
-  tags: joi.array().items(sanitizedString()).messages({
-    "array.base": "Tags must be an array",
-    "string.base": "Each tag must be a string",
+  isNewArrival: joi.boolean().default(false).messages({
+    "boolean.base": "isNewArrival must be a boolean",
   }),
   status: joi.string().valid("draft", "published", "suspended").default("published").messages({
     "string.base": "Status must be a string",
     "any.only": "Status must be one of: draft, published, suspended",
   }),
-  isNewArrival: joi.boolean().default(false).messages({
-    "boolean.base": "isNewArrival must be a boolean",
-  }),
-  isFeatured: joi.boolean().default(false).messages({
-    "boolean.base": "isFeatured must be a boolean",
-  }),
-  variantImageMapping: joi.array().items(joi.object({
-    optionIndex: joi.number().required(),
-    count: joi.number().required(),
-  })).optional().messages({
-    "array.base": "Variant image mapping must be an array",
-  }),
-  descriptionImages: joi.array().items(joi.string().uri()).optional().messages({
-    "array.base": "Description images must be an array",
-    "string.uri": "Each description image must be a valid URL",
-  }),
 });
 
 const updateProductValidator = joi
   .object({
-    id: joi.string().optional(), // THÊM FIELD ID VÀO VALIDATOR
+    id: joi.string().optional(),
     name: joi.string().min(3).max(200).optional().messages({
       "string.base": "Product name must be a string",
       "string.min": "Product name must be at least 3 characters long",
@@ -272,12 +230,35 @@ const updateProductValidator = joi
         "string.base": "Shop category must be a string",
         "string.pattern.base": "Shop category must be a valid MongoDB ObjectId",
       }),
-    brand: joi.string().allow("").optional().messages({
+    brand: joi.string().max(100).allow("").optional().messages({
       "string.base": "Brand must be a string",
+      "string.max": "Brand must be at most 100 characters",
     }),
-    images: joi.array().items(joi.string().uri()).optional().messages({
-      "array.base": "Images must be an array",
-      "string.uri": "Each image must be a valid URL",
+    tags: joi.array().items(joi.string()).optional().messages({
+      "array.base": "Tags must be an array",
+      "string.base": "Each tag must be a string",
+    }),
+    // Sizes - Product level
+    sizes: joi.alternatives().try(
+      joi.array().items(joi.string()),
+      joi.string()
+    ).optional().messages({
+      "array.base": "Sizes must be an array",
+    }),
+    // Description images
+    descriptionImages: joi.array().items(joi.string()).max(20).optional().messages({
+      "array.base": "Description images must be an array",
+      "array.max": "Maximum 20 description images allowed",
+    }),
+    existingDescriptionImages: joi.alternatives().try(
+      joi.array().items(joi.string()),
+      joi.string()
+    ).optional().messages({
+      "array.base": "Existing description images must be an array",
+    }),
+    video: joi.string().uri().allow("", null).optional().messages({
+      "string.base": "Video must be a string",
+      "string.uri": "Video must be a valid URL",
     }),
     price: priceSchema.optional().messages({
       "object.base": "Price must be an object",
@@ -287,64 +268,13 @@ const updateProductValidator = joi
       "number.integer": "Stock must be an integer",
       "number.min": "Stock cannot be negative",
     }),
-    weight: joi.number().min(0).optional().messages({
-      "number.base": "Weight must be a number",
-      "number.min": "Weight cannot be negative",
-    }),
-    dimensions: dimensionsSchema.optional().messages({
-      "object.base": "Dimensions must be an object",
-    }),
-    tierVariations: joi.array().items(tierVariationSchema).optional().messages({
-      "array.base": "Tier variations must be an array",
-    }),
-    models: joi.array().items(modelSchema).optional().messages({
-      "array.base": "Models must be an array",
-    }),
-    attributes: joi.array().items(attributeSchema).optional().messages({
-      "array.base": "Attributes must be an array",
-    }),
-    variants: joi.array().items(variantSchema).optional().messages({
-      "array.base": "Variants must be an array",
-    }),
-    tags: joi.array().items(joi.string()).optional().messages({
-      "array.base": "Tags must be an array",
-      "string.base": "Each tag must be a string",
-    }),
-    status: joi.string().valid("draft", "published", "suspended").optional().messages({
-      "string.base": "Status must be a string",
-      "any.only": "Status must be one of: draft, published, suspended",
-    }),
-    isNewArrival: joi
-      .boolean()
-      .truthy("true")
-      .falsy("false")
-      .optional()
-      .messages({
-        "boolean.base": "isNewArrival must be a boolean",
-      }),
-    isFeatured: joi
-      .boolean()
-      .truthy("true")
-      .falsy("false")
-      .optional()
-      .messages({
-        "boolean.base": "isFeatured must be a boolean",
-      }),
-    variantImageMapping: joi.array().items(joi.object({
-      optionIndex: joi.number().required(),
-      count: joi.number().required(),
-    })).optional().messages({
-      "array.base": "Variant image mapping must be an array",
-    }),
-    descriptionImages: joi.array().items(joi.string().uri()).optional().messages({
-      "array.base": "Description images must be an array",
-      "string.uri": "Each description image must be a valid URL",
-    }),
-    existingDescriptionImages: joi.alternatives().try(
-      joi.array().items(joi.string().uri()),
-      joi.string()
+    // Variants - Color variants only
+    variants: joi.alternatives().try(
+      joi.array().items(variantSchema).max(100),
+      joi.string() // Allow JSON string
     ).optional().messages({
-      "array.base": "Existing description images must be an array",
+      "array.base": "Variants must be an array",
+      "array.max": "Maximum 100 variants allowed",
     }),
     existingVariantImages: joi.alternatives().try(
       joi.array().items(joi.object({
@@ -355,16 +285,56 @@ const updateProductValidator = joi
     ).optional().messages({
       "array.base": "Existing variant images must be an array",
     }),
-    sizes: joi.alternatives().try(
-      joi.array().items(joi.string()),
+    // Shipping
+    shippingTemplate: joi
+      .string()
+      .pattern(/^[0-9a-fA-F]{24}$/)
+      .allow("")
+      .optional()
+      .messages({
+        "string.base": "Shipping template must be a string",
+        "string.pattern.base": "Shipping template must be a valid MongoDB ObjectId",
+      }),
+    weight: joi.number().min(0).optional().messages({
+      "number.base": "Weight must be a number",
+      "number.min": "Weight cannot be negative",
+    }),
+    dimensions: dimensionsSchema.optional().messages({
+      "object.base": "Dimensions must be an object",
+    }),
+    // Attributes/Specifications
+    attributes: joi.alternatives().try(
+      joi.array().items(attributeSchema).max(30),
       joi.string()
     ).optional().messages({
-      "array.base": "Sizes must be an array",
+      "array.base": "Attributes must be an array",
+      "array.max": "Maximum 30 attributes allowed",
+    }),
+    // Flags
+    isFeatured: joi
+      .boolean()
+      .truthy("true")
+      .falsy("false")
+      .optional()
+      .messages({
+        "boolean.base": "isFeatured must be a boolean",
+      }),
+    isNewArrival: joi
+      .boolean()
+      .truthy("true")
+      .falsy("false")
+      .optional()
+      .messages({
+        "boolean.base": "isNewArrival must be a boolean",
+      }),
+    status: joi.string().valid("draft", "published", "suspended").optional().messages({
+      "string.base": "Status must be a string",
+      "any.only": "Status must be one of: draft, published, suspended",
     }),
   })
   .min(1);
 
-// Add variant validator (new structure)
+// Add variant validator - Simplified structure
 const addVariantValidator = joi.object({
   name: joi.string().required().messages({
     "string.base": "Variant name must be a string",
@@ -373,8 +343,8 @@ const addVariantValidator = joi.object({
   sku: joi.string().optional().allow("").messages({
     "string.base": "SKU must be a string",
   }),
-  attributes: variantAttributesSchema.optional().messages({
-    "object.base": "Attributes must be an object",
+  color: joi.string().optional().allow("").messages({
+    "string.base": "Color must be a string",
   }),
   price: joi.number().min(0).required().messages({
     "number.base": "Price must be a number",
@@ -386,13 +356,12 @@ const addVariantValidator = joi.object({
     "number.integer": "Stock must be an integer",
     "number.min": "Stock cannot be negative",
   }),
-  images: joi.array().items(joi.string().uri()).optional().messages({
+  images: joi.array().items(joi.string()).optional().messages({
     "array.base": "Images must be an array",
-    "string.uri": "Each image must be a valid URL",
   }),
 });
 
-// Update variant validator (new structure)
+// Update variant validator - Simplified structure
 const updateVariantValidator = joi.object({
   name: joi.string().optional().messages({
     "string.base": "Variant name must be a string",
@@ -400,8 +369,8 @@ const updateVariantValidator = joi.object({
   sku: joi.string().optional().allow("").messages({
     "string.base": "SKU must be a string",
   }),
-  attributes: variantAttributesSchema.optional().messages({
-    "object.base": "Attributes must be an object",
+  color: joi.string().optional().allow("").messages({
+    "string.base": "Color must be a string",
   }),
   price: joi.number().min(0).optional().messages({
     "number.base": "Price must be a number",
@@ -412,9 +381,8 @@ const updateVariantValidator = joi.object({
     "number.integer": "Stock must be an integer",
     "number.min": "Stock cannot be negative",
   }),
-  images: joi.array().items(joi.string().uri()).optional().messages({
+  images: joi.array().items(joi.string()).optional().messages({
     "array.base": "Images must be an array",
-    "string.uri": "Each image must be a valid URL",
   }),
 });
 

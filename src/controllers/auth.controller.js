@@ -172,12 +172,28 @@ const AuthController = {
       );
     }
 
-    // Remove JWT standard claims before generating new token
-    const { exp, iat, nbf, ...userPayload } = payload;
+    // Get user from database to get fresh permissions
+    const User = require("../models/user.model");
+    const user = await User.findById(payload.userId).lean();
+    
+    if (!user) {
+      return sendFail(res, "User not found", StatusCodes.UNAUTHORIZED);
+    }
 
-    // Generate new access token
+    // Get fresh permissions
+    const permissionService = require("../services/permission.service");
+    const permissions = permissionService.getUserPermissions(user);
+
+    // Generate new access token with fresh permissions
     const tokenService = require("../services/token.service");
-    const newAccessToken = tokenService.generateAccessToken(userPayload);
+    const newPayload = {
+      userId: user._id,
+      username: user.username,
+      email: user.email,
+      role: user.roles,
+      permissions: permissions,
+    };
+    const newAccessToken = tokenService.generateAccessToken(newPayload);
 
     // Set access token mới vào cookie (refresh token cookie giữ nguyên)
     res.cookie("accessToken", newAccessToken, {
@@ -189,7 +205,7 @@ const AuthController = {
 
     return sendSuccess(
       res,
-      { accessToken: newAccessToken },
+      { accessToken: newAccessToken, permissions },
       "Access token refreshed successfully",
       StatusCodes.OK
     );

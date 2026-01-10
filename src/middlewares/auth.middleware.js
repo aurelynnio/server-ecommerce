@@ -229,3 +229,11 @@ module.exports = {
   requireRole,
   authorize,
 };
+
+// Re-export permission middleware for convenience
+const permissionMiddleware = require('./permission.middleware');
+module.exports.requirePermission = permissionMiddleware.requirePermission;
+module.exports.requirePermissionWithOwnership = permissionMiddleware.requirePermissionWithOwnership;
+module.exports.requireAdminAccess = permissionMiddleware.requireAdminAccess;
+module.exports.requireSellerAccess = permissionMiddleware.requireSellerAccess;
+module.exports.requireResourcePermission = permissionMiddleware.requireResourcePermission;
