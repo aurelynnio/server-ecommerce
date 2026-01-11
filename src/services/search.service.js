@@ -29,22 +29,21 @@ class SearchService {
     // Search products - Note: images are in variants[].images, not root level
     const products = await Product.find({
       status: "published",
-      $or: [
-        { name: regex },
-        { "tags": regex },
-      ],
+      $or: [{ name: regex }, { tags: regex }],
     })
       .select("name slug price variants")
       .limit(limit)
       .lean();
-    
-    // Map products to include first variant image for display
-    const productsWithImages = products.map(product => {
-      const image = product.variants?.[0]?.images?.[0] || null;
-      console.log(`[Search] Product: ${product.name}, Variants: ${product.variants?.length || 0}, Image: ${image}`);
+
+    // Map products to include first variant image for display in 'images' array
+    const productsWithImages = products.map((product) => {
+      const variantImage = product.variants?.[0]?.images?.[0];
+      const images = variantImage
+        ? [variantImage]
+        : product.descriptionImages || [];
       return {
         ...product,
-        image,
+        images,
       };
     });
 
@@ -116,10 +115,7 @@ class SearchService {
         .select("name tags")
         .limit(limit)
         .lean(),
-      Category.find({ isActive: true })
-        .select("name")
-        .limit(10)
-        .lean(),
+      Category.find({ isActive: true }).select("name").limit(10).lean(),
     ]);
 
     const keywords = [
@@ -163,7 +159,9 @@ class SearchService {
       const cat = await Category.findOne({ slug: category });
       if (cat) {
         // Include subcategories
-        const subcats = await Category.find({ parentCategory: cat._id }).select("_id");
+        const subcats = await Category.find({ parentCategory: cat._id }).select(
+          "_id"
+        );
         const categoryIds = [cat._id, ...subcats.map((s) => s._id)];
         query.category = { $in: categoryIds };
       }

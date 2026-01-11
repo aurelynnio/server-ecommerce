@@ -18,7 +18,8 @@ class ShopCategoryService {
     const shop = await Shop.findOne({ owner: userId });
     if (!shop) throw new Error("Shop not found");
 
-    const categories = await ShopCategory.find({ shopId: shop._id, isActive: true }).sort(
+    // Seller sees ALL categories (including inactive) for management
+    const categories = await ShopCategory.find({ shopId: shop._id }).sort(
       { displayOrder: 1 }
     );
 

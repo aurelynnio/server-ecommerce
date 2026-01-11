@@ -38,17 +38,11 @@ const NotificationController = {
       }
     );
 
-    // Transform result to match standard pagination structure
+    // Service already returns proper structure: { data, pagination, metadata }
     const response = {
-      data: result.notifications,
-      pagination: {
-        currentPage: result.meta.page,
-        pageSize: result.meta.limit,
-        totalItems: result.meta.total,
-        totalPages: result.meta.totalPages,
-      },
-      // Keep unreadCount accessible
-      unreadCount: result.meta.unreadCount,
+      data: result.data,
+      pagination: result.pagination,
+      unreadCount: result.metadata?.unreadCount || 0,
     };
 
     return sendSuccess(
