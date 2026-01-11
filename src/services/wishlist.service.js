@@ -41,15 +41,20 @@ class WishlistService {
       image: product.variants?.[0]?.images?.[0] || null,
     }));
 
+    const totalPages = Math.ceil(total / limit);
+    const currentPage = page;
+
     return {
       data: productsWithImages,
       pagination: {
-        currentPage: page,
+        currentPage,
         pageSize: limit,
         totalItems: total,
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: skip + limit < total,
-        hasPrevPage: page > 1,
+        totalPages,
+        hasNextPage: currentPage < totalPages,
+        hasPrevPage: currentPage > 1,
+        nextPage: currentPage < totalPages ? currentPage + 1 : null,
+        prevPage: currentPage > 1 ? currentPage - 1 : null,
       },
     };
   }

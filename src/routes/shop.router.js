@@ -82,6 +82,18 @@ router.get(
 );
 
 /**
+ * @route   GET /api/shops/my
+ * @desc    Get current user's shop information (Alias for /me)
+ * @access  Private (Seller or Admin)
+ */
+router.get(
+  "/my",
+  verifyAccessToken,
+  requireRole("seller", "admin"),
+  shopController.getMyShop
+);
+
+/**
  * @route   PUT /api/shops
  * @desc    Update current user's shop information
  * @access  Private (Seller or Admin)

@@ -434,13 +434,20 @@ class CategoryService {
       Category.countDocuments(query),
     ]);
 
+    const totalPages = Math.ceil(total / pageLimit);
+    const currentPage = parseInt(page);
+
     return {
-      categories,
+      data: categories,
       pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(total / pageLimit),
+        currentPage,
+        pageSize: pageLimit,
         totalItems: total,
-        itemsPerPage: pageLimit,
+        totalPages,
+        hasNextPage: currentPage < totalPages,
+        hasPrevPage: currentPage > 1,
+        nextPage: currentPage < totalPages ? currentPage + 1 : null,
+        prevPage: currentPage > 1 ? currentPage - 1 : null,
       },
     };
   }

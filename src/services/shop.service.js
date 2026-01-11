@@ -104,6 +104,10 @@ class ShopService {
         pageSize: paginationParams.pageSize,
         totalItems: total,
         totalPages: paginationParams.totalPages,
+        hasNextPage: paginationParams.hasNextPage,
+        hasPrevPage: paginationParams.hasPrevPage,
+        nextPage: paginationParams.nextPage,
+        prevPage: paginationParams.prevPage,
       },
     };
   }
@@ -165,6 +169,10 @@ class ShopService {
         pageSize: paginationParams.pageSize,
         totalItems: total,
         totalPages: paginationParams.totalPages,
+        hasNextPage: paginationParams.hasNextPage,
+        hasPrevPage: paginationParams.hasPrevPage,
+        nextPage: paginationParams.nextPage,
+        prevPage: paginationParams.prevPage,
       },
     };
   }

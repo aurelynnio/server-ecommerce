@@ -119,13 +119,23 @@ class NotificationService {
       isRead: false,
     });
 
+    const totalPages = Math.ceil((total || 0) / limit);
+    const currentPage = Number(page);
+    const pageSize = Number(limit);
+
     return {
-      notifications,
-      meta: {
-        total: total || 0,
-        page: Number(page),
-        limit: Number(limit),
-        totalPages: Math.ceil((total || 0) / limit),
+      data: notifications,
+      pagination: {
+        currentPage,
+        pageSize,
+        totalItems: total || 0,
+        totalPages,
+        hasNextPage: currentPage < totalPages,
+        hasPrevPage: currentPage > 1,
+        nextPage: currentPage < totalPages ? currentPage + 1 : null,
+        prevPage: currentPage > 1 ? currentPage - 1 : null,
+      },
+      metadata: {
         unreadCount: unreadCount || 0,
       },
     };

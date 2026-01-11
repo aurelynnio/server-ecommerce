@@ -338,13 +338,21 @@ class OrderService {
       Order.countDocuments(query),
     ]);
 
+    const totalPages = Math.ceil(total / parseInt(limit));
+    const currentPage = parseInt(page);
+    const pageSize = parseInt(limit);
+
     return {
       data: orders,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        totalPages: Math.ceil(total / parseInt(limit)),
+        currentPage,
+        pageSize,
+        totalItems: total,
+        totalPages,
+        hasNextPage: currentPage < totalPages,
+        hasPrevPage: currentPage > 1,
+        nextPage: currentPage < totalPages ? currentPage + 1 : null,
+        prevPage: currentPage > 1 ? currentPage - 1 : null,
       },
     };
   }
@@ -590,13 +598,21 @@ class OrderService {
       Order.countDocuments(query),
     ]);
 
+    const totalPages = Math.ceil(total / parseInt(limit));
+    const currentPage = parseInt(page);
+    const pageSize = parseInt(limit);
+
     return {
       data: orders,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        totalPages: Math.ceil(total / parseInt(limit)),
+        currentPage,
+        pageSize,
+        totalItems: total,
+        totalPages,
+        hasNextPage: currentPage < totalPages,
+        hasPrevPage: currentPage > 1,
+        nextPage: currentPage < totalPages ? currentPage + 1 : null,
+        prevPage: currentPage > 1 ? currentPage - 1 : null,
       },
     };
   }

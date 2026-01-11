@@ -1,7 +1,6 @@
 const Order = require("../models/order.model");
 const User = require("../models/user.model");
 const Product = require("../models/product.model");
-const Review = require("../models/review.model");
 
 class StatisticsService {
   /**
@@ -20,21 +19,53 @@ class StatisticsService {
     const totalProducts = await Product.countDocuments({ status: "published" });
 
     // 2. Recent Orders (5)
-    const recentOrders = await Order.find()
+    const recentOrdersRaw = await Order.find()
       .sort({ createdAt: -1 })
       .limit(5)
       .populate("userId", "username email avatar")
       .lean();
+    
+    // Transform recentOrders to match client expected format
+    const recentOrders = recentOrdersRaw.map(order => ({
+      _id: order._id,
+      orderNumber: order.orderNumber || order._id.toString().slice(-6).toUpperCase(),
+      user: order.userId ? {
+        name: order.userId.username || order.userId.email || 'Guest',
+        avatar: order.userId.avatar || null
+      } : { name: 'Guest', avatar: null },
+      totalAmount: order.totalAmount || 0,
+      status: order.status,
+      createdAt: order.createdAt
+    }));
 
-    // 3. Top Products (By Revenue or Sold Count)
-    const topProducts = await Product.find()
+    // 3. Top Products (By Revenue or Sold Count) - Only products with sales
+    const topProductsRaw = await Product.find({ soldCount: { $gt: 0 } })
       .sort({ soldCount: -1 })
       .limit(5)
       .select("name price soldCount variants slug")
       .lean();
     
+    // Transform topProducts to match client expected format
+    const topProducts = topProductsRaw.map(product => {
+      // Get first variant image if available
+      const image = product.variants?.[0]?.images?.[0] || null;
+      // Calculate revenue: price * soldCount
+      const price = product.variants?.[0]?.price || product.price?.currentPrice || 0;
+      const sold = product.soldCount || 0;
+      const revenue = price * sold;
+      
+      return {
+        _id: product._id,
+        name: product.name,
+        slug: product.slug,
+        image,
+        sold,
+        revenue,
+        price // Also include price for display purposes
+      };
+    });
+    
     // 4. Monthly Revenue & Orders (Last 6 months) for Chart
-    const currentYear = new Date().getFullYear();
     const today = new Date();
     
     // Create an array of the last 6 months (keys: "M/Y")
@@ -92,6 +123,12 @@ class StatisticsService {
     });
 
     return {
+      // Flat structure for stats cards
+      totalRevenue: totalRevenue[0]?.total || 0,
+      totalOrders: totalOrders,
+      totalUsers: totalUsers,
+      totalProducts: totalProducts,
+      // Also include counts object for backward compatibility
       counts: {
         revenue: totalRevenue[0]?.total || 0,
         orders: totalOrders,

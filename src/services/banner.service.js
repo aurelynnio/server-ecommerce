@@ -54,13 +54,21 @@ class BannerService {
       .limit(limit);
 
     const total = await Banner.countDocuments(query);
+    const totalPages = Math.ceil(total / limit);
 
+    // Standardized response format matching other services
     return {
-      banners,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      data: banners,
+      pagination: {
+        currentPage: page,
+        pageSize: limit,
+        totalItems: total,
+        totalPages: totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+        nextPage: page < totalPages ? page + 1 : null,
+        prevPage: page > 1 ? page - 1 : null,
+      },
     };
   }
 

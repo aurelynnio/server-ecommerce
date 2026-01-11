@@ -227,13 +227,20 @@ class SearchService {
     // Get facets (aggregations for filters)
     const facets = await this.getSearchFacets(query);
 
+    const totalPages = Math.ceil(total / limit);
+    const currentPage = page;
+
     return {
       data: products,
       pagination: {
-        currentPage: page,
+        currentPage,
         pageSize: limit,
         totalItems: total,
-        totalPages: Math.ceil(total / limit),
+        totalPages,
+        hasNextPage: currentPage < totalPages,
+        hasPrevPage: currentPage > 1,
+        nextPage: currentPage < totalPages ? currentPage + 1 : null,
+        prevPage: currentPage > 1 ? currentPage - 1 : null,
       },
       facets,
     };

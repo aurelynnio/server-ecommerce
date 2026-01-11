@@ -265,18 +265,37 @@ class PermissionService {
         PermissionAudit.countDocuments(query),
       ]);
 
+      const totalPages = Math.ceil(total / limit);
+      const currentPage = parseInt(page);
+      
       return {
-        logs,
+        data: logs,
         pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
+          currentPage,
+          pageSize: limit,
+          totalItems: total,
+          totalPages,
+          hasNextPage: currentPage < totalPages,
+          hasPrevPage: currentPage > 1,
+          nextPage: currentPage < totalPages ? currentPage + 1 : null,
+          prevPage: currentPage > 1 ? currentPage - 1 : null,
         },
       };
     } catch (error) {
       console.error('Failed to get audit logs:', error.message);
-      return { logs: [], pagination: { page, limit, total: 0, totalPages: 0 } };
+      return { 
+        data: [], 
+        pagination: { 
+          currentPage: page, 
+          pageSize: limit, 
+          totalItems: 0, 
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+          nextPage: null,
+          prevPage: null,
+        } 
+      };
     }
   }
 }

@@ -158,9 +158,11 @@ class ReviewService {
         nextPage: paginationParams.nextPage,
         prevPage: paginationParams.prevPage,
       },
-      ratingDistribution: distribution,
-      averageRating: productExists.averageRating || 0,
-      totalReviews: total,
+      metadata: {
+        ratingDistribution: distribution,
+        averageRating: productExists.averageRating || 0,
+        totalReviews: total,
+      },
     };
   }
 

@@ -60,13 +60,20 @@ class FlashSaleService {
       },
     }));
 
+    const totalPages = paginationParams.totalPages;
+    const currentPage = paginationParams.currentPage;
+
     const result = {
       data: enrichedProducts,
       pagination: {
-        currentPage: paginationParams.currentPage,
+        currentPage,
         pageSize: paginationParams.pageSize,
         totalItems: total,
-        totalPages: paginationParams.totalPages,
+        totalPages,
+        hasNextPage: currentPage < totalPages,
+        hasPrevPage: currentPage > 1,
+        nextPage: currentPage < totalPages ? currentPage + 1 : null,
+        prevPage: currentPage > 1 ? currentPage - 1 : null,
       },
       saleInfo: {
         currentTime: now,
