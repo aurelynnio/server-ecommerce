@@ -6,8 +6,11 @@ const reviewSchema = new Schema(
     product: { type: Types.ObjectId, ref: "Product", required: true },
     rating: { type: Number, required: true, min: 1, max: 5 },
     comment: { type: String, default: "" },
+    reply: { type: String, default: "" },
+    replyAt: { type: Date },
   },
   { timestamps: true }
+
 );
 
 // Indexes

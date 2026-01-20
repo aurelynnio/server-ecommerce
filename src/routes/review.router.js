@@ -116,6 +116,33 @@ router.delete(
   reviewController.deleteReview
 );
 /**
+ * Seller Routes
+ */
+/**
+ * @desc    Get reviews for seller's shop
+ * @access  Private (Seller/Admin)
+ */
+router.get(
+  "/seller/me",
+  verifyAccessToken,
+  requireRole("seller", "admin"),
+  validate({ query: getReviewsQueryValidator }),
+  reviewController.getShopReviews
+);
+
+/**
+ * @desc    Reply to a review
+ * @access  Private (Seller/Admin)
+ */
+router.post(
+  "/seller/:reviewId/reply",
+  verifyAccessToken,
+  requireRole("seller", "admin"),
+  validate({ params: reviewIdParamValidator }),
+  reviewController.replyReview
+);
+
+/**
  * Admin Routes
  */
 /**

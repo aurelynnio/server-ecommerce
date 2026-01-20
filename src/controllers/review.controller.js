@@ -173,6 +173,41 @@ const ReviewController = {
   }),
 
   /**
+   * Get reviews for seller's shop
+   * @access  Private (Seller only)
+   */
+  getShopReviews: catchAsync(async (req, res) => {
+    const userId = req.user.userId;
+    const result = await reviewService.getShopReviews(userId, req.query);
+
+    return sendSuccess(
+      res,
+      result,
+      "Shop reviews retrieved successfully",
+      StatusCodes.OK
+    );
+  }),
+
+  /**
+   * Reply to a review
+   * @access  Private (Seller only)
+   */
+  replyReview: catchAsync(async (req, res) => {
+    const userId = req.user.userId;
+    const { reviewId } = req.params;
+    const { content } = req.body;
+
+    const result = await reviewService.replyReview(userId, reviewId, content);
+
+    return sendSuccess(
+      res,
+      result,
+      "Replied to review successfully",
+      StatusCodes.OK
+    );
+  }),
+
+  /**
    * Get review statistics overview
 
 * @access  Private (Admin only)

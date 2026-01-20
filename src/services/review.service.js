@@ -1,10 +1,12 @@
 const Review = require("../models/review.model");
 const Product = require("../models/product.model");
 const Order = require("../models/order.model");
+const Shop = require("../models/shop.model");
 const { getPaginationParams } = require("../utils/pagination");
 
 /**
  * Service handling product reviews
+
  * Manages review creation and retrieval
  */
 class ReviewService {
@@ -378,7 +380,93 @@ class ReviewService {
     return { canReview: true };
   }
 
+  // Get reviews for a specific shop
+  async getShopReviews(userId, filters = {}) {
+    // 1. Find the shop owned by this user
+    const shop = await Shop.findOne({ owner: userId });
+    if (!shop) {
+      throw new Error("Shop not found for this user");
+    }
+
+    // 2. Find all products belonging to this shop
+    const products = await Product.find({ shop: shop._id }).select("_id");
+    const productIds = products.map((p) => p._id);
+
+    // 3. Query reviews for these products
+    const { page = 1, limit = 10, rating, replyStatus, search } = filters;
+    
+    const query = { product: { $in: productIds } };
+
+    if (rating) {
+      query.rating = rating;
+    }
+
+    if (replyStatus === "replied") {
+      query.reply = { $ne: "" };
+    } else if (replyStatus === "unreplied") {
+      query.reply = "";
+    }
+
+    if (search) {
+      query.comment = { $regex: search, $options: "i" };
+    }
+
+    const total = await Review.countDocuments(query);
+    const paginationParams = getPaginationParams(page, limit, total);
+
+    const reviews = await Review.find(query)
+      .populate("user", "username email avatar")
+      .populate("product", "name slug images")
+      .sort({ createdAt: -1 })
+      .skip(paginationParams.skip)
+      .limit(paginationParams.limit);
+
+    return {
+      data: reviews,
+      pagination: {
+        currentPage: paginationParams.currentPage,
+        pageSize: paginationParams.pageSize,
+        totalPages: paginationParams.totalPages,
+        totalItems: paginationParams.totalItems,
+      },
+    };
+  }
+
+  // Reply to a review (Shop owner only)
+  async replyReview(userId, reviewId, content) {
+    if (!content || !content.trim()) {
+      throw new Error("Reply content is required");
+    }
+
+    const review = await Review.findById(reviewId).populate("product");
+    if (!review) {
+      throw new Error("Review not found");
+    }
+
+    // Check if user owns the shop that owns the product
+    const shop = await Shop.findOne({ owner: userId });
+    if (!shop) {
+      throw new Error("Shop not found");
+    }
+
+    // Verify product belongs to shop (assuming product has shop field populated or id)
+    // If product.shop is ObjectId
+    const productShopId = review.product.shop.toString(); 
+    
+    if (productShopId !== shop._id.toString()) {
+      throw new Error("Unauthorized: Product does not belong to your shop");
+    }
+
+    // Update review with reply
+    review.reply = content;
+    review.replyAt = new Date();
+    await review.save();
+
+    return review;
+  }
+
   // Get review statistics (Admin)
+
   async getReviewStatistics() {
     const totalReviews = await Review.countDocuments();
 
