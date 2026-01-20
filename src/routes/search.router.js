@@ -1,21 +1,29 @@
-
 const express = require("express");
-
 const router = express.Router();
-
 const searchController = require("../controllers/search.controller");
-// Public routes - no authentication required
-// Advanced search
 
+/**
+ * @desc    Advanced search for products
+ * @access  Public
+ */
 router.get("/", searchController.advancedSearch);
-// Get search suggestions (autocomplete)
 
+/**
+ * @desc    Get search suggestions (autocomplete)
+ * @access  Public
+ */
 router.get("/suggestions", searchController.getSuggestions);
-// Get trending searches
 
+/**
+ * @desc    Get trending searches
+ * @access  Public
+ */
 router.get("/trending", searchController.getTrending);
-// Get hot keywords
 
+/**
+ * @desc    Get hot keywords
+ * @access  Public
+ */
 router.get("/hot-keywords", searchController.getHotKeywords);
 
 module.exports = router;

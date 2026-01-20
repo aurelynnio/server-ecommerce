@@ -1,34 +1,51 @@
-
 const express = require("express");
-
 const router = express.Router();
-
 const wishlistController = require("../controllers/wishlist.controller");
+const { verifyAccessToken } = require("../middlewares/auth.middleware");
 
-const { authenticate } = require("../middlewares/auth.middleware");
 // All routes require authentication
+router.use(verifyAccessToken);
 
-router.use(authenticate);
-// Get wishlist
-
+/**
+ * @desc    Get current user's wishlist
+ * @access  Private
+ */
 router.get("/", wishlistController.getWishlist);
-// Get wishlist count
 
+/**
+ * @desc    Get wishlist items count
+ * @access  Private
+ */
 router.get("/count", wishlistController.getWishlistCount);
-// Check if product is in wishlist
 
+/**
+ * @desc    Check if a product is in user's wishlist
+ * @access  Private
+ */
 router.get("/check/:productId", wishlistController.checkInWishlist);
-// Check multiple products
 
+/**
+ * @desc    Check multiple products in wishlist
+ * @access  Private
+ */
 router.post("/check-multiple", wishlistController.checkMultiple);
-// Add to wishlist
 
+/**
+ * @desc    Add a product to wishlist
+ * @access  Private
+ */
 router.post("/:productId", wishlistController.addToWishlist);
-// Remove from wishlist
 
+/**
+ * @desc    Remove a product from wishlist
+ * @access  Private
+ */
 router.delete("/:productId", wishlistController.removeFromWishlist);
-// Clear wishlist
 
+/**
+ * @desc    Clear entire wishlist
+ * @access  Private
+ */
 router.delete("/", wishlistController.clearWishlist);
 
 module.exports = router;

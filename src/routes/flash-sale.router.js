@@ -1,33 +1,51 @@
-
 const express = require("express");
-
 const router = express.Router();
-
 const flashSaleController = require("../controllers/flash-sale.controller");
+const { verifyAccessToken, requireRole } = require("../middlewares/auth.middleware");
 
-const { authenticate, authorize } = require("../middlewares/auth.middleware");
-// Public routes
-
+/**
+ * @desc    Get active flash sale products
+ * @access  Public
+ */
 router.get("/", flashSaleController.getActiveFlashSale);
 
+/**
+ * @desc    Get flash sale schedule
+ * @access  Public
+ */
 router.get("/schedule", flashSaleController.getSchedule);
 
+/**
+ * @desc    Get flash sale by time slot
+ * @access  Public
+ */
 router.get("/slot/:timeSlot", flashSaleController.getBySlot);
-// Admin/Seller routes
 
-router.get("/stats", authenticate, authorize("admin"), flashSaleController.getStats);
+/**
+ * @desc    Get flash sale statistics
+ * @access  Private (Admin)
+ */
+router.get("/stats", verifyAccessToken, requireRole("admin"), flashSaleController.getStats);
 
+/**
+ * @desc    Add product to flash sale
+ * @access  Private (Admin/Seller)
+ */
 router.post(
   "/:productId",
-  authenticate,
-  authorize("admin", "seller"),
+  verifyAccessToken,
+  requireRole("admin", "seller"),
   flashSaleController.addToFlashSale
 );
 
+/**
+ * @desc    Remove product from flash sale
+ * @access  Private (Admin/Seller)
+ */
 router.delete(
   "/:productId",
-  authenticate,
-  authorize("admin", "seller"),
+  verifyAccessToken,
+  requireRole("admin", "seller"),
   flashSaleController.removeFromFlashSale
 );
 
