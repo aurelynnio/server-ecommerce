@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const cookie = require("cookie");
+const logger = require("../utils/logger");
 
 const socketAuthMiddleware = (socket, next) => {
   try {
@@ -32,7 +33,7 @@ const socketAuthMiddleware = (socket, next) => {
 
     next();
   } catch (error) {
-    console.error("Socket Auth Error:", error.message);
+    logger.error("Socket Auth Error:", { error: error.message });
     next(new Error("Authentication error: Invalid token"));
   }
 };

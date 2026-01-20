@@ -1,6 +1,8 @@
 const { Server } = require("socket.io");
 const notificationSocket = require("./notification.socket");
+const chatSocket = require("./chat.socket");
 const socketAuthMiddleware = require("../middlewares/socketAuth.middleware");
+const logger = require("../utils/logger");
 
 let io = null;
 
@@ -18,13 +20,14 @@ const initSocket = (httpServer) => {
 
   // 2. Central Connection Handler
   io.on("connection", (socket) => {
-    console.log(`User connected: ${socket.id} (User ID: ${socket.user.id})`);
+    logger.info(`User connected: ${socket.id} (User ID: ${socket.user.id})`);
 
     // Initialize handlers for this specific socket
     notificationSocket(io, socket);
+    chatSocket(io, socket);
 
     socket.on("disconnect", () => {
-      console.log(`User disconnected: ${socket.id}`);
+      logger.info(`User disconnected: ${socket.id}`);
     });
   });
 

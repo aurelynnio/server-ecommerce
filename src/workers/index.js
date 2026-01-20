@@ -1,11 +1,12 @@
 const { initNotificationWorker } = require("./notification.worker");
+const logger = require("../utils/logger");
 
 const initWorkers = async () => {
   try {
     await initNotificationWorker();
-    console.log("All workers initialized successfully");
+    logger.info("All workers initialized successfully");
   } catch (error) {
-    console.error("Failed to initialize workers:", error);
+    logger.error("Failed to initialize workers:", error);
   }
 };
 

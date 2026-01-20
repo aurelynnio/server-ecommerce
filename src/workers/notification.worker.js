@@ -1,5 +1,6 @@
 const { consumeFromQueue } = require("../utils/rabbitmq.util");
 const notificationService = require("../services/notification.service");
+const logger = require("../utils/logger");
 
 const initNotificationWorker = async () => {
   await consumeFromQueue("notifications", async (data) => {
@@ -15,9 +16,9 @@ const initNotificationWorker = async () => {
         link,
       });
 
-      console.log(`Notification of type ${type} processed for user ${userId}`);
+      logger.info(`Notification of type ${type} processed for user ${userId}`);
     } catch (error) {
-      console.error("Failed to process notification:", error);
+      logger.error("Failed to process notification:", error);
       throw error;
     }
   });

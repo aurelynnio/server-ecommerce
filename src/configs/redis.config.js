@@ -12,11 +12,13 @@ const redisConfig = {
 const redis = new Redis(redisConfig);
 
 redis.on("connect", () => {
-  console.log("Redis client connected");
+  const logger = require("../utils/logger");
+  logger.info("Redis client connected");
 });
 
 redis.on("error", (err) => {
-  console.error("Redis client error:", err);
+  const logger = require("../utils/logger");
+  logger.error("Redis client error:", err);
 });
 
 module.exports = redis;

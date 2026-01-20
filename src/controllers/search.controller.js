@@ -5,7 +5,7 @@ const { sendSuccess } = require("../shared/res/formatResponse");
 const SearchController = {
   /**
    * Get search suggestions (autocomplete)
-   * @route GET /api/search/suggestions
+
    */
   getSuggestions: catchAsync(async (req, res) => {
     const { q, limit } = req.query;
@@ -20,7 +20,7 @@ const SearchController = {
 
   /**
    * Get trending searches
-   * @route GET /api/search/trending
+
    */
   getTrending: catchAsync(async (req, res) => {
     const { limit } = req.query;
@@ -34,7 +34,7 @@ const SearchController = {
 
   /**
    * Get hot keywords
-   * @route GET /api/search/hot-keywords
+
    */
   getHotKeywords: catchAsync(async (req, res) => {
     const { limit } = req.query;
@@ -46,7 +46,7 @@ const SearchController = {
 
   /**
    * Advanced search with filters
-   * @route GET /api/search
+
    */
   advancedSearch: catchAsync(async (req, res) => {
     const {

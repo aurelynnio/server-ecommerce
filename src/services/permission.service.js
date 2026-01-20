@@ -3,13 +3,14 @@
  * Handles permission checking, granting, revoking, and audit logging
  */
 
-const User = require('../models/user.model');
+const User = require("../models/user.model");
 const {
   ROLE_PERMISSIONS,
   getAllPermissionsList,
   isValidPermission,
   expandManagePermissions,
-} = require('../configs/permission');
+} = require("../configs/permission");
+const logger = require("../utils/logger");
 
 class PermissionService {
   /**
@@ -26,7 +27,7 @@ class PermissionService {
     const userPermissions = user.permissions || [];
 
     // Admin has all permissions (wildcard)
-    if (rolePermissions.includes('*')) {
+    if (rolePermissions.includes("*")) {
       return this.getAllPermissions();
     }
 
@@ -34,13 +35,13 @@ class PermissionService {
     const combined = new Set([...rolePermissions, ...userPermissions]);
 
     // Filter out negative permissions (those starting with '-')
-    const positivePerms = [...combined].filter(p => !p.startsWith('-'));
+    const positivePerms = [...combined].filter((p) => !p.startsWith("-"));
     const negativePerms = [...combined]
-      .filter(p => p.startsWith('-'))
-      .map(p => p.substring(1)); // Remove the '-' prefix
+      .filter((p) => p.startsWith("-"))
+      .map((p) => p.substring(1)); // Remove the '-' prefix
 
     // Remove negated permissions from positive permissions
-    const finalPerms = positivePerms.filter(p => !negativePerms.includes(p));
+    const finalPerms = positivePerms.filter((p) => !negativePerms.includes(p));
 
     // Expand 'manage' permissions to CRUD
     return expandManagePermissions(finalPerms);
@@ -66,13 +67,13 @@ class PermissionService {
     const permissions = this.getUserPermissions(user);
 
     // Check for wildcard (admin)
-    if (permissions.includes('*')) return true;
+    if (permissions.includes("*")) return true;
 
     // Check for exact match
     if (permissions.includes(permission)) return true;
 
     // Check for manage permission (grants all CRUD)
-    const [resource] = permission.split(':');
+    const [resource] = permission.split(":");
     if (permissions.includes(`${resource}:manage`)) return true;
 
     return false;
@@ -86,7 +87,7 @@ class PermissionService {
    */
   hasAnyPermission(user, permissions) {
     if (!user || !permissions || permissions.length === 0) return false;
-    return permissions.some(p => this.hasPermission(user, p));
+    return permissions.some((p) => this.hasPermission(user, p));
   }
 
   /**
@@ -97,7 +98,7 @@ class PermissionService {
    */
   hasAllPermissions(user, permissions) {
     if (!user || !permissions || permissions.length === 0) return false;
-    return permissions.every(p => this.hasPermission(user, p));
+    return permissions.every((p) => this.hasPermission(user, p));
   }
 
   /**
@@ -115,12 +116,12 @@ class PermissionService {
 
     const user = await User.findById(userId);
     if (!user) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     // Check if permission already exists
     if (user.permissions.includes(permission)) {
-      throw new Error('Permission already granted');
+      throw new Error("Permission already granted");
     }
 
     // Add permission
@@ -128,7 +129,7 @@ class PermissionService {
     await user.save();
 
     // Log audit
-    await this.logAudit('grant', adminId, userId, permission);
+    await this.logAudit("grant", adminId, userId, permission);
 
     return user;
   }
@@ -143,13 +144,13 @@ class PermissionService {
   async revokePermission(userId, permission, adminId) {
     const user = await User.findById(userId);
     if (!user) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     // Check if permission exists on user
     const permIndex = user.permissions.indexOf(permission);
     if (permIndex === -1) {
-      throw new Error('Permission not found on user');
+      throw new Error("Permission not found on user");
     }
 
     // Remove permission
@@ -157,7 +158,7 @@ class PermissionService {
     await user.save();
 
     // Log audit
-    await this.logAudit('revoke', adminId, userId, permission);
+    await this.logAudit("revoke", adminId, userId, permission);
 
     return user;
   }
@@ -171,19 +172,21 @@ class PermissionService {
    */
   async updateUserPermissions(userId, permissions, adminId) {
     // Validate all permissions
-    const invalidPerms = permissions.filter(p => !isValidPermission(p) && !p.startsWith('-'));
+    const invalidPerms = permissions.filter(
+      (p) => !isValidPermission(p) && !p.startsWith("-"),
+    );
     if (invalidPerms.length > 0) {
-      throw new Error(`Invalid permissions: ${invalidPerms.join(', ')}`);
+      throw new Error(`Invalid permissions: ${invalidPerms.join(", ")}`);
     }
 
     const user = await User.findByIdAndUpdate(
       userId,
       { permissions },
-      { new: true }
+      { new: true },
     );
 
     if (!user) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     // Log bulk update audit
@@ -201,7 +204,7 @@ class PermissionService {
    */
   async logAudit(action, adminId, targetUserId, permission) {
     try {
-      const PermissionAudit = require('../models/permission-audit.model');
+      const PermissionAudit = require("../models/permission-audit.model");
       await PermissionAudit.create({
         action,
         adminId,
@@ -211,7 +214,7 @@ class PermissionService {
       });
     } catch (error) {
       // Log error but don't fail the operation
-      console.error('Failed to log permission audit:', error.message);
+      logger.error("Failed to log permission audit:", { error: error.message });
     }
   }
 
@@ -223,16 +226,18 @@ class PermissionService {
    */
   async logBulkUpdate(adminId, targetUserId, permissions) {
     try {
-      const PermissionAudit = require('../models/permission-audit.model');
+      const PermissionAudit = require("../models/permission-audit.model");
       await PermissionAudit.create({
-        action: 'bulk_update',
+        action: "bulk_update",
         adminId,
         targetUserId,
         permission: JSON.stringify(permissions),
         timestamp: new Date(),
       });
     } catch (error) {
-      console.error('Failed to log bulk permission update:', error.message);
+      logger.error("Failed to log bulk permission update:", {
+        error: error.message,
+      });
     }
   }
 
@@ -247,27 +252,27 @@ class PermissionService {
    */
   async getAuditLogs({ page = 1, limit = 20, userId, action }) {
     try {
-      const PermissionAudit = require('../models/permission-audit.model');
-      
+      const PermissionAudit = require("../models/permission-audit.model");
+
       const query = {};
       if (userId) query.targetUserId = userId;
       if (action) query.action = action;
 
       const skip = (page - 1) * limit;
-      
+
       const [logs, total] = await Promise.all([
         PermissionAudit.find(query)
           .sort({ timestamp: -1 })
           .skip(skip)
           .limit(limit)
-          .populate('adminId', 'username email')
-          .populate('targetUserId', 'username email'),
+          .populate("adminId", "username email")
+          .populate("targetUserId", "username email"),
         PermissionAudit.countDocuments(query),
       ]);
 
       const totalPages = Math.ceil(total / limit);
       const currentPage = parseInt(page);
-      
+
       return {
         data: logs,
         pagination: {
@@ -282,19 +287,19 @@ class PermissionService {
         },
       };
     } catch (error) {
-      console.error('Failed to get audit logs:', error.message);
-      return { 
-        data: [], 
-        pagination: { 
-          currentPage: page, 
-          pageSize: limit, 
-          totalItems: 0, 
+      logger.error("Failed to get audit logs:", { error: error.message });
+      return {
+        data: [],
+        pagination: {
+          currentPage: page,
+          pageSize: limit,
+          totalItems: 0,
           totalPages: 0,
           hasNextPage: false,
           hasPrevPage: false,
           nextPage: null,
           prevPage: null,
-        } 
+        },
       };
     }
   }

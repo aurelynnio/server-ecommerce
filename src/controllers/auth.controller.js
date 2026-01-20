@@ -12,12 +12,12 @@ const jwt = require("jsonwebtoken");
 const AuthController = {
   /**
    * Register a new user
-   * @route POST /api/auth/register
-   * @access Public
-   * @body {string} username - User's username
-   * @body {string} email - User's email
-   * @body {string} password - User's password
-   * @returns {Object} Created user object
+
+* @access  Public
+
+
+
+
    */
   register: catchAsync(async (req, res) => {
     const result = await authService.register(req.body);
@@ -31,11 +31,11 @@ const AuthController = {
 
   /**
    * Authenticate user and return tokens
-   * @route POST /api/auth/login
-   * @access Public
-   * @body {string} email - User's email
-   * @body {string} password - User's password
-   * @returns {Object} User info with access and refresh tokens
+
+* @access  Public
+
+
+
    */
   login: catchAsync(async (req, res) => {
     const { email, password } = req.body;
@@ -68,10 +68,10 @@ const AuthController = {
 
   /**
    * Send email verification code
-   * @route POST /api/auth/send-verification
-   * @access Public
-   * @body {string} email - User's email
-   * @returns {Object} Success message with expiration info
+
+* @access  Public
+
+
    */
   sendVerificationCode: catchAsync(async (req, res) => {
     const { email } = req.body;
@@ -86,10 +86,10 @@ const AuthController = {
 
   /**
    * Verify email with verification code
-   * @route POST /api/auth/verify-email
-   * @access Public
-   * @body {string} code - 6-digit verification code
-   * @returns {Object} Verified user object
+
+* @access  Public
+
+
    */
   verifyEmail: catchAsync(async (req, res) => {
     const { code } = req.body;
@@ -104,10 +104,10 @@ const AuthController = {
 
   /**
    * Request password reset (forgot password)
-   * @route POST /api/auth/forgot-password
-   * @access Public
-   * @body {string} email - User's email
-   * @returns {Object} Success message
+
+* @access  Public
+
+
    */
   forgotPassword: catchAsync(async (req, res) => {
     const { email } = req.body;
@@ -122,12 +122,12 @@ const AuthController = {
 
   /**
    * Reset password with verification code
-   * @route POST /api/auth/reset-password
-   * @access Public
-   * @body {string} email - User's email
-   * @body {string} code - Reset verification code
-   * @body {string} newPassword - New password
-   * @returns {Object} Success message
+
+* @access  Public
+
+
+
+
    */
   resetPassword: catchAsync(async (req, res) => {
     const { email, code, newPassword } = req.body;
@@ -142,11 +142,11 @@ const AuthController = {
 
   /**
    * Refresh access token using refresh token
-   * @route POST /api/auth/refresh-token
-   * @access Public (requires valid refresh token)
+
+* @access  Public (requires valid refresh token)
    * @cookie refreshToken - HTTP-only refresh token
-   * @body {string} [refreshToken] - Fallback refresh token in body
-   * @returns {Object} New access token
+
+
    */
   refreshToken: catchAsync(async (req, res) => {
     // Lấy refresh token từ cookie (ưu tiên) hoặc body (fallback)
@@ -213,9 +213,9 @@ const AuthController = {
 
   /**
    * Logout user and clear tokens
-   * @route POST /api/auth/logout
-   * @access Private (requires authentication)
-   * @returns {Object} Success message
+
+* @access  Private (requires authentication)
+
    */
   logout: catchAsync(async (req, res) => {
     res.clearCookie("accessToken", {
@@ -235,11 +235,11 @@ const AuthController = {
 
   /**
    * Change password for authenticated user
-   * @route POST /api/auth/change-password
-   * @access Private (requires authentication)
-   * @body {string} currentPassword - Current password
-   * @body {string} newPassword - New password
-   * @returns {Object} Success message
+
+* @access  Private (requires authentication)
+
+
+
    */
   changePassword: catchAsync(async (req, res) => {
     const { currentPassword, newPassword } = req.body;

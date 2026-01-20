@@ -10,11 +10,11 @@ const { StatusCodes } = require("http-status-codes");
 const ChatController = {
   /**
    * Start or get an existing conversation
-   * @route POST /api/chat/start
-   * @access Private (Authenticated users)
-   * @body {string} participantId - ID of the other participant
-   * @body {string} [type] - Conversation type (user-to-user, user-to-shop)
-   * @returns {Object} Conversation object
+
+* @access  Private (Authenticated users)
+
+
+
    */
   startConversation: catchAsync(async (req, res) => {
     const conversation = await chatService.startConversation(
@@ -31,12 +31,12 @@ const ChatController = {
 
   /**
    * Send a message in a conversation
-   * @route POST /api/chat/message
-   * @access Private (Authenticated users)
-   * @body {string} conversationId - Conversation ID
-   * @body {string} content - Message content
-   * @body {string} [type] - Message type (text, image, etc.)
-   * @returns {Object} Sent message object
+
+* @access  Private (Authenticated users)
+
+
+
+
    */
   sendMessage: catchAsync(async (req, res) => {
     const info = await chatService.sendMessage(req.user.userId, req.body);
@@ -45,9 +45,9 @@ const ChatController = {
 
   /**
    * Get all conversations for current user
-   * @route GET /api/chat/conversations
-   * @access Private (Authenticated users)
-   * @returns {Array} User's conversations with last message
+
+* @access  Private (Authenticated users)
+
    */
   getMyConversations: catchAsync(async (req, res) => {
     const conversations = await chatService.getMyConversations(req.user.userId);
@@ -61,14 +61,28 @@ const ChatController = {
 
   /**
    * Get all messages in a conversation
-   * @route GET /api/chat/messages/:conversationId
-   * @access Private (Authenticated users - participants only)
-   * @param {string} conversationId - Conversation ID
-   * @returns {Array} Messages in the conversation
+
+* @access  Private (Authenticated users - participants only)
+
+
    */
   getMessages: catchAsync(async (req, res) => {
     const messages = await chatService.getMessages(req.params.conversationId);
     return sendSuccess(res, messages, "Get messages success", StatusCodes.OK);
+  }),
+
+  /**
+   * Mark all messages in a conversation as read
+
+* @access  Private (Authenticated users - participants only)
+
+
+   */
+  markAsRead: catchAsync(async (req, res) => {
+    const { conversationId } = req.params;
+    const userId = req.user.userId;
+    const result = await chatService.markAsRead(conversationId, userId);
+    return sendSuccess(res, result, "Messages marked as read", StatusCodes.OK);
   }),
 };
 

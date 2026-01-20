@@ -9,6 +9,7 @@ const nodemailer = require("nodemailer");
 const React = require("react");
 const { render } = require("@react-email/render");
 const VerificationEmail = require("../emails/VerificationEmail").default;
+const logger = require("../utils/logger");
 
 /**
  * Create email transporter configuration
@@ -41,7 +42,6 @@ const sendVerificationCode = async (to, code, type = "email_verification") => {
         ? "Verify Your Email Address"
         : "Reset Your Password";
 
-    // TODO: Determine base URL from environment variable
     const baseUrl = process.env.CLIENT_URL || "http://localhost:3000";
     const verificationLink = `${baseUrl}/verify-code?email=${to}&code=${code}`;
 
@@ -49,7 +49,7 @@ const sendVerificationCode = async (to, code, type = "email_verification") => {
       React.createElement(VerificationEmail, {
         verificationCode: code,
         verificationLink: verificationLink,
-      })
+      }),
     );
 
     const mailOptions = {
@@ -59,16 +59,14 @@ const sendVerificationCode = async (to, code, type = "email_verification") => {
       html: emailHtml,
     };
 
-    console.log(`[EmailService] Sending verification email to ${to}...`);
     const info = await transporter.sendMail(mailOptions);
-    console.log(`[EmailService] Email sent: ${info.messageId}`);
 
     return {
       success: true,
       messageId: info.messageId,
     };
   } catch (error) {
-    console.error("Error sending email:", error);
+    logger.error("Error sending email:", { error: error.message });
     throw new Error(`Failed to send email: ${error.message}`);
   }
 };

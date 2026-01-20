@@ -1,4 +1,5 @@
 const { getChannel } = require("../configs/rabbitmq.config");
+const logger = require("./logger");
 
 const publishToQueue = async (queueName, data) => {
   try {
@@ -10,9 +11,9 @@ const publishToQueue = async (queueName, data) => {
     channel.sendToQueue(queueName, Buffer.from(JSON.stringify(data)), {
       persistent: true,
     });
-    console.log(`Message sent to queue: ${queueName}`);
+    logger.info(`Message sent to queue: ${queueName}`);
   } catch (error) {
-    console.error("RabbitMQ Publish Error:", error);
+    logger.error("RabbitMQ Publish Error:", error);
   }
 };
 
@@ -23,7 +24,7 @@ const consumeFromQueue = async (queueName, callback) => {
       throw new Error("RabbitMQ channel not initialized");
     }
     await channel.assertQueue(queueName, { durable: true });
-    console.log(`Waiting for messages in queue: ${queueName}`);
+    logger.info(`Waiting for messages in queue: ${queueName}`);
 
     channel.consume(queueName, async (msg) => {
       if (msg !== null) {
@@ -32,13 +33,13 @@ const consumeFromQueue = async (queueName, callback) => {
           await callback(content);
           channel.ack(msg);
         } catch (error) {
-          console.error("Error processing message:", error);
+          logger.error("Error processing message:", error);
           channel.nack(msg, false, true);
         }
       }
     });
   } catch (error) {
-    console.error("RabbitMQ Consume Error:", error);
+    logger.error("RabbitMQ Consume Error:", error);
   }
 };
 

@@ -3,6 +3,7 @@ const { server } = require("./app");
 const connectDB = require("./db/connect.db");
 const cluster = require("cluster");
 const { initSocket } = require("./socket");
+const logger = require("./utils/logger");
 
 const PORT = process.env.PORT || 3000;
 
@@ -14,7 +15,7 @@ const redis = require("./configs/redis.config");
 const startServer = async () => {
   try {
     await connectDB();
-    console.log("Database connected successfully");
+    logger.info("Database connected successfully");
 
     await connectRabbitMQ();
 
@@ -23,18 +24,18 @@ const startServer = async () => {
     await initWorkers();
 
     server.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
+      logger.info(`Server is running on port ${PORT}`);
     });
   } catch (error) {
-    console.error("Failed to start server:", error);
+    logger.error("Failed to start server:", error);
     process.exit(1);
   }
 };
 
 if (cluster.isPrimary && process.env.NODE_ENV === "production") {
   const numWorkers = require("os").cpus().length;
-  console.log(
-    `Primary ${process.pid} is running in production mode. Forking ${numWorkers} workers...`
+  logger.info(
+    `Primary ${process.pid} is running in production mode. Forking ${numWorkers} workers...`,
   );
 
   for (let i = 0; i < numWorkers; i++) {
@@ -42,12 +43,12 @@ if (cluster.isPrimary && process.env.NODE_ENV === "production") {
   }
 
   cluster.on("exit", (worker, code, signal) => {
-    console.log(`Worker ${worker.process.pid} died. Forking a new worker...`);
+    logger.warn(`Worker ${worker.process.pid} died. Forking a new worker...`);
     cluster.fork();
   });
 } else {
   if (cluster.isPrimary) {
-    console.log(`Server starting in ${process.env.NODE_ENV} mode...`);
+    logger.info(`Server starting in ${process.env.NODE_ENV} mode...`);
   }
   startServer();
 }

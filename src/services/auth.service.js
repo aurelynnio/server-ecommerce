@@ -7,6 +7,7 @@ const {
   sendPasswordResetCode,
 } = require("./email.service");
 const cacheService = require("./cache.service");
+const logger = require("../utils/logger");
 
 /**
  * Service handling authentication logic
@@ -70,13 +71,13 @@ class AuthService {
 
     // Send verification email
     try {
-      console.log(
-        `[AuthService] Attempting to send verification email to ${data.email}`
+      logger.info(
+        `[AuthService] Attempting to send verification email to ${data.email}`,
       );
       await this.sendVerificationCode(data.email);
-      console.log(`[AuthService] Verification email sent successfully`);
+      logger.info(`[AuthService] Verification email sent successfully`);
     } catch (error) {
-      console.error("[AuthService] Failed to send verification email:", error);
+      logger.error("[AuthService] Failed to send verification email:", error);
       // Do not block registration if email fails, user can resend later
     }
 
@@ -280,7 +281,7 @@ class AuthService {
     try {
       await sendPasswordResetCode(email, resetCode);
     } catch (error) {
-      console.error("Failed to send password reset email:", error);
+      logger.error("Failed to send password reset email:", error);
       throw new Error("Failed to send password reset email. Please try again.");
     }
 

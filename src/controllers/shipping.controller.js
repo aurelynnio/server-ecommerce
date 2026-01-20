@@ -10,15 +10,15 @@ const { StatusCodes } = require("http-status-codes");
 const ShippingController = {
   /**
    * Create a new shipping template
-   * @route POST /api/shipping
-   * @access Private (Seller only)
-   * @body {string} name - Template name
-   * @body {string} [description] - Template description
-   * @body {number} baseFee - Base shipping fee
-   * @body {number} [freeShippingThreshold] - Order value for free shipping
-   * @body {number} estimatedDays - Estimated delivery days
-   * @body {Array} [regions] - Supported regions
-   * @returns {Object} Created shipping template
+
+* @access  Private (Seller only)
+
+
+
+
+
+
+
    */
   createTemplate: catchAsync(async (req, res) => {
     const newTemplate = await shippingService.createTemplate(
@@ -35,9 +35,9 @@ const ShippingController = {
 
   /**
    * Get all shipping templates for current seller's shop
-   * @route GET /api/shipping
-   * @access Private (Seller only)
-   * @returns {Array} Seller's shipping templates
+
+* @access  Private (Seller only)
+
    */
   getMyTemplates: catchAsync(async (req, res) => {
     const templates = await shippingService.getMyTemplates(req.user.userId);
@@ -46,11 +46,11 @@ const ShippingController = {
 
   /**
    * Update a shipping template
-   * @route PUT /api/shipping/:templateId
-   * @access Private (Seller only - own templates)
-   * @param {string} templateId - Shipping template ID
-   * @body {Object} updateData - Fields to update
-   * @returns {Object} Updated shipping template
+
+* @access  Private (Seller only - own templates)
+
+
+
    */
   updateTemplate: catchAsync(async (req, res) => {
     const updated = await shippingService.updateTemplate(
@@ -63,10 +63,10 @@ const ShippingController = {
 
   /**
    * Delete a shipping template
-   * @route DELETE /api/shipping/:templateId
-   * @access Private (Seller only - own templates)
-   * @param {string} templateId - Shipping template ID to delete
-   * @returns {Object} Deletion confirmation
+
+* @access  Private (Seller only - own templates)
+
+
    */
   deleteTemplate: catchAsync(async (req, res) => {
     const deleted = await shippingService.deleteTemplate(

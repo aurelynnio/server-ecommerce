@@ -3,9 +3,10 @@
  * Middleware functions for checking user permissions on API endpoints
  */
 
-const { StatusCodes } = require('http-status-codes');
-const { sendFail } = require('../shared/res/formatResponse');
-const permissionService = require('../services/permission.service');
+const { StatusCodes } = require("http-status-codes");
+const { sendFail } = require("../shared/res/formatResponse");
+const permissionService = require("../services/permission.service");
+const logger = require("../utils/logger");
 
 /**
  * Middleware to check if user has required permission(s)
@@ -14,7 +15,7 @@ const permissionService = require('../services/permission.service');
  * @param {string} options.mode - 'all' (AND logic) or 'any' (OR logic), default: 'all'
  * @returns {Function} Express middleware function
  */
-const requirePermission = (requiredPermissions, options = { mode: 'all' }) => {
+const requirePermission = (requiredPermissions, options = { mode: "all" }) => {
   // Normalize to array
   const permissions = Array.isArray(requiredPermissions)
     ? requiredPermissions
@@ -26,34 +27,40 @@ const requirePermission = (requiredPermissions, options = { mode: 'all' }) => {
       if (!req.user) {
         return sendFail(
           res,
-          'Authentication required',
-          StatusCodes.UNAUTHORIZED
+          "Authentication required",
+          StatusCodes.UNAUTHORIZED,
         );
       }
 
       // Check permissions based on mode
       let hasPermission;
-      if (options.mode === 'any') {
-        hasPermission = permissionService.hasAnyPermission(req.user, permissions);
+      if (options.mode === "any") {
+        hasPermission = permissionService.hasAnyPermission(
+          req.user,
+          permissions,
+        );
       } else {
-        hasPermission = permissionService.hasAllPermissions(req.user, permissions);
+        hasPermission = permissionService.hasAllPermissions(
+          req.user,
+          permissions,
+        );
       }
 
       if (!hasPermission) {
         return sendFail(
           res,
-          `Access denied. Required permission: ${permissions.join(', ')}`,
-          StatusCodes.FORBIDDEN
+          `Access denied. Required permission: ${permissions.join(", ")}`,
+          StatusCodes.FORBIDDEN,
         );
       }
 
       next();
     } catch (error) {
-      console.error('Permission check error:', error);
+      logger.error("Permission check error:", { error });
       return sendFail(
         res,
-        'Permission check failed',
-        StatusCodes.INTERNAL_SERVER_ERROR
+        "Permission check failed",
+        StatusCodes.INTERNAL_SERVER_ERROR,
       );
     }
   };
@@ -73,20 +80,20 @@ const requirePermissionWithOwnership = (permission, ownershipCheck) => {
       if (!req.user) {
         return sendFail(
           res,
-          'Authentication required',
-          StatusCodes.UNAUTHORIZED
+          "Authentication required",
+          StatusCodes.UNAUTHORIZED,
         );
       }
 
       // Admin bypasses ownership check
       const role = req.user.roles || req.user.role;
-      if (role === 'admin') {
+      if (role === "admin") {
         // Admin still needs the permission
         if (!permissionService.hasPermission(req.user, permission)) {
           return sendFail(
             res,
             `Access denied. Required permission: ${permission}`,
-            StatusCodes.FORBIDDEN
+            StatusCodes.FORBIDDEN,
           );
         }
         return next();
@@ -97,7 +104,7 @@ const requirePermissionWithOwnership = (permission, ownershipCheck) => {
         return sendFail(
           res,
           `Access denied. Required permission: ${permission}`,
-          StatusCodes.FORBIDDEN
+          StatusCodes.FORBIDDEN,
         );
       }
 
@@ -106,18 +113,18 @@ const requirePermissionWithOwnership = (permission, ownershipCheck) => {
       if (!isOwner) {
         return sendFail(
           res,
-          'You can only access your own resources',
-          StatusCodes.FORBIDDEN
+          "You can only access your own resources",
+          StatusCodes.FORBIDDEN,
         );
       }
 
       next();
     } catch (error) {
-      console.error('Permission with ownership check error:', error);
+      logger.error("Permission with ownership check error:", { error });
       return sendFail(
         res,
-        'Permission check failed',
-        StatusCodes.INTERNAL_SERVER_ERROR
+        "Permission check failed",
+        StatusCodes.INTERNAL_SERVER_ERROR,
       );
     }
   };
@@ -127,13 +134,13 @@ const requirePermissionWithOwnership = (permission, ownershipCheck) => {
  * Middleware to check if user has admin access
  * Shorthand for requirePermission('admin:access')
  */
-const requireAdminAccess = requirePermission('admin:access');
+const requireAdminAccess = requirePermission("admin:access");
 
 /**
  * Middleware to check if user has seller access
  * Shorthand for requirePermission('seller:access')
  */
-const requireSellerAccess = requirePermission('seller:access');
+const requireSellerAccess = requirePermission("seller:access");
 
 /**
  * Middleware to check resource-specific permission

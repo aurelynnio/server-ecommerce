@@ -74,6 +74,38 @@ class ChatService {
     });
     return messages;
   }
+
+  async markAsRead(conversationId, userId) {
+    // Find the conversation by ID
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      const error = new Error("Conversation not found");
+      error.status = 404;
+      throw error;
+    }
+
+    // Verify user is a member of the conversation
+    const isMember = conversation.members.some(
+      (memberId) => memberId.toString() === userId.toString()
+    );
+    if (!isMember) {
+      const error = new Error("You are not a member of this conversation");
+      error.status = 403;
+      throw error;
+    }
+
+    // Update all messages where senderId != userId to isRead: true
+    const result = await Message.updateMany(
+      {
+        conversationId,
+        senderId: { $ne: userId },
+        isRead: false,
+      },
+      { $set: { isRead: true } }
+    );
+
+    return { updatedCount: result.modifiedCount };
+  }
 }
 
 module.exports = new ChatService();

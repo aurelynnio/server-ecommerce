@@ -1,12 +1,13 @@
 const notificationService = require("../services/notification.service");
+const logger = require("../utils/logger");
 
 /**
  * @param {import('socket.io').Server} io
  * @param {import('socket.io').Socket} socket
  */
 const notificationSocket = (io, socket) => {
-  const userId = socket.user.id; 
-  console.log(`🔌 [Socket] User ${userId} connected and joining room.`);
+  const userId = socket.user.id;
+  logger.info(`🔌 [Socket] User ${userId} connected and joining room.`);
   socket.join(userId);
 
   socket.on("get_notifications", async ({ page = 1, limit = 10 } = {}) => {
@@ -17,7 +18,7 @@ const notificationSocket = (io, socket) => {
       });
       socket.emit("list_notification", result);
     } catch (error) {
-      console.error("Error getting notifications:", error);
+      logger.error("Error getting notifications:", error);
       socket.emit("error", { message: "Failed to get notifications" });
     }
   });
@@ -31,7 +32,7 @@ const notificationSocket = (io, socket) => {
       const unreadCount = await notificationService.countUnread(userId);
       io.to(userId).emit("unread_count", unreadCount);
     } catch (error) {
-      console.error("Error marking all as read:", error);
+      logger.error("Error marking all as read:", error);
       socket.emit("error", { message: "Failed to mark all as read" });
     }
   });
@@ -43,7 +44,7 @@ const notificationSocket = (io, socket) => {
       socket.emit("clean_notifications_success", { success: true });
       io.to(userId).emit("unread_count", 0);
     } catch (error) {
-      console.error("Error cleaning notifications:", error);
+      logger.error("Error cleaning notifications:", error);
       socket.emit("error", { message: "Failed to clean notifications" });
     }
   });
@@ -54,7 +55,7 @@ const notificationSocket = (io, socket) => {
       const count = await notificationService.countUnread(userId);
       socket.emit("unread_count", count);
     } catch (error) {
-      console.error("Error getting unread count:", error);
+      logger.error("Error getting unread count:", error);
       socket.emit("error", { message: "Failed to get unread count" });
     }
   });

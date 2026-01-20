@@ -10,14 +10,14 @@ const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const OrderController = {
   /**
    * Create order from cart items
-   * @route POST /api/orders
-   * @access Private (requires authentication)
-   * @body {string[]} cartItemIds - Cart item IDs to checkout
-   * @body {Object} shippingAddress - Shipping address details
-   * @body {string} [paymentMethod="cod"] - Payment method
-   * @body {Array} [shopVouchers] - Shop-specific vouchers
-   * @body {string} [platformVoucher] - Platform voucher code
-   * @returns {Object} Created orders with group ID
+
+* @access  Private (requires authentication)
+
+
+
+
+
+
    */
   createOrder: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -33,10 +33,10 @@ const OrderController = {
 
   /**
    * Get all orders (Admin only)
-   * @route GET /api/orders/admin
-   * @access Private (Admin only)
-   * @query {Object} [filters] - Optional filters
-   * @returns {Object} All orders
+
+* @access  Private (Admin only)
+
+
    */
   getAllOrders: catchAsync(async (req, res) => {
     const result = await orderService.getAllOrders(req.query);
@@ -51,10 +51,10 @@ const OrderController = {
 
   /**
    * Get current user's orders
-   * @route GET /api/orders/my-orders
-   * @access Private (requires authentication)
-   * @query {Object} [filters] - Optional filters
-   * @returns {Object} User's orders
+
+* @access  Private (requires authentication)
+
+
    */
   getUserOrders: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -70,10 +70,10 @@ const OrderController = {
 
   /**
    * Get single order by ID
-   * @route GET /api/orders/:orderId
-   * @access Private (Owner or Admin)
-   * @param {string} orderId - Order ID
-   * @returns {Object} Order details
+
+* @access  Private (Owner or Admin)
+
+
    */
   getOrderById: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -94,11 +94,11 @@ const OrderController = {
 
   /**
    * Update order status
-   * @route PUT /api/orders/:orderId/status
-   * @access Private (Admin or Seller)
-   * @param {string} orderId - Order ID
-   * @body {string} status - New status (confirmed, processing, shipped, delivered, cancelled)
-   * @returns {Object} Updated order
+
+* @access  Private (Admin or Seller)
+
+
+
    */
   updateOrderStatus: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -123,10 +123,10 @@ const OrderController = {
 
   /**
    * Cancel an order
-   * @route PUT /api/orders/:orderId/cancel
-   * @access Private (Owner or Admin)
-   * @param {string} orderId - Order ID
-   * @returns {Object} Cancelled order
+
+* @access  Private (Owner or Admin)
+
+
    */
   cancelOrder: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -147,9 +147,9 @@ const OrderController = {
 
   /**
    * Get order statistics for admin dashboard
-   * @route GET /api/orders/statistics
-   * @access Private (Admin only)
-   * @returns {Object} Order statistics (totals, revenue, top products, etc.)
+
+* @access  Private (Admin only)
+
    */
   getOrderStatistics: catchAsync(async (req, res) => {
     const stats = await orderService.getOrderStatistics();
@@ -164,9 +164,9 @@ const OrderController = {
 
   /**
    * Get orders for seller's shop
-   * @route GET /api/orders/seller/list
-   * @access Private (Seller only)
-   * @returns {Object} Shop's orders
+
+* @access  Private (Seller only)
+
    */
   getSellerOrders: catchAsync(async (req, res) => {
     const shopId = req.shop._id;
@@ -182,11 +182,11 @@ const OrderController = {
 
   /**
    * Update order status by seller
-   * @route PUT /api/orders/seller/:orderId/status
-   * @access Private (Seller only)
-   * @param {string} orderId - Order ID
-   * @body {string} status - New status
-   * @returns {Object} Updated order
+
+* @access  Private (Seller only)
+
+
+
    */
   updateOrderStatusBySeller: catchAsync(async (req, res) => {
     const shopId = req.shop._id;
@@ -209,9 +209,9 @@ const OrderController = {
 
   /**
    * Get order statistics for seller's shop
-   * @route GET /api/orders/seller/statistics
-   * @access Private (Seller only)
-   * @returns {Object} Shop's order statistics
+
+* @access  Private (Seller only)
+
    */
   getSellerOrderStatistics: catchAsync(async (req, res) => {
     const shopId = req.shop._id;

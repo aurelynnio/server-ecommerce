@@ -6,7 +6,7 @@ const { StatusCodes } = require("http-status-codes");
 const FlashSaleController = {
   /**
    * Get active flash sale products
-   * @route GET /api/flash-sale
+
    */
   getActiveFlashSale: catchAsync(async (req, res) => {
     const { page, limit } = req.query;
@@ -21,7 +21,7 @@ const FlashSaleController = {
 
   /**
    * Get flash sale schedule
-   * @route GET /api/flash-sale/schedule
+
    */
   getSchedule: catchAsync(async (req, res) => {
     const schedule = await flashSaleService.getFlashSaleSchedule();
@@ -30,7 +30,7 @@ const FlashSaleController = {
 
   /**
    * Get flash sale by time slot
-   * @route GET /api/flash-sale/slot/:timeSlot
+
    */
   getBySlot: catchAsync(async (req, res) => {
     const { timeSlot } = req.params;
@@ -41,13 +41,13 @@ const FlashSaleController = {
 
   /**
    * Add product to flash sale (Seller/Admin)
-   * @route POST /api/flash-sale/:productId
+
    */
   addToFlashSale: catchAsync(async (req, res) => {
     const { productId } = req.params;
     const flashSaleData = req.body;
 
-    // Validate required fields
+    
     if (!flashSaleData.salePrice || !flashSaleData.startTime || !flashSaleData.endTime) {
       return sendFail(
         res,
@@ -62,7 +62,7 @@ const FlashSaleController = {
 
   /**
    * Remove product from flash sale (Seller/Admin)
-   * @route DELETE /api/flash-sale/:productId
+
    */
   removeFromFlashSale: catchAsync(async (req, res) => {
     const { productId } = req.params;
@@ -73,7 +73,7 @@ const FlashSaleController = {
 
   /**
    * Get flash sale statistics (Admin)
-   * @route GET /api/flash-sale/stats
+
    */
   getStats: catchAsync(async (req, res) => {
     const stats = await flashSaleService.getFlashSaleStats();

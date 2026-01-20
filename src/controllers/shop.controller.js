@@ -11,27 +11,33 @@ const { StatusCodes } = require("http-status-codes");
 const ShopController = {
   /**
    * Get all shops (Admin)
-   * @route GET /api/shops/admin/all
-   * @access Private (Admin only)
-   * @query {number} page - Page number
-   * @query {number} limit - Items per page
-   * @query {string} status - Filter by status
-   * @query {string} search - Search by name
-   * @returns {Object} Shops with pagination
+
+* @access  Private (Admin only)
+
+
+
+
+
    */
   getAllShops: catchAsync(async (req, res) => {
     const { page, limit, status, search, sort } = req.query;
-    const result = await shopService.getAllShops({ page, limit, status, search, sort });
+    const result = await shopService.getAllShops({
+      page,
+      limit,
+      status,
+      search,
+      sort,
+    });
     return sendSuccess(res, result, "Get all shops success", StatusCodes.OK);
   }),
 
   /**
    * Update shop status (Admin)
-   * @route PUT /api/shops/admin/:shopId/status
-   * @access Private (Admin only)
-   * @param {string} shopId - Shop ID
-   * @body {string} status - New status
-   * @returns {Object} Updated shop
+
+* @access  Private (Admin only)
+
+
+
    */
   updateShopStatus: catchAsync(async (req, res) => {
     const { shopId } = req.params;
@@ -42,15 +48,15 @@ const ShopController = {
 
   /**
    * Register a new shop (become a seller)
-   * @route POST /api/shops/register
-   * @access Private (Authenticated users)
-   * @body {string} name - Shop name
-   * @body {string} [description] - Shop description
-   * @body {string} [logo] - Shop logo URL
-   * @body {string} [address] - Shop address
-   * @body {string} [phone] - Shop phone number
-   * @body {string} [email] - Shop email
-   * @returns {Object} Created shop object
+
+* @access  Private (Authenticated users)
+
+
+
+
+
+
+
    */
   createShop: catchAsync(async (req, res) => {
     const newShop = await shopService.createShop(req.user.userId, req.body);
@@ -58,16 +64,16 @@ const ShopController = {
       res,
       newShop,
       "Shop registered successfully",
-      StatusCodes.CREATED
+      StatusCodes.CREATED,
     );
   }),
 
   /**
    * Get shop information by ID
-   * @route GET /api/shops/:shopId
-   * @access Public
-   * @param {string} shopId - Shop ID
-   * @returns {Object} Shop information
+
+* @access  Public
+
+
    */
   getShopInfo: catchAsync(async (req, res) => {
     const shop = await shopService.getShopInfo(req.params.shopId);
@@ -76,10 +82,10 @@ const ShopController = {
 
   /**
    * Get shop information by slug
-   * @route GET /api/shops/slug/:slug
-   * @access Public
-   * @param {string} slug - Shop slug
-   * @returns {Object} Shop information
+
+* @access  Public
+
+
    */
   getShopBySlug: catchAsync(async (req, res) => {
     const shop = await shopService.getShopBySlug(req.params.slug);
@@ -88,9 +94,9 @@ const ShopController = {
 
   /**
    * Get current user's shop information
-   * @route GET /api/shops/me
-   * @access Private (Seller only)
-   * @returns {Object} Current user's shop information
+
+* @access  Private (Seller only)
+
    */
   getMyShop: catchAsync(async (req, res) => {
     const shop = await shopService.getMyShop(req.user.userId);
@@ -99,16 +105,16 @@ const ShopController = {
 
   /**
    * Update current user's shop information
-   * @route PUT /api/shops
-   * @access Private (Seller only)
-   * @body {string} [name] - Updated shop name
-   * @body {string} [description] - Updated description
-   * @body {string} [logo] - Updated logo URL
-   * @body {string} [address] - Updated address
-   * @body {string} [phone] - Updated phone
-   * @body {string} [email] - Updated email
-   * @body {boolean} [isActive] - Shop active status
-   * @returns {Object} Updated shop object
+
+* @access  Private (Seller only)
+
+
+
+
+
+
+
+
    */
   updateShop: catchAsync(async (req, res) => {
     const updatedShop = await shopService.updateShop(req.user.userId, req.body);
@@ -116,12 +122,28 @@ const ShopController = {
   }),
 
   /**
+   * Get shop statistics for seller dashboard
+
+* @access  Private (Seller or Admin)
+
+   */
+  getShopStatistics: catchAsync(async (req, res) => {
+    const statistics = await shopService.getShopStatistics(req.user.userId);
+    return sendSuccess(
+      res,
+      statistics,
+      "Get shop statistics success",
+      StatusCodes.OK,
+    );
+  }),
+
+  /**
    * Upload shop image (logo or banner)
-   * @route POST /api/shops/upload-image
-   * @access Private (Seller or Admin)
-   * @body {string} type - Image type ("logo" or "banner")
-   * @files {File} image - Image file
-   * @returns {Object} Uploaded image URL
+
+* @access  Private (Seller or Admin)
+
+
+
    */
   uploadImage: catchAsync(async (req, res) => {
     const file = req.file;
@@ -132,21 +154,29 @@ const ShopController = {
     }
 
     if (!type || !["logo", "banner"].includes(type)) {
-      return sendFail(res, "Invalid image type. Must be 'logo' or 'banner'", StatusCodes.BAD_REQUEST);
+      return sendFail(
+        res,
+        "Invalid image type. Must be 'logo' or 'banner'",
+        StatusCodes.BAD_REQUEST,
+      );
     }
 
     const folder = type === "logo" ? "shop-logos" : "shop-banners";
     const result = await uploadImage(file.buffer, folder);
 
     if (!result) {
-      return sendFail(res, "Image upload failed", StatusCodes.INTERNAL_SERVER_ERROR);
+      return sendFail(
+        res,
+        "Image upload failed",
+        StatusCodes.INTERNAL_SERVER_ERROR,
+      );
     }
 
     return sendSuccess(
       res,
       { url: result.secure_url, type },
       "Image uploaded successfully",
-      StatusCodes.OK
+      StatusCodes.OK,
     );
   }),
 };

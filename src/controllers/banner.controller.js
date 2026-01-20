@@ -10,15 +10,15 @@ const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const BannerController = {
   /**
    * Create a new banner
-   * @route POST /api/banners
-   * @access Private (Admin only)
-   * @body {string} title - Banner title
-   * @body {string} [description] - Banner description
-   * @body {string} [link] - Banner click link
-   * @body {number} [order] - Display order
-   * @body {boolean} [isActive] - Active status
-   * @files {File} image - Banner image file
-   * @returns {Object} Created banner object
+
+* @access  Private (Admin only)
+
+
+
+
+
+
+
    */
   createBanner: catchAsync(async (req, res) => {
     const banner = await bannerService.createBanner(req.body, req.file);
@@ -32,11 +32,11 @@ const BannerController = {
 
   /**
    * Get active banners for public display
-   * @route GET /api/banners
-   * @access Public
-   * @query {number} [limit=10] - Maximum banners to return
-   * @query {number} [page=1] - Page number
-   * @returns {Object} Active banners with pagination
+
+* @access  Public
+
+
+
    */
   getBanners: catchAsync(async (req, res) => {
     const { limit, page, ...filter } = req.query;
@@ -51,11 +51,11 @@ const BannerController = {
    
   /**
    * Get all banners for admin management
-   * @route GET /api/banners/admin/all
-   * @access Private (Admin only)
-   * @query {number} [limit=20] - Maximum banners to return
-   * @query {number} [page=1] - Page number
-   * @returns {Object} All banners with pagination
+
+* @access  Private (Admin only)
+
+
+
    */
   getAllBannersAdmin: catchAsync(async (req, res) => {
      const { limit, page, ...filter } = req.query;
@@ -70,10 +70,10 @@ const BannerController = {
 
   /**
    * Get banner by ID
-   * @route GET /api/banners/:id
-   * @access Public
-   * @param {string} id - Banner ID
-   * @returns {Object} Banner object
+
+* @access  Public
+
+
    */
   getBannerById: catchAsync(async (req, res) => {
     const banner = await bannerService.getBannerById(req.params.id);
@@ -86,16 +86,16 @@ const BannerController = {
 
   /**
    * Update a banner
-   * @route PUT /api/banners/:id
-   * @access Private (Admin only)
-   * @param {string} id - Banner ID to update
-   * @body {string} [title] - Updated title
-   * @body {string} [description] - Updated description
-   * @body {string} [link] - Updated link
-   * @body {number} [order] - Updated display order
-   * @body {boolean} [isActive] - Updated active status
-   * @files {File} [image] - New banner image
-   * @returns {Object} Updated banner object
+
+* @access  Private (Admin only)
+
+
+
+
+
+
+
+
    */
   updateBanner: catchAsync(async (req, res) => {
     const banner = await bannerService.updateBanner(req.params.id, req.body, req.file);
@@ -108,10 +108,10 @@ const BannerController = {
 
   /**
    * Delete a banner
-   * @route DELETE /api/banners/:id
-   * @access Private (Admin only)
-   * @param {string} id - Banner ID to delete
-   * @returns {Object} Deletion confirmation
+
+* @access  Private (Admin only)
+
+
    */
   deleteBanner: catchAsync(async (req, res) => {
     const result = await bannerService.deleteBanner(req.params.id);

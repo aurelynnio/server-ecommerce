@@ -8,6 +8,7 @@ const {
 const Payment = require("../models/payment.model");
 const Order = require("../models/order.model");
 const { getIO } = require("../socket/index");
+const logger = require("../utils/logger");
 
 /**
  * Service handling payment operations
@@ -151,7 +152,7 @@ class PaymentService {
           createdAt: order.createdAt,
         });
       } catch (error) {
-        console.error("Socket emit error:", error.message);
+        logger.error("Socket emit error:", { error: error.message });
       }
     }
 

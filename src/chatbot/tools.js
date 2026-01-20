@@ -1,6 +1,7 @@
 const Product = require("../models/product.model");
 const Category = require("../models/category.model");
 const mongoose = require("mongoose");
+const logger = require("../utils/logger");
 
 // Định nghĩa các tools cho AI
 const toolDefinitions = [
@@ -8,7 +9,8 @@ const toolDefinitions = [
     type: "function",
     function: {
       name: "search_products",
-      description: "Tìm kiếm sản phẩm theo từ khóa, danh mục, giá. Dùng khi khách hỏi về sản phẩm.",
+      description:
+        "Tìm kiếm sản phẩm theo từ khóa, danh mục, giá. Dùng khi khách hỏi về sản phẩm.",
       parameters: {
         type: "object",
         properties: {
@@ -16,7 +18,11 @@ const toolDefinitions = [
           category: { type: "string", description: "Tên danh mục" },
           minPrice: { type: "number", description: "Giá tối thiểu" },
           maxPrice: { type: "number", description: "Giá tối đa" },
-          limit: { type: "number", description: "Số lượng kết quả", default: 5 },
+          limit: {
+            type: "number",
+            description: "Số lượng kết quả",
+            default: 5,
+          },
         },
       },
     },
@@ -25,7 +31,8 @@ const toolDefinitions = [
     type: "function",
     function: {
       name: "get_product_details",
-      description: "Lấy chi tiết sản phẩm theo ID hoặc slug. Dùng khi khách muốn biết thêm về sản phẩm cụ thể.",
+      description:
+        "Lấy chi tiết sản phẩm theo ID hoặc slug. Dùng khi khách muốn biết thêm về sản phẩm cụ thể.",
       parameters: {
         type: "object",
         properties: {
@@ -39,7 +46,8 @@ const toolDefinitions = [
     type: "function",
     function: {
       name: "get_categories",
-      description: "Lấy danh sách các danh mục sản phẩm. Dùng khi khách muốn xem có những loại sản phẩm gì.",
+      description:
+        "Lấy danh sách các danh mục sản phẩm. Dùng khi khách muốn xem có những loại sản phẩm gì.",
       parameters: { type: "object", properties: {} },
     },
   },
@@ -47,14 +55,16 @@ const toolDefinitions = [
     type: "function",
     function: {
       name: "get_featured_products",
-      description: "Lấy sản phẩm nổi bật, bán chạy. Dùng khi khách chưa biết mua gì hoặc muốn gợi ý.",
+      description:
+        "Lấy sản phẩm nổi bật, bán chạy. Dùng khi khách chưa biết mua gì hoặc muốn gợi ý.",
       parameters: {
         type: "object",
         properties: {
-          type: { 
-            type: "string", 
+          type: {
+            type: "string",
             enum: ["featured", "newArrivals", "onSale"],
-            description: "Loại sản phẩm: featured (nổi bật), newArrivals (mới), onSale (giảm giá)"
+            description:
+              "Loại sản phẩm: featured (nổi bật), newArrivals (mới), onSale (giảm giá)",
           },
           limit: { type: "number", default: 5 },
         },
@@ -65,7 +75,8 @@ const toolDefinitions = [
     type: "function",
     function: {
       name: "check_product_availability",
-      description: "Kiểm tra tồn kho sản phẩm theo size/màu. Dùng khi khách hỏi còn hàng không.",
+      description:
+        "Kiểm tra tồn kho sản phẩm theo size/màu. Dùng khi khách hỏi còn hàng không.",
       parameters: {
         type: "object",
         properties: {
@@ -78,10 +89,11 @@ const toolDefinitions = [
     },
   },
   {
-    type: "function", 
+    type: "function",
     function: {
       name: "generate_checkout_link",
-      description: "Tạo link checkout cho sản phẩm. LUÔN DÙNG khi khách muốn mua hoặc đã quyết định.",
+      description:
+        "Tạo link checkout cho sản phẩm. LUÔN DÙNG khi khách muốn mua hoặc đã quyết định.",
       parameters: {
         type: "object",
         properties: {
@@ -97,14 +109,15 @@ const toolDefinitions = [
     type: "function",
     function: {
       name: "compare_products",
-      description: "So sánh 2-3 sản phẩm. Dùng khi khách phân vân giữa các lựa chọn.",
+      description:
+        "So sánh 2-3 sản phẩm. Dùng khi khách phân vân giữa các lựa chọn.",
       parameters: {
         type: "object",
         properties: {
-          productIds: { 
-            type: "array", 
+          productIds: {
+            type: "array",
             items: { type: "string" },
-            description: "Danh sách ID sản phẩm cần so sánh" 
+            description: "Danh sách ID sản phẩm cần so sánh",
           },
         },
         required: ["productIds"],
@@ -116,14 +129,18 @@ const toolDefinitions = [
 // Helper function để tìm product theo ID hoặc slug
 async function findProduct(productId) {
   const isValidId = mongoose.Types.ObjectId.isValid(productId);
-  
+
   if (isValidId) {
-    const product = await Product.findById(productId).populate("category", "name").lean();
+    const product = await Product.findById(productId)
+      .populate("category", "name")
+      .lean();
     if (product) return product;
   }
-  
+
   // Tìm theo slug
-  return await Product.findOne({ slug: productId }).populate("category", "name").lean();
+  return await Product.findOne({ slug: productId })
+    .populate("category", "name")
+    .lean();
 }
 
 // Tool handlers với error handling
@@ -131,7 +148,7 @@ const toolHandlers = {
   async search_products({ keyword, category, minPrice, maxPrice, limit = 5 }) {
     try {
       const query = { isActive: true };
-      
+
       if (keyword) {
         query.$or = [
           { name: { $regex: keyword, $options: "i" } },
@@ -139,14 +156,14 @@ const toolHandlers = {
           { brand: { $regex: keyword, $options: "i" } },
         ];
       }
-      
+
       if (category) {
-        const cat = await Category.findOne({ 
-          name: { $regex: category, $options: "i" } 
+        const cat = await Category.findOne({
+          name: { $regex: category, $options: "i" },
         });
         if (cat) query.category = cat._id;
       }
-      
+
       if (minPrice || maxPrice) {
         query["price.currentPrice"] = {};
         if (minPrice) query["price.currentPrice"].$gte = minPrice;
@@ -159,13 +176,15 @@ const toolHandlers = {
         .limit(limit)
         .lean();
 
-      return products.map(p => ({
+      return products.map((p) => ({
         id: p._id,
         name: p.name,
         slug: p.slug,
         price: p.price?.discountPrice || p.price?.currentPrice,
         originalPrice: p.price?.currentPrice,
-        hasDiscount: p.price?.discountPrice && p.price.discountPrice < p.price.currentPrice,
+        hasDiscount:
+          p.price?.discountPrice &&
+          p.price.discountPrice < p.price.currentPrice,
         brand: p.brand,
         category: p.category?.name,
         variantCount: p.variants?.length || 0,
@@ -174,7 +193,7 @@ const toolHandlers = {
         productUrl: `/products/${p.slug}`,
       }));
     } catch (error) {
-      console.error("[Tool] search_products error:", error.message);
+      logger.error("[Tool] search_products error:", { error: error.message });
       return { error: "Không thể tìm kiếm sản phẩm", details: error.message };
     }
   },
@@ -191,10 +210,12 @@ const toolHandlers = {
         description: product.description,
         price: product.price?.discountPrice || product.price?.currentPrice,
         originalPrice: product.price?.currentPrice,
-        hasDiscount: product.price?.discountPrice && product.price.discountPrice < product.price.currentPrice,
+        hasDiscount:
+          product.price?.discountPrice &&
+          product.price.discountPrice < product.price.currentPrice,
         brand: product.brand,
         category: product.category?.name,
-        variants: product.variants?.map(v => ({
+        variants: product.variants?.map((v) => ({
           id: v._id,
           size: v.size,
           color: v.color,
@@ -206,8 +227,13 @@ const toolHandlers = {
         productUrl: `/products/${product.slug}`,
       };
     } catch (error) {
-      console.error("[Tool] get_product_details error:", error.message);
-      return { error: "Không thể lấy thông tin sản phẩm", details: error.message };
+      logger.error("[Tool] get_product_details error:", {
+        error: error.message,
+      });
+      return {
+        error: "Không thể lấy thông tin sản phẩm",
+        details: error.message,
+      };
     }
   },
 
@@ -216,14 +242,14 @@ const toolHandlers = {
       const categories = await Category.find({ isActive: true })
         .select("name slug description")
         .lean();
-      
-      return categories.map(c => ({
+
+      return categories.map((c) => ({
         name: c.name,
         slug: c.slug,
         url: `/categories/${c.slug}`,
       }));
     } catch (error) {
-      console.error("[Tool] get_categories error:", error.message);
+      logger.error("[Tool] get_categories error:", { error: error.message });
       return { error: "Không thể lấy danh mục" };
     }
   },
@@ -231,7 +257,7 @@ const toolHandlers = {
   async get_featured_products({ type = "featured", limit = 5 }) {
     try {
       const query = { isActive: true };
-      
+
       if (type === "featured") query.isFeatured = true;
       else if (type === "newArrivals") query.isNewArrival = true;
       else if (type === "onSale") query.onSale = true;
@@ -243,7 +269,7 @@ const toolHandlers = {
         .limit(limit)
         .lean();
 
-      return products.map(p => ({
+      return products.map((p) => ({
         id: p._id,
         name: p.name,
         slug: p.slug,
@@ -255,7 +281,9 @@ const toolHandlers = {
         productUrl: `/products/${p.slug}`,
       }));
     } catch (error) {
-      console.error("[Tool] get_featured_products error:", error.message);
+      logger.error("[Tool] get_featured_products error:", {
+        error: error.message,
+      });
       return { error: "Không thể lấy sản phẩm nổi bật" };
     }
   },
@@ -266,17 +294,23 @@ const toolHandlers = {
       if (!product) return { error: "Không tìm thấy sản phẩm" };
 
       let variants = product.variants || [];
-      
-      if (size) variants = variants.filter(v => v.size?.toLowerCase() === size.toLowerCase());
-      if (color) variants = variants.filter(v => v.color?.toLowerCase() === color.toLowerCase());
 
-      const available = variants.filter(v => v.stock > 0);
-      
+      if (size)
+        variants = variants.filter(
+          (v) => v.size?.toLowerCase() === size.toLowerCase(),
+        );
+      if (color)
+        variants = variants.filter(
+          (v) => v.color?.toLowerCase() === color.toLowerCase(),
+        );
+
+      const available = variants.filter((v) => v.stock > 0);
+
       return {
         productName: product.name,
         productSlug: product.slug,
         available: available.length > 0,
-        variants: available.map(v => ({
+        variants: available.map((v) => ({
           id: v._id,
           size: v.size,
           color: v.color,
@@ -284,14 +318,20 @@ const toolHandlers = {
           price: v.price?.discountPrice || v.price?.currentPrice,
         })),
         totalStock: available.reduce((sum, v) => sum + v.stock, 0),
-        message: available.length > 0 
-          ? `Còn ${available.reduce((sum, v) => sum + v.stock, 0)} sản phẩm` 
-          : "Hết hàng",
-        checkoutUrl: available.length > 0 ? `/checkout?product=${product._id}&variant=${available[0]._id}` : null,
+        message:
+          available.length > 0
+            ? `Còn ${available.reduce((sum, v) => sum + v.stock, 0)} sản phẩm`
+            : "Hết hàng",
+        checkoutUrl:
+          available.length > 0
+            ? `/checkout?product=${product._id}&variant=${available[0]._id}`
+            : null,
         productUrl: `/products/${product.slug}`,
       };
     } catch (error) {
-      console.error("[Tool] check_product_availability error:", error.message);
+      logger.error("[Tool] check_product_availability error:", {
+        error: error.message,
+      });
       return { error: "Không thể kiểm tra tồn kho" };
     }
   },
@@ -304,25 +344,32 @@ const toolHandlers = {
       let checkoutUrl = `/checkout?product=${product._id}&quantity=${quantity}`;
       if (variantId) checkoutUrl += `&variant=${variantId}`;
 
-      const variant = variantId 
-        ? product.variants?.find(v => v._id.toString() === variantId)
+      const variant = variantId
+        ? product.variants?.find((v) => v._id.toString() === variantId)
         : product.variants?.[0];
 
       return {
         checkoutUrl,
-        addToCartUrl: `/cart/add?product=${product._id}${variantId ? `&variant=${variantId}` : ''}&quantity=${quantity}`,
+        addToCartUrl: `/cart/add?product=${product._id}${variantId ? `&variant=${variantId}` : ""}&quantity=${quantity}`,
         productUrl: `/products/${product.slug}`,
         product: {
           name: product.name,
           slug: product.slug,
-          price: variant?.price?.discountPrice || variant?.price?.currentPrice || product.price?.currentPrice,
-          variant: variant ? { size: variant.size, color: variant.color } : null,
+          price:
+            variant?.price?.discountPrice ||
+            variant?.price?.currentPrice ||
+            product.price?.currentPrice,
+          variant: variant
+            ? { size: variant.size, color: variant.color }
+            : null,
           quantity,
         },
         message: "Nhấn vào link để tiến hành thanh toán ngay!",
       };
     } catch (error) {
-      console.error("[Tool] generate_checkout_link error:", error.message);
+      logger.error("[Tool] generate_checkout_link error:", {
+        error: error.message,
+      });
       return { error: "Không thể tạo link thanh toán" };
     }
   },
@@ -330,13 +377,13 @@ const toolHandlers = {
   async compare_products({ productIds }) {
     try {
       const products = [];
-      
+
       for (const id of productIds) {
         const product = await findProduct(id);
         if (product) products.push(product);
       }
 
-      return products.map(p => ({
+      return products.map((p) => ({
         id: p._id,
         name: p.name,
         slug: p.slug,
@@ -345,13 +392,13 @@ const toolHandlers = {
         brand: p.brand,
         category: p.category?.name,
         variantCount: p.variants?.length || 0,
-        sizes: [...new Set(p.variants?.map(v => v.size).filter(Boolean))],
-        colors: [...new Set(p.variants?.map(v => v.color).filter(Boolean))],
+        sizes: [...new Set(p.variants?.map((v) => v.size).filter(Boolean))],
+        colors: [...new Set(p.variants?.map((v) => v.color).filter(Boolean))],
         checkoutUrl: `/checkout?product=${p._id}`,
         productUrl: `/products/${p.slug}`,
       }));
     } catch (error) {
-      console.error("[Tool] compare_products error:", error.message);
+      logger.error("[Tool] compare_products error:", { error: error.message });
       return { error: "Không thể so sánh sản phẩm" };
     }
   },

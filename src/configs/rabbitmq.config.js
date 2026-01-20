@@ -1,5 +1,6 @@
 const amqp = require("amqplib");
 const dotenv = require("dotenv");
+const logger = require("../utils/logger");
 
 dotenv.config();
 
@@ -13,20 +14,20 @@ const connectRabbitMQ = async () => {
     connection = await amqp.connect(amqpUrl);
     channel = await connection.createChannel();
 
-    console.log("RabbitMQ connected successfully");
+    logger.info("RabbitMQ connected successfully");
 
     connection.on("error", (err) => {
-      console.error("RabbitMQ connection error:", err);
+      logger.error("RabbitMQ connection error:", { error: err.message });
     });
 
     connection.on("close", () => {
-      console.log("RabbitMQ connection closed, reconnecting...");
+      logger.info("RabbitMQ connection closed, reconnecting...");
       setTimeout(connectRabbitMQ, 5000);
     });
 
     return { connection, channel };
   } catch (error) {
-    console.error("RabbitMQ connection failed:", error);
+    logger.error("RabbitMQ connection failed:", { error: error.message });
     setTimeout(connectRabbitMQ, 5000);
   }
 };

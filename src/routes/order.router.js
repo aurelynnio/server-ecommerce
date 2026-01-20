@@ -18,14 +18,8 @@ const {
 } = require("../validations/order.validator");
 
 /**
- * User Routes (Authenticated)
- */
-
-/**
- * @route   POST /api/orders
  * @desc    Create a new order from cart items
- * @access  Private (Authenticated users)
- * @body    { cartItemIds, shippingAddress, paymentMethod, shopVouchers?, platformVoucher?, note? }
+ * @access  Private
  */
 router.post(
   "/",
@@ -35,10 +29,8 @@ router.post(
 );
 
 /**
- * @route   GET /api/orders
  * @desc    Get current user's orders with pagination
- * @access  Private (Authenticated users)
- * @query   page, limit, status, paymentStatus, paymentMethod
+ * @access  Private
  */
 router.get(
   "/",
@@ -48,9 +40,8 @@ router.get(
 );
 
 /**
- * @route   GET /api/orders/:orderId
  * @desc    Get order details by ID
- * @access  Private (Authenticated users - own orders, Admin - all orders)
+ * @access  Private
  */
 router.get(
   "/:orderId",
@@ -60,9 +51,8 @@ router.get(
 );
 
 /**
- * @route   DELETE /api/orders/:orderId/cancel
  * @desc    Cancel an order
- * @access  Private (Authenticated users - own orders, Admin - all orders)
+ * @access  Private
  */
 router.delete(
   "/:orderId/cancel",
@@ -72,14 +62,8 @@ router.delete(
 );
 
 /**
- * Admin Routes
- */
-
-/**
- * @route   GET /api/orders/all/list
  * @desc    Get all orders with filters (Admin)
- * @access  Private (Admin only)
- * @query   page, limit, status, paymentStatus, paymentMethod, userId, search, startDate, endDate
+ * @access  Private (Admin)
  */
 router.get(
   "/all/list",
@@ -90,14 +74,8 @@ router.get(
 );
 
 /**
- * Seller Routes
- */
-
-/**
- * @route   GET /api/orders/seller/list
  * @desc    Get orders for seller's shop
- * @access  Private (Seller only)
- * @query   page, limit, status
+ * @access  Private (Seller)
  */
 router.get(
   "/seller/list",
@@ -109,9 +87,8 @@ router.get(
 );
 
 /**
- * @route   GET /api/orders/seller/statistics
  * @desc    Get order statistics for seller's shop
- * @access  Private (Seller only)
+ * @access  Private (Seller)
  */
 router.get(
   "/seller/statistics",
@@ -122,10 +99,8 @@ router.get(
 );
 
 /**
- * @route   PUT /api/orders/seller/:orderId/status
  * @desc    Update order status by seller
- * @access  Private (Seller only)
- * @body    { status }
+ * @access  Private (Seller)
  */
 router.put(
   "/seller/:orderId/status",
@@ -141,10 +116,8 @@ router.put(
 );
 
 /**
- * @route   PUT /api/orders/:orderId/status
  * @desc    Update order status
- * @access  Private (Admin only)
- * @body    { status }
+ * @access  Private (Admin)
  */
 router.put(
   "/:orderId/status",
@@ -158,9 +131,8 @@ router.put(
 );
 
 /**
- * @route   GET /api/orders/statistics/overview
  * @desc    Get order statistics overview
- * @access  Private (Admin only)
+ * @access  Private (Admin)
  */
 router.get(
   "/statistics/overview",

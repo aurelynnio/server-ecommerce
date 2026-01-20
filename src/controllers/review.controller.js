@@ -10,13 +10,13 @@ const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const ReviewController = {
   /**
    * Create a new review for a product
-   * @route POST /api/reviews
-   * @access Private (Authenticated users - must have purchased product)
-   * @body {string} productId - Product ID to review
-   * @body {number} rating - Rating (1-5)
-   * @body {string} comment - Review comment
-   * @body {Array} [images] - Review images
-   * @returns {Object} Created review object
+
+* @access  Private (Authenticated users - must have purchased product)
+
+
+
+
+
    */
   createReview: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -32,14 +32,14 @@ const ReviewController = {
 
   /**
    * Get all reviews for a specific product
-   * @route GET /api/reviews/product/:productId
-   * @access Public
-   * @param {string} productId - Product ID
-   * @query {number} [page=1] - Page number
-   * @query {number} [limit=10] - Items per page
-   * @query {number} [rating] - Filter by rating
-   * @query {string} [sort] - Sort order
-   * @returns {Object} Reviews with pagination metadata
+
+* @access  Public
+
+
+
+
+
+
    */
   getProductReviews: catchAsync(async (req, res) => {
     const result = await reviewService.getProductReviews(
@@ -57,11 +57,11 @@ const ReviewController = {
 
   /**
    * Get current user's reviews
-   * @route GET /api/reviews/user/me
-   * @access Private (Authenticated users)
-   * @query {number} [page=1] - Page number
-   * @query {number} [limit=10] - Items per page
-   * @returns {Object} User's reviews with pagination
+
+* @access  Private (Authenticated users)
+
+
+
    */
   getUserReviews: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -77,10 +77,10 @@ const ReviewController = {
 
   /**
    * Get a single review by ID
-   * @route GET /api/reviews/:reviewId
-   * @access Public
-   * @param {string} reviewId - Review ID
-   * @returns {Object} Review object
+
+* @access  Public
+
+
    */
   getReviewById: catchAsync(async (req, res) => {
     const review = await reviewService.getReviewById(req.params.reviewId);
@@ -95,13 +95,13 @@ const ReviewController = {
 
   /**
    * Update an existing review
-   * @route PUT /api/reviews/:reviewId
-   * @access Private (Owner only)
-   * @param {string} reviewId - Review ID to update
-   * @body {number} [rating] - Updated rating
-   * @body {string} [comment] - Updated comment
-   * @body {Array} [images] - Updated images
-   * @returns {Object} Updated review object
+
+* @access  Private (Owner only)
+
+
+
+
+
    */
   updateReview: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -121,10 +121,10 @@ const ReviewController = {
 
   /**
    * Delete a review
-   * @route DELETE /api/reviews/:reviewId
-   * @access Private (Owner or Admin)
-   * @param {string} reviewId - Review ID to delete
-   * @returns {Object} Deletion confirmation
+
+* @access  Private (Owner or Admin)
+
+
    */
   deleteReview: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -140,10 +140,10 @@ const ReviewController = {
 
   /**
    * Check if current user can review a product
-   * @route GET /api/reviews/check/:productId
-   * @access Private (Authenticated users)
-   * @param {string} productId - Product ID to check
-   * @returns {Object} Eligibility status { canReview: boolean, reason?: string }
+
+* @access  Private (Authenticated users)
+
+
    */
   canUserReview: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -159,9 +159,9 @@ const ReviewController = {
 
   /**
    * Get review statistics overview
-   * @route GET /api/reviews/statistics/overview
-   * @access Private (Admin only)
-   * @returns {Object} Review statistics (total, average rating, distribution, etc.)
+
+* @access  Private (Admin only)
+
    */
   getReviewStatistics: catchAsync(async (req, res) => {
     const stats = await reviewService.getReviewStatistics();

@@ -9,7 +9,7 @@ const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const NotificationController = {
   /**
    * Create a new notification
-   * @route POST /api/notifications
+
    */
   createNotification: catchAsync(async (req, res) => {
     const notification = await notificationService.createNotification({
@@ -27,7 +27,7 @@ const NotificationController = {
 
   /**
    * Get list of notifications for current user
-   * @route GET /api/notifications
+
    */
   getListNotification: catchAsync(async (req, res) => {
     const result = await notificationService.getListNotification(
@@ -55,7 +55,7 @@ const NotificationController = {
 
   /**
    * Mark all notifications as read
-   * @route PATCH /api/notifications/read-all
+
    */
   markReadAll: catchAsync(async (req, res) => {
     await notificationService.markReadAll(req.user.userId);
@@ -70,7 +70,7 @@ const NotificationController = {
 
   /**
    * Delete all notifications for current user
-   * @route DELETE /api/notifications
+
    */
   cleanNotification: catchAsync(async (req, res) => {
     await notificationService.cleanNotification(req.user.userId);
@@ -85,7 +85,7 @@ const NotificationController = {
 
   /**
    * Count unread notifications
-   * @route GET /api/notifications/count
+
    */
   countUnread: catchAsync(async (req, res) => {
     const count = await notificationService.countUnread(req.user.userId);
@@ -100,7 +100,7 @@ const NotificationController = {
 
   /**
    * Get notification by ID
-   * @route GET /api/notifications/:id
+
    */
   getNotificationById: catchAsync(async (req, res) => {
     const { id } = req.params;
@@ -118,7 +118,7 @@ const NotificationController = {
 
   /**
    * Update notification by ID
-   * @route PATCH /api/notifications/:id
+
    */
   updateNotification: catchAsync(async (req, res) => {
     const { id } = req.params;

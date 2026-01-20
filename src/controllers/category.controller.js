@@ -10,13 +10,13 @@ const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const CategoryController = {
   /**
    * Create a new category (Admin only)
-   * @route POST /api/categories
-   * @access Private (Admin)
-   * @body {string} name - Category name
-   * @body {string} [slug] - Category slug (auto-generated if not provided)
-   * @body {string} [description] - Category description
-   * @body {string} [parentCategory] - Parent category ID
-   * @returns {Object} Created category
+
+* @access  Private (Admin)
+
+
+
+
+
    */
   createCategory: catchAsync(async (req, res) => {
     const category = await categoryService.createCategory(req.body);
@@ -31,13 +31,13 @@ const CategoryController = {
 
   /**
    * Get all categories with pagination (Admin)
-   * @route GET /api/categories/admin
-   * @access Private (Admin)
-   * @query {number} page - Page number
-   * @query {number} limit - Items per page
-   * @query {boolean} [isActive] - Filter by active status
-   * @query {string} [parentCategory] - Filter by parent category
-   * @returns {Object} Categories with pagination
+
+* @access  Private (Admin)
+
+
+
+
+
    */
   getAllCategories: catchAsync(async (req, res) => {
     const result = await categoryService.getAllCategories(req.query);
@@ -52,11 +52,11 @@ const CategoryController = {
 
   /**
    * Get active categories for public display
-   * @route GET /api/categories
-   * @access Public
-   * @query {number} [page=1] - Page number
-   * @query {number} [limit=10] - Items per page
-   * @returns {Object} Active categories with pagination
+
+* @access  Public
+
+
+
    */
   getActiveCategories: catchAsync(async (req, res) => {
     const result = await categoryService.getActiveCategories(req.query);
@@ -71,9 +71,9 @@ const CategoryController = {
 
   /**
    * Get hierarchical category tree
-   * @route GET /api/categories/tree
-   * @access Public
-   * @returns {Array} Category tree with nested subcategories
+
+* @access  Public
+
    */
   getCategoryTree: catchAsync(async (req, res) => {
     const tree = await categoryService.getCategoryTree();
@@ -88,10 +88,10 @@ const CategoryController = {
 
   /**
    * Get category by ID
-   * @route GET /api/categories/:categoryId
-   * @access Public
-   * @param {string} categoryId - Category ID
-   * @returns {Object} Category object
+
+* @access  Public
+
+
    */
   getCategoryById: catchAsync(async (req, res) => {
     const category = await categoryService.getCategoryById(req.params.categoryId);
@@ -106,10 +106,10 @@ const CategoryController = {
 
   /**
    * Get category by slug
-   * @route GET /api/categories/slug/:slug
-   * @access Public
-   * @param {string} slug - Category slug
-   * @returns {Object} Category object
+
+* @access  Public
+
+
    */
   getCategoryBySlug: catchAsync(async (req, res) => {
     const category = await categoryService.getCategoryBySlug(req.params.slug);
@@ -124,10 +124,10 @@ const CategoryController = {
 
   /**
    * Get category with its subcategories
-   * @route GET /api/categories/:categoryId/subcategories
-   * @access Public
-   * @param {string} categoryId - Category ID
-   * @returns {Object} Category with subcategories array
+
+* @access  Public
+
+
    */
   getCategoryWithSubcategories: catchAsync(async (req, res) => {
     const result = await categoryService.getCategoryWithSubcategories(
@@ -144,11 +144,11 @@ const CategoryController = {
 
   /**
    * Update a category (Admin only)
-   * @route PUT /api/categories/:categoryId
-   * @access Private (Admin)
-   * @param {string} categoryId - Category ID
-   * @body {Object} updateData - Fields to update
-   * @returns {Object} Updated category
+
+* @access  Private (Admin)
+
+
+
    */
   updateCategory: catchAsync(async (req, res) => {
     const category = await categoryService.updateCategory(
@@ -166,10 +166,10 @@ const CategoryController = {
 
   /**
    * Delete a category (Admin only)
-   * @route DELETE /api/categories/:categoryId
-   * @access Private (Admin)
-   * @param {string} categoryId - Category ID
-   * @returns {Object} Deletion confirmation
+
+* @access  Private (Admin)
+
+
    */
   deleteCategory: catchAsync(async (req, res) => {
     const result = await categoryService.deleteCategory(req.params.categoryId);
@@ -179,9 +179,9 @@ const CategoryController = {
 
   /**
    * Get category statistics (Admin only)
-   * @route GET /api/categories/statistics
-   * @access Private (Admin)
-   * @returns {Object} Category statistics
+
+* @access  Private (Admin)
+
    */
   getCategoryStatistics: catchAsync(async (req, res) => {
     const stats = await categoryService.getCategoryStatistics();

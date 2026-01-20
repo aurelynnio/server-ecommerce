@@ -9,7 +9,7 @@ const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const CartController = {
   /**
    * Get user's shopping cart
-   * @route GET /api/cart
+
    */
   getCart: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -25,7 +25,7 @@ const CartController = {
 
   /**
    * Add item to cart
-   * @route POST /api/cart
+
    */
   addToCart: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -41,7 +41,7 @@ const CartController = {
 
   /**
    * Update cart item quantity
-   * @route PUT /api/cart/:itemId
+
    */
   updateCartItem: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -61,7 +61,7 @@ const CartController = {
 
   /**
    * Remove item from cart
-   * @route DELETE /api/cart/:itemId
+
    */
   removeCartItem: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -79,7 +79,7 @@ const CartController = {
 
   /**
    * Clear all items from cart
-   * @route DELETE /api/cart
+
    */
   clearCart: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -90,7 +90,7 @@ const CartController = {
 
   /**
    * Get cart item count
-   * @route GET /api/cart/count
+
    */
   getCartItemCount: catchAsync(async (req, res) => {
     const userId = req.user.userId;

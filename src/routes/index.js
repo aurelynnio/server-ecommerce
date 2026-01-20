@@ -11,19 +11,18 @@ const paymentRouter = require("./payment.router");
 const bannerRouter = require("./banner.router");
 const chatbotRouter = require("./chatbot.router");
 
-// New Routers
 const shopRouter = require("./shop.router");
 const shippingRouter = require("./shipping.router");
 const voucherRouter = require("./voucher.router");
 const chatRouter = require("./chat.router");
 const shopCategoryRouter = require("./shop.category.router");
 
-// Additional Feature Routers
 const wishlistRouter = require("./wishlist.router");
 const searchRouter = require("./search.router");
 const flashSaleRouter = require("./flash-sale.router");
 const recommendationRouter = require("./recommendation.router");
 const permissionRouter = require("./permission.router");
+const settingsRouter = require("./settings.router");
 
 const initRoutes = (app) => {
   app.use("/api/users", userRouter);
@@ -39,19 +38,18 @@ const initRoutes = (app) => {
   app.use("/api/banners", bannerRouter);
   app.use("/api/chatbot", chatbotRouter);
 
-  // New Routes
   app.use("/api/shops", shopRouter);
   app.use("/api/shipping", shippingRouter);
   app.use("/api/vouchers", voucherRouter);
   app.use("/api/chat", chatRouter);
   app.use("/api/shop-categories", shopCategoryRouter);
 
-  // Additional Feature Routes
   app.use("/api/wishlist", wishlistRouter);
   app.use("/api/search", searchRouter);
   app.use("/api/flash-sale", flashSaleRouter);
   app.use("/api/recommendations", recommendationRouter);
   app.use("/api/permissions", permissionRouter);
+  app.use("/api/settings", settingsRouter);
 };
 
 module.exports = initRoutes;

@@ -8,6 +8,7 @@ const Review = require("../models/review.model");
 const { multiUpload } = require("../configs/cloudinary");
 const { getIO } = require("../socket/index");
 const cacheService = require("./cache.service");
+const logger = require("../utils/logger");
 
 /**
  * Service handling product operations
@@ -53,7 +54,8 @@ class ProductService {
     if (cachedData) return cachedData;
 
     // Build query - if status is "all", don't filter by status (for seller dashboard)
-    const query = status === "all" ? { status: { $ne: "deleted" } } : { status };
+    const query =
+      status === "all" ? { status: { $ne: "deleted" } } : { status };
 
     // Filter by category
     if (category) {
@@ -209,9 +211,13 @@ class ProductService {
    * @returns {string} Generated SKU
    */
   generateSku(slug, color, index) {
-    const slugPart = slug ? slug.substring(0, 20).toUpperCase().replace(/-/g, '') : 'PROD';
-    const colorPart = color ? color.substring(0, 10).toUpperCase().replace(/\s+/g, '') : 'DEFAULT';
-    return `${slugPart}-${colorPart}-${String(index + 1).padStart(3, '0')}`;
+    const slugPart = slug
+      ? slug.substring(0, 20).toUpperCase().replace(/-/g, "")
+      : "PROD";
+    const colorPart = color
+      ? color.substring(0, 10).toUpperCase().replace(/\s+/g, "")
+      : "DEFAULT";
+    return `${slugPart}-${colorPart}-${String(index + 1).padStart(3, "0")}`;
   }
 
   /**
@@ -230,27 +236,31 @@ class ProductService {
 
     // Generate slug if not provided
     if (!productData.slug && productData.name) {
-      const slugify = require('slugify');
-      productData.slug = slugify(productData.name, { lower: true, strict: true, locale: 'vi' });
+      const slugify = require("slugify");
+      productData.slug = slugify(productData.name, {
+        lower: true,
+        strict: true,
+        locale: "vi",
+      });
     }
 
     // Clean up and process variants
     if (productData.variants && Array.isArray(productData.variants)) {
       productData.variants = productData.variants.map((variant, index) => {
         const { _id, attributes, ...rest } = variant;
-        
+
         // Extract color from old attributes structure if present
-        const color = variant.color || attributes?.color || '';
-        
+        const color = variant.color || attributes?.color || "";
+
         // Auto-generate SKU
         const sku = this.generateSku(productData.slug, color, index);
-        
+
         return {
           ...rest,
           color,
           sku,
           // Only keep _id if it's a valid ObjectId (24 hex chars)
-          ...(_id && /^[0-9a-fA-F]{24}$/.test(_id) ? { _id } : {})
+          ...(_id && /^[0-9a-fA-F]{24}$/.test(_id) ? { _id } : {}),
         };
       });
     }
@@ -265,8 +275,11 @@ class ProductService {
 
     // Handle image files
     if (files && files.length > 0) {
-      console.log("[ProductService] Processing files:", files.map(f => ({ fieldname: f.fieldname, size: f.size })));
-      
+      logger.info(
+        "[ProductService] Processing files:",
+        files.map((f) => ({ fieldname: f.fieldname, size: f.size })),
+      );
+
       const filesToUpload = files.map((file) => ({
         buffer: file.buffer,
         fieldname: file.fieldname,
@@ -274,7 +287,7 @@ class ProductService {
 
       const uploadResults = await multiUpload(
         filesToUpload.map((f) => f.buffer),
-        "products"
+        "products",
       );
 
       const uploads = uploadResults.map((result, index) => ({
@@ -282,7 +295,13 @@ class ProductService {
         fieldname: filesToUpload[index].fieldname,
       }));
 
-      console.log("[ProductService] Upload results:", uploads.map(u => ({ fieldname: u.fieldname, url: u.secure_url?.substring(0, 50) + "..." })));
+      logger.info(
+        "[ProductService] Upload results:",
+        uploads.map((u) => ({
+          fieldname: u.fieldname,
+          url: u.secure_url?.substring(0, 50) + "...",
+        })),
+      );
 
       // 1. Variant Images (variantImages_0, variantImages_1, etc.)
       // Product images are stored in variants[].images, not product.images
@@ -298,7 +317,7 @@ class ProductService {
           }
         });
 
-        console.log("[ProductService] Variant image map:", variantImageMap);
+        logger.info("[ProductService] Variant image map:", variantImageMap);
 
         // Assign images to variants
         productData.variants = productData.variants.map((variant, idx) => ({
@@ -306,11 +325,16 @@ class ProductService {
           images: [...(variant.images || []), ...(variantImageMap[idx] || [])],
         }));
 
-        console.log("[ProductService] Variants after image assignment:", productData.variants.map(v => ({ name: v.name, images: v.images })));
+        logger.info(
+          "[ProductService] Variants after image assignment:",
+          productData.variants.map((v) => ({ name: v.name, images: v.images })),
+        );
       }
 
       // 2. Description Images
-      const descImages = uploads.filter((u) => u.fieldname === "descriptionImages");
+      const descImages = uploads.filter(
+        (u) => u.fieldname === "descriptionImages",
+      );
       if (descImages.length > 0) {
         productData.descriptionImages = descImages.map((u) => u.secure_url);
       }
@@ -375,13 +399,19 @@ class ProductService {
       }
 
       // Handle description images update
-      if (updateData.existingDescriptionImages !== undefined || newDescriptionImages.length > 0) {
-        const existingImages = updateData.existingDescriptionImages 
-          ? (Array.isArray(updateData.existingDescriptionImages) 
-              ? updateData.existingDescriptionImages 
-              : JSON.parse(updateData.existingDescriptionImages))
+      if (
+        updateData.existingDescriptionImages !== undefined ||
+        newDescriptionImages.length > 0
+      ) {
+        const existingImages = updateData.existingDescriptionImages
+          ? Array.isArray(updateData.existingDescriptionImages)
+            ? updateData.existingDescriptionImages
+            : JSON.parse(updateData.existingDescriptionImages)
           : [];
-        updateData.descriptionImages = [...existingImages, ...newDescriptionImages];
+        updateData.descriptionImages = [
+          ...existingImages,
+          ...newDescriptionImages,
+        ];
         delete updateData.existingDescriptionImages;
       }
 
@@ -390,10 +420,11 @@ class ProductService {
         // Parse existing variant images if provided
         let existingVariantImagesMap = {};
         if (updateData.existingVariantImages) {
-          const mapping = typeof updateData.existingVariantImages === 'string' 
-            ? JSON.parse(updateData.existingVariantImages) 
-            : updateData.existingVariantImages;
-          mapping.forEach(item => {
+          const mapping =
+            typeof updateData.existingVariantImages === "string"
+              ? JSON.parse(updateData.existingVariantImages)
+              : updateData.existingVariantImages;
+          mapping.forEach((item) => {
             existingVariantImagesMap[item.variantIndex] = item.existing || [];
           });
         }
@@ -401,14 +432,19 @@ class ProductService {
 
         updateData.variants = updateData.variants.map((variant, index) => {
           const variantData = { ...variant };
-          
+
           // Remove temp _id - MongoDB will generate real ObjectId
-          if (variantData._id && (typeof variantData._id === 'string' && variantData._id.startsWith("temp-"))) {
+          if (
+            variantData._id &&
+            typeof variantData._id === "string" &&
+            variantData._id.startsWith("temp-")
+          ) {
             delete variantData._id;
           }
 
           // Combine existing + new uploaded images
-          const existingImages = existingVariantImagesMap[index] || variantData.images || [];
+          const existingImages =
+            existingVariantImagesMap[index] || variantData.images || [];
           const newImages = variantUploadMap[index] || [];
           variantData.images = [...existingImages, ...newImages];
 
@@ -435,7 +471,7 @@ class ProductService {
 
       return product;
     } catch (error) {
-      console.error("Error in updateProduct service:", error);
+      logger.error("Error in updateProduct service:", error);
       throw error;
     }
   }
@@ -450,7 +486,7 @@ class ProductService {
     const product = await Product.findByIdAndUpdate(
       id,
       { status: "deleted" },
-      { new: true }
+      { new: true },
     );
 
     if (!product) {
@@ -510,7 +546,7 @@ class ProductService {
     const product = await Product.findByIdAndUpdate(
       productId,
       { $push: { variants: allowedVariantData } },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!product) {
@@ -537,7 +573,7 @@ class ProductService {
     const product = await Product.findOneAndUpdate(
       { _id: productId, "variants._id": variantId },
       { $set: { "variants.$": allowedVariantData } },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!product) {
@@ -558,7 +594,7 @@ class ProductService {
     const product = await Product.findByIdAndUpdate(
       productId,
       { $pull: { variants: { _id: variantId } } },
-      { new: true }
+      { new: true },
     );
 
     if (!product) {
@@ -768,11 +804,11 @@ class ProductService {
       status: "published",
       $or: [
         { "price.discountPrice": { $ne: null, $gt: 0 } },
-        { 
+        {
           "flashSale.isActive": true,
           "flashSale.startTime": { $lte: now },
-          "flashSale.endTime": { $gt: now }
-        }
+          "flashSale.endTime": { $gt: now },
+        },
       ],
     };
 
@@ -814,7 +850,7 @@ class ProductService {
       .lean();
 
     // Map products to include first variant image
-    const productsWithImages = products.map(product => ({
+    const productsWithImages = products.map((product) => ({
       ...product,
       image: product.variants?.[0]?.images?.[0] || null,
     }));
@@ -876,7 +912,9 @@ class ProductService {
     });
 
     if (!existingProduct) {
-      throw new Error("Product not found or you don't have permission to update it");
+      throw new Error(
+        "Product not found or you don't have permission to update it",
+      );
     }
 
     // Remove fields that seller shouldn't modify
@@ -902,16 +940,18 @@ class ProductService {
     // Verify ownership and soft delete
     const product = await Product.findOneAndUpdate(
       { _id: productId, shop: shopId },
-      { 
+      {
         isActive: false,
         deletedAt: new Date(),
-        deletedBy: 'seller'
+        deletedBy: "seller",
       },
-      { new: true }
+      { new: true },
     );
 
     if (!product) {
-      throw new Error("Product not found or you don't have permission to delete it");
+      throw new Error(
+        "Product not found or you don't have permission to delete it",
+      );
     }
 
     // Invalidate cache

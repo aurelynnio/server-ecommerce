@@ -5,7 +5,7 @@ const { sendSuccess } = require("../shared/res/formatResponse");
 const RecommendationController = {
   /**
    * Get personalized recommendations ("Guess You Like")
-   * @route GET /api/recommendations/for-you
+
    */
   getForYou: catchAsync(async (req, res) => {
     const userId = req.user?._id;
@@ -28,7 +28,7 @@ const RecommendationController = {
 
   /**
    * Get frequently bought together products
-   * @route GET /api/recommendations/fbt/:productId
+
    */
   getFrequentlyBoughtTogether: catchAsync(async (req, res) => {
     const { productId } = req.params;
@@ -44,7 +44,7 @@ const RecommendationController = {
 
   /**
    * Get similar products
-   * @route GET /api/recommendations/similar/:productId
+
    */
   getSimilar: catchAsync(async (req, res) => {
     const { productId } = req.params;
@@ -60,7 +60,7 @@ const RecommendationController = {
 
   /**
    * Get recently viewed products
-   * @route GET /api/recommendations/recently-viewed
+
    */
   getRecentlyViewed: catchAsync(async (req, res) => {
     const userId = req.user?._id;
@@ -80,7 +80,7 @@ const RecommendationController = {
 
   /**
    * Track product view
-   * @route POST /api/recommendations/track-view/:productId
+
    */
   trackView: catchAsync(async (req, res) => {
     const userId = req.user?._id;
@@ -95,7 +95,7 @@ const RecommendationController = {
 
   /**
    * Get category recommendations
-   * @route GET /api/recommendations/category/:categoryId
+
    */
   getCategoryRecommendations: catchAsync(async (req, res) => {
     const { categoryId } = req.params;
@@ -111,7 +111,7 @@ const RecommendationController = {
 
   /**
    * Get homepage recommendations
-   * @route GET /api/recommendations/homepage
+
    */
   getHomepage: catchAsync(async (req, res) => {
     const userId = req.user?._id;

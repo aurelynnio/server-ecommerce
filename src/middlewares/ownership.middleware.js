@@ -3,6 +3,7 @@ const { sendFail } = require("../shared/res/formatResponse");
 const Shop = require("../models/shop.model");
 const Product = require("../models/product.model");
 const Order = require("../models/order.model");
+const logger = require("../utils/logger");
 
 /**
  * Verify that the authenticated user owns a shop
@@ -11,18 +12,18 @@ const Order = require("../models/order.model");
 const verifyShopOwnership = async (req, res, next) => {
   try {
     const userId = req.user?.userId || req.user?._id;
-    
+
     if (!userId) {
       return sendFail(res, "Authentication required", StatusCodes.UNAUTHORIZED);
     }
 
     const shop = await Shop.findOne({ owner: userId });
-    
+
     if (!shop) {
       return sendFail(
         res,
         "You don't have a shop. Please register a shop first.",
-        StatusCodes.FORBIDDEN
+        StatusCodes.FORBIDDEN,
       );
     }
 
@@ -30,18 +31,18 @@ const verifyShopOwnership = async (req, res, next) => {
       return sendFail(
         res,
         "Your shop has been banned. Please contact support.",
-        StatusCodes.FORBIDDEN
+        StatusCodes.FORBIDDEN,
       );
     }
 
     req.shop = shop;
     next();
   } catch (error) {
-    console.error("verifyShopOwnership error:", error);
+    logger.error("verifyShopOwnership error:", { error });
     return sendFail(
       res,
       "Failed to verify shop ownership",
-      StatusCodes.INTERNAL_SERVER_ERROR
+      StatusCodes.INTERNAL_SERVER_ERROR,
     );
   }
 };
@@ -54,7 +55,7 @@ const verifyShopOwnership = async (req, res, next) => {
 const verifyProductOwnership = async (req, res, next) => {
   try {
     const productId = req.params.id || req.params.productId;
-    
+
     if (!productId) {
       return sendFail(res, "Product ID is required", StatusCodes.BAD_REQUEST);
     }
@@ -63,12 +64,12 @@ const verifyProductOwnership = async (req, res, next) => {
       return sendFail(
         res,
         "Shop verification required. Use verifyShopOwnership middleware first.",
-        StatusCodes.INTERNAL_SERVER_ERROR
+        StatusCodes.INTERNAL_SERVER_ERROR,
       );
     }
 
     const product = await Product.findById(productId);
-    
+
     if (!product) {
       return sendFail(res, "Product not found", StatusCodes.NOT_FOUND);
     }
@@ -78,22 +79,21 @@ const verifyProductOwnership = async (req, res, next) => {
       return sendFail(
         res,
         "You don't have permission to access this product. It belongs to another shop.",
-        StatusCodes.FORBIDDEN
+        StatusCodes.FORBIDDEN,
       );
     }
 
     req.product = product;
     next();
   } catch (error) {
-    console.error("verifyProductOwnership error:", error);
+    logger.error("verifyProductOwnership error:", { error });
     return sendFail(
       res,
       "Failed to verify product ownership",
-      StatusCodes.INTERNAL_SERVER_ERROR
+      StatusCodes.INTERNAL_SERVER_ERROR,
     );
   }
 };
-
 
 /**
  * Verify that the order belongs to the user's shop
@@ -103,7 +103,7 @@ const verifyProductOwnership = async (req, res, next) => {
 const verifyOrderOwnership = async (req, res, next) => {
   try {
     const orderId = req.params.orderId || req.params.id;
-    
+
     if (!orderId) {
       return sendFail(res, "Order ID is required", StatusCodes.BAD_REQUEST);
     }
@@ -112,12 +112,12 @@ const verifyOrderOwnership = async (req, res, next) => {
       return sendFail(
         res,
         "Shop verification required. Use verifyShopOwnership middleware first.",
-        StatusCodes.INTERNAL_SERVER_ERROR
+        StatusCodes.INTERNAL_SERVER_ERROR,
       );
     }
 
     const order = await Order.findById(orderId);
-    
+
     if (!order) {
       return sendFail(res, "Order not found", StatusCodes.NOT_FOUND);
     }
@@ -127,18 +127,18 @@ const verifyOrderOwnership = async (req, res, next) => {
       return sendFail(
         res,
         "This order doesn't belong to your shop.",
-        StatusCodes.FORBIDDEN
+        StatusCodes.FORBIDDEN,
       );
     }
 
     req.order = order;
     next();
   } catch (error) {
-    console.error("verifyOrderOwnership error:", error);
+    logger.error("verifyOrderOwnership error:", { error });
     return sendFail(
       res,
       "Failed to verify order ownership",
-      StatusCodes.INTERNAL_SERVER_ERROR
+      StatusCodes.INTERNAL_SERVER_ERROR,
     );
   }
 };

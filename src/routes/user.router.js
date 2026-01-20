@@ -10,7 +10,6 @@ const {
   updateProfileValidator,
   addAddressValidator,
   updateAddressValidator,
-  changePasswordValidator,
   createUserValidator,
   updateUserValidator,
   updateRoleValidator,
@@ -22,13 +21,8 @@ const {
 const upload = require("../configs/upload");
 
 /**
- * Upload Routes
- */
-
-/**
- * @route   POST /api/users/upload-avatar
  * @desc    Upload user avatar image
- * @access  Private (Authenticated users)
+ * @access  Private
  */
 router.post(
   "/upload-avatar",
@@ -38,21 +32,14 @@ router.post(
 );
 
 /**
- * Profile Routes
- */
-
-/**
- * @route   GET /api/users/profile
  * @desc    Get current user's profile
- * @access  Private (Authenticated users)
+ * @access  Private
  */
 router.get("/profile", verifyAccessToken, userController.getProfile);
 
 /**
- * @route   PUT /api/users/profile
  * @desc    Update current user's profile
- * @access  Private (Authenticated users)
- * @body    { username?, email?, phone? }
+ * @access  Private
  */
 router.put(
   "/profile",
@@ -62,14 +49,8 @@ router.put(
 );
 
 /**
- * Address Routes
- */
-
-/**
- * @route   POST /api/users/address
  * @desc    Add new address
- * @access  Private (Authenticated users)
- * @body    { fullName, phone, address, city, district, ward, isDefault? }
+ * @access  Private
  */
 router.post(
   "/address",
@@ -79,9 +60,8 @@ router.post(
 );
 
 /**
- * @route   PUT /api/users/address/:addressId
  * @desc    Update existing address
- * @access  Private (Authenticated users)
+ * @access  Private
  */
 router.put(
   "/address/:addressId",
@@ -94,9 +74,8 @@ router.put(
 );
 
 /**
- * @route   DELETE /api/users/address/:addressId
  * @desc    Delete address
- * @access  Private (Authenticated users)
+ * @access  Private
  */
 router.delete(
   "/address/:addressId",
@@ -106,16 +85,14 @@ router.delete(
 );
 
 /**
- * @route   GET /api/users/address
  * @desc    Get all addresses for current user
- * @access  Private (Authenticated users)
+ * @access  Private
  */
 router.get("/address", verifyAccessToken, userController.getAddresses);
 
 /**
- * @route   PUT /api/users/address/:addressId/default
  * @desc    Set address as default
- * @access  Private (Authenticated users)
+ * @access  Private
  */
 router.put(
   "/address/:addressId/default",
@@ -125,31 +102,19 @@ router.put(
 );
 
 /**
- * Password Management
- */
-
-/**
- * @route   PUT /api/users/change-password
  * @desc    Change user password
- * @access  Private (Authenticated users)
- * @body    { oldPassword, newPassword }
+ * @access  Private
  */
 router.put(
   "/change-password",
   verifyAccessToken,
-  validate(changePasswordValidator),
+  validate(require("../validations/user.validator").changePasswordValidator),
   userController.changePassword
 );
 
 /**
- * Admin Routes - User Management
- */
-
-/**
- * @route   GET /api/users
  * @desc    Get all users with pagination
- * @access  Private (Admin only)
- * @query   page, limit, search, role, isVerifiedEmail
+ * @access  Private (Admin)
  */
 router.get(
   "/",
@@ -160,10 +125,8 @@ router.get(
 );
 
 /**
- * @route   POST /api/users/create
  * @desc    Create new user (Admin)
- * @access  Private (Admin only)
- * @body    { username, email, roles?, phone?, isVerifiedEmail? }
+ * @access  Private (Admin)
  */
 router.post(
   "/create",
@@ -174,10 +137,8 @@ router.post(
 );
 
 /**
- * @route   POST /api/users/update
  * @desc    Update user by ID (Admin)
- * @access  Private (Admin only)
- * @body    { id, username?, email?, roles?, isVerifiedEmail? }
+ * @access  Private (Admin)
  */
 router.post(
   "/update",
@@ -188,10 +149,8 @@ router.post(
 );
 
 /**
- * @route   PUT /api/users/:id/role
  * @desc    Update user role
- * @access  Private (Admin only)
- * @body    { roles }
+ * @access  Private (Admin)
  */
 router.put(
   "/:id/role",
@@ -205,9 +164,8 @@ router.put(
 );
 
 /**
- * @route   GET /api/users/:id
  * @desc    Get user by ID
- * @access  Private (Admin only)
+ * @access  Private (Admin)
  */
 router.get(
   "/:id",
@@ -218,9 +176,8 @@ router.get(
 );
 
 /**
- * @route   PUT /api/users/:id
  * @desc    Update user by ID
- * @access  Private (Admin only)
+ * @access  Private (Admin)
  */
 router.put(
   "/:id",
@@ -234,9 +191,8 @@ router.put(
 );
 
 /**
- * @route   DELETE /api/users/:id
  * @desc    Delete user
- * @access  Private (Admin only)
+ * @access  Private (Admin)
  */
 router.delete(
   "/:id",

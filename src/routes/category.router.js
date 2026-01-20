@@ -14,20 +14,36 @@ const {
   getCategoriesQueryValidator,
 } = require("../validations/category.validator");
 
-// Public routes (no authentication required)
+/**
+ * @desc    Get active categories
+ * @access  Public
+ */
 router.get(
   "/active",
   validate({ query: getCategoriesQueryValidator }),
   categoryController.getActiveCategories
 );
+
+/**
+ * @desc    Get category tree
+ * @access  Public
+ */
 router.get("/tree", categoryController.getCategoryTree);
+
+/**
+ * @desc    Get category by slug
+ * @access  Public
+ */
 router.get(
   "/slug/:slug",
   validate({ params: categorySlugParamValidator }),
   categoryController.getCategoryBySlug
 );
 
-// Admin routes (require admin role)
+/**
+ * @desc    Create new category
+ * @access  Private (Admin)
+ */
 router.post(
   "/",
   verifyAccessToken,
@@ -35,6 +51,11 @@ router.post(
   validate(createCategoryValidator),
   categoryController.createCategory
 );
+
+/**
+ * @desc    Get all categories
+ * @access  Private (Admin)
+ */
 router.get(
   "/",
   verifyAccessToken,
@@ -42,12 +63,22 @@ router.get(
   validate({ query: getCategoriesQueryValidator }),
   categoryController.getAllCategories
 );
+
+/**
+ * @desc    Get category statistics
+ * @access  Private (Admin)
+ */
 router.get(
   "/statistics",
   verifyAccessToken,
   requireRole("admin"),
   categoryController.getCategoryStatistics
 );
+
+/**
+ * @desc    Get category by ID
+ * @access  Private (Admin)
+ */
 router.get(
   "/:categoryId",
   verifyAccessToken,
@@ -55,6 +86,11 @@ router.get(
   validate({ params: categoryIdParamValidator }),
   categoryController.getCategoryById
 );
+
+/**
+ * @desc    Get category with subcategories
+ * @access  Private (Admin)
+ */
 router.get(
   "/:categoryId/subcategories",
   verifyAccessToken,
@@ -62,6 +98,11 @@ router.get(
   validate({ params: categoryIdParamValidator }),
   categoryController.getCategoryWithSubcategories
 );
+
+/**
+ * @desc    Update category
+ * @access  Private (Admin)
+ */
 router.put(
   "/:categoryId",
   verifyAccessToken,
@@ -72,6 +113,11 @@ router.put(
   }),
   categoryController.updateCategory
 );
+
+/**
+ * @desc    Delete category
+ * @access  Private (Admin)
+ */
 router.delete(
   "/:categoryId",
   verifyAccessToken,
@@ -81,4 +127,3 @@ router.delete(
 );
 
 module.exports = router;
-

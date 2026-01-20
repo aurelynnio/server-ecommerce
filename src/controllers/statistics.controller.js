@@ -10,9 +10,9 @@ const { sendSuccess } = require("../shared/res/formatResponse");
 const statisticsController = {
   /**
    * Get dashboard statistics overview
-   * @route GET /api/statistics/dashboard
-   * @access Private (Admin only)
-   * @returns {Object} Dashboard statistics including:
+
+* @access  Private (Admin only)
+
    *   - totalUsers: Total registered users
    *   - totalOrders: Total orders count
    *   - totalRevenue: Total revenue

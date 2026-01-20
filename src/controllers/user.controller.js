@@ -11,12 +11,12 @@ const { StatusCodes } = require("http-status-codes");
 const UserController = {
   /**
    * Create a new user (Admin only)
-   * @route POST /api/users
-   * @access Private (Admin)
-   * @body {string} username - Username
-   * @body {string} email - Email address
-   * @body {string} [roles] - User role
-   * @returns {Object} Created user
+
+* @access  Private (Admin)
+
+
+
+
    */
   createUser: catchAsync(async (req, res) => {
     const user = await userService.createUser(req.body);
@@ -30,11 +30,11 @@ const UserController = {
 
   /**
    * Update user by ID (Admin only)
-   * @route PUT /api/users/:id
-   * @access Private (Admin)
-   * @param {string} id - User ID in body
-   * @body {Object} updateData - Fields to update
-   * @returns {Object} Updated user
+
+* @access  Private (Admin)
+
+
+
    */
   updateUser: catchAsync(async (req, res) => {
     // Extract id from validated data
@@ -55,10 +55,10 @@ const UserController = {
 
   /**
    * Upload user avatar
-   * @route POST /api/users/avatar
-   * @access Private (requires authentication)
-   * @files {File} avatar - Avatar image file
-   * @returns {Object} Updated user with new avatar URL
+
+* @access  Private (requires authentication)
+
+
    */
   uploadAvatar: catchAsync(async (req, res) => {
     const file = req.file;
@@ -88,9 +88,9 @@ const UserController = {
 
   /**
    * Get current user's profile
-   * @route GET /api/users/profile
-   * @access Private (requires authentication)
-   * @returns {Object} User profile
+
+* @access  Private (requires authentication)
+
    */
   getProfile: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -105,11 +105,11 @@ const UserController = {
 
   /**
    * Update current user's profile
-   * @route PUT /api/users/profile
-   * @access Private (requires authentication)
-   * @body {string} [username] - New username
-   * @body {string} [email] - New email
-   * @returns {Object} Updated user profile
+
+* @access  Private (requires authentication)
+
+
+
    */
   updateProfile: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -124,10 +124,10 @@ const UserController = {
 
   /**
    * Add a new address to user's address book
-   * @route POST /api/users/address
-   * @access Private (requires authentication)
-   * @body {Object} addressData - Address details
-   * @returns {Object} Updated user with new address
+
+* @access  Private (requires authentication)
+
+
    */
   addAddress: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -142,11 +142,11 @@ const UserController = {
 
   /**
    * Update an existing address
-   * @route PUT /api/users/address/:addressId
-   * @access Private (requires authentication)
-   * @param {string} addressId - Address ID
-   * @body {Object} addressData - Updated address details
-   * @returns {Object} Updated user
+
+* @access  Private (requires authentication)
+
+
+
    */
   updateAddress: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -165,10 +165,10 @@ const UserController = {
 
   /**
    * Delete an address from user's address book
-   * @route DELETE /api/users/address/:addressId
-   * @access Private (requires authentication)
-   * @param {string} addressId - Address ID
-   * @returns {Object} Updated user
+
+* @access  Private (requires authentication)
+
+
    */
   deleteAddress: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -186,9 +186,9 @@ const UserController = {
 
   /**
    * Get all user's addresses
-   * @route GET /api/users/address
-   * @access Private (requires authentication)
-   * @returns {Array} User's addresses
+
+* @access  Private (requires authentication)
+
    */
   getAddresses: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -203,7 +203,7 @@ const UserController = {
 
   /**
    * Set an address as the default address
-   * @route PUT /api/users/address/:addressId/default
+
    */
   setDefaultAddress: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -221,11 +221,11 @@ const UserController = {
 
   /**
    * Change user's password
-   * @route PUT /api/users/change-password
-   * @access Private (requires authentication)
-   * @body {string} oldPassword - Current password
-   * @body {string} newPassword - New password
-   * @returns {Object} Success message
+
+* @access  Private (requires authentication)
+
+
+
    */
   changePassword: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -239,13 +239,13 @@ const UserController = {
 
   /**
    * Get all users with pagination (Admin only)
-   * @route GET /api/users
-   * @access Private (Admin)
-   * @query {number} [page] - Page number
-   * @query {number} [limit] - Items per page
-   * @query {string} [search] - Search by username or email
-   * @query {string} [role] - Filter by role
-   * @returns {Object} Users with pagination
+
+* @access  Private (Admin)
+
+
+
+
+
    */
   getAllUsers: catchAsync(async (req, res) => {
     const result = await userService.getAllUsers(req.query);
@@ -259,10 +259,10 @@ const UserController = {
 
   /**
    * Get user by ID (Admin only)
-   * @route GET /api/users/:id
-   * @access Private (Admin)
-   * @param {string} id - User ID
-   * @returns {Object} User object
+
+* @access  Private (Admin)
+
+
    */
   getUserById: catchAsync(async (req, res) => {
     const user = await userService.getUserById(req.params.id);
@@ -276,11 +276,11 @@ const UserController = {
 
   /**
    * Update user by ID (Admin only)
-   * @route PUT /api/users/:id
-   * @access Private (Admin)
-   * @param {string} id - User ID
-   * @body {Object} updateData - Fields to update
-   * @returns {Object} Updated user
+
+* @access  Private (Admin)
+
+
+
    */
   updateUserById: catchAsync(async (req, res) => {
     const bodyValue = req.body;
@@ -300,11 +300,11 @@ const UserController = {
 
   /**
    * Update user role (Admin only)
-   * @route PUT /api/users/:id/role
-   * @access Private (Admin)
-   * @param {string} id - User ID
-   * @body {string} roles - New role
-   * @returns {Object} Updated user
+
+* @access  Private (Admin)
+
+
+
    */
   updateUserRole: catchAsync(async (req, res) => {
     const user = await userService.updateUserRole(req.params.id, req.body.roles);
@@ -318,11 +318,11 @@ const UserController = {
 
   /**
    * Update user permissions (Admin only)
-   * @route PUT /api/users/:id/permissions
-   * @access Private (Admin)
-   * @param {string} id - User ID
-   * @body {Array} permissions - New permissions array
-   * @returns {Object} Updated user
+
+* @access  Private (Admin)
+
+
+
    */
   updateUserPermissions: catchAsync(async (req, res) => {
     const user = await userService.updateUserPermissions(
@@ -339,10 +339,10 @@ const UserController = {
 
   /**
    * Delete user (Admin only)
-   * @route DELETE /api/users/:id
-   * @access Private (Admin)
-   * @param {string} id - User ID
-   * @returns {Object} Deletion confirmation
+
+* @access  Private (Admin)
+
+
    */
   deleteUser: catchAsync(async (req, res) => {
     const result = await userService.deleteUser(req.params.id);

@@ -6,7 +6,7 @@ const { StatusCodes } = require("http-status-codes");
 const WishlistController = {
   /**
    * Get user's wishlist
-   * @route GET /api/wishlist
+
    */
   getWishlist: catchAsync(async (req, res) => {
     const userId = req.user._id;
@@ -22,7 +22,7 @@ const WishlistController = {
 
   /**
    * Add product to wishlist
-   * @route POST /api/wishlist/:productId
+
    */
   addToWishlist: catchAsync(async (req, res) => {
     const userId = req.user._id;
@@ -34,7 +34,7 @@ const WishlistController = {
 
   /**
    * Remove product from wishlist
-   * @route DELETE /api/wishlist/:productId
+
    */
   removeFromWishlist: catchAsync(async (req, res) => {
     const userId = req.user._id;
@@ -46,7 +46,7 @@ const WishlistController = {
 
   /**
    * Check if product is in wishlist
-   * @route GET /api/wishlist/check/:productId
+
    */
   checkInWishlist: catchAsync(async (req, res) => {
     const userId = req.user._id;
@@ -58,7 +58,7 @@ const WishlistController = {
 
   /**
    * Clear entire wishlist
-   * @route DELETE /api/wishlist
+
    */
   clearWishlist: catchAsync(async (req, res) => {
     const userId = req.user._id;
@@ -69,7 +69,7 @@ const WishlistController = {
 
   /**
    * Get wishlist count
-   * @route GET /api/wishlist/count
+
    */
   getWishlistCount: catchAsync(async (req, res) => {
     const userId = req.user._id;
@@ -80,7 +80,7 @@ const WishlistController = {
 
   /**
    * Check multiple products in wishlist
-   * @route POST /api/wishlist/check-multiple
+
    */
   checkMultiple: catchAsync(async (req, res) => {
     const userId = req.user._id;

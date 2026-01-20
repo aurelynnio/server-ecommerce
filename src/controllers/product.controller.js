@@ -10,18 +10,10 @@ const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const ProductController = {
   /**
    * Get all products with filtering, sorting, and pagination
-   * @route GET /api/products
-   * @access Public
-   * @query {number} [page=1] - Page number
-   * @query {number} [limit=10] - Items per page
-   * @query {string} [category] - Filter by category ID
-   * @query {string} [brand] - Filter by brand
-   * @query {number} [minPrice] - Minimum price
-   * @query {number} [maxPrice] - Maximum price
-   * @query {string} [search] - Search term
-   * @returns {Object} Products with pagination metadata
+* @access  Public
    */
   getAllProducts: catchAsync(async (req, res) => {
+
     const result = await productService.getAllProducts(req.query);
     return sendSuccess(
       res,
@@ -33,10 +25,10 @@ const ProductController = {
 
   /**
    * Get single product by ID
-   * @route GET /api/products/:id
-   * @access Public
-   * @param {string} id - Product ID
-   * @returns {Object} Product object with populated fields
+
+* @access  Public
+
+
    */
   getProductById: catchAsync(async (req, res) => {
     const product = await productService.getProductById(req.params.id);
@@ -50,10 +42,10 @@ const ProductController = {
 
   /**
    * Get single product by slug
-   * @route GET /api/products/slug/:slug
-   * @access Public
-   * @param {string} slug - Product slug
-   * @returns {Object} Product object
+
+* @access  Public
+
+
    */
   getProductBySlug: catchAsync(async (req, res) => {
     const product = await productService.getProductBySlug(req.params.slug);
@@ -67,27 +59,24 @@ const ProductController = {
 
   /**
    * Create a new product
-   * @route POST /api/products
-   * @access Private (Seller only)
-   * @body {string} name - Product name
-   * @body {Object} price - Price information
-   * @body {string} [description] - Product description
-   * @files {Array} [images] - Product images
-   * @returns {Object} Created product
+
+* @access  Private (Seller only)
+
+
+
+
+
    */
   createProduct: catchAsync(async (req, res) => {
-    // Fetch user from database to get shop ID
     const User = require("../models/user.model");
     const Shop = require("../models/shop.model");
     
     const user = await User.findById(req.user.userId);
     let shopId = user?.shop;
     
-    // If user doesn't have shop field set, try to find shop by owner
     if (!shopId) {
       const shop = await Shop.findOne({ owner: req.user.userId });
       if (shop) {
-        // Fix the user's shop field
         await User.findByIdAndUpdate(req.user.userId, { shop: shop._id });
         shopId = shop._id;
       }
@@ -102,6 +91,7 @@ const ProductController = {
       req.files,
       shopId
     );
+
     return sendSuccess(
       res,
       product,
@@ -112,16 +102,16 @@ const ProductController = {
 
   /**
    * Update an existing product
-   * @route PUT /api/products/:id
-   * @access Private (Seller/Admin)
-   * @param {string} id - Product ID
-   * @body {Object} updateData - Fields to update
-   * @files {Array} [images] - New product images
-   * @returns {Object} Updated product
+
+* @access  Private (Seller/Admin)
+
+
+
+
    */
   updateProduct: catchAsync(async (req, res) => {
-    // Parse JSON fields handled by middleware
-    // Validate request body handled by middleware
+    
+    
 
     const { id } = req.params;
     const product = await productService.updateProduct(id, req.body, req.files);
@@ -135,13 +125,13 @@ const ProductController = {
 
   /**
    * Soft delete a product
-   * @route DELETE /api/products/:id
-   * @access Private (Seller/Admin)
-   * @param {string} id - Product ID
-   * @returns {Object} Deleted product
+
+* @access  Private (Seller/Admin)
+
+
    */
   deleteProduct: catchAsync(async (req, res) => {
-    // Validate params
+    
 
     const product = await productService.deleteProduct(req.params.id);
     return sendSuccess(
@@ -154,13 +144,13 @@ const ProductController = {
 
   /**
    * Permanently delete a product
-   * @route DELETE /api/products/:id/permanent
-   * @access Private (Admin only)
-   * @param {string} id - Product ID
-   * @returns {Object} Success message
+
+* @access  Private (Admin only)
+
+
    */
   permanentDeleteProduct: catchAsync(async (req, res) => {
-    // Validate params
+    
 
     await productService.permanentDeleteProduct(req.params.id);
     return sendSuccess(
@@ -173,15 +163,15 @@ const ProductController = {
 
   /**
    * Add a variant to a product
-   * @route POST /api/products/:id/variants
-   * @access Private (Seller/Admin)
-   * @param {string} id - Product ID
-   * @body {string} sku - Variant SKU
-   * @body {string} [color] - Variant color
-   * @body {string} [size] - Variant size
-   * @body {number} price - Variant price
-   * @body {number} stock - Variant stock
-   * @returns {Object} Updated product with new variant
+
+* @access  Private (Seller/Admin)
+
+
+
+
+
+
+
    */
   addVariant: catchAsync(async (req, res) => {
     const { id } = req.params;
@@ -197,12 +187,12 @@ const ProductController = {
 
   /**
    * Update a product variant
-   * @route PUT /api/products/:id/variants/:variantId
-   * @access Private (Seller/Admin)
-   * @param {string} id - Product ID
-   * @param {string} variantId - Variant ID
-   * @body {Object} variantData - Variant fields to update
-   * @returns {Object} Updated product
+
+* @access  Private (Seller/Admin)
+
+
+
+
    */
   updateVariant: catchAsync(async (req, res) => {
     const { id, variantId } = req.params;
@@ -217,11 +207,11 @@ const ProductController = {
 
   /**
    * Delete a product variant
-   * @route DELETE /api/products/:id/variants/:variantId
-   * @access Private (Seller/Admin)
-   * @param {string} id - Product ID
-   * @param {string} variantId - Variant ID
-   * @returns {Object} Updated product
+
+* @access  Private (Seller/Admin)
+
+
+
    */
   deleteVariant: catchAsync(async (req, res) => {
     const product = await productService.deleteVariant(
@@ -238,12 +228,12 @@ const ProductController = {
 
   /**
    * Get products by category ID
-   * @route GET /api/products/category/:categoryId
-   * @access Public
-   * @param {string} categoryId - Category ID
-   * @query {number} [page=1] - Page number
-   * @query {number} [limit=10] - Items per page
-   * @returns {Object} Products with pagination
+
+* @access  Public
+
+
+
+
    */
   getProductsByCategory: catchAsync(async (req, res) => {
     const result = await productService.getProductsByCategory(
@@ -260,12 +250,12 @@ const ProductController = {
 
   /**
    * Get products by category slug
-   * @route GET /api/products/category/slug/:slug
-   * @access Public
-   * @param {string} slug - Category slug
-   * @query {number} [page=1] - Page number
-   * @query {number} [limit=10] - Items per page
-   * @returns {Object} Products with category info and pagination
+
+* @access  Public
+
+
+
+
    */
   getProductsByCategorySlug: catchAsync(async (req, res) => {
     const result = await productService.getProductsByCategorySlug(
@@ -282,10 +272,10 @@ const ProductController = {
 
   /**
    * Get featured products
-   * @route GET /api/products/featured
-   * @access Public
-   * @query {number} [limit=10] - Maximum products to return
-   * @returns {Array} Featured products
+
+* @access  Public
+
+
    */
   getFeaturedProducts: catchAsync(async (req, res) => {
     const products = await productService.getFeaturedProductsSimple(
@@ -301,9 +291,9 @@ const ProductController = {
 
   /**
    * Get new arrival products
-   * @route GET /api/products/new-arrivals
-   * @access Public
-   * @returns {Array} New arrival products (max 10)
+
+* @access  Public
+
    */
   getNewArrivalProducts: catchAsync(async (req, res) => {
     const result = await productService.getNewArrivalProducts();
@@ -317,9 +307,9 @@ const ProductController = {
 
   /**
    * Get products on sale
-   * @route GET /api/products/on-sale
-   * @access Public
-   * @returns {Array} On-sale products (max 10)
+
+* @access  Public
+
    */
   getOnSaleProducts: catchAsync(async (req, res) => {
     const result = await productService.getOnSaleProducts();
@@ -333,11 +323,11 @@ const ProductController = {
 
   /**
    * Search products by keyword
-   * @route GET /api/products/search
-   * @access Public
-   * @query {string} q - Search keyword
-   * @query {number} [limit=10] - Maximum results
-   * @returns {Array} Matching products
+
+* @access  Public
+
+
+
    */
   searchProducts: catchAsync(async (req, res) => {
     const result = await productService.searchProducts(
@@ -354,10 +344,10 @@ const ProductController = {
 
   /**
    * Get related products
-   * @route GET /api/products/:id/related
-   * @access Public
-   * @param {string} id - Product ID
-   * @returns {Array} Related products (max 10)
+
+* @access  Public
+
+
    */
   getRelatedProducts: catchAsync(async (req, res) => {
     const { id } = req.params;
@@ -374,12 +364,12 @@ const ProductController = {
 
   /**
    * Update product by seller (own shop only)
-   * @route PUT /api/products/seller/:id
-   * @access Private (Seller or Admin)
-   * @param {string} id - Product ID
-   * @body {Object} updateData - Fields to update
-   * @files {Array} [images] - New product images
-   * @returns {Object} Updated product
+
+* @access  Private (Seller or Admin)
+
+
+
+
    */
   updateProductBySeller: catchAsync(async (req, res) => {
     const { id } = req.params;
@@ -401,10 +391,10 @@ const ProductController = {
 
   /**
    * Delete product by seller (own shop only, soft delete)
-   * @route DELETE /api/products/seller/:id
-   * @access Private (Seller or Admin)
-   * @param {string} id - Product ID
-   * @returns {Object} Deleted product
+
+* @access  Private (Seller or Admin)
+
+
    */
   deleteProductBySeller: catchAsync(async (req, res) => {
     const { id } = req.params;

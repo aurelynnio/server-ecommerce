@@ -1,7 +1,7 @@
 const Notification = require("../models/notification.model");
 const User = require("../models/user.model");
 const mongoose = require("mongoose");
-
+const logger = require("../utils/logger");
 
 /**
  * Service handling notification operations
@@ -48,23 +48,23 @@ class NotificationService {
           const io = getIO();
           const targetedIds = [];
           users.forEach((user) => {
-             const userStrId = user._id.toString();
-             targetedIds.push(userStrId);
-             io.to(userStrId).emit("new_notification", {
-               _id: new mongoose.Types.ObjectId(),
-               userId: user._id,
-               type,
-               title,
-               message,
-               orderId,
-               link,
-               createdAt: new Date(),
-               isRead: false
-             });
+            const userStrId = user._id.toString();
+            targetedIds.push(userStrId);
+            io.to(userStrId).emit("new_notification", {
+              _id: new mongoose.Types.ObjectId(),
+              userId: user._id,
+              type,
+              title,
+              message,
+              orderId,
+              link,
+              createdAt: new Date(),
+              isRead: false,
+            });
           });
           // Broadcast completed silently
         } catch (error) {
-           console.error("Socket broadcast error:", error.message);
+          logger.error("Socket broadcast error:", { error: error.message });
         }
         return { message: `Broadcasted to ${users.length} users` };
       }
@@ -87,7 +87,7 @@ class NotificationService {
       const unreadCount = await this.countUnread(userId);
       io.to(userId).emit("unread_count", unreadCount);
     } catch (error) {
-      console.error("Socket error:", error.message);
+      logger.error("Socket error:", { error: error.message });
     }
 
     return notification;
@@ -109,10 +109,10 @@ class NotificationService {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("orderId", "orderCode totalAmount status"); 
+      .populate("orderId", "orderCode totalAmount status");
 
     const total = await Notification.countDocuments({ userId });
-    
+
     // Safety check for counts
     const unreadCount = await Notification.countDocuments({
       userId,
@@ -155,14 +155,14 @@ class NotificationService {
           isRead: true,
           readAt: new Date(),
         },
-      }
+      },
     );
-     // Update real-time count
-     try {
-       const { getIO } = require("../socket/index");
-       const io = getIO();
-       io.to(userId).emit("unread_count", 0);
-     } catch(e) {}
+    // Update real-time count
+    try {
+      const { getIO } = require("../socket/index");
+      const io = getIO();
+      io.to(userId).emit("unread_count", 0);
+    } catch (e) {}
 
     return result;
   }
@@ -173,14 +173,14 @@ class NotificationService {
    */
   async cleanNotification(userId) {
     const result = await Notification.deleteMany({ userId });
-    
+
     // Update real-time count
     try {
-       const { getIO } = require("../socket/index");
-       const io = getIO();
-       io.to(userId).emit("unread_count", 0);
-    } catch(e) {}
-     
+      const { getIO } = require("../socket/index");
+      const io = getIO();
+      io.to(userId).emit("unread_count", 0);
+    } catch (e) {}
+
     return result;
   }
 
@@ -199,33 +199,36 @@ class NotificationService {
    * @param {String} userId - Owner ID
    */
   async getNotificationById(id, userId) {
-     const notification = await Notification.findOne({ _id: id, userId }).populate("orderId");
-     if (!notification) throw new Error("Notification not found");
-     return notification;
+    const notification = await Notification.findOne({
+      _id: id,
+      userId,
+    }).populate("orderId");
+    if (!notification) throw new Error("Notification not found");
+    return notification;
   }
 
   /**
    * Update notification by ID
-   * @param {String} id 
-   * @param {String} userId 
-   * @param {Object} data 
+   * @param {String} id
+   * @param {String} userId
+   * @param {Object} data
    */
   async updateNotification(id, userId, data) {
     const notification = await Notification.findOneAndUpdate(
-       { _id: id, userId },
-       data,
-       { new: true }
+      { _id: id, userId },
+      data,
+      { new: true },
     );
     if (!notification) throw new Error("Notification not found");
-    
+
     // If update affects read status, emit new count
     if (data.isRead !== undefined) {
-         try {
-             const { getIO } = require("../socket/index");
-             const io = getIO();
-             const count = await this.countUnread(userId);
-             io.to(userId).emit("unread_count", count);
-         } catch(e) {}
+      try {
+        const { getIO } = require("../socket/index");
+        const io = getIO();
+        const count = await this.countUnread(userId);
+        io.to(userId).emit("unread_count", count);
+      } catch (e) {}
     }
 
     return notification;

@@ -1,4 +1,5 @@
 const redis = require("../configs/redis.config");
+const logger = require("../utils/logger");
 
 /**
  * Repository for Redis caching operations
@@ -15,7 +16,7 @@ class CacheService {
       const stringValue = JSON.stringify(value);
       await redis.set(key, stringValue, "EX", ttl);
     } catch (error) {
-      console.error(`Redis Set Error [${key}]:`, error);
+      logger.error(`Redis Set Error [${key}]:`, { error });
     }
   }
 
@@ -29,7 +30,7 @@ class CacheService {
       const value = await redis.get(key);
       return value ? JSON.parse(value) : null;
     } catch (error) {
-      console.error(`Redis Get Error [${key}]:`, error);
+      logger.error(`Redis Get Error [${key}]:`, { error });
       return null;
     }
   }
@@ -42,7 +43,7 @@ class CacheService {
     try {
       await redis.del(key);
     } catch (error) {
-      console.error(`Redis Del Error [${key}]:`, error);
+      logger.error(`Redis Del Error [${key}]:`, { error });
     }
   }
 
@@ -57,7 +58,7 @@ class CacheService {
         await redis.del(...keys);
       }
     } catch (error) {
-      console.error(`Redis DelPattern Error [${pattern}]:`, error);
+      logger.error(`Redis DelPattern Error [${pattern}]:`, { error });
     }
   }
 }

@@ -63,7 +63,7 @@ class ShopService {
     const updatedShop = await Shop.findOneAndUpdate(
       { owner: userId },
       updates,
-      { new: true }
+      { new: true },
     );
 
     if (!updatedShop) throw new Error("Shop not found");
@@ -76,7 +76,13 @@ class ShopService {
    * @returns {Promise<Object>} Shops with pagination
    */
   async getAllShops(filters = {}) {
-    const { page = 1, limit = 10, status, search, sort = "-createdAt" } = filters;
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      search,
+      sort = "-createdAt",
+    } = filters;
 
     const query = {};
     if (status) query.status = status;
@@ -187,67 +193,153 @@ class ShopService {
     if (!shop) throw new Error("Shop not found");
 
     const shopId = shop._id;
-
-    // Get various statistics
     const [
       totalProducts,
       totalOrders,
-      pendingOrders,
+      orderStatusCounts,
       revenueData,
       topProducts,
+      recentOrders,
     ] = await Promise.all([
       Product.countDocuments({ shop: shopId, status: "published" }),
       Order.countDocuments({ shopId }),
-      Order.countDocuments({ shopId, status: "pending" }),
+
+      Order.aggregate([
+        { $match: { shopId } },
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]),
       Order.aggregate([
         { $match: { shopId, paymentStatus: "paid" } },
         { $group: { _id: null, total: { $sum: "$totalAmount" } } },
       ]),
-      Product.find({ shop: shopId })
+      Product.find({ shop: shopId, soldCount: { $gt: 0 } })
         .sort({ soldCount: -1 })
         .limit(5)
-        .select("name soldCount price images")
+        .select("name soldCount price variants slug")
+        .lean(),
+
+      Order.find({ shopId })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .populate("userId", "username avatar")
+        .select("_id status totalAmount createdAt paymentStatus")
         .lean(),
     ]);
+    const ordersByStatus = {
+      pending: 0,
+      confirmed: 0,
+      processing: 0,
+      shipped: 0,
+      delivered: 0,
+      cancelled: 0,
+      returned: 0,
+    };
+    orderStatusCounts.forEach((item) => {
+      if (ordersByStatus.hasOwnProperty(item._id)) {
+        ordersByStatus[item._id] = item.count;
+      }
+    });
+    const today = new Date();
+    const last6Months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      last6Months.push({
+        month: d.getMonth() + 1,
+        year: d.getFullYear(),
+        key: `${d.getMonth() + 1}/${d.getFullYear()}`,
+      });
+    }
 
-    // Monthly revenue for chart
-    const monthlyRevenue = await Order.aggregate([
+    const monthlyRevenueRaw = await Order.aggregate([
       {
         $match: {
           shopId,
-          paymentStatus: "paid",
-          createdAt: { $gte: new Date(new Date().setMonth(new Date().getMonth() - 6)) },
+          status: { $ne: "cancelled" },
+          createdAt: {
+            $gte: new Date(new Date().setMonth(new Date().getMonth() - 5)),
+          },
         },
       },
       {
         $group: {
-          _id: { month: { $month: "$createdAt" }, year: { $year: "$createdAt" } },
-          revenue: { $sum: "$totalAmount" },
+          _id: {
+            month: { $month: "$createdAt" },
+            year: { $year: "$createdAt" },
+          },
+          revenue: {
+            $sum: {
+              $cond: [{ $eq: ["$paymentStatus", "paid"] }, "$totalAmount", 0],
+            },
+          },
           orders: { $sum: 1 },
         },
       },
       { $sort: { "_id.year": 1, "_id.month": 1 } },
     ]);
 
+    // Map raw data to lookup object
+    const revenueMap = {};
+    monthlyRevenueRaw.forEach((item) => {
+      const key = `${item._id.month}/${item._id.year}`;
+      revenueMap[key] = { revenue: item.revenue, orders: item.orders };
+    });
+
+    // Merge with last6Months
+    const chartData = last6Months.map((time) => {
+      const data = revenueMap[time.key] || { revenue: 0, orders: 0 };
+      return {
+        month: `T${time.month}`,
+        revenue: data.revenue,
+        orders: data.orders,
+      };
+    });
+
+    // Transform top products
+    const formattedTopProducts = topProducts.map((product) => {
+      const image = product.variants?.[0]?.images?.[0] || null;
+      const price = product.variants?.[0]?.price || 0;
+      return {
+        _id: product._id,
+        name: product.name,
+        slug: product.slug,
+        image,
+        sold: product.soldCount || 0,
+        revenue: price * (product.soldCount || 0),
+      };
+    });
+
+    // Transform recent orders
+    const formattedRecentOrders = recentOrders.map((order) => ({
+      _id: order._id,
+      customer: order.userId?.username || "Guest",
+      avatar: order.userId?.avatar || null,
+      totalAmount: order.totalAmount,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      createdAt: order.createdAt,
+    }));
+
     return {
       shop: {
+        _id: shop._id,
         name: shop.name,
+        slug: shop.slug,
         logo: shop.logo,
-        rating: shop.rating,
+        banner: shop.banner,
+        rating: shop.rating || 0,
         status: shop.status,
+        followers: shop.followers?.length || 0,
+        responseRate: shop.metrics?.responseRate || 0,
       },
       stats: {
         totalProducts,
         totalOrders,
-        pendingOrders,
         totalRevenue: revenueData[0]?.total || 0,
+        ordersByStatus,
       },
-      topProducts,
-      monthlyRevenue: monthlyRevenue.map((m) => ({
-        month: `${m._id.month}/${m._id.year}`,
-        revenue: m.revenue,
-        orders: m.orders,
-      })),
+      topProducts: formattedTopProducts,
+      recentOrders: formattedRecentOrders,
+      chartData,
     };
   }
 
@@ -332,7 +424,7 @@ class ShopService {
     const shop = await Shop.findByIdAndUpdate(
       shopId,
       { status },
-      { new: true }
+      { new: true },
     );
 
     if (!shop) throw new Error("Shop not found");
@@ -364,15 +456,17 @@ class ShopService {
       },
     ]);
 
-    return stats[0] || {
-      averageRating: 0,
-      totalReviews: 0,
-      rating5: 0,
-      rating4: 0,
-      rating3: 0,
-      rating2: 0,
-      rating1: 0,
-    };
+    return (
+      stats[0] || {
+        averageRating: 0,
+        totalReviews: 0,
+        rating5: 0,
+        rating4: 0,
+        rating3: 0,
+        rating2: 0,
+        rating1: 0,
+      }
+    );
   }
 
   /**
