@@ -1,51 +1,27 @@
-const joi = require("joi");
+const Joi = require("joi");
+const { objectId } = require("./common.validator");
 
-const startEndSchema = joi.object({
-  code: joi.string().required(),
-  fee: joi.number().min(0).required(),
+const ruleSchema = Joi.object({
+  name: Joi.string().required(),
+  type: Joi.string().valid("fixed", "weight_based", "quantity_based").required(),
+  baseFee: Joi.number().min(0).required(),
+  stepUnit: Joi.number().min(0),
+  stepFee: Joi.number().min(0),
 });
 
-const createTemplateValidator = joi.object({
-  name: joi.string().required(),
-  rules: joi
-    .array()
-    .items(
-      joi.object({
-        name: joi.string().required(),
-        type: joi
-          .string()
-          .valid("fixed", "weight_based", "quantity_based")
-          .required(),
-        baseFee: joi.number().min(0).required(),
-        stepUnit: joi.number().min(0).optional(),
-        stepFee: joi.number().min(0).optional(),
-      })
-    )
-    .required(),
-  isDefault: joi.boolean().optional(),
+const createTemplateValidator = Joi.object({
+  name: Joi.string().required(),
+  rules: Joi.array().items(ruleSchema).required(),
+  isDefault: Joi.boolean().default(false),
 });
 
-const updateTemplateValidator = joi.object({
-  name: joi.string().optional(),
-  rules: joi
-    .array()
-    .items(
-      joi.object({
-        name: joi.string().required(),
-        type: joi
-          .string()
-          .valid("fixed", "weight_based", "quantity_based")
-          .required(),
-        baseFee: joi.number().min(0).required(),
-        stepUnit: joi.number().min(0).optional(),
-        stepFee: joi.number().min(0).optional(),
-      })
-    )
-    .optional(),
-  isDefault: joi.boolean().optional(),
-});
+const updateTemplateValidator = createTemplateValidator.fork(
+  ["name", "rules"],
+  (schema) => schema.optional()
+);
 
 module.exports = {
   createTemplateValidator,
   updateTemplateValidator,
+  templateIdParamValidator: Joi.object({ id: objectId.required() }),
 };

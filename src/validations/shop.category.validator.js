@@ -1,18 +1,17 @@
-const joi = require("joi");
+const Joi = require("joi");
 
-const createCategoryValidator = joi.object({
-  name: joi.string().required().trim(),
-  displayOrder: joi.number().integer().optional(),
-  isActive: joi.boolean().optional(),
+const createShopCategoryValidator = Joi.object({
+  name: Joi.string().required().trim(),
+  displayOrder: Joi.number().integer().min(0).default(0),
+  isActive: Joi.boolean().default(true),
 });
 
-const updateCategoryValidator = joi.object({
-  name: joi.string().optional().trim(),
-  displayOrder: joi.number().integer().optional(),
-  isActive: joi.boolean().optional(),
-});
+const updateShopCategoryValidator = createShopCategoryValidator.fork(
+  ["name"],
+  (schema) => schema.optional()
+);
 
 module.exports = {
-  createCategoryValidator,
-  updateCategoryValidator,
+  createCategoryValidator: createShopCategoryValidator,
+  updateCategoryValidator: updateShopCategoryValidator,
 };

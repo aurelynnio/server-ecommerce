@@ -1,23 +1,18 @@
-const joi = require("joi");
+const Joi = require("joi");
+const { objectId } = require("./common.validator");
 
-const startConversationValidator = joi.object({
-  shopId: joi
-    .string()
-    .pattern(/^[0-9a-fA-F]{24}$/)
-    .required(),
-  productId: joi
-    .string()
-    .pattern(/^[0-9a-fA-F]{24}$/)
-    .optional(),
+const startConversationValidator = Joi.object({
+  shopId: objectId.required(),
+  productId: objectId.optional(),
+  message: Joi.string().optional(),
 });
 
-const sendMessageValidator = joi.object({
-  conversationId: joi
-    .string()
-    .pattern(/^[0-9a-fA-F]{24}$/)
-    .required(),
-  content: joi.string().required(),
-  attachments: joi.array().items(joi.string()).optional(),
+const sendMessageValidator = Joi.object({
+  conversationId: objectId.required(),
+  content: Joi.string().required(),
+  attachments: Joi.array().items(Joi.string()).optional(),
+  messageType: Joi.string().valid("text", "image", "product").default("text"),
+  productRef: objectId.optional(),
 });
 
 module.exports = {

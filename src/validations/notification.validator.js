@@ -1,26 +1,26 @@
 const Joi = require("joi");
+const { objectId, pagination } = require("./common.validator");
 
-const notificationValidator = {
-  createNotification: Joi.object({
-    type: Joi.string().valid("order_status", "promotion", "system").default("system"),
-    title: Joi.string().required(),
-    message: Joi.string().required(),
-    orderId: Joi.string().pattern(/^[0-9a-fA-F]{24}$/),
-    link: Joi.string(),
-  }),
+const createNotificationValidator = Joi.object({
+  type: Joi.string().valid("order_status", "promotion", "system", "chat").default("system"),
+  title: Joi.string().required(),
+  message: Joi.string().required(),
+  orderId: objectId,
+  link: Joi.string(),
+  recipient: objectId, // Optional if global
+});
 
-  getListNotification: Joi.object({
-    page: Joi.number().integer().min(1).default(1),
-    limit: Joi.number().integer().min(1).max(100).default(10),
-  }),
+const updateNotificationValidator = Joi.object({
+  title: Joi.string(),
+  message: Joi.string(),
+  type: Joi.string().valid("order_status", "promotion", "system", "chat"),
+  link: Joi.string().allow(""),
+  isRead: Joi.boolean(),
+});
 
-  updateNotification: Joi.object({
-    title: Joi.string(),
-    message: Joi.string(),
-    type: Joi.string().valid("order_status", "promotion", "system"),
-    link: Joi.string().allow(""),
-    isRead: Joi.boolean(),
-  }),
+module.exports = {
+  createNotificationValidator,
+  updateNotificationValidator,
+  getListNotificationValidator: Joi.object({ ...pagination }),
+  notificationIdParamValidator: Joi.object({ id: objectId.required() }),
 };
-
-module.exports = notificationValidator;

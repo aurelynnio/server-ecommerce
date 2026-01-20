@@ -1,88 +1,63 @@
-const joi = require("joi");
+const Joi = require("joi");
 const { sanitizedString } = require("./sanitize");
 
-const loginValidator = joi.object({
-  email: sanitizedString().email().required().messages({
-    "string.email": "Please provide a valid email address",
-    "any.required": "Email is required",
-  }),
-  password: joi.string().min(6).required().messages({
-    "string.min": "Password must be at least 6 characters long",
-    "any.required": "Password is required",
-  }),
-});
-
-const registerValidator = joi.object({
+const registerValidator = Joi.object({
   username: sanitizedString().min(3).max(30).required().messages({
-    "string.min": "Username must be at least 3 characters long",
-    "string.max": "Username must be at most 30 characters long",
-    "any.required": "Username is required",
+    "string.min": "Tên đăng nhập phải có ít nhất 3 ký tự",
+    "any.required": "Tên đăng nhập là bắt buộc",
   }),
   email: sanitizedString().email().required().messages({
-    "string.email": "Please provide a valid email address",
-    "any.required": "Email is required",
+    "string.email": "Email không hợp lệ",
+    "any.required": "Email là bắt buộc",
   }),
-  password: joi.string().min(6).required().messages({
-    "string.min": "Password must be at least 6 characters long",
-    "any.required": "Password is required",
-  }),
-  confirmPassword: joi.string().valid(joi.ref("password")).required().messages({
-    "any.only": "Confirm password must match password",
-    "any.required": "Confirm password is required",
+  password: Joi.string().min(6).required().messages({
+    "string.min": "Mật khẩu phải có ít nhất 6 ký tự",
+    "any.required": "Mật khẩu là bắt buộc",
   }),
 });
 
-const sendVerificationCodeValidator = joi.object({
+const loginValidator = Joi.object({
   email: sanitizedString().email().required().messages({
-    "string.email": "Please provide a valid email address",
-    "any.required": "Email is required",
+    "string.email": "Email không hợp lệ",
+    "any.required": "Email là bắt buộc",
+  }),
+  password: Joi.string().required().messages({
+    "any.required": "Mật khẩu là bắt buộc",
   }),
 });
 
-const verifyEmailValidator = joi.object({
+const sendVerificationCodeValidator = Joi.object({
+  email: sanitizedString().email().required(),
+});
+
+const verifyEmailValidator = Joi.object({
+  email: sanitizedString().email().required(),
   code: sanitizedString().length(6).pattern(/^\d+$/).required().messages({
-    "string.length": "Verification code must be 6 digits",
-    "string.pattern.base": "Verification code must contain only numbers",
-    "any.required": "Verification code is required",
+    "string.length": "Mã xác thực phải đúng 6 ký tự",
+    "string.pattern.base": "Mã xác thực chỉ được chứa số",
   }),
 });
 
-const forgotPasswordValidator = joi.object({
-  email: sanitizedString().email().required().messages({
-    "string.email": "Please provide a valid email address",
-    "any.required": "Email is required",
-  }),
+const forgotPasswordValidator = Joi.object({
+  email: sanitizedString().email().required(),
 });
 
-const resetPasswordValidator = joi.object({
-  email: sanitizedString().email().required().messages({
-    "string.email": "Please provide a valid email address",
-    "any.required": "Email is required",
-  }),
-  code: sanitizedString().length(6).pattern(/^\d+$/).required().messages({
-    "string.length": "Reset code must be 6 digits",
-    "string.pattern.base": "Reset code must contain only numbers",
-    "any.required": "Reset code is required",
-  }),
-  newPassword: joi.string().min(6).required().messages({
-    "string.min": "New password must be at least 6 characters long",
-    "any.required": "New password is required",
-  }),
+const resetPasswordValidator = Joi.object({
+  email: sanitizedString().email().required(),
+  code: sanitizedString().length(6).pattern(/^\d+$/).required(),
+  newPassword: Joi.string().min(6).required(),
 });
 
-const changePasswordValidator = joi.object({
-  currentPassword: joi.string().required().messages({
-    "any.required": "Current password is required",
-  }),
-  newPassword: joi.string().min(6).required().messages({
-    "string.min": "New password must be at least 6 characters long",
-    "any.required": "New password is required",
+const changePasswordValidator = Joi.object({
+  oldPassword: Joi.string().required(),
+  newPassword: Joi.string().min(6).different(Joi.ref("oldPassword")).required().messages({
+    "any.invalid": "Mật khẩu mới phải khác mật khẩu cũ",
   }),
 });
 
 module.exports = {
-  loginValidator,
   registerValidator,
+  loginValidator,
   sendVerificationCodeValidator,
   verifyEmailValidator,
   forgotPasswordValidator,
