@@ -166,7 +166,51 @@ class ReviewService {
     };
   }
 
+  /**
+   * Get all reviews with filters (Admin)
+   */
+  async getAllReviews(filters = {}) {
+    const { page = 1, limit = 10, rating, sort = "newest", search } = filters;
+
+    const query = {};
+
+    if (rating) {
+      query.rating = rating;
+    }
+
+    if (search) {
+      // Simple search by comment content
+      query.comment = { $regex: search, $options: "i" };
+    }
+
+    let sortOption = { createdAt: -1 };
+    if (sort === "oldest") sortOption = { createdAt: 1 };
+    if (sort === "highest") sortOption = { rating: -1 };
+    if (sort === "lowest") sortOption = { rating: 1 };
+
+    const total = await Review.countDocuments(query);
+    const paginationParams = getPaginationParams(page, limit, total);
+
+    const reviews = await Review.find(query)
+      .populate("user", "username email avatar")
+      .populate("product", "name slug images")
+      .sort(sortOption)
+      .skip(paginationParams.skip)
+      .limit(paginationParams.limit);
+
+    return {
+      data: reviews,
+      pagination: {
+        currentPage: paginationParams.currentPage,
+        pageSize: paginationParams.pageSize,
+        totalPages: paginationParams.totalPages,
+        totalItems: paginationParams.totalItems,
+      },
+    };
+  }
+
   // Get user's reviews
+
   async getUserReviews(userId, filters = {}) {
     const { page = 1, limit = 10 } = filters;
 

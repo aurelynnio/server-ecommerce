@@ -6,8 +6,13 @@ const router = express.Router();
 const chatbotController = require("../controllers/chatbot.controller");
 
 const { chatbotLimiter } = require("../middlewares/rateLimited.middleware");
+const {
+  verifyAccessToken,
+  requireRole,
+} = require("../middlewares/auth.middleware");
+
 /**
-* @desc Send message to AI chatbot (non-streaming)
+ * @desc Send message to AI chatbot (non-streaming)
 * @accessPublic
  * @body    { message, sessionId? }
  */
@@ -33,10 +38,23 @@ router.get("/history/:sessionId", chatbotController.getHistory);
 
 router.delete("/session/:sessionId", chatbotController.clearSession);
 /**
-* @desc Get chat suggestions for user
-* @accessPublic
+ * @desc Get chat suggestions for user
+ * @access Public
  */
-
 router.get("/suggestions", chatbotController.getSuggestions);
+
+/**
+ * Admin Routes
+ */
+/**
+ * @desc    Get all chat sessions (Admin)
+ * @access  Private (Admin)
+ */
+router.get(
+  "/admin/sessions",
+  verifyAccessToken,
+  requireRole("admin"),
+  chatbotController.getAllSessions
+);
 
 module.exports = router;

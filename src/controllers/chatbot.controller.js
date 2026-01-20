@@ -152,6 +152,67 @@ const ChatbotController = {
       StatusCodes.OK,
     );
   }),
+  /**
+   * Get all chat sessions (Admin)
+   */
+  getAllSessions: catchAsync(async (req, res) => {
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const collection = mongoose.connection.collection("chatbot_messages");
+
+    // Aggregate to get unique sessions with metadata
+    const sessions = await collection
+      .aggregate([
+        {
+          $sort: { _id: 1 }, // Sort by time to ensure first/last logic works
+        },
+        {
+          $group: {
+            _id: "$sessionId",
+            lastMessageAt: { $max: "$_id" },
+            createdAt: { $min: "$_id" },
+            messageCount: { $sum: 1 },
+            lastMessage: { $last: "$data.content" },
+          },
+        },
+        {
+          $sort: { lastMessageAt: -1 }, // Sort sessions by latest activity
+        },
+        {
+          $facet: {
+            metadata: [{ $count: "total" }],
+            data: [{ $skip: skip }, { $limit: parseInt(limit) }],
+          },
+        },
+      ])
+      .toArray();
+
+    const result = sessions[0];
+    const total = result.metadata[0]?.total || 0;
+    const sessionData = result.data.map((s) => ({
+      sessionId: s._id,
+      lastMessage: s.lastMessage,
+      messageCount: s.messageCount,
+      createdAt: s.createdAt.getTimestamp(),
+      updatedAt: s.lastMessageAt.getTimestamp(),
+    }));
+
+    return sendSuccess(
+      res,
+      {
+        data: sessionData,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      },
+      "Chat sessions retrieved successfully",
+      StatusCodes.OK
+    );
+  }),
 };
 
 module.exports = ChatbotController;

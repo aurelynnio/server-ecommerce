@@ -119,9 +119,22 @@ router.delete(
  * Admin Routes
  */
 /**
-* @desc Get review statistics overview
-* @accessPrivate (Admin only)
+ * @desc    Get all reviews (Admin)
+ * @access  Private (Admin)
  */
+router.get(
+  "/",
+  verifyAccessToken,
+  requireRole("admin"),
+  validate({ query: getReviewsQueryValidator }),
+  reviewController.getAllReviews
+);
+
+/**
+ * @desc Get review statistics overview
+ * @accessPrivate (Admin only)
+ */
+
 
 router.get(
   "/statistics/overview",

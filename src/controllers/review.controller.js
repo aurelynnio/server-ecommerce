@@ -158,6 +158,21 @@ const ReviewController = {
   }),
 
   /**
+   * Get all reviews (Admin)
+   * @access  Private (Admin)
+   */
+  getAllReviews: catchAsync(async (req, res) => {
+    const result = await reviewService.getAllReviews(req.query);
+
+    return sendSuccess(
+      res,
+      result,
+      "All reviews retrieved successfully",
+      StatusCodes.OK
+    );
+  }),
+
+  /**
    * Get review statistics overview
 
 * @access  Private (Admin only)
