@@ -23,7 +23,8 @@ const currentLevel =
  */
 const formatMessage = (level, message, meta = {}) => {
   const timestamp = new Date().toISOString();
-  const metaStr = Object.keys(meta).length > 0 ? ` ${JSON.stringify(meta)}` : "";
+  const metaStr =
+    Object.keys(meta).length > 0 ? ` ${JSON.stringify(meta)}` : "";
   return `[${timestamp}] [${level}] ${message}${metaStr}`;
 };
 

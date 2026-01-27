@@ -19,8 +19,7 @@ const logger = require("../utils/logger");
 class PermissionController {
   /**
    * Get all available permissions
-
-* @access  Public
+   * @access Public
    */
   async getAllPermissions(req, res) {
     try {
@@ -44,8 +43,7 @@ class PermissionController {
 
   /**
    * Get default permissions for each role
-
-* @access  Public
+   * @access Public
    */
   async getRolePermissions(req, res) {
     try {
@@ -62,8 +60,7 @@ class PermissionController {
 
   /**
    * Get current user's effective permissions
-
-* @access  Private (Authenticated users)
+   * @access Private (Authenticated users)
    */
   async getMyPermissions(req, res) {
     try {
@@ -86,8 +83,7 @@ class PermissionController {
 
   /**
    * Get specific user's permissions (Admin only)
-
-* @access  Private (Admin only)
+   * @access Private (Admin only)
    */
   async getUserPermissions(req, res) {
     try {
@@ -124,9 +120,7 @@ class PermissionController {
 
   /**
    * Update user's permissions (Admin only)
-
-* @access  Private (Admin only)
-
+   * @access Private (Admin only)
    */
   async updateUserPermissions(req, res) {
     try {
@@ -181,9 +175,7 @@ class PermissionController {
 
   /**
    * Grant single permission to user (Admin only)
-
-* @access  Private (Admin only)
-
+   * @access Private (Admin only)
    */
   async grantPermission(req, res) {
     try {
@@ -221,9 +213,7 @@ class PermissionController {
 
   /**
    * Revoke single permission from user (Admin only)
-
-* @access  Private (Admin only)
-
+   * @access Private (Admin only)
    */
   async revokePermission(req, res) {
     try {
@@ -261,9 +251,7 @@ class PermissionController {
 
   /**
    * Get permission audit logs (Admin only)
-
-* @access  Private (Admin only)
-
+   * @access Private (Admin only)
    */
   async getAuditLogs(req, res) {
     try {

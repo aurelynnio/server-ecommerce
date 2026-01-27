@@ -11,12 +11,7 @@ const { StatusCodes } = require("http-status-codes");
 const UserController = {
   /**
    * Create a new user (Admin only)
-
-* @access  Private (Admin)
-
-
-
-
+   * @access Private (Admin)
    */
   createUser: catchAsync(async (req, res) => {
     const user = await userService.createUser(req.body);
@@ -30,11 +25,7 @@ const UserController = {
 
   /**
    * Update user by ID (Admin only)
-
-* @access  Private (Admin)
-
-
-
+   * @access Private (Admin)
    */
   updateUser: catchAsync(async (req, res) => {
     // Extract id from validated data
@@ -55,10 +46,7 @@ const UserController = {
 
   /**
    * Upload user avatar
-
-* @access  Private (requires authentication)
-
-
+   * @access Private (requires authentication)
    */
   uploadAvatar: catchAsync(async (req, res) => {
     const file = req.file;
@@ -88,9 +76,7 @@ const UserController = {
 
   /**
    * Get current user's profile
-
-* @access  Private (requires authentication)
-
+   * @access Private (requires authentication)
    */
   getProfile: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -105,11 +91,7 @@ const UserController = {
 
   /**
    * Update current user's profile
-
-* @access  Private (requires authentication)
-
-
-
+   * @access Private (requires authentication)
    */
   updateProfile: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -124,10 +106,7 @@ const UserController = {
 
   /**
    * Add a new address to user's address book
-
-* @access  Private (requires authentication)
-
-
+   * @access Private (requires authentication)
    */
   addAddress: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -142,11 +121,7 @@ const UserController = {
 
   /**
    * Update an existing address
-
-* @access  Private (requires authentication)
-
-
-
+   * @access Private (requires authentication)
    */
   updateAddress: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -165,10 +140,7 @@ const UserController = {
 
   /**
    * Delete an address from user's address book
-
-* @access  Private (requires authentication)
-
-
+   * @access Private (requires authentication)
    */
   deleteAddress: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -186,9 +158,7 @@ const UserController = {
 
   /**
    * Get all user's addresses
-
-* @access  Private (requires authentication)
-
+   * @access Private (requires authentication)
    */
   getAddresses: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -203,7 +173,7 @@ const UserController = {
 
   /**
    * Set an address as the default address
-
+   * @access Private (requires authentication)
    */
   setDefaultAddress: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -221,11 +191,7 @@ const UserController = {
 
   /**
    * Change user's password
-
-* @access  Private (requires authentication)
-
-
-
+   * @access Private (requires authentication)
    */
   changePassword: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -239,13 +205,7 @@ const UserController = {
 
   /**
    * Get all users with pagination (Admin only)
-
-* @access  Private (Admin)
-
-
-
-
-
+   * @access Private (Admin)
    */
   getAllUsers: catchAsync(async (req, res) => {
     const result = await userService.getAllUsers(req.query);
@@ -259,10 +219,7 @@ const UserController = {
 
   /**
    * Get user by ID (Admin only)
-
-* @access  Private (Admin)
-
-
+   * @access Private (Admin)
    */
   getUserById: catchAsync(async (req, res) => {
     const user = await userService.getUserById(req.params.id);
@@ -276,11 +233,7 @@ const UserController = {
 
   /**
    * Update user by ID (Admin only)
-
-* @access  Private (Admin)
-
-
-
+   * @access Private (Admin)
    */
   updateUserById: catchAsync(async (req, res) => {
     const bodyValue = req.body;
@@ -300,11 +253,7 @@ const UserController = {
 
   /**
    * Update user role (Admin only)
-
-* @access  Private (Admin)
-
-
-
+   * @access Private (Admin)
    */
   updateUserRole: catchAsync(async (req, res) => {
     const user = await userService.updateUserRole(req.params.id, req.body.roles);
@@ -318,11 +267,7 @@ const UserController = {
 
   /**
    * Update user permissions (Admin only)
-
-* @access  Private (Admin)
-
-
-
+   * @access Private (Admin)
    */
   updateUserPermissions: catchAsync(async (req, res) => {
     const user = await userService.updateUserPermissions(
@@ -339,10 +284,7 @@ const UserController = {
 
   /**
    * Delete user (Admin only)
-
-* @access  Private (Admin)
-
-
+   * @access Private (Admin)
    */
   deleteUser: catchAsync(async (req, res) => {
     const result = await userService.deleteUser(req.params.id);

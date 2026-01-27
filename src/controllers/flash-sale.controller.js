@@ -3,10 +3,14 @@ const flashSaleService = require("../services/flash-sale.service");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const { StatusCodes } = require("http-status-codes");
 
+/**
+ * Flash Sale Controller
+ * Handles flash sale operations including product management and scheduling
+ */
 const FlashSaleController = {
   /**
    * Get active flash sale products
-
+   * @access Public
    */
   getActiveFlashSale: catchAsync(async (req, res) => {
     const { page, limit } = req.query;
@@ -21,7 +25,7 @@ const FlashSaleController = {
 
   /**
    * Get flash sale schedule
-
+   * @access Public
    */
   getSchedule: catchAsync(async (req, res) => {
     const schedule = await flashSaleService.getFlashSaleSchedule();
@@ -30,7 +34,7 @@ const FlashSaleController = {
 
   /**
    * Get flash sale by time slot
-
+   * @access Public
    */
   getBySlot: catchAsync(async (req, res) => {
     const { timeSlot } = req.params;
@@ -41,7 +45,7 @@ const FlashSaleController = {
 
   /**
    * Add product to flash sale (Seller/Admin)
-
+   * @access Private (Seller or Admin)
    */
   addToFlashSale: catchAsync(async (req, res) => {
     const { productId } = req.params;
@@ -62,7 +66,7 @@ const FlashSaleController = {
 
   /**
    * Remove product from flash sale (Seller/Admin)
-
+   * @access Private (Seller or Admin)
    */
   removeFromFlashSale: catchAsync(async (req, res) => {
     const { productId } = req.params;
@@ -73,7 +77,7 @@ const FlashSaleController = {
 
   /**
    * Get flash sale statistics (Admin)
-
+   * @access Private (Admin only)
    */
   getStats: catchAsync(async (req, res) => {
     const stats = await flashSaleService.getFlashSaleStats();

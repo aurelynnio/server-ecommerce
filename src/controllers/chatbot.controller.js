@@ -5,10 +5,14 @@ const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const { StatusCodes } = require("http-status-codes");
 const logger = require("../utils/logger");
 
+/**
+ * Chatbot Controller
+ * Handles AI chatbot operations including messaging and session management
+ */
 const ChatbotController = {
   /**
    * Send message to chatbot (non-streaming)
-
+   * @access Public
    */
   sendMessage: catchAsync(async (req, res) => {
     const { message, sessionId } = req.body;
@@ -36,7 +40,7 @@ const ChatbotController = {
 
   /**
    * Stream message to chatbot using SSE
-
+   * @access Public
    */
   streamMessage: catchAsync(async (req, res) => {
     const { message, sessionId } = req.body;
@@ -89,7 +93,7 @@ const ChatbotController = {
 
   /**
    * Get chat history
-
+   * @access Public
    */
   getHistory: catchAsync(async (req, res) => {
     const { sessionId } = req.params;
@@ -116,7 +120,7 @@ const ChatbotController = {
 
   /**
    * Clear chat session
-
+   * @access Public
    */
   clearSession: catchAsync(async (req, res) => {
     const { sessionId } = req.params;
@@ -134,7 +138,7 @@ const ChatbotController = {
 
   /**
    * Get chat suggestions
-
+   * @access Public
    */
   getSuggestions: catchAsync(async (_req, res) => {
     const suggestions = [
@@ -152,8 +156,10 @@ const ChatbotController = {
       StatusCodes.OK,
     );
   }),
+
   /**
    * Get all chat sessions (Admin)
+   * @access Private (Admin only)
    */
   getAllSessions: catchAsync(async (req, res) => {
     const { page = 1, limit = 10 } = req.query;

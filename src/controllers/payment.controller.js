@@ -11,10 +11,7 @@ const { StatusCodes } = require("http-status-codes");
 const PaymentController = {
   /**
    * Create payment URL for VNPay
-
-* @access  Private (Authenticated users)
-
-
+   * @access Private (Authenticated users)
    */
   createPayment: catchAsync(async (req, res) => {
     const { orderId } = req.body;
@@ -47,10 +44,7 @@ const PaymentController = {
 
   /**
    * Handle VNPay return callback (user redirect after payment)
-
-* @access  Public
-
-
+   * @access Public
    */
   handleVnpayReturn: catchAsync(async (req, res) => {
     const vnpayParams = req.query;
@@ -77,10 +71,7 @@ const PaymentController = {
 
   /**
    * Handle VNPay IPN (Instant Payment Notification)
-
-* @access  Public
-
-
+   * @access Public
    */
   handleVnpayIPN: catchAsync(async (req, res) => {
     const vnpayParams = req.query;
@@ -94,10 +85,7 @@ const PaymentController = {
 
   /**
    * Get payment details by order ID
-
-* @access  Private (Owner or Admin)
-
-
+   * @access Private (Owner or Admin)
    */
   getPaymentByOrder: catchAsync(async (req, res) => {
     const { orderId } = req.params;

@@ -9,7 +9,7 @@ const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const CartController = {
   /**
    * Get user's shopping cart
-
+   * @access Private (requires authentication)
    */
   getCart: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -25,7 +25,7 @@ const CartController = {
 
   /**
    * Add item to cart
-
+   * @access Private (requires authentication)
    */
   addToCart: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -41,7 +41,7 @@ const CartController = {
 
   /**
    * Update cart item quantity
-
+   * @access Private (requires authentication)
    */
   updateCartItem: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -61,7 +61,7 @@ const CartController = {
 
   /**
    * Remove item from cart
-
+   * @access Private (requires authentication)
    */
   removeCartItem: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -79,7 +79,7 @@ const CartController = {
 
   /**
    * Clear all items from cart
-
+   * @access Private (requires authentication)
    */
   clearCart: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -90,7 +90,7 @@ const CartController = {
 
   /**
    * Get cart item count
-
+   * @access Private (requires authentication)
    */
   getCartItemCount: catchAsync(async (req, res) => {
     const userId = req.user.userId;

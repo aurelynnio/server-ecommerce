@@ -10,6 +10,7 @@ const cacheService = require("./cache.service");
 class SearchService {
   /**
    * Get search suggestions (autocomplete)
+   * PERFORMANCE FIX: Re-enabled cache for better performance
    * @param {string} keyword - Search keyword
    * @param {number} [limit=10] - Maximum suggestions
    * @returns {Promise<Object>} Search suggestions grouped by type
@@ -19,10 +20,10 @@ class SearchService {
       return { products: [], categories: [], shops: [] };
     }
 
-    // Temporarily skip cache to ensure fresh data with variants
-    // const cacheKey = `search:suggestions:${keyword.toLowerCase()}`;
-    // const cached = await cacheService.get(cacheKey);
-    // if (cached) return cached;
+    // PERFORMANCE FIX: Re-enable cache
+    const cacheKey = `search:suggestions:${keyword.toLowerCase()}`;
+    const cached = await cacheService.get(cacheKey);
+    if (cached) return cached;
 
     const regex = new RegExp(keyword, "i");
 
@@ -66,8 +67,8 @@ class SearchService {
       .lean();
 
     const result = { products: productsWithImages, categories, shops };
-    // Temporarily skip cache
-    // await cacheService.set(cacheKey, result, 300); // 5 mins cache
+    // PERFORMANCE FIX: Cache for 5 minutes
+    await cacheService.set(cacheKey, result, 300);
 
     return result;
   }

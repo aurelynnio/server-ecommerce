@@ -3,6 +3,7 @@ const Product = require("../models/product.model");
 const Order = require("../models/order.model");
 const Shop = require("../models/shop.model");
 const { getPaginationParams } = require("../utils/pagination");
+const cacheService = require("./cache.service");
 
 /**
  * Service handling product reviews
@@ -128,25 +129,34 @@ class ReviewService {
       .skip(paginationParams.skip)
       .limit(paginationParams.limit);
 
-    // Calculate rating distribution
-    const ratingDistribution = await Review.aggregate([
-      { $match: { product: productExists._id } },
-      {
-        $group: {
-          _id: "$rating",
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: -1 } },
-    ]);
+    // PERFORMANCE FIX: Cache rating distribution for 5 minutes
+    const distributionCacheKey = `reviews:distribution:${productId}`;
+    let distribution = await cacheService.get(distributionCacheKey);
 
-    const distribution = {};
-    for (let i = 1; i <= 5; i++) {
-      distribution[i] = 0;
+    if (!distribution) {
+      // Calculate rating distribution
+      const ratingDistribution = await Review.aggregate([
+        { $match: { product: productExists._id } },
+        {
+          $group: {
+            _id: "$rating",
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: -1 } },
+      ]);
+
+      distribution = {};
+      for (let i = 1; i <= 5; i++) {
+        distribution[i] = 0;
+      }
+      ratingDistribution.forEach((item) => {
+        distribution[item._id] = item.count;
+      });
+
+      // Cache for 5 minutes
+      await cacheService.set(distributionCacheKey, distribution, 300);
     }
-    ratingDistribution.forEach((item) => {
-      distribution[item._id] = item.count;
-    });
 
     return {
       data: reviews,

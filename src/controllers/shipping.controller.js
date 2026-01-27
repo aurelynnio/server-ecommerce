@@ -10,15 +10,7 @@ const { StatusCodes } = require("http-status-codes");
 const ShippingController = {
   /**
    * Create a new shipping template
-
-* @access  Private (Seller only)
-
-
-
-
-
-
-
+   * @access Private (Seller only)
    */
   createTemplate: catchAsync(async (req, res) => {
     const newTemplate = await shippingService.createTemplate(
@@ -35,9 +27,7 @@ const ShippingController = {
 
   /**
    * Get all shipping templates for current seller's shop
-
-* @access  Private (Seller only)
-
+   * @access Private (Seller only)
    */
   getMyTemplates: catchAsync(async (req, res) => {
     const templates = await shippingService.getMyTemplates(req.user.userId);
@@ -46,11 +36,7 @@ const ShippingController = {
 
   /**
    * Update a shipping template
-
-* @access  Private (Seller only - own templates)
-
-
-
+   * @access Private (Seller only - own templates)
    */
   updateTemplate: catchAsync(async (req, res) => {
     const updated = await shippingService.updateTemplate(
@@ -63,10 +49,7 @@ const ShippingController = {
 
   /**
    * Delete a shipping template
-
-* @access  Private (Seller only - own templates)
-
-
+   * @access Private (Seller only - own templates)
    */
   deleteTemplate: catchAsync(async (req, res) => {
     const deleted = await shippingService.deleteTemplate(

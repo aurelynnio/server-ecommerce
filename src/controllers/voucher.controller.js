@@ -10,18 +10,7 @@ const { StatusCodes } = require("http-status-codes");
 const VoucherController = {
   /**
    * Create a new voucher
-
-* @access  Private (Admin or Seller)
-
-
-
-
-
-
-
-
-
-
+   * @access Private (Admin or Seller)
    */
   createVoucher: catchAsync(async (req, res) => {
     const newVoucher = await voucherService.createVoucher(
@@ -34,10 +23,7 @@ const VoucherController = {
 
   /**
    * Get voucher by ID
-
-* @access  Private (Authenticated users)
-
-
+   * @access Private (Authenticated users)
    */
   getVoucherById: catchAsync(async (req, res) => {
     const voucher = await voucherService.getVoucherById(req.params.id);
@@ -46,14 +32,7 @@ const VoucherController = {
 
   /**
    * Get all vouchers with pagination
-
-* @access  Private (Admin only)
-
-
-
-
-
-
+   * @access Private (Admin only)
    */
   getAllVouchers: catchAsync(async (req, res) => {
     const result = await voucherService.getAllVouchers(req.query);
@@ -62,11 +41,7 @@ const VoucherController = {
 
   /**
    * Update voucher by ID
-
-* @access  Private (Owner or Admin)
-
-
-
+   * @access Private (Owner or Admin)
    */
   updateVoucher: catchAsync(async (req, res) => {
     const voucher = await voucherService.updateVoucher(
@@ -80,10 +55,7 @@ const VoucherController = {
 
   /**
    * Delete voucher (soft delete)
-
-* @access  Private (Owner or Admin)
-
-
+   * @access Private (Owner or Admin)
    */
   deleteVoucher: catchAsync(async (req, res) => {
     const result = await voucherService.deleteVoucher(
@@ -96,10 +68,7 @@ const VoucherController = {
 
   /**
    * Permanently delete voucher
-
-* @access  Private (Admin only)
-
-
+   * @access Private (Admin only)
    */
   permanentDeleteVoucher: catchAsync(async (req, res) => {
     const result = await voucherService.permanentDeleteVoucher(req.params.id);
@@ -108,10 +77,7 @@ const VoucherController = {
 
   /**
    * Get vouchers by shop
-
-* @access  Public
-
-
+   * @access Public
    */
   getShopVouchers: catchAsync(async (req, res) => {
     const vouchers = await voucherService.getShopVouchers(req.params.shopId);
@@ -120,9 +86,7 @@ const VoucherController = {
 
   /**
    * Get platform vouchers
-
-* @access  Public
-
+   * @access Public
    */
   getPlatformVouchers: catchAsync(async (req, res) => {
     const vouchers = await voucherService.getPlatformVouchers();
@@ -131,10 +95,7 @@ const VoucherController = {
 
   /**
    * Get available vouchers for current user
-
-* @access  Private (Authenticated users)
-
-
+   * @access Private (Authenticated users)
    */
   getAvailableVouchers: catchAsync(async (req, res) => {
     const { shopId } = req.query;
@@ -147,12 +108,7 @@ const VoucherController = {
 
   /**
    * Apply voucher to check discount amount
-
-* @access  Private (Authenticated users)
-
-
-
-
+   * @access Private (Authenticated users)
    */
   applyVoucher: catchAsync(async (req, res) => {
     const { code, orderValue, shopId } = req.body;
@@ -167,9 +123,7 @@ const VoucherController = {
 
   /**
    * Get voucher statistics overview
-
-* @access  Private (Admin only)
-
+   * @access Private (Admin only)
    */
   getVoucherStatistics: catchAsync(async (req, res) => {
     const stats = await voucherService.getVoucherStatistics();

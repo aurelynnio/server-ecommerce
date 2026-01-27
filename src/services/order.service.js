@@ -85,9 +85,14 @@ class OrderService {
         const orderProducts = [];
         let subtotal = 0;
 
+        // PERFORMANCE FIX: Batch fetch all products for this shop at once (avoid N+1)
+        const productIds = items.map(item => item.productId._id);
+        const products = await Product.find({ _id: { $in: productIds } }).session(session);
+        const productMap = new Map(products.map(p => [p._id.toString(), p]));
+
         // Verify Stock & Price
         for (const item of items) {
-          const product = await Product.findById(item.productId._id).session(session);
+          const product = productMap.get(item.productId._id.toString());
           if (!product || product.status !== "published")
             throw new Error(`${item.productId.name} unavailable`);
 
@@ -123,7 +128,6 @@ class OrderService {
           }
 
           product.soldCount += item.quantity;
-          await product.save({ session });
 
           subtotal += price * item.quantity;
 
@@ -138,6 +142,23 @@ class OrderService {
             price,
             totalPrice: price * item.quantity,
           });
+        }
+
+        // PERFORMANCE FIX: Save all products in batch using bulkWrite
+        const bulkOps = products.map(product => ({
+          updateOne: {
+            filter: { _id: product._id },
+            update: {
+              $set: {
+                stock: product.stock,
+                soldCount: product.soldCount,
+                models: product.models
+              }
+            }
+          }
+        }));
+        if (bulkOps.length > 0) {
+          await Product.bulkWrite(bulkOps, { session });
         }
 
         // --- APPLY SHOP VOUCHER ---
@@ -412,11 +433,19 @@ class OrderService {
 
   /**
    * Restore stock when order is cancelled
+   * PERFORMANCE FIX: Batch fetch and update products to avoid N+1 queries
    * @param {Object} order - Order object
    */
   async restoreOrderStock(order) {
+    // Batch fetch all products at once
+    const productIds = order.products.map(item => item.productId);
+    const products = await Product.find({ _id: { $in: productIds } });
+    const productMap = new Map(products.map(p => [p._id.toString(), p]));
+
+    const bulkOps = [];
+
     for (const item of order.products) {
-      const product = await Product.findById(item.productId);
+      const product = productMap.get(item.productId.toString());
       if (product) {
         if (item.modelId) {
           const model = product.models.find(
@@ -430,8 +459,25 @@ class OrderService {
           product.stock += item.quantity;
         }
         product.soldCount = Math.max(0, product.soldCount - item.quantity);
-        await product.save();
+
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: product._id },
+            update: {
+              $set: {
+                stock: product.stock,
+                soldCount: product.soldCount,
+                models: product.models
+              }
+            }
+          }
+        });
       }
+    }
+
+    // Single bulk update instead of N individual saves
+    if (bulkOps.length > 0) {
+      await Product.bulkWrite(bulkOps);
     }
   }
 
@@ -531,20 +577,33 @@ class OrderService {
       { $limit: 10 },
     ]);
 
-    // 5. Summary counts
-    const totalOrders = await Order.countDocuments({ shopId: shopObjectId });
-    const pendingOrders = await Order.countDocuments({
-      shopId: shopObjectId,
-      status: "pending",
-    });
-    const completedOrders = await Order.countDocuments({
-      shopId: shopObjectId,
-      status: "delivered",
-    });
-    const cancelledOrders = await Order.countDocuments({
-      shopId: shopObjectId,
-      status: "cancelled",
-    });
+    // 7. Summary counts - PERFORMANCE FIX: Use single aggregation with $facet
+    const summaryCounts = await Order.aggregate([
+      { $match: { shopId: shopObjectId } },
+      {
+        $facet: {
+          total: [{ $count: "count" }],
+          pending: [
+            { $match: { status: "pending" } },
+            { $count: "count" }
+          ],
+          completed: [
+            { $match: { status: "delivered" } },
+            { $count: "count" }
+          ],
+          cancelled: [
+            { $match: { status: "cancelled" } },
+            { $count: "count" }
+          ]
+        }
+      }
+    ]);
+
+    const counts = summaryCounts[0] || {};
+    const totalOrders = counts.total?.[0]?.count || 0;
+    const pendingOrders = counts.pending?.[0]?.count || 0;
+    const completedOrders = counts.completed?.[0]?.count || 0;
+    const cancelledOrders = counts.cancelled?.[0]?.count || 0;
 
     return {
       summary: {
@@ -700,6 +759,7 @@ class OrderService {
 
   /**
    * Cancel an order and restore stock
+   * PERFORMANCE FIX: Batch fetch and update products to avoid N+1 queries
    * @param {string} orderId - Order ID
    * @param {string} userId - User ID (for ownership verification)
    * @returns {Promise<Object>} Cancelled order
@@ -714,9 +774,16 @@ class OrderService {
       throw new Error("Cannot cancel order in this status");
     }
 
+    // PERFORMANCE FIX: Batch fetch all products at once
+    const productIds = order.products.map(item => item.productId);
+    const products = await Product.find({ _id: { $in: productIds } });
+    const productMap = new Map(products.map(p => [p._id.toString(), p]));
+
+    const bulkOps = [];
+
     // Restore Stock
     for (const item of order.products) {
-      const product = await Product.findById(item.productId);
+      const product = productMap.get(item.productId.toString());
       if (product) {
         if (item.modelId) {
           const model = product.models.find(
@@ -730,8 +797,25 @@ class OrderService {
           product.stock += item.quantity;
         }
         product.soldCount = Math.max(0, product.soldCount - item.quantity);
-        await product.save();
+
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: product._id },
+            update: {
+              $set: {
+                stock: product.stock,
+                soldCount: product.soldCount,
+                models: product.models
+              }
+            }
+          }
+        });
       }
+    }
+
+    // Single bulk update instead of N individual saves
+    if (bulkOps.length > 0) {
+      await Product.bulkWrite(bulkOps);
     }
 
     order.status = "cancelled";
@@ -884,11 +968,33 @@ class OrderService {
       }
     ]);
 
-    // 7. Summary counts
-    const totalOrders = await Order.countDocuments(dateFilter);
-    const pendingOrders = await Order.countDocuments({ ...dateFilter, status: "pending" });
-    const completedOrders = await Order.countDocuments({ ...dateFilter, status: "delivered" });
-    const cancelledOrders = await Order.countDocuments({ ...dateFilter, status: "cancelled" });
+    // 7. Summary counts - PERFORMANCE FIX: Use single aggregation with $facet
+    const adminSummaryCounts = await Order.aggregate([
+      { $match: dateFilter },
+      {
+        $facet: {
+          total: [{ $count: "count" }],
+          pending: [
+            { $match: { status: "pending" } },
+            { $count: "count" }
+          ],
+          completed: [
+            { $match: { status: "delivered" } },
+            { $count: "count" }
+          ],
+          cancelled: [
+            { $match: { status: "cancelled" } },
+            { $count: "count" }
+          ]
+        }
+      }
+    ]);
+
+    const adminCounts = adminSummaryCounts[0] || {};
+    const totalOrders = adminCounts.total?.[0]?.count || 0;
+    const pendingOrders = adminCounts.pending?.[0]?.count || 0;
+    const completedOrders = adminCounts.completed?.[0]?.count || 0;
+    const cancelledOrders = adminCounts.cancelled?.[0]?.count || 0;
 
     return {
       summary: {

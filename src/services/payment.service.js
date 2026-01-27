@@ -11,6 +11,28 @@ const { getIO } = require("../socket/index");
 const logger = require("../utils/logger");
 
 /**
+ * PERFORMANCE FIX: Singleton VNPay instance - reuse across requests
+ */
+let vnpayInstance = null;
+
+/**
+ * Get or create VNPay instance (singleton pattern)
+ * @returns {Object} VNPay instance
+ */
+const getVNPayInstance = () => {
+  if (!vnpayInstance) {
+    vnpayInstance = new VNPay({
+      tmnCode: process.env.VNP_TMNCODE,
+      secureSecret: process.env.VNP_HASHSECRET,
+      vnpayHost: process.env.VNP_URL || "https://sandbox.vnpayment.vn",
+      testMode: process.env.NODE_ENV !== "production",
+      hashAlgorithm: "SHA512",
+    });
+  }
+  return vnpayInstance;
+};
+
+/**
  * Service handling payment operations
  * Integrates with VNPay for payment processing
  */
@@ -42,14 +64,8 @@ class PaymentService {
       throw new Error("Order has already been paid");
     }
 
-    // Initialize VNPay
-    const vnpay = new VNPay({
-      tmnCode: process.env.VNP_TMNCODE,
-      secureSecret: process.env.VNP_HASHSECRET,
-      vnpayHost: process.env.VNP_URL || "https://sandbox.vnpayment.vn",
-      testMode: process.env.NODE_ENV !== "production",
-      hashAlgorithm: "SHA512",
-    });
+    // PERFORMANCE FIX: Use singleton VNPay instance
+    const vnpay = getVNPayInstance();
 
     // Generate unique transaction reference
     const transactionId = `${orderId}_${Date.now()}`;
@@ -98,13 +114,8 @@ class PaymentService {
    * @throws {Error} If signature is invalid
    */
   async verifyReturnUrl(vnpayParams) {
-    const vnpay = new VNPay({
-      tmnCode: process.env.VNP_TMNCODE,
-      secureSecret: process.env.VNP_HASHSECRET,
-      vnpayHost: process.env.VNP_URL || "https://sandbox.vnpayment.vn",
-      testMode: process.env.NODE_ENV !== "production",
-      hashAlgorithm: "SHA512",
-    });
+    // PERFORMANCE FIX: Use singleton VNPay instance
+    const vnpay = getVNPayInstance();
 
     // Verify signature
     const isValid = vnpay.verifyReturnUrl(vnpayParams);
@@ -170,13 +181,8 @@ class PaymentService {
    * @returns {Object} IPN response
    */
   async handleIPN(vnpayParams) {
-    const vnpay = new VNPay({
-      tmnCode: process.env.VNP_TMNCODE,
-      secureSecret: process.env.VNP_HASHSECRET,
-      vnpayHost: process.env.VNP_URL || "https://sandbox.vnpayment.vn",
-      testMode: process.env.NODE_ENV !== "production",
-      hashAlgorithm: "SHA512",
-    });
+    // PERFORMANCE FIX: Use singleton VNPay instance
+    const vnpay = getVNPayInstance();
 
     // Verify IPN signature
     const isValid = vnpay.verifyIpnCall(vnpayParams);

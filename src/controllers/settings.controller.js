@@ -10,8 +10,7 @@ const { StatusCodes } = require("http-status-codes");
 const SettingsController = {
   /**
    * Get all settings
-
-* @access  Private (Admin only)
+   * @access Private (Admin only)
    */
   getSettings: catchAsync(async (req, res) => {
     const settings = await settingsService.getSettings();
@@ -20,9 +19,7 @@ const SettingsController = {
 
   /**
    * Update settings (partial update)
-
-* @access  Private (Admin only)
-
+   * @access Private (Admin only)
    */
   updateSettings: catchAsync(async (req, res) => {
     const settings = await settingsService.updateSettings(
@@ -39,9 +36,7 @@ const SettingsController = {
 
   /**
    * Get specific settings section
-
-* @access  Private (Admin only)
-
+   * @access Private (Admin only)
    */
   getSection: catchAsync(async (req, res) => {
     const { section } = req.params;
@@ -51,9 +46,7 @@ const SettingsController = {
 
   /**
    * Update specific settings section
-
-* @access  Private (Admin only)
-
+   * @access Private (Admin only)
    */
   updateSection: catchAsync(async (req, res) => {
     const { section } = req.params;
@@ -72,8 +65,7 @@ const SettingsController = {
 
   /**
    * Reset settings to default
-
-* @access  Private (Admin only)
+   * @access Private (Admin only)
    */
   resetSettings: catchAsync(async (req, res) => {
     const settings = await settingsService.resetSettings(req.user.userId);

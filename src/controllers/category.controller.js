@@ -10,13 +10,7 @@ const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const CategoryController = {
   /**
    * Create a new category (Admin only)
-
-* @access  Private (Admin)
-
-
-
-
-
+   * @access Private (Admin)
    */
   createCategory: catchAsync(async (req, res) => {
     const category = await categoryService.createCategory(req.body);
@@ -31,13 +25,7 @@ const CategoryController = {
 
   /**
    * Get all categories with pagination (Admin)
-
-* @access  Private (Admin)
-
-
-
-
-
+   * @access Private (Admin)
    */
   getAllCategories: catchAsync(async (req, res) => {
     const result = await categoryService.getAllCategories(req.query);
@@ -52,11 +40,7 @@ const CategoryController = {
 
   /**
    * Get active categories for public display
-
-* @access  Public
-
-
-
+   * @access Public
    */
   getActiveCategories: catchAsync(async (req, res) => {
     const result = await categoryService.getActiveCategories(req.query);
@@ -71,9 +55,7 @@ const CategoryController = {
 
   /**
    * Get hierarchical category tree
-
-* @access  Public
-
+   * @access Public
    */
   getCategoryTree: catchAsync(async (req, res) => {
     const tree = await categoryService.getCategoryTree();
@@ -88,10 +70,7 @@ const CategoryController = {
 
   /**
    * Get category by ID
-
-* @access  Public
-
-
+   * @access Public
    */
   getCategoryById: catchAsync(async (req, res) => {
     const category = await categoryService.getCategoryById(req.params.categoryId);
@@ -106,10 +85,7 @@ const CategoryController = {
 
   /**
    * Get category by slug
-
-* @access  Public
-
-
+   * @access Public
    */
   getCategoryBySlug: catchAsync(async (req, res) => {
     const category = await categoryService.getCategoryBySlug(req.params.slug);
@@ -124,10 +100,7 @@ const CategoryController = {
 
   /**
    * Get category with its subcategories
-
-* @access  Public
-
-
+   * @access Public
    */
   getCategoryWithSubcategories: catchAsync(async (req, res) => {
     const result = await categoryService.getCategoryWithSubcategories(
@@ -144,11 +117,7 @@ const CategoryController = {
 
   /**
    * Update a category (Admin only)
-
-* @access  Private (Admin)
-
-
-
+   * @access Private (Admin)
    */
   updateCategory: catchAsync(async (req, res) => {
     const category = await categoryService.updateCategory(
@@ -166,10 +135,7 @@ const CategoryController = {
 
   /**
    * Delete a category (Admin only)
-
-* @access  Private (Admin)
-
-
+   * @access Private (Admin)
    */
   deleteCategory: catchAsync(async (req, res) => {
     const result = await categoryService.deleteCategory(req.params.categoryId);
@@ -179,9 +145,7 @@ const CategoryController = {
 
   /**
    * Get category statistics (Admin only)
-
-* @access  Private (Admin)
-
+   * @access Private (Admin)
    */
   getCategoryStatistics: catchAsync(async (req, res) => {
     const stats = await categoryService.getCategoryStatistics();

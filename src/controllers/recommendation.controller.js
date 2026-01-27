@@ -2,10 +2,14 @@ const catchAsync = require("../configs/catchAsync");
 const recommendationService = require("../services/recommendation.service");
 const { sendSuccess } = require("../shared/res/formatResponse");
 
+/**
+ * Recommendation Controller
+ * Handles product recommendation operations
+ */
 const RecommendationController = {
   /**
    * Get personalized recommendations ("Guess You Like")
-
+   * @access Public (personalized if authenticated)
    */
   getForYou: catchAsync(async (req, res) => {
     const userId = req.user?._id;
@@ -28,7 +32,7 @@ const RecommendationController = {
 
   /**
    * Get frequently bought together products
-
+   * @access Public
    */
   getFrequentlyBoughtTogether: catchAsync(async (req, res) => {
     const { productId } = req.params;
@@ -44,7 +48,7 @@ const RecommendationController = {
 
   /**
    * Get similar products
-
+   * @access Public
    */
   getSimilar: catchAsync(async (req, res) => {
     const { productId } = req.params;
@@ -60,7 +64,7 @@ const RecommendationController = {
 
   /**
    * Get recently viewed products
-
+   * @access Private (requires authentication)
    */
   getRecentlyViewed: catchAsync(async (req, res) => {
     const userId = req.user?._id;
@@ -80,7 +84,7 @@ const RecommendationController = {
 
   /**
    * Track product view
-
+   * @access Public (tracks if authenticated)
    */
   trackView: catchAsync(async (req, res) => {
     const userId = req.user?._id;
@@ -95,7 +99,7 @@ const RecommendationController = {
 
   /**
    * Get category recommendations
-
+   * @access Public
    */
   getCategoryRecommendations: catchAsync(async (req, res) => {
     const { categoryId } = req.params;
@@ -111,7 +115,7 @@ const RecommendationController = {
 
   /**
    * Get homepage recommendations
-
+   * @access Public (personalized if authenticated)
    */
   getHomepage: catchAsync(async (req, res) => {
     const userId = req.user?._id;

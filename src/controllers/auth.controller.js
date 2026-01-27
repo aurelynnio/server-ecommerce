@@ -12,12 +12,7 @@ const jwt = require("jsonwebtoken");
 const AuthController = {
   /**
    * Register a new user
-
-* @access  Public
-
-
-
-
+   * @access Public
    */
   register: catchAsync(async (req, res) => {
     const result = await authService.register(req.body);
@@ -31,11 +26,7 @@ const AuthController = {
 
   /**
    * Authenticate user and return tokens
-
-* @access  Public
-
-
-
+   * @access Public
    */
   login: catchAsync(async (req, res) => {
     const { email, password } = req.body;
@@ -68,10 +59,7 @@ const AuthController = {
 
   /**
    * Send email verification code
-
-* @access  Public
-
-
+   * @access Public
    */
   sendVerificationCode: catchAsync(async (req, res) => {
     const { email } = req.body;
@@ -86,10 +74,7 @@ const AuthController = {
 
   /**
    * Verify email with verification code
-
-* @access  Public
-
-
+   * @access Public
    */
   verifyEmail: catchAsync(async (req, res) => {
     const { code } = req.body;
@@ -104,10 +89,7 @@ const AuthController = {
 
   /**
    * Request password reset (forgot password)
-
-* @access  Public
-
-
+   * @access Public
    */
   forgotPassword: catchAsync(async (req, res) => {
     const { email } = req.body;
@@ -122,12 +104,7 @@ const AuthController = {
 
   /**
    * Reset password with verification code
-
-* @access  Public
-
-
-
-
+   * @access Public
    */
   resetPassword: catchAsync(async (req, res) => {
     const { email, code, newPassword } = req.body;
@@ -142,11 +119,8 @@ const AuthController = {
 
   /**
    * Refresh access token using refresh token
-
-* @access  Public (requires valid refresh token)
+   * @access Public (requires valid refresh token)
    * @cookie refreshToken - HTTP-only refresh token
-
-
    */
   refreshToken: catchAsync(async (req, res) => {
     // Lấy refresh token từ cookie (ưu tiên) hoặc body (fallback)
@@ -213,9 +187,7 @@ const AuthController = {
 
   /**
    * Logout user and clear tokens
-
-* @access  Private (requires authentication)
-
+   * @access Private (requires authentication)
    */
   logout: catchAsync(async (req, res) => {
     res.clearCookie("accessToken", {
@@ -235,11 +207,7 @@ const AuthController = {
 
   /**
    * Change password for authenticated user
-
-* @access  Private (requires authentication)
-
-
-
+   * @access Private (requires authentication)
    */
   changePassword: catchAsync(async (req, res) => {
     const { currentPassword, newPassword } = req.body;

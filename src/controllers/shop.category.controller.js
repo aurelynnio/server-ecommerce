@@ -10,13 +10,7 @@ const { StatusCodes } = require("http-status-codes");
 const ShopCategoryController = {
   /**
    * Create a new shop category
-
-* @access  Private (Seller only)
-
-
-
-
-
+   * @access Private (Seller only)
    */
   createCategory: catchAsync(async (req, res) => {
     const newCategory = await shopCategoryService.createCategory(
@@ -33,9 +27,7 @@ const ShopCategoryController = {
 
   /**
    * Get all categories for current seller's shop
-
-* @access  Private (Seller only)
-
+   * @access Private (Seller only)
    */
   getMyShopCategories: catchAsync(async (req, res) => {
     const categories = await shopCategoryService.getMyShopCategories(
@@ -51,10 +43,7 @@ const ShopCategoryController = {
 
   /**
    * Get all categories for a specific shop
-
-* @access  Public
-
-
+   * @access Public
    */
   getShopCategories: catchAsync(async (req, res) => {
     const categories = await shopCategoryService.getShopCategories(
@@ -71,15 +60,7 @@ const ShopCategoryController = {
 
   /**
    * Update a shop category
-
-* @access  Private (Seller only - own categories)
-
-
-
-
-
-
-
+   * @access Private (Seller only - own categories)
    */
   updateCategory: catchAsync(async (req, res) => {
     const updated = await shopCategoryService.updateCategory(
@@ -92,10 +73,7 @@ const ShopCategoryController = {
 
   /**
    * Delete a shop category
-
-* @access  Private (Seller only - own categories)
-
-
+   * @access Private (Seller only - own categories)
    */
   deleteCategory: catchAsync(async (req, res) => {
     const deleted = await shopCategoryService.deleteCategory(

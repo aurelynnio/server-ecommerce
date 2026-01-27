@@ -2,10 +2,14 @@ const catchAsync = require("../configs/catchAsync");
 const searchService = require("../services/search.service");
 const { sendSuccess } = require("../shared/res/formatResponse");
 
+/**
+ * Search Controller
+ * Handles search operations including suggestions, trending, and advanced search
+ */
 const SearchController = {
   /**
    * Get search suggestions (autocomplete)
-
+   * @access Public
    */
   getSuggestions: catchAsync(async (req, res) => {
     const { q, limit } = req.query;
@@ -20,7 +24,7 @@ const SearchController = {
 
   /**
    * Get trending searches
-
+   * @access Public
    */
   getTrending: catchAsync(async (req, res) => {
     const { limit } = req.query;
@@ -34,7 +38,7 @@ const SearchController = {
 
   /**
    * Get hot keywords
-
+   * @access Public
    */
   getHotKeywords: catchAsync(async (req, res) => {
     const { limit } = req.query;
@@ -46,7 +50,7 @@ const SearchController = {
 
   /**
    * Advanced search with filters
-
+   * @access Public
    */
   advancedSearch: catchAsync(async (req, res) => {
     const {

@@ -4,6 +4,7 @@
  */
 
 const User = require("../models/user.model");
+const PermissionAudit = require("../models/permission-audit.model");
 const {
   ROLE_PERMISSIONS,
   getAllPermissionsList,
@@ -197,6 +198,7 @@ class PermissionService {
 
   /**
    * Log a permission change to audit log
+   * PERFORMANCE FIX: Use top-level require instead of dynamic require
    * @param {string} action - 'grant' or 'revoke'
    * @param {string} adminId - Admin user ID
    * @param {string} targetUserId - Target user ID
@@ -204,7 +206,6 @@ class PermissionService {
    */
   async logAudit(action, adminId, targetUserId, permission) {
     try {
-      const PermissionAudit = require("../models/permission-audit.model");
       await PermissionAudit.create({
         action,
         adminId,
@@ -220,13 +221,13 @@ class PermissionService {
 
   /**
    * Log a bulk permission update
+   * PERFORMANCE FIX: Use top-level require instead of dynamic require
    * @param {string} adminId - Admin user ID
    * @param {string} targetUserId - Target user ID
    * @param {string[]} permissions - New permissions array
    */
   async logBulkUpdate(adminId, targetUserId, permissions) {
     try {
-      const PermissionAudit = require("../models/permission-audit.model");
       await PermissionAudit.create({
         action: "bulk_update",
         adminId,
@@ -243,6 +244,7 @@ class PermissionService {
 
   /**
    * Get audit logs with pagination and filters
+   * PERFORMANCE FIX: Use top-level require instead of dynamic require
    * @param {Object} options - Query options
    * @param {number} options.page - Page number
    * @param {number} options.limit - Items per page
@@ -252,8 +254,6 @@ class PermissionService {
    */
   async getAuditLogs({ page = 1, limit = 20, userId, action }) {
     try {
-      const PermissionAudit = require("../models/permission-audit.model");
-
       const query = {};
       if (userId) query.targetUserId = userId;
       if (action) query.action = action;

@@ -11,13 +11,7 @@ const { StatusCodes } = require("http-status-codes");
 const ShopController = {
   /**
    * Get all shops (Admin)
-
-* @access  Private (Admin only)
-
-
-
-
-
+   * @access Private (Admin only)
    */
   getAllShops: catchAsync(async (req, res) => {
     const { page, limit, status, search, sort } = req.query;
@@ -33,11 +27,7 @@ const ShopController = {
 
   /**
    * Update shop status (Admin)
-
-* @access  Private (Admin only)
-
-
-
+   * @access Private (Admin only)
    */
   updateShopStatus: catchAsync(async (req, res) => {
     const { shopId } = req.params;
@@ -48,15 +38,7 @@ const ShopController = {
 
   /**
    * Register a new shop (become a seller)
-
-* @access  Private (Authenticated users)
-
-
-
-
-
-
-
+   * @access Private (Authenticated users)
    */
   createShop: catchAsync(async (req, res) => {
     const newShop = await shopService.createShop(req.user.userId, req.body);
@@ -70,10 +52,7 @@ const ShopController = {
 
   /**
    * Get shop information by ID
-
-* @access  Public
-
-
+   * @access Public
    */
   getShopInfo: catchAsync(async (req, res) => {
     const shop = await shopService.getShopInfo(req.params.shopId);
@@ -82,10 +61,7 @@ const ShopController = {
 
   /**
    * Get shop information by slug
-
-* @access  Public
-
-
+   * @access Public
    */
   getShopBySlug: catchAsync(async (req, res) => {
     const shop = await shopService.getShopBySlug(req.params.slug);
@@ -94,9 +70,7 @@ const ShopController = {
 
   /**
    * Get current user's shop information
-
-* @access  Private (Seller only)
-
+   * @access Private (Seller only)
    */
   getMyShop: catchAsync(async (req, res) => {
     const shop = await shopService.getMyShop(req.user.userId);
@@ -105,16 +79,7 @@ const ShopController = {
 
   /**
    * Update current user's shop information
-
-* @access  Private (Seller only)
-
-
-
-
-
-
-
-
+   * @access Private (Seller only)
    */
   updateShop: catchAsync(async (req, res) => {
     const updatedShop = await shopService.updateShop(req.user.userId, req.body);
@@ -123,9 +88,7 @@ const ShopController = {
 
   /**
    * Get shop statistics for seller dashboard
-
-* @access  Private (Seller or Admin)
-
+   * @access Private (Seller or Admin)
    */
   getShopStatistics: catchAsync(async (req, res) => {
     const statistics = await shopService.getShopStatistics(req.user.userId);
@@ -139,11 +102,7 @@ const ShopController = {
 
   /**
    * Upload shop image (logo or banner)
-
-* @access  Private (Seller or Admin)
-
-
-
+   * @access Private (Seller or Admin)
    */
   uploadImage: catchAsync(async (req, res) => {
     const file = req.file;

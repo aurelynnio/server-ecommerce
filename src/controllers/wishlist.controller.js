@@ -3,10 +3,14 @@ const wishlistService = require("../services/wishlist.service");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const { StatusCodes } = require("http-status-codes");
 
+/**
+ * Wishlist Controller
+ * Handles user wishlist operations
+ */
 const WishlistController = {
   /**
    * Get user's wishlist
-
+   * @access Private (requires authentication)
    */
   getWishlist: catchAsync(async (req, res) => {
     const userId = req.user._id;
@@ -22,7 +26,7 @@ const WishlistController = {
 
   /**
    * Add product to wishlist
-
+   * @access Private (requires authentication)
    */
   addToWishlist: catchAsync(async (req, res) => {
     const userId = req.user._id;
@@ -34,7 +38,7 @@ const WishlistController = {
 
   /**
    * Remove product from wishlist
-
+   * @access Private (requires authentication)
    */
   removeFromWishlist: catchAsync(async (req, res) => {
     const userId = req.user._id;
@@ -46,7 +50,7 @@ const WishlistController = {
 
   /**
    * Check if product is in wishlist
-
+   * @access Private (requires authentication)
    */
   checkInWishlist: catchAsync(async (req, res) => {
     const userId = req.user._id;
@@ -58,7 +62,7 @@ const WishlistController = {
 
   /**
    * Clear entire wishlist
-
+   * @access Private (requires authentication)
    */
   clearWishlist: catchAsync(async (req, res) => {
     const userId = req.user._id;
@@ -69,7 +73,7 @@ const WishlistController = {
 
   /**
    * Get wishlist count
-
+   * @access Private (requires authentication)
    */
   getWishlistCount: catchAsync(async (req, res) => {
     const userId = req.user._id;
@@ -80,7 +84,7 @@ const WishlistController = {
 
   /**
    * Check multiple products in wishlist
-
+   * @access Private (requires authentication)
    */
   checkMultiple: catchAsync(async (req, res) => {
     const userId = req.user._id;

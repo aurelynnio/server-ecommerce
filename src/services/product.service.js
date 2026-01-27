@@ -1,4 +1,4 @@
-﻿const Product = require("../models/product.model");
+const Product = require("../models/product.model");
 const {
   getPaginationParams,
   buildPaginationResponse,
@@ -824,15 +824,16 @@ class ProductService {
 
   /**
    * Search products by keyword (optimized for autocomplete)
+   * PERFORMANCE FIX: Re-enabled cache for better performance
    * @param {string} keyword - Search keyword
    * @param {number} [limit=10] - Maximum results to return
    * @returns {Promise<Array>} Matching products with basic info
    */
   async searchProducts(keyword, limit = 10) {
-    // Skip cache temporarily to ensure fresh data
-    // const cacheKey = `products:search:${keyword}:${limit}`;
-    // const cachedProducts = await cacheService.get(cacheKey);
-    // if (cachedProducts) return cachedProducts;
+    // PERFORMANCE FIX: Re-enable cache
+    const cacheKey = `products:search:${keyword}:${limit}`;
+    const cachedProducts = await cacheService.get(cacheKey);
+    if (cachedProducts) return cachedProducts;
 
     const query = {
       status: "published",
@@ -855,8 +856,8 @@ class ProductService {
       image: product.variants?.[0]?.images?.[0] || null,
     }));
 
-    // Skip cache temporarily
-    // await cacheService.set(cacheKey, productsWithImages, 600); // 10 mins cache
+    // PERFORMANCE FIX: Cache for 5 minutes
+    await cacheService.set(cacheKey, productsWithImages, 300);
     return productsWithImages;
   }
 

@@ -30,45 +30,74 @@ class NotificationService {
     const { getIO } = require("../socket/index");
 
     // Broadcast Logic for Promotion
+    // PERFORMANCE FIX: Use cursor with batch processing instead of loading ALL users
     if (type === "promotion") {
-      const users = await User.find({}).select("_id");
-      if (users.length > 0) {
-        const notificationsData = users.map((user) => ({
-          userId: user._id,
-          type,
-          title,
-          message,
-          orderId,
-          link,
-        }));
+      const BATCH_SIZE = 1000;
+      let processedCount = 0;
+      
+      // Use cursor to stream users without loading all into memory
+      const cursor = User.find({}).select("_id").cursor();
+      let batch = [];
 
-        await Notification.insertMany(notificationsData);
-
-        try {
-          const io = getIO();
-          const targetedIds = [];
-          users.forEach((user) => {
-            const userStrId = user._id.toString();
-            targetedIds.push(userStrId);
-            io.to(userStrId).emit("new_notification", {
-              _id: new mongoose.Types.ObjectId(),
+      for await (const user of cursor) {
+        batch.push({
+          insertOne: {
+            document: {
               userId: user._id,
               type,
               title,
               message,
               orderId,
               link,
-              createdAt: new Date(),
               isRead: false,
+              createdAt: new Date(),
+            }
+          }
+        });
+
+        if (batch.length >= BATCH_SIZE) {
+          await Notification.bulkWrite(batch);
+          
+          // Emit socket notifications for this batch
+          try {
+            const io = getIO();
+            batch.forEach(item => {
+              const userStrId = item.insertOne.document.userId.toString();
+              io.to(userStrId).emit("new_notification", {
+                _id: new mongoose.Types.ObjectId(),
+                ...item.insertOne.document,
+              });
+            });
+          } catch (error) {
+            logger.error("Socket broadcast error:", { error: error.message });
+          }
+
+          processedCount += batch.length;
+          batch = [];
+        }
+      }
+
+      // Process remaining batch
+      if (batch.length > 0) {
+        await Notification.bulkWrite(batch);
+        
+        try {
+          const io = getIO();
+          batch.forEach(item => {
+            const userStrId = item.insertOne.document.userId.toString();
+            io.to(userStrId).emit("new_notification", {
+              _id: new mongoose.Types.ObjectId(),
+              ...item.insertOne.document,
             });
           });
-          // Broadcast completed silently
         } catch (error) {
           logger.error("Socket broadcast error:", { error: error.message });
         }
-        return { message: `Broadcasted to ${users.length} users` };
+
+        processedCount += batch.length;
       }
-      return { message: "No users to broadcast" };
+
+      return { message: `Broadcasted to ${processedCount} users` };
     }
 
     // Single User Notification

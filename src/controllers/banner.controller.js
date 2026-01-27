@@ -10,15 +10,7 @@ const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const BannerController = {
   /**
    * Create a new banner
-
-* @access  Private (Admin only)
-
-
-
-
-
-
-
+   * @access Private (Admin only)
    */
   createBanner: catchAsync(async (req, res) => {
     const banner = await bannerService.createBanner(req.body, req.file);
@@ -32,11 +24,7 @@ const BannerController = {
 
   /**
    * Get active banners for public display
-
-* @access  Public
-
-
-
+   * @access Public
    */
   getBanners: catchAsync(async (req, res) => {
     const { limit, page, ...filter } = req.query;
@@ -51,11 +39,7 @@ const BannerController = {
    
   /**
    * Get all banners for admin management
-
-* @access  Private (Admin only)
-
-
-
+   * @access Private (Admin only)
    */
   getAllBannersAdmin: catchAsync(async (req, res) => {
      const { limit, page, ...filter } = req.query;
@@ -70,10 +54,7 @@ const BannerController = {
 
   /**
    * Get banner by ID
-
-* @access  Public
-
-
+   * @access Public
    */
   getBannerById: catchAsync(async (req, res) => {
     const banner = await bannerService.getBannerById(req.params.id);
@@ -86,16 +67,7 @@ const BannerController = {
 
   /**
    * Update a banner
-
-* @access  Private (Admin only)
-
-
-
-
-
-
-
-
+   * @access Private (Admin only)
    */
   updateBanner: catchAsync(async (req, res) => {
     const banner = await bannerService.updateBanner(req.params.id, req.body, req.file);
@@ -108,10 +80,7 @@ const BannerController = {
 
   /**
    * Delete a banner
-
-* @access  Private (Admin only)
-
-
+   * @access Private (Admin only)
    */
   deleteBanner: catchAsync(async (req, res) => {
     const result = await bannerService.deleteBanner(req.params.id);
@@ -124,4 +93,3 @@ const BannerController = {
 };
 
 module.exports = BannerController;
-

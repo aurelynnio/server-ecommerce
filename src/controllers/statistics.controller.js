@@ -10,9 +10,8 @@ const { sendSuccess } = require("../shared/res/formatResponse");
 const statisticsController = {
   /**
    * Get dashboard statistics overview
-
-* @access  Private (Admin only)
-
+   * @access Private (Admin only)
+   * @returns {Object} Dashboard statistics including:
    *   - totalUsers: Total registered users
    *   - totalOrders: Total orders count
    *   - totalRevenue: Total revenue

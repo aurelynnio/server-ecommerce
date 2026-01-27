@@ -10,14 +10,7 @@ const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const OrderController = {
   /**
    * Create order from cart items
-
-* @access  Private (requires authentication)
-
-
-
-
-
-
+   * @access Private (requires authentication)
    */
   createOrder: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -33,10 +26,7 @@ const OrderController = {
 
   /**
    * Get all orders (Admin only)
-
-* @access  Private (Admin only)
-
-
+   * @access Private (Admin only)
    */
   getAllOrders: catchAsync(async (req, res) => {
     const result = await orderService.getAllOrders(req.query);
@@ -51,10 +41,7 @@ const OrderController = {
 
   /**
    * Get current user's orders
-
-* @access  Private (requires authentication)
-
-
+   * @access Private (requires authentication)
    */
   getUserOrders: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -70,10 +57,7 @@ const OrderController = {
 
   /**
    * Get single order by ID
-
-* @access  Private (Owner or Admin)
-
-
+   * @access Private (Owner or Admin)
    */
   getOrderById: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -94,11 +78,7 @@ const OrderController = {
 
   /**
    * Update order status
-
-* @access  Private (Admin or Seller)
-
-
-
+   * @access Private (Admin or Seller)
    */
   updateOrderStatus: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -123,10 +103,7 @@ const OrderController = {
 
   /**
    * Cancel an order
-
-* @access  Private (Owner or Admin)
-
-
+   * @access Private (Owner or Admin)
    */
   cancelOrder: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -147,9 +124,7 @@ const OrderController = {
 
   /**
    * Get order statistics for admin dashboard
-
-* @access  Private (Admin only)
-
+   * @access Private (Admin only)
    */
   getOrderStatistics: catchAsync(async (req, res) => {
     const stats = await orderService.getOrderStatistics();
@@ -164,9 +139,7 @@ const OrderController = {
 
   /**
    * Get orders for seller's shop
-
-* @access  Private (Seller only)
-
+   * @access Private (Seller only)
    */
   getSellerOrders: catchAsync(async (req, res) => {
     const shopId = req.shop._id;
@@ -182,11 +155,7 @@ const OrderController = {
 
   /**
    * Update order status by seller
-
-* @access  Private (Seller only)
-
-
-
+   * @access Private (Seller only)
    */
   updateOrderStatusBySeller: catchAsync(async (req, res) => {
     const shopId = req.shop._id;
@@ -209,9 +178,7 @@ const OrderController = {
 
   /**
    * Get order statistics for seller's shop
-
-* @access  Private (Seller only)
-
+   * @access Private (Seller only)
    */
   getSellerOrderStatistics: catchAsync(async (req, res) => {
     const shopId = req.shop._id;

@@ -10,13 +10,7 @@ const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const ReviewController = {
   /**
    * Create a new review for a product
-
-* @access  Private (Authenticated users - must have purchased product)
-
-
-
-
-
+   * @access Private (Authenticated users - must have purchased product)
    */
   createReview: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -32,14 +26,7 @@ const ReviewController = {
 
   /**
    * Get all reviews for a specific product
-
-* @access  Public
-
-
-
-
-
-
+   * @access Public
    */
   getProductReviews: catchAsync(async (req, res) => {
     const result = await reviewService.getProductReviews(
@@ -57,11 +44,7 @@ const ReviewController = {
 
   /**
    * Get current user's reviews
-
-* @access  Private (Authenticated users)
-
-
-
+   * @access Private (Authenticated users)
    */
   getUserReviews: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -77,10 +60,7 @@ const ReviewController = {
 
   /**
    * Get a single review by ID
-
-* @access  Public
-
-
+   * @access Public
    */
   getReviewById: catchAsync(async (req, res) => {
     const review = await reviewService.getReviewById(req.params.reviewId);
@@ -95,13 +75,7 @@ const ReviewController = {
 
   /**
    * Update an existing review
-
-* @access  Private (Owner only)
-
-
-
-
-
+   * @access Private (Owner only)
    */
   updateReview: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -121,10 +95,7 @@ const ReviewController = {
 
   /**
    * Delete a review
-
-* @access  Private (Owner or Admin)
-
-
+   * @access Private (Owner or Admin)
    */
   deleteReview: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -140,10 +111,7 @@ const ReviewController = {
 
   /**
    * Check if current user can review a product
-
-* @access  Private (Authenticated users)
-
-
+   * @access Private (Authenticated users)
    */
   canUserReview: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -159,7 +127,7 @@ const ReviewController = {
 
   /**
    * Get all reviews (Admin)
-   * @access  Private (Admin)
+   * @access Private (Admin)
    */
   getAllReviews: catchAsync(async (req, res) => {
     const result = await reviewService.getAllReviews(req.query);
@@ -174,7 +142,7 @@ const ReviewController = {
 
   /**
    * Get reviews for seller's shop
-   * @access  Private (Seller only)
+   * @access Private (Seller only)
    */
   getShopReviews: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -190,7 +158,7 @@ const ReviewController = {
 
   /**
    * Reply to a review
-   * @access  Private (Seller only)
+   * @access Private (Seller only)
    */
   replyReview: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -209,9 +177,7 @@ const ReviewController = {
 
   /**
    * Get review statistics overview
-
-* @access  Private (Admin only)
-
+   * @access Private (Admin only)
    */
   getReviewStatistics: catchAsync(async (req, res) => {
     const stats = await reviewService.getReviewStatistics();

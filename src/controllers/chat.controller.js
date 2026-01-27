@@ -10,11 +10,7 @@ const { StatusCodes } = require("http-status-codes");
 const ChatController = {
   /**
    * Start or get an existing conversation
-
-* @access  Private (Authenticated users)
-
-
-
+   * @access Private (Authenticated users)
    */
   startConversation: catchAsync(async (req, res) => {
     const conversation = await chatService.startConversation(
@@ -31,12 +27,7 @@ const ChatController = {
 
   /**
    * Send a message in a conversation
-
-* @access  Private (Authenticated users)
-
-
-
-
+   * @access Private (Authenticated users)
    */
   sendMessage: catchAsync(async (req, res) => {
     const info = await chatService.sendMessage(req.user.userId, req.body);
@@ -45,9 +36,7 @@ const ChatController = {
 
   /**
    * Get all conversations for current user
-
-* @access  Private (Authenticated users)
-
+   * @access Private (Authenticated users)
    */
   getMyConversations: catchAsync(async (req, res) => {
     const conversations = await chatService.getMyConversations(req.user.userId);
@@ -61,10 +50,7 @@ const ChatController = {
 
   /**
    * Get all messages in a conversation
-
-* @access  Private (Authenticated users - participants only)
-
-
+   * @access Private (Authenticated users - participants only)
    */
   getMessages: catchAsync(async (req, res) => {
     const messages = await chatService.getMessages(req.params.conversationId);
@@ -73,10 +59,7 @@ const ChatController = {
 
   /**
    * Mark all messages in a conversation as read
-
-* @access  Private (Authenticated users - participants only)
-
-
+   * @access Private (Authenticated users - participants only)
    */
   markAsRead: catchAsync(async (req, res) => {
     const { conversationId } = req.params;

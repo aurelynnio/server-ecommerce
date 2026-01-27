@@ -5,25 +5,77 @@ const Product = require("../models/product.model");
 class StatisticsService {
   /**
    * Get overall dashboard statistics
+   * PERFORMANCE FIX: Use $facet to combine multiple counts into single query
    * @returns {Promise<Object>} Dashboard data
    */
   async getDashboardStats() {
-    // 1. Counts
-    const totalRevenue = await Order.aggregate([
-      { $match: { paymentStatus: "paid" } },
-      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    // PERFORMANCE FIX: Combine all counts into single aggregation with $facet
+    const [countsResult, recentOrdersRaw, topProductsRaw, monthlyStatsRaw] = await Promise.all([
+      // Single aggregation for all counts
+      Promise.all([
+        Order.aggregate([
+          {
+            $facet: {
+              totalRevenue: [
+                { $match: { paymentStatus: "paid" } },
+                { $group: { _id: null, total: { $sum: "$totalAmount" } } }
+              ],
+              totalOrders: [{ $count: "count" }]
+            }
+          }
+        ]),
+        User.countDocuments({ roles: "user" }),
+        Product.countDocuments({ status: "published" })
+      ]),
+
+      // Recent Orders (5)
+      Order.find()
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .populate("userId", "username email avatar")
+        .lean(),
+
+      // Top Products (By Revenue or Sold Count) - Only products with sales
+      Product.find({ soldCount: { $gt: 0 } })
+        .sort({ soldCount: -1 })
+        .limit(5)
+        .select("name price soldCount variants slug")
+        .lean(),
+
+      // Monthly Stats
+      Order.aggregate([
+        {
+          $match: {
+            status: { $ne: "cancelled" },
+            createdAt: {
+              $gte: new Date(new Date().setMonth(new Date().getMonth() - 5)),
+            },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              month: { $month: "$createdAt" },
+              year: { $year: "$createdAt" },
+            },
+            revenue: {
+              $sum: {
+                $cond: [{ $eq: ["$paymentStatus", "paid"] }, "$totalAmount", 0]
+              }
+            },
+            orders: { $sum: 1 },
+          },
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1 } },
+      ])
     ]);
 
-    const totalOrders = await Order.countDocuments();
-    const totalUsers = await User.countDocuments({ roles: "user" });
-    const totalProducts = await Product.countDocuments({ status: "published" });
-
-    // 2. Recent Orders (5)
-    const recentOrdersRaw = await Order.find()
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .populate("userId", "username email avatar")
-      .lean();
+    // Extract counts from aggregation result
+    const orderAggResult = countsResult[0][0]?.[0] || {};
+    const totalRevenue = orderAggResult.totalRevenue?.[0]?.total || 0;
+    const totalOrders = orderAggResult.totalOrders?.[0]?.count || 0;
+    const totalUsers = countsResult[1];
+    const totalProducts = countsResult[2];
     
     // Transform recentOrders to match client expected format
     const recentOrders = recentOrdersRaw.map(order => ({
@@ -79,32 +131,6 @@ class StatisticsService {
         });
     }
 
-    const monthlyStatsRaw = await Order.aggregate([
-      {
-        $match: {
-          status: { $ne: "cancelled" }, // Exclude cancelled, include pending/unpaid
-          createdAt: {
-            $gte: new Date(new Date().setMonth(new Date().getMonth() - 5)), 
-          },
-        },
-      },
-      {
-        $group: {
-          _id: {
-            month: { $month: "$createdAt" },
-            year: { $year: "$createdAt" },
-          },
-          revenue: {
-            $sum: {
-              $cond: [{ $eq: ["$paymentStatus", "paid"] }, "$totalAmount", 0]
-            }
-          },
-          orders: { $sum: 1 },
-        },
-      },
-      { $sort: { "_id.year": 1, "_id.month": 1 } },
-    ]);
-
     // Map raw data to a lookup object
     const statsMap = {};
     monthlyStatsRaw.forEach(item => {
@@ -124,13 +150,13 @@ class StatisticsService {
 
     return {
       // Flat structure for stats cards
-      totalRevenue: totalRevenue[0]?.total || 0,
+      totalRevenue: totalRevenue,
       totalOrders: totalOrders,
       totalUsers: totalUsers,
       totalProducts: totalProducts,
       // Also include counts object for backward compatibility
       counts: {
-        revenue: totalRevenue[0]?.total || 0,
+        revenue: totalRevenue,
         orders: totalOrders,
         users: totalUsers,
         products: totalProducts,

@@ -49,13 +49,27 @@ class CacheService {
 
   /**
    * Delete cache by pattern (e.g., "products:*")
+   * PERFORMANCE FIX: Use SCAN instead of KEYS to avoid blocking Redis
    * @param {string} pattern
    */
   async delByPattern(pattern) {
     try {
-      const keys = await redis.keys(pattern);
-      if (keys.length > 0) {
-        await redis.del(...keys);
+      let cursor = '0';
+      let deletedCount = 0;
+
+      // Use SCAN to iterate through keys without blocking Redis
+      do {
+        const [newCursor, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+        cursor = newCursor;
+
+        if (keys.length > 0) {
+          await redis.del(...keys);
+          deletedCount += keys.length;
+        }
+      } while (cursor !== '0');
+
+      if (deletedCount > 0) {
+        logger.info(`Redis: Deleted ${deletedCount} keys matching pattern [${pattern}]`);
       }
     } catch (error) {
       logger.error(`Redis DelPattern Error [${pattern}]:`, { error });

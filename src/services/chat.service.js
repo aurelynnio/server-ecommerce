@@ -67,12 +67,44 @@ class ChatService {
     return conversations;
   }
 
-  async getMessages(conversationId) {
+  /**
+   * Get messages for a conversation with pagination
+   * PERFORMANCE FIX: Added pagination to prevent loading too many messages
+   * @param {string} conversationId - Conversation ID
+   * @param {Object} options - Pagination options
+   * @param {number} [options.page=1] - Page number
+   * @param {number} [options.limit=50] - Messages per page
+   * @returns {Promise<Object>} Messages with pagination
+   */
+  async getMessages(conversationId, { page = 1, limit = 50 } = {}) {
     // Basic check omitted, but usually verify user membership here too
-    const messages = await Message.find({ conversationId }).sort({
-      createdAt: 1,
-    });
-    return messages;
+    const skip = (page - 1) * limit;
+
+    const [messages, total] = await Promise.all([
+      Message.find({ conversationId })
+        .sort({ createdAt: -1 }) // Latest first
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Message.countDocuments({ conversationId })
+    ]);
+
+    // Reverse to show oldest first within the page
+    const reversedMessages = messages.reverse();
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data: reversedMessages,
+      pagination: {
+        currentPage: page,
+        pageSize: limit,
+        totalItems: total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      }
+    };
   }
 
   async markAsRead(conversationId, userId) {

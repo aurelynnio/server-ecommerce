@@ -12,19 +12,30 @@ const VerificationEmail = require("../emails/VerificationEmail").default;
 const logger = require("../utils/logger");
 
 /**
- * Create email transporter configuration
+ * PERFORMANCE FIX: Singleton transporter - reuse connection pool
+ */
+let transporter = null;
+
+/**
+ * Get or create email transporter (singleton pattern)
  * @returns {Object} Nodemailer transporter instance
  */
-const createTransporter = () => {
-  return nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-    auth: {
-      user: "cyhincdr@gmail.com",
-      pass: "plnbqekohbjynjlt",
-    },
-  });
+const getTransporter = () => {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      pool: true, // Use connection pooling
+      maxConnections: 5, // Max 5 concurrent connections
+      maxMessages: 100, // Max 100 messages per connection
+      auth: {
+        user: "cyhincdr@gmail.com",
+        pass: "plnbqekohbjynjlt",
+      },
+    });
+  }
+  return transporter;
 };
 
 /**
@@ -35,7 +46,7 @@ const createTransporter = () => {
  */
 const sendVerificationCode = async (to, code, type = "email_verification") => {
   try {
-    const transporter = createTransporter();
+    const transporter = getTransporter();
 
     const subject =
       type === "email_verification"
