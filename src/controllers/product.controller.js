@@ -89,35 +89,6 @@ const ProductController = {
   }),
 
   /**
-   * Update an existing product
-   * @access Private (Seller/Admin)
-   */
-  updateProduct: catchAsync(async (req, res) => {
-    const { id } = req.params;
-    const product = await productService.updateProduct(id, req.body, req.files);
-    return sendSuccess(
-      res,
-      product,
-      "Product updated successfully",
-      StatusCodes.OK
-    );
-  }),
-
-  /**
-   * Soft delete a product
-   * @access Private (Seller/Admin)
-   */
-  deleteProduct: catchAsync(async (req, res) => {
-    const product = await productService.deleteProduct(req.params.id);
-    return sendSuccess(
-      res,
-      product,
-      "Product deleted successfully",
-      StatusCodes.OK
-    );
-  }),
-
-  /**
    * Permanently delete a product
    * @access Private (Admin only)
    */
@@ -127,54 +98,6 @@ const ProductController = {
       res,
       null,
       "Product permanently deleted",
-      StatusCodes.OK
-    );
-  }),
-
-  /**
-   * Add a variant to a product
-   * @access Private (Seller/Admin)
-   */
-  addVariant: catchAsync(async (req, res) => {
-    const { id } = req.params;
-
-    const product = await productService.addVariant(id, req.body, req.files);
-    return sendSuccess(
-      res,
-      product,
-      "Variant added successfully",
-      StatusCodes.CREATED
-    );
-  }),
-
-  /**
-   * Update a product variant
-   * @access Private (Seller/Admin)
-   */
-  updateVariant: catchAsync(async (req, res) => {
-    const { id, variantId } = req.params;
-    const product = await productService.updateVariant(id, variantId, req.body);
-    return sendSuccess(
-      res,
-      product,
-      "Variant updated successfully",
-      StatusCodes.OK
-    );
-  }),
-
-  /**
-   * Delete a product variant
-   * @access Private (Seller/Admin)
-   */
-  deleteVariant: catchAsync(async (req, res) => {
-    const product = await productService.deleteVariant(
-      req.params.id,
-      req.params.variantId
-    );
-    return sendSuccess(
-      res,
-      product,
-      "Variant deleted successfully",
       StatusCodes.OK
     );
   }),
@@ -328,6 +251,42 @@ const ProductController = {
       "Product deleted successfully",
       StatusCodes.OK
     );
+  }),
+
+  /**
+   * Add variant by seller
+   * @access Private (Seller)
+   */
+  addVariantBySeller: catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const shopId = req.shop._id;
+    
+    const product = await productService.addVariantBySeller(id, shopId, req.body, req.files);
+    return sendSuccess(res, product, "Variant added successfully", StatusCodes.CREATED);
+  }),
+
+  /**
+   * Update variant by seller
+   * @access Private (Seller)
+   */
+  updateVariantBySeller: catchAsync(async (req, res) => {
+    const { id, variantId } = req.params;
+    const shopId = req.shop._id;
+
+    const product = await productService.updateVariantBySeller(id, shopId, variantId, req.body);
+    return sendSuccess(res, product, "Variant updated successfully", StatusCodes.OK);
+  }),
+
+  /**
+   * Delete variant by seller
+   * @access Private (Seller)
+   */
+  deleteVariantBySeller: catchAsync(async (req, res) => {
+    const { id, variantId } = req.params;
+    const shopId = req.shop._id;
+
+    const product = await productService.deleteVariantBySeller(id, shopId, variantId);
+    return sendSuccess(res, product, "Variant deleted successfully", StatusCodes.OK);
   }),
 };
 

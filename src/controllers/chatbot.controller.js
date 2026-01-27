@@ -1,5 +1,5 @@
 const catchAsync = require("../configs/catchAsync");
-const chatbotService = require("../chatbot");
+const chatbotService = require("../services/chatbot.service");
 const mongoose = require("mongoose");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const { StatusCodes } = require("http-status-codes");

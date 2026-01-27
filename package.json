@@ -8,7 +8,9 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "embeddings:init": "node src/scripts/init-embeddings.js",
+    "embeddings:rebuild": "node src/scripts/init-embeddings.js --force"
   },
   "keywords": [],
   "author": "",

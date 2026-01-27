@@ -9,6 +9,7 @@ const { multiUpload } = require("../configs/cloudinary");
 const { getIO } = require("../socket/index");
 const cacheService = require("./cache.service");
 const logger = require("../utils/logger");
+const { embedProduct, deleteProductEmbedding } = require("./embedding.service");
 
 /**
  * Service handling product operations
@@ -354,6 +355,16 @@ class ProductService {
       });
     }
 
+    // Generate embedding for the new product (async, don't wait)
+    if (product.status === "published") {
+      const populatedProduct = await Product.findById(product._id)
+        .populate("category", "name")
+        .lean();
+      embedProduct(populatedProduct).catch((err) => {
+        logger.error("[ProductService] Error embedding new product:", err.message);
+      });
+    }
+
     return product;
   }
 
@@ -469,6 +480,21 @@ class ProductService {
       // Invalidate cache
       await cacheService.delByPattern("products:*");
 
+      // Update embedding for the product (async, don't wait)
+      if (product.status === "published") {
+        const populatedProduct = await Product.findById(product._id)
+          .populate("category", "name")
+          .lean();
+        embedProduct(populatedProduct).catch((err) => {
+          logger.error("[ProductService] Error updating product embedding:", err.message);
+        });
+      } else {
+        // If product is no longer published, delete its embedding
+        deleteProductEmbedding(product._id).catch((err) => {
+          logger.error("[ProductService] Error deleting product embedding:", err.message);
+        });
+      }
+
       return product;
     } catch (error) {
       logger.error("Error in updateProduct service:", error);
@@ -494,6 +520,11 @@ class ProductService {
     }
 
     await cacheService.delByPattern("products:*");
+
+    // Delete embedding for the deleted product (async, don't wait)
+    deleteProductEmbedding(id).catch((err) => {
+      logger.error("[ProductService] Error deleting product embedding:", err.message);
+    });
 
     return product;
   }
@@ -941,11 +972,7 @@ class ProductService {
     // Verify ownership and soft delete
     const product = await Product.findOneAndUpdate(
       { _id: productId, shop: shopId },
-      {
-        isActive: false,
-        deletedAt: new Date(),
-        deletedBy: "seller",
-      },
+      { status: "deleted" },
       { new: true },
     );
 
@@ -958,7 +985,56 @@ class ProductService {
     // Invalidate cache
     await cacheService.delByPattern("products:*");
 
+    // Delete embedding
+    deleteProductEmbedding(productId).catch((err) => {
+      logger.error("[ProductService] Error deleting product embedding:", err.message);
+    });
+
     return product;
+  }
+
+  /**
+   * Add variant by seller
+   * @param {string} productId
+   * @param {string} shopId
+   * @param {Object} variantData
+   * @param {Array} files
+   */
+  async addVariantBySeller(productId, shopId, variantData, files) {
+    const product = await Product.findOne({ _id: productId, shop: shopId });
+    if (!product) {
+      throw new Error("Product not found or access denied");
+    }
+    return this.addVariant(productId, variantData, files);
+  }
+
+  /**
+   * Update variant by seller
+   * @param {string} productId
+   * @param {string} shopId
+   * @param {string} variantId
+   * @param {Object} variantData
+   */
+  async updateVariantBySeller(productId, shopId, variantId, variantData) {
+    const product = await Product.findOne({ _id: productId, shop: shopId });
+    if (!product) {
+      throw new Error("Product not found or access denied");
+    }
+    return this.updateVariant(productId, variantId, variantData);
+  }
+
+  /**
+   * Delete variant by seller
+   * @param {string} productId
+   * @param {string} shopId
+   * @param {string} variantId
+   */
+  async deleteVariantBySeller(productId, shopId, variantId) {
+    const product = await Product.findOne({ _id: productId, shop: shopId });
+    if (!product) {
+      throw new Error("Product not found or access denied");
+    }
+    return this.deleteVariant(productId, variantId);
   }
 }
 

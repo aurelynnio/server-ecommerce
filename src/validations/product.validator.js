@@ -64,10 +64,38 @@ const getProductsQueryValidator = Joi.object({
   status: Joi.string().valid("draft", "published", "suspended", "all"),
 });
 
+const addVariantValidator = variantSchema.keys({
+  _id: Joi.forbidden(), // Should not provide _id when adding
+  sku: Joi.string().required(), // SKU usually required when adding
+});
+
+const updateVariantValidator = variantSchema.fork(
+  Object.keys(variantSchema.describe().keys),
+  (schema) => schema.optional()
+).keys({
+  _id: Joi.forbidden(),
+});
+
 module.exports = {
   createProductValidator,
   updateProductValidator,
   getProductsQueryValidator,
+  addVariantValidator,
+  updateVariantValidator,
   mongoIdParamValidator: Joi.object({ id: objectId.required() }),
   slugParamValidator: Joi.object({ slug: Joi.string().required() }),
+  categoryIdParamValidator: Joi.object({ categoryId: objectId.required() }),
+  categorySlugParamValidator: Joi.object({ slug: Joi.string().required() }),
+  variantIdsParamValidator: Joi.object({
+    id: objectId.required(),
+    variantId: objectId.required(), // Variant ID is typically an ObjectId
+  }),
+  paginationQueryValidator: Joi.object(pagination),
+  limitQueryValidator: Joi.object({
+    limit: Joi.number().integer().min(1).max(100).default(10),
+  }),
+  searchQueryValidator: Joi.object({
+    q: searchString.required(),
+    limit: Joi.number().integer().min(1).max(100).default(10),
+  }),
 };

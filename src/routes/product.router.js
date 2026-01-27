@@ -131,29 +131,47 @@ router.post(
 );
 
 /**
- * @desc    Update product
- * @access  Private (Admin only)
+ * @desc    Add variant by seller
+ * @access  Private (Seller/Admin)
  */
-router.put(
-  "/:id",
+router.post(
+  "/seller/:id/variants",
   verifyAccessToken,
-  requireRole("admin"),
-  upload.any(),
-  parseJsonFields(["price", "variants", "tags", "tierVariations", "models", "attributes", "dimensions", "variantImageMapping", "existingDescriptionImages", "existingVariantImages"]),
-  validate({ params: mongoIdParamValidator, body: updateProductValidator }),
-  productController.updateProduct
+  requireRole("seller", "admin"),
+  verifyShopOwnership,
+  verifyProductOwnership,
+  upload.array("images", 10),
+  parseJsonFields(["price"]),
+  validate({ params: mongoIdParamValidator, body: addVariantValidator }),
+  productController.addVariantBySeller
 );
 
 /**
- * @desc    Delete product (soft delete)
- * @access  Private (Admin only)
+ * @desc    Update variant by seller
+ * @access  Private (Seller/Admin)
+ */
+router.put(
+  "/seller/:id/variants/:variantId",
+  verifyAccessToken,
+  requireRole("seller", "admin"),
+  verifyShopOwnership,
+  verifyProductOwnership,
+  validate({ params: variantIdsParamValidator, body: updateVariantValidator }),
+  productController.updateVariantBySeller
+);
+
+/**
+ * @desc    Delete variant by seller
+ * @access  Private (Seller/Admin)
  */
 router.delete(
-  "/:id",
+  "/seller/:id/variants/:variantId",
   verifyAccessToken,
-  requireRole("admin"),
-  validate({ params: mongoIdParamValidator }),
-  productController.deleteProduct
+  requireRole("seller", "admin"),
+  verifyShopOwnership,
+  verifyProductOwnership,
+  validate({ params: variantIdsParamValidator }),
+  productController.deleteVariantBySeller
 );
 
 /**
@@ -166,44 +184,6 @@ router.delete(
   requireRole("admin"),
   validate({ params: mongoIdParamValidator }),
   productController.permanentDeleteProduct
-);
-
-/**
- * @desc    Add variant to product
- * @access  Private (Admin only)
- */
-router.post(
-  "/:id/variants",
-  verifyAccessToken,
-  requireRole("admin"),
-  upload.array("images", 10),
-  parseJsonFields(["price"]),
-  validate({ params: mongoIdParamValidator, body: addVariantValidator }),
-  productController.addVariant
-);
-
-/**
- * @desc    Update variant
- * @access  Private (Admin only)
- */
-router.put(
-  "/:id/variants/:variantId",
-  verifyAccessToken,
-  requireRole("admin"),
-  validate({ params: variantIdsParamValidator, body: updateVariantValidator }),
-  productController.updateVariant
-);
-
-/**
- * @desc    Delete variant
- * @access  Private (Admin only)
- */
-router.delete(
-  "/:id/variants/:variantId",
-  verifyAccessToken,
-  requireRole("admin"),
-  validate({ params: variantIdsParamValidator }),
-  productController.deleteVariant
 );
 
 module.exports = router;

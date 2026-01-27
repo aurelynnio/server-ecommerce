@@ -1,130 +1,7 @@
 const Product = require("../models/product.model");
 const Category = require("../models/category.model");
 const mongoose = require("mongoose");
-const logger = require("../utils/logger");
-
-// Định nghĩa các tools cho AI
-const toolDefinitions = [
-  {
-    type: "function",
-    function: {
-      name: "search_products",
-      description:
-        "Tìm kiếm sản phẩm theo từ khóa, danh mục, giá. Dùng khi khách hỏi về sản phẩm.",
-      parameters: {
-        type: "object",
-        properties: {
-          keyword: { type: "string", description: "Từ khóa tìm kiếm" },
-          category: { type: "string", description: "Tên danh mục" },
-          minPrice: { type: "number", description: "Giá tối thiểu" },
-          maxPrice: { type: "number", description: "Giá tối đa" },
-          limit: {
-            type: "number",
-            description: "Số lượng kết quả",
-            default: 5,
-          },
-        },
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_product_details",
-      description:
-        "Lấy chi tiết sản phẩm theo ID hoặc slug. Dùng khi khách muốn biết thêm về sản phẩm cụ thể.",
-      parameters: {
-        type: "object",
-        properties: {
-          productId: { type: "string", description: "ID hoặc slug sản phẩm" },
-        },
-        required: ["productId"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_categories",
-      description:
-        "Lấy danh sách các danh mục sản phẩm. Dùng khi khách muốn xem có những loại sản phẩm gì.",
-      parameters: { type: "object", properties: {} },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_featured_products",
-      description:
-        "Lấy sản phẩm nổi bật, bán chạy. Dùng khi khách chưa biết mua gì hoặc muốn gợi ý.",
-      parameters: {
-        type: "object",
-        properties: {
-          type: {
-            type: "string",
-            enum: ["featured", "newArrivals", "onSale"],
-            description:
-              "Loại sản phẩm: featured (nổi bật), newArrivals (mới), onSale (giảm giá)",
-          },
-          limit: { type: "number", default: 5 },
-        },
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "check_product_availability",
-      description:
-        "Kiểm tra tồn kho sản phẩm theo size/màu. Dùng khi khách hỏi còn hàng không.",
-      parameters: {
-        type: "object",
-        properties: {
-          productId: { type: "string", description: "ID hoặc slug sản phẩm" },
-          size: { type: "string", description: "Size cần kiểm tra" },
-          color: { type: "string", description: "Màu cần kiểm tra" },
-        },
-        required: ["productId"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "generate_checkout_link",
-      description:
-        "Tạo link checkout cho sản phẩm. LUÔN DÙNG khi khách muốn mua hoặc đã quyết định.",
-      parameters: {
-        type: "object",
-        properties: {
-          productId: { type: "string", description: "ID hoặc slug sản phẩm" },
-          variantId: { type: "string", description: "ID variant (size/màu)" },
-          quantity: { type: "number", default: 1 },
-        },
-        required: ["productId"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "compare_products",
-      description:
-        "So sánh 2-3 sản phẩm. Dùng khi khách phân vân giữa các lựa chọn.",
-      parameters: {
-        type: "object",
-        properties: {
-          productIds: {
-            type: "array",
-            items: { type: "string" },
-            description: "Danh sách ID sản phẩm cần so sánh",
-          },
-        },
-        required: ["productIds"],
-      },
-    },
-  },
-];
+const logger = require("./logger"); // Corrected path to logger
 
 // Helper function để tìm product theo ID hoặc slug
 async function findProduct(productId) {
@@ -147,7 +24,8 @@ async function findProduct(productId) {
 const toolHandlers = {
   async search_products({ keyword, category, minPrice, maxPrice, limit = 5 }) {
     try {
-      const query = { isActive: true };
+      // Note: isActive is a virtual field, use status instead
+      const query = { status: "published" };
 
       if (keyword) {
         query.$or = [
@@ -256,18 +134,51 @@ const toolHandlers = {
 
   async get_featured_products({ type = "featured", limit = 5 }) {
     try {
-      const query = { isActive: true };
+      // Note: isActive and onSale are virtual fields, use status and price conditions instead
+      const query = { status: "published" };
+      let sort = { soldCount: -1 };
 
-      if (type === "featured") query.isFeatured = true;
-      else if (type === "newArrivals") query.isNewArrival = true;
-      else if (type === "onSale") query.onSale = true;
+      if (type === "featured") {
+        query.isFeatured = true;
+      } else if (type === "newArrivals") {
+        query.isNewArrival = true;
+        sort = { createdAt: -1 };
+      } else if (type === "onSale") {
+        // onSale is a virtual field - we need to query the actual price fields
+        // Products with discountPrice < currentPrice
+        query["price.discountPrice"] = { $exists: true, $ne: null };
+        query.$expr = { $lt: ["$price.discountPrice", "$price.currentPrice"] };
+      }
 
       const products = await Product.find(query)
         .populate("category", "name")
         .select("name slug price variants brand")
-        .sort({ soldCount: -1 })
+        .sort(sort)
         .limit(limit)
         .lean();
+
+      // Fallback: if query returns empty, get any published products
+      if (products.length === 0 && (type === "featured" || type === "newArrivals")) {
+        logger.info(`[Tool] No ${type} products found, falling back to all products`);
+        const fallbackProducts = await Product.find({ status: "published" })
+          .populate("category", "name")
+          .select("name slug price variants brand")
+          .sort({ soldCount: -1 })
+          .limit(limit)
+          .lean();
+        
+        return fallbackProducts.map((p) => ({
+          id: p._id,
+          name: p.name,
+          slug: p.slug,
+          price: p.price?.discountPrice || p.price?.currentPrice,
+          originalPrice: p.price?.currentPrice,
+          brand: p.brand,
+          image: p.variants?.[0]?.images?.[0] || null,
+          checkoutUrl: `/checkout?product=${p._id}`,
+          productUrl: `/products/${p.slug}`,
+        }));
+      }
 
       return products.map((p) => ({
         id: p._id,
@@ -404,4 +315,4 @@ const toolHandlers = {
   },
 };
 
-module.exports = { toolDefinitions, toolHandlers };
+module.exports = { toolHandlers };

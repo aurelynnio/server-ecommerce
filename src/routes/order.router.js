@@ -116,21 +116,6 @@ router.put(
 );
 
 /**
- * @desc    Update order status
- * @access  Private (Admin)
- */
-router.put(
-  "/:orderId/status",
-  verifyAccessToken,
-  requireRole("admin"),
-  validate({
-    params: orderIdParamValidator,
-    body: updateOrderStatusValidator,
-  }),
-  orderController.updateOrderStatus
-);
-
-/**
  * @desc    Get order statistics overview
  * @access  Private (Admin)
  */

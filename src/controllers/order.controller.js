@@ -77,31 +77,6 @@ const OrderController = {
   }),
 
   /**
-   * Update order status
-   * @access Private (Admin or Seller)
-   */
-  updateOrderStatus: catchAsync(async (req, res) => {
-    const userId = req.user.userId;
-    const isAdmin = req.user.role === "admin";
-    const shopId = req.user.shopId || null; // Seller's shop ID if applicable
-
-    const order = await orderService.updateOrderStatus(
-      req.params.orderId,
-      req.body.status,
-      userId,
-      isAdmin,
-      shopId
-    );
-
-    return sendSuccess(
-      res,
-      order,
-      "Order status updated successfully",
-      StatusCodes.OK
-    );
-  }),
-
-  /**
    * Cancel an order
    * @access Private (Owner or Admin)
    */
