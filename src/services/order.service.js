@@ -7,6 +7,7 @@ const mongoose = require("mongoose");
 
 const voucherService = require("./voucher.service");
 const Voucher = require("../models/voucher.model");
+const inventoryService = require("./inventory.service");
 
 /**
  * Service handling order operations
@@ -84,13 +85,14 @@ class OrderService {
       for (const [shopId, items] of shopItemsMap.entries()) {
         const orderProducts = [];
         let subtotal = 0;
+        const inventoryItems = [];
 
         // PERFORMANCE FIX: Batch fetch all products for this shop at once (avoid N+1)
         const productIds = items.map(item => item.productId._id);
         const products = await Product.find({ _id: { $in: productIds } }).session(session);
         const productMap = new Map(products.map(p => [p._id.toString(), p]));
 
-        // Verify Stock & Price
+        // Verify Price & Build Inventory List
         for (const item of items) {
           const product = productMap.get(item.productId._id.toString());
           if (!product || product.status !== "published")
@@ -101,33 +103,33 @@ class OrderService {
           let tierIndex = [];
 
           if (item.modelId) {
-            const model = product.models.find(
-              (m) => m._id.toString() === item.modelId.toString()
+            // FIX: Use variants instead of models
+            const variant = product.variants?.find(
+              (v) => v._id.toString() === item.modelId.toString()
             );
 
-            if (!model) {
+            if (!variant) {
               throw new Error(`Variation for ${product.name} no longer exists`);
             }
 
-            if (model.stock < item.quantity) {
-              throw new Error(`Out of stock for ${product.name}`);
-            }
+            // Note: Stock check is now handled by inventoryService.deductStock
 
-            price = model.price;
-            skuCode = model.sku;
-            tierIndex = model.tierIndex;
+            price = variant.price;
+            skuCode = variant.sku;
+            tierIndex = variant.tierIndex || []; // Handle optional tierIndex
 
-            // Deduct Stock
-            model.stock -= item.quantity;
-            model.sold = (model.sold || 0) + item.quantity;
+            inventoryItems.push({
+                productId: product._id,
+                modelId: item.modelId,
+                quantity: item.quantity
+            });
           } else {
-            // Base product stock check
-            if (product.stock < item.quantity)
-              throw new Error(`Out of stock for ${product.name}`);
-            product.stock -= item.quantity;
+            // Base product
+            inventoryItems.push({
+                productId: product._id,
+                quantity: item.quantity
+            });
           }
-
-          product.soldCount += item.quantity;
 
           subtotal += price * item.quantity;
 
@@ -144,22 +146,8 @@ class OrderService {
           });
         }
 
-        // PERFORMANCE FIX: Save all products in batch using bulkWrite
-        const bulkOps = products.map(product => ({
-          updateOne: {
-            filter: { _id: product._id },
-            update: {
-              $set: {
-                stock: product.stock,
-                soldCount: product.soldCount,
-                models: product.models
-              }
-            }
-          }
-        }));
-        if (bulkOps.length > 0) {
-          await Product.bulkWrite(bulkOps, { session });
-        }
+        // --- DEDUCT STOCK (via InventoryService) ---
+        await inventoryService.deductStock(inventoryItems, session);
 
         // --- APPLY SHOP VOUCHER ---
         let discountShop = 0;
@@ -433,52 +421,16 @@ class OrderService {
 
   /**
    * Restore stock when order is cancelled
-   * PERFORMANCE FIX: Batch fetch and update products to avoid N+1 queries
    * @param {Object} order - Order object
    */
   async restoreOrderStock(order) {
-    // Batch fetch all products at once
-    const productIds = order.products.map(item => item.productId);
-    const products = await Product.find({ _id: { $in: productIds } });
-    const productMap = new Map(products.map(p => [p._id.toString(), p]));
+    const inventoryItems = order.products.map(item => ({
+        productId: item.productId,
+        modelId: item.modelId,
+        quantity: item.quantity
+    }));
 
-    const bulkOps = [];
-
-    for (const item of order.products) {
-      const product = productMap.get(item.productId.toString());
-      if (product) {
-        if (item.modelId) {
-          const model = product.models.find(
-            (m) => m._id.toString() === item.modelId.toString()
-          );
-          if (model) {
-            model.stock += item.quantity;
-            model.sold = Math.max(0, (model.sold || 0) - item.quantity);
-          }
-        } else {
-          product.stock += item.quantity;
-        }
-        product.soldCount = Math.max(0, product.soldCount - item.quantity);
-
-        bulkOps.push({
-          updateOne: {
-            filter: { _id: product._id },
-            update: {
-              $set: {
-                stock: product.stock,
-                soldCount: product.soldCount,
-                models: product.models
-              }
-            }
-          }
-        });
-      }
-    }
-
-    // Single bulk update instead of N individual saves
-    if (bulkOps.length > 0) {
-      await Product.bulkWrite(bulkOps);
-    }
+    await inventoryService.restoreStock(inventoryItems);
   }
 
   /**
@@ -774,49 +726,8 @@ class OrderService {
       throw new Error("Cannot cancel order in this status");
     }
 
-    // PERFORMANCE FIX: Batch fetch all products at once
-    const productIds = order.products.map(item => item.productId);
-    const products = await Product.find({ _id: { $in: productIds } });
-    const productMap = new Map(products.map(p => [p._id.toString(), p]));
-
-    const bulkOps = [];
-
-    // Restore Stock
-    for (const item of order.products) {
-      const product = productMap.get(item.productId.toString());
-      if (product) {
-        if (item.modelId) {
-          const model = product.models.find(
-            (m) => m._id.toString() === item.modelId.toString()
-          );
-          if (model) {
-            model.stock += item.quantity;
-            model.sold = Math.max(0, (model.sold || 0) - item.quantity);
-          }
-        } else {
-          product.stock += item.quantity;
-        }
-        product.soldCount = Math.max(0, product.soldCount - item.quantity);
-
-        bulkOps.push({
-          updateOne: {
-            filter: { _id: product._id },
-            update: {
-              $set: {
-                stock: product.stock,
-                soldCount: product.soldCount,
-                models: product.models
-              }
-            }
-          }
-        });
-      }
-    }
-
-    // Single bulk update instead of N individual saves
-    if (bulkOps.length > 0) {
-      await Product.bulkWrite(bulkOps);
-    }
+    // Restore Stock via InventoryService
+    await this.restoreOrderStock(order);
 
     order.status = "cancelled";
     order.cancelledAt = new Date();
