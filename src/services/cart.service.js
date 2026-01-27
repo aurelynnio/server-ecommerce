@@ -38,7 +38,7 @@ class CartService {
         const product = item.productId;
         if (!product) return item;
 
-        // NEW: Handle new variant structure (color variants)
+        // Handle color variants
         if (item.variantId && product.variants && product.variants.length > 0) {
           const variant = product.variants.find(
             (v) => v._id.toString() === item.variantId.toString()
@@ -64,7 +64,7 @@ class CartService {
             }
           }
         }
-        // Also check modelId for new variants (backward compatibility)
+        // Backward compatibility: Check modelId for variants
         else if (item.modelId && product.variants && product.variants.length > 0) {
           const variant = product.variants.find(
             (v) => v._id.toString() === item.modelId.toString()
@@ -89,7 +89,7 @@ class CartService {
             }
           }
         }
-        // OLD: Handle Tier Variations (SKU) - backward compatibility
+        // Handle legacy Tier Variations (SKU)
         else if (item.modelId && product.models) {
           const model = product.models.find(
             (m) => m._id.toString() === item.modelId.toString()
@@ -178,7 +178,7 @@ class CartService {
     let price = product.price?.currentPrice || 0;
     let selectedVariantId = null;
 
-    // NEW: Handle new variant structure (color variants)
+    // Handle color variants
     if (product.variants && product.variants.length > 0) {
       if (modelId) {
         // Find variant by ID
@@ -198,7 +198,7 @@ class CartService {
         selectedVariantId = variant._id.toString();
       }
     }
-    // OLD: Handle tier variations (backward compatibility)
+    // Handle legacy tier variations
     else if (product.models && product.models.length > 0) {
       if (modelId) {
         const model = product.models.find((m) => m._id.toString() === modelId);
@@ -287,7 +287,7 @@ class CartService {
     const isIncreasing = quantity > item.quantity;
     
     if (isIncreasing) {
-      // NEW: Check variantId first (new variant structure)
+      // Check variantId first
       if (item.variantId && product.variants && product.variants.length > 0) {
         const variant = product.variants.find(
           (v) => v._id.toString() === item.variantId.toString()
@@ -299,7 +299,7 @@ class CartService {
           throw new Error(`Only ${variant.stock} item(s) available`);
         }
       }
-      // OLD: Check modelId for tier variations (backward compatibility)
+      // Check modelId for tier variations (legacy)
       else if (item.modelId && product.models && product.models.length > 0) {
         const model = product.models.find(
           (m) => m._id.toString() === item.modelId.toString()

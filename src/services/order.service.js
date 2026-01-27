@@ -87,7 +87,7 @@ class OrderService {
         let subtotal = 0;
         const inventoryItems = [];
 
-        // PERFORMANCE FIX: Batch fetch all products for this shop at once (avoid N+1)
+        // Batch fetch products to optimize performance
         const productIds = items.map(item => item.productId._id);
         const products = await Product.find({ _id: { $in: productIds } }).session(session);
         const productMap = new Map(products.map(p => [p._id.toString(), p]));
@@ -103,7 +103,6 @@ class OrderService {
           let tierIndex = [];
 
           if (item.modelId) {
-            // FIX: Use variants instead of models
             const variant = product.variants?.find(
               (v) => v._id.toString() === item.modelId.toString()
             );
@@ -185,7 +184,7 @@ class OrderService {
           paymentMethod,
           subtotal,
           discountShop, // Saved here
-          discountPlatform: 0, // Placeholder
+          discountPlatform: 0,
           totalAmount, // Temporary, will subtract platform discount later
           status: "pending",
         });
