@@ -53,7 +53,7 @@ const ChatController = {
    * @access Private (Authenticated users - participants only)
    */
   getMessages: catchAsync(async (req, res) => {
-    const messages = await chatService.getMessages(req.params.conversationId);
+    const messages = await chatService.getMessages(req.params.conversationId, req.query);
     return sendSuccess(res, messages, "Get messages success", StatusCodes.OK);
   }),
 
