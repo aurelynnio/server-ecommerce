@@ -159,6 +159,8 @@ productSchema.virtual("effectivePrice").get(function () {
 // Compound indexes for common queries
 productSchema.index({ shop: 1, status: 1 });
 productSchema.index({ category: 1, status: 1 });
+productSchema.index({ shop: 1, shopCategory: 1, status: 1 }); // Optimized for shop category filtering
+productSchema.index({ shopCategory: 1, status: 1 });
 productSchema.index({ status: 1, isFeatured: -1, createdAt: -1 });
 productSchema.index({ status: 1, soldCount: -1 });
 productSchema.index({ status: 1, "price.currentPrice": 1 });
