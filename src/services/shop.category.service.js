@@ -1,5 +1,7 @@
 const ShopCategory = require("../models/shop.category.model");
 const Shop = require("../models/shop.model");
+const Product = require("../models/product.model");
+const mongoose = require("mongoose");
 
 class ShopCategoryService {
   async createCategory(userId, categoryData) {
@@ -37,11 +39,55 @@ class ShopCategoryService {
 
     if (!shopId) throw new Error("Shop ID required");
 
-    const categories = await ShopCategory.find({ shopId, isActive: true }).sort(
-      { displayOrder: 1 }
-    );
+    // Convert to ObjectId if string
+    const shopObjectId = typeof shopId === "string" 
+      ? new mongoose.Types.ObjectId(shopId) 
+      : shopId;
 
-    return categories;
+    const categories = await ShopCategory.find({ shopId: shopObjectId, isActive: true })
+      .sort({ displayOrder: 1 })
+      .lean();
+
+    // Get product counts for each category
+    const categoryIds = categories.map((c) => c._id);
+    const productCounts = await Product.aggregate([
+      {
+        $match: {
+          shop: shopObjectId,
+          shopCategory: { $in: categoryIds },
+          status: "published",
+        },
+      },
+      {
+        $group: {
+          _id: "$shopCategory",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    // Create count map
+    const countMap = {};
+    productCounts.forEach((p) => {
+      countMap[p._id.toString()] = p.count;
+    });
+
+    // Get total products for this shop
+    const totalProducts = await Product.countDocuments({
+      shop: shopObjectId,
+      status: "published",
+    });
+
+    // Add productCount to each category
+    const categoriesWithCount = categories.map((cat) => ({
+      ...cat,
+      productCount: countMap[cat._id.toString()] || 0,
+    }));
+
+    return {
+      categories: categoriesWithCount,
+      totalProducts,
+    };
   }
 
   async updateCategory(userId, categoryId, updates) {
