@@ -73,6 +73,11 @@ class ProductService {
       query.shop = filters.shop;
     }
 
+    // Filter by Shop Category
+    if (filters.shopCategory) {
+      query.shopCategory = filters.shopCategory;
+    }
+
     // Filter by price range
     if (minPrice || maxPrice) {
       query["price.currentPrice"] = {};
