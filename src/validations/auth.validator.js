@@ -50,7 +50,7 @@ const resetPasswordValidator = Joi.object({
 
 const changePasswordValidator = Joi.object({
   oldPassword: Joi.string().required(),
-  newPassword: Joi.string().min(6).different(Joi.ref("oldPassword")).required().messages({
+  newPassword: Joi.string().min(6).invalid(Joi.ref("oldPassword")).required().messages({
     "any.invalid": "Mật khẩu mới phải khác mật khẩu cũ",
   }),
 });

@@ -95,7 +95,7 @@ module.exports = {
     limit: Joi.number().integer().min(1).max(100).default(10),
   }),
   searchQueryValidator: Joi.object({
-    q: searchString.required(),
+    q: searchString().required(),
     limit: Joi.number().integer().min(1).max(100).default(10),
   }),
 };

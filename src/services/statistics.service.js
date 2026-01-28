@@ -90,13 +90,6 @@ class StatisticsService {
       createdAt: order.createdAt
     }));
 
-    // 3. Top Products (By Revenue or Sold Count) - Only products with sales
-    const topProductsRaw = await Product.find({ soldCount: { $gt: 0 } })
-      .sort({ soldCount: -1 })
-      .limit(5)
-      .select("name price soldCount variants slug")
-      .lean();
-    
     // Transform topProducts to match client expected format
     const topProducts = topProductsRaw.map(product => {
       // Get first variant image if available

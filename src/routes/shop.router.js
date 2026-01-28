@@ -13,6 +13,12 @@ const {
 const upload = require("../configs/upload");
 
 /**
+ * @desc    Get all public shops (active only)
+ * @access  Public
+ */
+router.get("/", shopController.getPublicShops);
+
+/**
  * @desc    Get all shops with pagination (Admin)
  * @access  Private (Admin)
  */

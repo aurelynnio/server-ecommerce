@@ -26,6 +26,22 @@ const ShopController = {
   }),
 
   /**
+   * Get public shops list (only active shops)
+   * @access Public
+   */
+  getPublicShops: catchAsync(async (req, res) => {
+    const { page, limit, search, sort } = req.query;
+    const result = await shopService.getAllShops({
+      page,
+      limit,
+      status: "active", // Only show active shops to public
+      search,
+      sort,
+    });
+    return sendSuccess(res, result, "Get shops success", StatusCodes.OK);
+  }),
+
+  /**
    * Update shop status (Admin)
    * @access Private (Admin only)
    */

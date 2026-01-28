@@ -20,7 +20,7 @@ const updateProfileValidator = Joi.object({
 
 const changePasswordValidator = Joi.object({
   oldPassword: Joi.string().required(),
-  newPassword: Joi.string().min(6).different(Joi.ref("oldPassword")).required(),
+  newPassword: Joi.string().min(6).invalid(Joi.ref("oldPassword")).required(),
 });
 
 const adminCreateUserValidator = Joi.object({
