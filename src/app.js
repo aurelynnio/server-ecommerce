@@ -6,7 +6,9 @@ const cookieParser = require("cookie-parser");
 const initRoutes = require("./routes");
 const http = require("http");
 const { errorHandler, notFoundHandler } = require("./middlewares/errorHandler.middleware");
+const logger = require("./utils/logger");
 const app = ex();
+
 const server = http.createServer(app);
 
 // Middlewares
@@ -31,7 +33,7 @@ app.use(
       if (allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
-        console.error(`Blocked by CORS: ${origin}`);
+        logger.warn(`Blocked by CORS: ${origin}`);
         callback(new Error("Not allowed by CORS"));
       }
     },

@@ -10,6 +10,8 @@ const { getIO } = require("../socket/index");
 const cacheService = require("./cache.service");
 const logger = require("../utils/logger");
 const { embedProduct, deleteProductEmbedding } = require("./embedding.service");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
 
 /**
  * Service handling product operations
@@ -178,8 +180,9 @@ class ProductService {
       .populate("shopCategory", "name slug");
 
     if (!product) {
-      throw new Error("Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
+
 
     await cacheService.set(cacheKey, product, 3600); // 1 hour cache
     return product;
@@ -202,8 +205,9 @@ class ProductService {
       .populate("shopCategory", "name slug");
 
     if (!product) {
-      throw new Error("Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
+
 
     await cacheService.set(cacheKey, product, 3600);
     return product;
@@ -275,8 +279,12 @@ class ProductService {
     if (data.slug) {
       const existingProduct = await Product.findOne({ slug: data.slug });
       if (existingProduct) {
-        throw new Error("Product with this slug already exists");
+        throw new ApiError(
+          StatusCodes.CONFLICT,
+          "Product with this slug already exists"
+        );
       }
+
     }
 
     // Handle image files
@@ -391,8 +399,12 @@ class ProductService {
           _id: { $ne: id },
         });
         if (existingProduct) {
-          throw new Error("Product with this slug already exists");
+          throw new ApiError(
+            StatusCodes.CONFLICT,
+            "Product with this slug already exists"
+          );
         }
+
       }
 
       let variantUploadMap = {};
@@ -479,7 +491,7 @@ class ProductService {
       }).populate("category", "name slug");
 
       if (!product) {
-        throw new Error("Product not found");
+        throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
       }
 
       // Invalidate cache
@@ -521,7 +533,7 @@ class ProductService {
     );
 
     if (!product) {
-      throw new Error("Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
 
     await cacheService.delByPattern("products:*");
@@ -544,8 +556,9 @@ class ProductService {
     const product = await Product.findByIdAndDelete(id);
 
     if (!product) {
-      throw new Error("Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
+
 
     await cacheService.delByPattern("products:*");
 
@@ -576,8 +589,9 @@ class ProductService {
     });
 
     if (existingProduct) {
-      throw new Error("SKU already exists");
+      throw new ApiError(StatusCodes.CONFLICT, "SKU already exists");
     }
+
 
     const product = await Product.findByIdAndUpdate(
       productId,
@@ -586,8 +600,9 @@ class ProductService {
     );
 
     if (!product) {
-      throw new Error("Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
+
 
     return product;
   }
@@ -613,8 +628,9 @@ class ProductService {
     );
 
     if (!product) {
-      throw new Error("Product or variant not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product or variant not found");
     }
+
 
     return product;
   }
@@ -634,8 +650,9 @@ class ProductService {
     );
 
     if (!product) {
-      throw new Error("Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
+
 
     return product;
   }
@@ -701,8 +718,9 @@ class ProductService {
     // First, find the category by slug
     const category = await Category.findOne({ slug, isActive: true });
     if (!category) {
-      throw new Error("Category not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Category not found");
     }
+
 
     // Get all child categories as well
     const childCategories = await Category.find({
@@ -768,8 +786,9 @@ class ProductService {
       .limit(Number(limit))
       .lean();
     if (!products) {
-      throw new Error("Products not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Products not found");
     }
+
 
     return products;
   }
@@ -907,8 +926,9 @@ class ProductService {
     const limit = 10;
     const currentProduct = await Product.findById(productId);
     if (!currentProduct) {
-      throw new Error("Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
+
 
     const priceBuffer = 0.2; // 20% price difference
     const currentPrice = currentProduct.price?.currentPrice || 0;
@@ -949,10 +969,12 @@ class ProductService {
     });
 
     if (!existingProduct) {
-      throw new Error(
-        "Product not found or you don't have permission to update it",
+      throw new ApiError(
+        StatusCodes.NOT_FOUND,
+        "Product not found or you don't have permission to update it"
       );
     }
+
 
     // Remove fields that seller shouldn't modify
     const updateData = { ...data };
@@ -982,8 +1004,9 @@ class ProductService {
     );
 
     if (!product) {
-      throw new Error(
-        "Product not found or you don't have permission to delete it",
+      throw new ApiError(
+        StatusCodes.NOT_FOUND,
+        "Product not found or you don't have permission to delete it"
       );
     }
 
@@ -1008,7 +1031,7 @@ class ProductService {
   async addVariantBySeller(productId, shopId, variantData, files) {
     const product = await Product.findOne({ _id: productId, shop: shopId });
     if (!product) {
-      throw new Error("Product not found or access denied");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found or access denied");
     }
     return this.addVariant(productId, variantData, files);
   }
@@ -1023,7 +1046,7 @@ class ProductService {
   async updateVariantBySeller(productId, shopId, variantId, variantData) {
     const product = await Product.findOne({ _id: productId, shop: shopId });
     if (!product) {
-      throw new Error("Product not found or access denied");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found or access denied");
     }
     return this.updateVariant(productId, variantId, variantData);
   }
@@ -1037,7 +1060,7 @@ class ProductService {
   async deleteVariantBySeller(productId, shopId, variantId) {
     const product = await Product.findOne({ _id: productId, shop: shopId });
     if (!product) {
-      throw new Error("Product not found or access denied");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found or access denied");
     }
     return this.deleteVariant(productId, variantId);
   }

@@ -2,23 +2,14 @@ const ShopCategory = require("../models/shop.category.model");
 const Shop = require("../models/shop.model");
 const Product = require("../models/product.model");
 const mongoose = require("mongoose");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
 
 class ShopCategoryService {
   async createCategory(userId, categoryData) {
     const shop = await Shop.findOne({ owner: userId });
-    if (!shop) throw new Error("Shop not found");
+    if (!shop) throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
 
-    const newCategory = await ShopCategory.create({
-      ...categoryData,
-      shopId: shop._id,
-    });
-
-    return newCategory;
-  }
-
-  async getMyShopCategories(userId) {
-    const shop = await Shop.findOne({ owner: userId });
-    if (!shop) throw new Error("Shop not found");
 
     // Seller sees ALL categories (including inactive) for management
     const categories = await ShopCategory.find({ shopId: shop._id }).sort(
@@ -37,7 +28,9 @@ class ShopCategoryService {
       if (shop) shopId = shop._id;
     }
 
-    if (!shopId) throw new Error("Shop ID required");
+    if (!shopId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Shop ID required");
+    }
 
     // Convert to ObjectId if string
     const shopObjectId = typeof shopId === "string" 
@@ -93,27 +86,35 @@ class ShopCategoryService {
   async updateCategory(userId, categoryId, updates) {
     const shop = await Shop.findOne({ owner: userId });
 
-    if (!shop) throw new Error("Shop not found");
+    if (!shop) throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
+
 
     const updated = await ShopCategory.findOneAndUpdate(
       { _id: categoryId, shopId: shop._id },
       updates,
       { new: true }
     );
-    if (!updated) throw new Error("Category not found");
+    if (!updated) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Category not found");
+    }
+
 
     return updated;
   }
 
   async deleteCategory(userId, categoryId) {
     const shop = await Shop.findOne({ owner: userId });
-    if (!shop) throw new Error("Shop not found");
+    if (!shop) throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
+
 
     const deleted = await ShopCategory.findOneAndDelete({
       _id: categoryId,
       shopId: shop._id,
     });
-    if (!deleted) throw new Error("Category not found");
+    if (!deleted) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Category not found");
+    }
+
 
     return deleted;
   }

@@ -1,10 +1,13 @@
 const cloudinary = require("cloudinary").v2;
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
+
 
 const uploadImage = async (fileBuffer, folder = "avatar") => {
   return new Promise((resolve, reject) => {
@@ -26,8 +29,12 @@ const uploadImage = async (fileBuffer, folder = "avatar") => {
 
 const multiUpload = async (fileBuffers, folder = "avatar") => {
   if (!Array.isArray(fileBuffers)) {
-    throw new Error("Input must be an array of file buffers");
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      "Input must be an array of file buffers"
+    );
   }
+
   const uploadPromises = fileBuffers.map((buffer) => uploadImage(buffer, folder));
   const results = await Promise.all(uploadPromises);
 

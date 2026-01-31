@@ -4,6 +4,8 @@ const Order = require("../models/order.model");
 const Shop = require("../models/shop.model");
 const { getPaginationParams } = require("../utils/pagination");
 const cacheService = require("./cache.service");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
 
 /**
  * Service handling product reviews
@@ -27,8 +29,16 @@ class ReviewService {
     // Check if product exists
     const productExists = await Product.findById(productId);
     if (!productExists) {
-      throw new Error("Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
+
+
+
+
+
+
+
+
 
     // Check if user has purchased this product
     const hasPurchased = await Order.exists({
@@ -38,7 +48,8 @@ class ReviewService {
     });
 
     if (!hasPurchased) {
-      throw new Error(
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
         "You can only review products you have purchased and received"
       );
     }
@@ -50,8 +61,12 @@ class ReviewService {
     });
 
     if (existingReview) {
-      throw new Error("You have already reviewed this product");
+      throw new ApiError(
+        StatusCodes.CONFLICT,
+        "You have already reviewed this product"
+      );
     }
+
 
     // Create review
     const review = await Review.create({
@@ -87,8 +102,9 @@ class ReviewService {
     // Check if product exists
     const productExists = await Product.findById(productId);
     if (!productExists) {
-      throw new Error("Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
+
 
     // Build query
     const query = { product: productId };
@@ -261,8 +277,9 @@ class ReviewService {
       .populate("product", "name slug images");
 
     if (!review) {
-      throw new Error("Review not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Review not found");
     }
+
 
     return review;
   }
@@ -272,13 +289,17 @@ class ReviewService {
     const review = await Review.findById(reviewId);
 
     if (!review) {
-      throw new Error("Review not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Review not found");
     }
 
     // Check if user owns this review
     if (review.user.toString() !== userId) {
-      throw new Error("Unauthorized to update this review");
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        "Unauthorized to update this review"
+      );
     }
+
 
     // Update review
     if (updateData.rating !== undefined) {
@@ -305,13 +326,17 @@ class ReviewService {
     const review = await Review.findById(reviewId);
 
     if (!review) {
-      throw new Error("Review not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Review not found");
     }
 
     // Check permission: user can only delete their own reviews unless admin
     if (!isAdmin && review.user.toString() !== userId) {
-      throw new Error("Unauthorized to delete this review");
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        "Unauthorized to delete this review"
+      );
     }
+
 
     const productId = review.product;
 
@@ -356,8 +381,9 @@ class ReviewService {
     // Check if product exists
     const productExists = await Product.findById(productId);
     if (!productExists) {
-      throw new Error("Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
+
 
     // Check if user has purchased and received this product
     const hasPurchased = await Order.exists({
@@ -395,7 +421,7 @@ class ReviewService {
     // 1. Find the shop owned by this user
     const shop = await Shop.findOne({ owner: userId });
     if (!shop) {
-      throw new Error("Shop not found for this user");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found for this user");
     }
 
     // 2. Find all products belonging to this shop
@@ -445,18 +471,18 @@ class ReviewService {
   // Reply to a review (Shop owner only)
   async replyReview(userId, reviewId, content) {
     if (!content || !content.trim()) {
-      throw new Error("Reply content is required");
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Reply content is required");
     }
 
     const review = await Review.findById(reviewId).populate("product");
     if (!review) {
-      throw new Error("Review not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Review not found");
     }
 
     // Check if user owns the shop that owns the product
     const shop = await Shop.findOne({ owner: userId });
     if (!shop) {
-      throw new Error("Shop not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
     }
 
     // Verify product belongs to shop (assuming product has shop field populated or id)
@@ -464,7 +490,10 @@ class ReviewService {
     const productShopId = review.product.shop.toString(); 
     
     if (productShopId !== shop._id.toString()) {
-      throw new Error("Unauthorized: Product does not belong to your shop");
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        "Unauthorized: Product does not belong to your shop"
+      );
     }
 
     // Update review with reply

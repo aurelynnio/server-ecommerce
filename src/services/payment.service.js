@@ -9,6 +9,8 @@ const Payment = require("../models/payment.model");
 const Order = require("../models/order.model");
 const { getIO } = require("../socket/index");
 const logger = require("../utils/logger");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
 
 /**
  * PERFORMANCE FIX: Singleton VNPay instance - reuse across requests
@@ -49,20 +51,24 @@ class PaymentService {
     // Get order details
     const order = await Order.findById(orderId);
     if (!order) {
-      throw new Error("Order not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Order not found");
     }
 
     if (order.userId.toString() !== userId.toString()) {
-      throw new Error("Unauthorized access to order");
+      throw new ApiError(StatusCodes.FORBIDDEN, "Unauthorized access to order");
     }
 
     if (order.paymentMethod !== "vnpay") {
-      throw new Error("Order payment method is not VNPay");
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Order payment method is not VNPay"
+      );
     }
 
     if (order.paymentStatus === "paid") {
-      throw new Error("Order has already been paid");
+      throw new ApiError(StatusCodes.CONFLICT, "Order has already been paid");
     }
+
 
     // PERFORMANCE FIX: Use singleton VNPay instance
     const vnpay = getVNPayInstance();
@@ -120,7 +126,7 @@ class PaymentService {
     // Verify signature
     const isValid = vnpay.verifyReturnUrl(vnpayParams);
     if (!isValid) {
-      throw new Error("Invalid signature");
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid signature");
     }
 
     const transactionId = vnpayParams.vnp_TxnRef;
@@ -130,14 +136,15 @@ class PaymentService {
     // Find payment record
     const payment = await Payment.findOne({ transactionId });
     if (!payment) {
-      throw new Error("Payment not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Payment not found");
     }
 
     // Find order
     const order = await Order.findById(payment.orderId);
     if (!order) {
-      throw new Error("Order not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Order not found");
     }
+
 
     // Check if payment is successful
     const isSuccess = responseCode === "00" && transactionStatus === "00";

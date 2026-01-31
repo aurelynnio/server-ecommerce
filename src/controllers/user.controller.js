@@ -3,6 +3,7 @@ const { uploadImage } = require("../configs/cloudinary");
 const userService = require("../services/user.service");
 const { sendFail, sendSuccess } = require("../shared/res/formatResponse");
 const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
 
 /**
  * User Controller
@@ -146,7 +147,7 @@ const UserController = {
     const userId = req.user.userId;
     const user = await userService.deleteAddress(userId, req.params.addressId);
     if (!user) {
-      throw new Error("Error")
+      throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, "Delete address failed");
     }
     return sendSuccess(
       res,

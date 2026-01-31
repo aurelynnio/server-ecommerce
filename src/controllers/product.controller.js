@@ -2,6 +2,7 @@ const catchAsync = require("../configs/catchAsync");
 const productService = require("../services/product.service");
 const { StatusCodes } = require("http-status-codes");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
 
 /**
  * Product Controller
@@ -71,7 +72,10 @@ const ProductController = {
     }
     
     if (!shopId) {
-      throw new Error("User does not have a shop. Please register a shop first.");
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "User does not have a shop. Please register a shop first."
+      );
     }
 
     const product = await productService.createProduct(

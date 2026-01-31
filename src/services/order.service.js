@@ -8,6 +8,8 @@ const mongoose = require("mongoose");
 const voucherService = require("./voucher.service");
 const Voucher = require("../models/voucher.model");
 const inventoryService = require("./inventory.service");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
 
 /**
  * Service handling order operations
@@ -45,26 +47,37 @@ class OrderService {
 
       // 1. Get Selected Items from Cart
       const cart = await Cart.findOne({ userId }).populate("items.productId").session(session);
-      if (!cart) throw new Error("Cart is empty");
+      if (!cart) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Cart is empty");
+      }
 
       const itemsToCheckout = cart.items.filter((item) =>
         cartItemIds.includes(item._id.toString())
       );
 
-      if (itemsToCheckout.length === 0) throw new Error("No items selected");
+      if (itemsToCheckout.length === 0) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, "No items selected");
+      }
 
       // 2. Group items by Shop
       const shopItemsMap = new Map(); // shopId -> [items]
 
       for (const item of itemsToCheckout) {
         const product = item.productId;
-        if (!product) throw new Error("Product info missing");
+        if (!product) {
+          throw new ApiError(StatusCodes.NOT_FOUND, "Product info missing");
+        }
 
         // Ensure shopId is available
         let shopId = item.shopId;
         if (!shopId && product.shop) shopId = product.shop;
 
-        if (!shopId) throw new Error(`Product ${product.name} has no shop?!`);
+        if (!shopId) {
+          throw new ApiError(
+            StatusCodes.UNPROCESSABLE_ENTITY,
+            `Product ${product.name} has no shop`
+          );
+        }
 
         const shopIdStr = shopId.toString();
         if (!shopItemsMap.has(shopIdStr)) {
@@ -95,8 +108,12 @@ class OrderService {
         // Verify Price & Build Inventory List
         for (const item of items) {
           const product = productMap.get(item.productId._id.toString());
-          if (!product || product.status !== "published")
-            throw new Error(`${item.productId.name} unavailable`);
+          if (!product || product.status !== "published") {
+            throw new ApiError(
+              StatusCodes.CONFLICT,
+              `${item.productId.name} unavailable`
+            );
+          }
 
           let price = product.price.currentPrice;
           let skuCode = "";
@@ -108,7 +125,10 @@ class OrderService {
             );
 
             if (!variant) {
-              throw new Error(`Variation for ${product.name} no longer exists`);
+              throw new ApiError(
+                StatusCodes.NOT_FOUND,
+                `Variation for ${product.name} no longer exists`
+              );
             }
 
             // Note: Stock check is now handled by inventoryService.deductStock
@@ -378,7 +398,10 @@ class OrderService {
     const order = await Order.findOne({ _id: orderId, shopId });
 
     if (!order) {
-      throw new Error("Order not found or doesn't belong to your shop");
+      throw new ApiError(
+        StatusCodes.NOT_FOUND,
+        "Order not found or doesn't belong to your shop"
+      );
     }
 
     // Seller allowed transitions (more restricted than admin)
@@ -393,7 +416,8 @@ class OrderService {
     };
 
     if (!allowedTransitions[order.status]?.includes(newStatus)) {
-      throw new Error(
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
         `Cannot change status from "${order.status}" to "${newStatus}"`
       );
     }
@@ -642,12 +666,15 @@ class OrderService {
       .lean();
 
     if (!order) {
-      throw new Error("Order not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Order not found");
     }
 
     // Authorization check: user can only view their own orders unless admin
     if (!isAdmin && order.userId.toString() !== userId.toString()) {
-      throw new Error("Unauthorized to view this order");
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        "Unauthorized to view this order"
+      );
     }
 
     return order;
@@ -667,18 +694,24 @@ class OrderService {
     const order = await Order.findById(orderId);
 
     if (!order) {
-      throw new Error("Order not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Order not found");
     }
 
     // Authorization check
     if (!isAdmin) {
       // Seller can only update orders for their shop
       if (shopId && order.shopId.toString() !== shopId.toString()) {
-        throw new Error("Unauthorized to update this order");
+        throw new ApiError(
+          StatusCodes.FORBIDDEN,
+          "Unauthorized to update this order"
+        );
       }
       // Regular users cannot update order status
       if (!shopId) {
-        throw new Error("Unauthorized to update order status");
+        throw new ApiError(
+          StatusCodes.FORBIDDEN,
+          "Unauthorized to update order status"
+        );
       }
     }
 
@@ -693,7 +726,10 @@ class OrderService {
     };
 
     if (!validTransitions[order.status]?.includes(status)) {
-      throw new Error(`Cannot transition from ${order.status} to ${status}`);
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        `Cannot transition from ${order.status} to ${status}`
+      );
     }
 
     order.status = status;
@@ -718,11 +754,16 @@ class OrderService {
    */
   async cancelOrder(orderId, userId) {
     const order = await Order.findOne({ _id: orderId, userId });
-    if (!order) throw new Error("Order not found or access denied");
+    if (!order) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Order not found or access denied");
+    }
 
     // Only allow cancel if pending or confirmed
     if (!["pending", "confirmed"].includes(order.status)) {
-      throw new Error("Cannot cancel order in this status");
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Cannot cancel order in this status"
+      );
     }
 
     // Restore Stock via InventoryService

@@ -1,5 +1,7 @@
 const Cart = require("../models/cart.model");
 const Product = require("../models/product.model");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
 
 /**
  * Service handling shopping cart operations
@@ -153,21 +155,28 @@ class CartService {
 
     // Validate quantity
     if (!quantity || quantity < 1) {
-      throw new Error("Quantity must be at least 1");
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Quantity must be at least 1"
+      );
     }
 
     // Check if product exists and is published
     const product = await Product.findById(productId);
-    if (!product) throw new Error("Product not found");
-    if (product.status !== "published") throw new Error("Product is not available");
+    if (!product) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+    }
+    if (product.status !== "published") {
+      throw new ApiError(StatusCodes.CONFLICT, "Product is not available");
+    }
 
     // Validate size selection if product has sizes
     if (product.sizes && product.sizes.length > 0) {
       if (!size) {
-        throw new Error("Please select a size");
+        throw new ApiError(StatusCodes.BAD_REQUEST, "Please select a size");
       }
       if (!product.sizes.includes(size)) {
-        throw new Error("Invalid size selected");
+        throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid size selected");
       }
     }
 
@@ -183,17 +192,24 @@ class CartService {
       if (modelId) {
         // Find variant by ID
         const variant = product.variants.find((v) => v._id.toString() === modelId);
-        if (!variant) throw new Error("Variant not found");
+        if (!variant) {
+          throw new ApiError(StatusCodes.NOT_FOUND, "Variant not found");
+        }
 
         if (variant.stock < quantity) {
-          throw new Error(`Only ${variant.stock} item(s) available`);
+          throw new ApiError(
+            StatusCodes.CONFLICT,
+            `Only ${variant.stock} item(s) available`
+          );
         }
         price = variant.price;
         selectedVariantId = modelId;
       } else {
         // Default to first variant if not specified
         const variant = product.variants[0];
-        if (variant.stock < quantity) throw new Error(`Out of stock`);
+        if (variant.stock < quantity) {
+          throw new ApiError(StatusCodes.CONFLICT, "Out of stock");
+        }
         price = variant.price;
         selectedVariantId = variant._id.toString();
       }
@@ -202,16 +218,23 @@ class CartService {
     else if (product.models && product.models.length > 0) {
       if (modelId) {
         const model = product.models.find((m) => m._id.toString() === modelId);
-        if (!model) throw new Error("Model variation not found");
+        if (!model) {
+          throw new ApiError(StatusCodes.NOT_FOUND, "Model variation not found");
+        }
 
         if (model.stock < quantity) {
-          throw new Error(`Only ${model.stock} item(s) available`);
+          throw new ApiError(
+            StatusCodes.CONFLICT,
+            `Only ${model.stock} item(s) available`
+          );
         }
         price = model.price;
         selectedVariantId = modelId;
       } else {
         const model = product.models[0];
-        if (model.stock < quantity) throw new Error(`Out of stock`);
+        if (model.stock < quantity) {
+          throw new ApiError(StatusCodes.CONFLICT, "Out of stock");
+        }
         price = model.price;
         selectedVariantId = model._id.toString();
       }
@@ -264,12 +287,12 @@ class CartService {
   async updateCartItem(userId, itemId, quantity) {
     const cart = await Cart.findOne({ userId });
     if (!cart) {
-      throw new Error("Cart not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Cart not found");
     }
 
     const item = cart.items.id(itemId);
     if (!item) {
-      throw new Error("Item not found in cart");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Item not found in cart");
     }
 
     // If quantity is 0 or less, remove the item
@@ -280,7 +303,7 @@ class CartService {
     // Check product stock
     const product = await Product.findById(item.productId);
     if (!product || product.status !== "published") {
-      throw new Error("Product is not available");
+      throw new ApiError(StatusCodes.CONFLICT, "Product is not available");
     }
 
     // Only validate stock when INCREASING quantity
@@ -293,10 +316,13 @@ class CartService {
           (v) => v._id.toString() === item.variantId.toString()
         );
         if (!variant) {
-          throw new Error("Product variant not found");
+          throw new ApiError(StatusCodes.NOT_FOUND, "Product variant not found");
         }
         if (variant.stock < quantity) {
-          throw new Error(`Only ${variant.stock} item(s) available`);
+          throw new ApiError(
+            StatusCodes.CONFLICT,
+            `Only ${variant.stock} item(s) available`
+          );
         }
       }
       // Check modelId for tier variations (legacy)
@@ -305,16 +331,22 @@ class CartService {
           (m) => m._id.toString() === item.modelId.toString()
         );
         if (!model) {
-          throw new Error("Product variation not found");
+          throw new ApiError(StatusCodes.NOT_FOUND, "Product variation not found");
         }
         if (model.stock < quantity) {
-          throw new Error(`Only ${model.stock} item(s) available`);
+          throw new ApiError(
+            StatusCodes.CONFLICT,
+            `Only ${model.stock} item(s) available`
+          );
         }
       } else {
         // Simple Product stock
         const availableStock = product.stock ?? product.quantity ?? 999;
         if (availableStock < quantity) {
-          throw new Error(`Only ${availableStock} item(s) available`);
+          throw new ApiError(
+            StatusCodes.CONFLICT,
+            `Only ${availableStock} item(s) available`
+          );
         }
       }
     }
@@ -334,7 +366,7 @@ class CartService {
   async removeCartItem(userId, itemId) {
     const cart = await Cart.findOne({ userId });
     if (!cart) {
-      throw new Error("Cart not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Cart not found");
     }
 
     // Remove item using pull
@@ -357,7 +389,7 @@ class CartService {
   async clearCart(userId) {
     const cart = await Cart.findOne({ userId });
     if (!cart) {
-      throw new Error("Cart not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Cart not found");
     }
 
     cart.items = [];

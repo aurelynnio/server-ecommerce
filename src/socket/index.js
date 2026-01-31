@@ -3,6 +3,9 @@ const notificationSocket = require("./notification.socket");
 const chatSocket = require("./chat.socket");
 const socketAuthMiddleware = require("../middlewares/socketAuth.middleware");
 const logger = require("../utils/logger");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
+
 
 let io = null;
 
@@ -36,8 +39,9 @@ const initSocket = (httpServer) => {
 
 const getIO = () => {
   if (!io) {
-    throw new Error("Socket.io not initialized!");
+    throw new ApiError(StatusCodes.SERVICE_UNAVAILABLE, "Socket.io not initialized!");
   }
+
   return io;
 };
 

@@ -1,11 +1,15 @@
 const { Conversation, Message } = require("../models/conversation.model");
 const Shop = require("../models/shop.model");
 const { getIO } = require("../socket/index");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
+
 
 class ChatService {
   async startConversation(userId, { shopId, productId }) {
     const shop = await Shop.findById(shopId);
-    if (!shop) throw new Error("Shop not found");
+    if (!shop) throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
+
 
     const sellerId = shop.owner;
 
@@ -28,11 +32,17 @@ class ChatService {
 
   async sendMessage(senderId, { conversationId, content, attachments }) {
     const conversation = await Conversation.findById(conversationId);
-    if (!conversation) throw new Error("Conversation not found");
+    if (!conversation) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Conversation not found");
+    }
 
     if (!conversation.members.includes(senderId)) {
-      throw new Error("You are not in this conversation");
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        "You are not in this conversation"
+      );
     }
+
 
     const info = await Message.create({
       conversationId,
@@ -111,9 +121,7 @@ class ChatService {
     // Find the conversation by ID
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
-      const error = new Error("Conversation not found");
-      error.status = 404;
-      throw error;
+      throw new ApiError(StatusCodes.NOT_FOUND, "Conversation not found");
     }
 
     // Verify user is a member of the conversation
@@ -121,10 +129,12 @@ class ChatService {
       (memberId) => memberId.toString() === userId.toString()
     );
     if (!isMember) {
-      const error = new Error("You are not a member of this conversation");
-      error.status = 403;
-      throw error;
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        "You are not a member of this conversation"
+      );
     }
+
 
     // Update all messages where senderId != userId to isRead: true
     const result = await Message.updateMany(

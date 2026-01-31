@@ -6,6 +6,9 @@ const Review = require("../models/review.model");
 const { getPaginationParams } = require("../utils/pagination");
 
 const slugify = require("slugify");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
+
 
 class ShopService {
   async createShop(userId, shopData) {
@@ -14,14 +17,15 @@ class ShopService {
     // Check if user already has a shop
     const existingShop = await Shop.findOne({ owner: userId });
     if (existingShop) {
-      throw new Error("User already owns a shop");
+      throw new ApiError(StatusCodes.CONFLICT, "User already owns a shop");
     }
 
     // Check duplicate name
     const existingName = await Shop.findOne({ name });
     if (existingName) {
-      throw new Error("Shop name already taken");
+      throw new ApiError(StatusCodes.CONFLICT, "Shop name already taken");
     }
+
 
     const slug = slugify(name, { lower: true });
 
@@ -43,14 +47,20 @@ class ShopService {
 
   async getShopInfo(shopId) {
     const findShop = await Shop.findById(shopId).lean();
-    if (!findShop) throw new Error("Shop not found");
+    if (!findShop) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
+    }
     return findShop;
+
   }
 
   async getMyShop(userId) {
     const findShop = await Shop.findOne({ owner: userId }).lean();
-    if (!findShop) throw new Error("You usually do not have a shop");
+    if (!findShop) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "You usually do not have a shop");
+    }
     return findShop;
+
   }
 
   async updateShop(userId, updates) {
@@ -66,8 +76,11 @@ class ShopService {
       { new: true },
     );
 
-    if (!updatedShop) throw new Error("Shop not found");
+    if (!updatedShop) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
+    }
     return updatedShop;
+
   }
 
   /**
@@ -128,7 +141,10 @@ class ShopService {
       .populate("owner", "username avatar")
       .lean();
 
-    if (!shop) throw new Error("Shop not found");
+    if (!shop) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
+    }
+
 
     // Get product count
     const productCount = await Product.countDocuments({
@@ -190,7 +206,10 @@ class ShopService {
    */
   async getShopStatistics(userId) {
     const shop = await Shop.findOne({ owner: userId });
-    if (!shop) throw new Error("Shop not found");
+    if (!shop) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
+    }
+
 
     const shopId = shop._id;
     const [
@@ -351,12 +370,16 @@ class ShopService {
    */
   async followShop(userId, shopId) {
     const shop = await Shop.findById(shopId);
-    if (!shop) throw new Error("Shop not found");
+    if (!shop) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
+    }
+
 
     // Check if already following
     if (shop.followers?.includes(userId)) {
-      throw new Error("Already following this shop");
+      throw new ApiError(StatusCodes.CONFLICT, "Already following this shop");
     }
+
 
     await Shop.findByIdAndUpdate(shopId, {
       $addToSet: { followers: userId },
@@ -397,7 +420,10 @@ class ShopService {
    */
   async getFollowedShops(userId) {
     const user = await User.findById(userId).select("followingShops");
-    if (!user) throw new Error("User not found");
+    if (!user) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
+    }
+
 
     const shops = await Shop.find({
       _id: { $in: user.followingShops || [] },
@@ -418,8 +444,9 @@ class ShopService {
   async updateShopStatus(shopId, status) {
     const validStatuses = ["pending", "active", "suspended", "closed"];
     if (!validStatuses.includes(status)) {
-      throw new Error("Invalid status");
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid status");
     }
+
 
     const shop = await Shop.findByIdAndUpdate(
       shopId,
@@ -427,7 +454,10 @@ class ShopService {
       { new: true },
     );
 
-    if (!shop) throw new Error("Shop not found");
+    if (!shop) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
+    }
+
     return shop;
   }
 

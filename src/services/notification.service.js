@@ -2,6 +2,9 @@ const Notification = require("../models/notification.model");
 const User = require("../models/user.model");
 const mongoose = require("mongoose");
 const logger = require("../utils/logger");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
+
 
 /**
  * Service handling notification operations
@@ -232,8 +235,11 @@ class NotificationService {
       _id: id,
       userId,
     }).populate("orderId");
-    if (!notification) throw new Error("Notification not found");
+    if (!notification) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Notification not found");
+    }
     return notification;
+
   }
 
   /**
@@ -248,7 +254,10 @@ class NotificationService {
       data,
       { new: true },
     );
-    if (!notification) throw new Error("Notification not found");
+    if (!notification) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Notification not found");
+    }
+
 
     // If update affects read status, emit new count
     if (data.isRead !== undefined) {

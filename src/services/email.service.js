@@ -10,6 +10,8 @@ const React = require("react");
 const { render } = require("@react-email/render");
 const VerificationEmail = require("../emails/VerificationEmail").default;
 const logger = require("../utils/logger");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
 
 /**
  * PERFORMANCE FIX: Singleton transporter - reuse connection pool
@@ -78,8 +80,12 @@ const sendVerificationCode = async (to, code, type = "email_verification") => {
     };
   } catch (error) {
     logger.error("Error sending email:", { error: error.message });
-    throw new Error(`Failed to send email: ${error.message}`);
+    throw new ApiError(
+      StatusCodes.SERVICE_UNAVAILABLE,
+      `Failed to send email: ${error.message}`
+    );
   }
+
 };
 
 /**

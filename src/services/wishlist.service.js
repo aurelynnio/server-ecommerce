@@ -1,5 +1,8 @@
 const User = require("../models/user.model");
 const Product = require("../models/product.model");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
+
 
 /**
  * Service handling wishlist/favorites operations
@@ -16,7 +19,10 @@ class WishlistService {
    */
   async getWishlist(userId, { page = 1, limit = 10 } = {}) {
     const user = await User.findById(userId).select("wishlist");
-    if (!user) throw new Error("User not found");
+    if (!user) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
+    }
+
 
     const wishlistIds = user.wishlist || [];
     const total = wishlistIds.length;
@@ -68,16 +74,23 @@ class WishlistService {
   async addToWishlist(userId, productId) {
     // Verify product exists
     const product = await Product.findById(productId);
-    if (!product) throw new Error("Product not found");
-    if (product.status !== "published") throw new Error("Product is not available");
+    if (!product) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+    }
+    if (product.status !== "published") {
+      throw new ApiError(StatusCodes.CONFLICT, "Product is not available");
+    }
 
     const user = await User.findById(userId);
-    if (!user) throw new Error("User not found");
+    if (!user) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
+    }
 
     // Check if already in wishlist
     if (user.wishlist && user.wishlist.includes(productId)) {
-      throw new Error("Product already in wishlist");
+      throw new ApiError(StatusCodes.CONFLICT, "Product already in wishlist");
     }
+
 
     // Add to wishlist
     await User.findByIdAndUpdate(userId, {
@@ -99,7 +112,10 @@ class WishlistService {
    */
   async removeFromWishlist(userId, productId) {
     const user = await User.findById(userId);
-    if (!user) throw new Error("User not found");
+    if (!user) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
+    }
+
 
     await User.findByIdAndUpdate(userId, {
       $pull: { wishlist: productId },

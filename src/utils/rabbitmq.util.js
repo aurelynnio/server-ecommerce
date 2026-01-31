@@ -1,49 +1,31 @@
-const { getChannel } = require("../configs/rabbitmq.config");
+const { getConnection } = require("../configs/rabbitmq.config");
 const logger = require("./logger");
 
 const publishToQueue = async (queueName, data) => {
   try {
-    const channel = getChannel();
-    if (!channel) {
-      throw new Error("RabbitMQ channel not initialized");
+    const connection = getConnection();
+    if (!connection) {
+      logger.warn("RabbitMQ connection not established, skipping message publish");
+      return false;
     }
-    await channel.assertQueue(queueName, { durable: true });
-    channel.sendToQueue(queueName, Buffer.from(JSON.stringify(data)), {
-      persistent: true,
-    });
-    logger.info(`Message sent to queue: ${queueName}`);
-  } catch (error) {
-    logger.error("RabbitMQ Publish Error:", error);
-  }
-};
 
-const consumeFromQueue = async (queueName, callback) => {
-  try {
-    const channel = getChannel();
-    if (!channel) {
-      throw new Error("RabbitMQ channel not initialized");
-    }
+    const channel = await connection.createChannel();
     await channel.assertQueue(queueName, { durable: true });
-    logger.info(`Waiting for messages in queue: ${queueName}`);
-
-    channel.consume(queueName, async (msg) => {
-      if (msg !== null) {
-        const content = JSON.parse(msg.content.toString());
-        try {
-          await callback(content);
-          channel.ack(msg);
-        } catch (error) {
-          logger.error("Error processing message:", error);
-          channel.nack(msg, false, true);
-        }
-      }
-    });
+    
+    const content = Buffer.from(JSON.stringify(data));
+    channel.sendToQueue(queueName, content, { persistent: true });
+    
+    // Close channel after use to prevent leak
+    await channel.close();
+    return true;
   } catch (error) {
-    logger.error("RabbitMQ Consume Error:", error);
+    logger.error(`Error publishing to queue ${queueName}`, {
+      error: error.message,
+    });
+    return false;
   }
 };
 
 module.exports = {
   publishToQueue,
-  consumeFromQueue,
 };

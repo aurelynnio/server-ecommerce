@@ -1,4 +1,7 @@
 const Settings = require("../models/settings.model");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
+
 
 class SettingsService {
   /**
@@ -71,8 +74,9 @@ class SettingsService {
   async getSection(section) {
     const validSections = ["store", "notifications", "display", "business"];
     if (!validSections.includes(section)) {
-      throw new Error("Invalid settings section");
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid settings section");
     }
+
 
     const settings = await this.getSettings();
     return settings[section];
@@ -88,8 +92,9 @@ class SettingsService {
   async updateSection(section, data, userId) {
     const validSections = ["store", "notifications", "display", "business"];
     if (!validSections.includes(section)) {
-      throw new Error("Invalid settings section");
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid settings section");
     }
+
 
     const updateData = {};
     Object.keys(data).forEach((key) => {

@@ -12,6 +12,8 @@ const {
   expandManagePermissions,
 } = require("../configs/permission");
 const logger = require("../utils/logger");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
 
 class PermissionService {
   /**
@@ -112,18 +114,20 @@ class PermissionService {
   async grantPermission(userId, permission, adminId) {
     // Validate permission exists
     if (!isValidPermission(permission)) {
-      throw new Error(`Invalid permission: ${permission}`);
+      throw new ApiError(StatusCodes.BAD_REQUEST, `Invalid permission: ${permission}`);
     }
+
 
     const user = await User.findById(userId);
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     // Check if permission already exists
     if (user.permissions.includes(permission)) {
-      throw new Error("Permission already granted");
+      throw new ApiError(StatusCodes.CONFLICT, "Permission already granted");
     }
+
 
     // Add permission
     user.permissions.push(permission);
@@ -145,14 +149,15 @@ class PermissionService {
   async revokePermission(userId, permission, adminId) {
     const user = await User.findById(userId);
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     // Check if permission exists on user
     const permIndex = user.permissions.indexOf(permission);
     if (permIndex === -1) {
-      throw new Error("Permission not found on user");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Permission not found on user");
     }
+
 
     // Remove permission
     user.permissions.splice(permIndex, 1);
@@ -177,8 +182,12 @@ class PermissionService {
       (p) => !isValidPermission(p) && !p.startsWith("-"),
     );
     if (invalidPerms.length > 0) {
-      throw new Error(`Invalid permissions: ${invalidPerms.join(", ")}`);
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        `Invalid permissions: ${invalidPerms.join(", ")}`
+      );
     }
+
 
     const user = await User.findByIdAndUpdate(
       userId,
@@ -187,8 +196,9 @@ class PermissionService {
     );
 
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
+
 
     // Log bulk update audit
     await this.logBulkUpdate(adminId, userId, permissions);

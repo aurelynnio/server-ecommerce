@@ -1,6 +1,9 @@
 const Voucher = require("../models/voucher.model");
 const Shop = require("../models/shop.model");
 const { getPaginationParams } = require("../utils/pagination");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
+
 
 /**
  * Service handling voucher/coupon operations
@@ -22,7 +25,10 @@ class VoucherService {
 
     if (role === "seller") {
       const shop = await Shop.findOne({ owner: userId });
-      if (!shop) throw new Error("Shop not found");
+      if (!shop) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
+      }
+
       shopId = shop._id;
       scope = "shop";
     }
@@ -30,8 +36,9 @@ class VoucherService {
     // Check if code already exists
     const existingVoucher = await Voucher.findOne({ code: voucherData.code });
     if (existingVoucher) {
-      throw new Error("Voucher code already exists");
+      throw new ApiError(StatusCodes.CONFLICT, "Voucher code already exists");
     }
+
 
     const newVoucher = await Voucher.create({
       ...voucherData,
@@ -54,8 +61,9 @@ class VoucherService {
       .lean();
 
     if (!voucher) {
-      throw new Error("Voucher not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Voucher not found");
     }
+
 
     return voucher;
   }
@@ -133,16 +141,21 @@ class VoucherService {
     const voucher = await Voucher.findById(voucherId);
 
     if (!voucher) {
-      throw new Error("Voucher not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Voucher not found");
     }
+
 
     // Check authorization
     const isAdmin = roles.includes("admin");
     if (!isAdmin && voucher.scope === "shop") {
       const shop = await Shop.findOne({ owner: userId });
       if (!shop || voucher.shopId.toString() !== shop._id.toString()) {
-        throw new Error("Unauthorized to update this voucher");
+        throw new ApiError(
+          StatusCodes.FORBIDDEN,
+          "Unauthorized to update this voucher"
+        );
       }
+
     }
 
     // Check if updating code and it already exists
@@ -152,8 +165,9 @@ class VoucherService {
         _id: { $ne: voucherId },
       });
       if (existingVoucher) {
-        throw new Error("Voucher code already exists");
+        throw new ApiError(StatusCodes.CONFLICT, "Voucher code already exists");
       }
+
     }
 
     // Update voucher
@@ -175,16 +189,21 @@ class VoucherService {
     const voucher = await Voucher.findById(voucherId);
 
     if (!voucher) {
-      throw new Error("Voucher not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Voucher not found");
     }
+
 
     // Check authorization
     const isAdmin = roles.includes("admin");
     if (!isAdmin && voucher.scope === "shop") {
       const shop = await Shop.findOne({ owner: userId });
       if (!shop || voucher.shopId.toString() !== shop._id.toString()) {
-        throw new Error("Unauthorized to delete this voucher");
+        throw new ApiError(
+          StatusCodes.FORBIDDEN,
+          "Unauthorized to delete this voucher"
+        );
       }
+
     }
 
     // Soft delete
@@ -203,8 +222,9 @@ class VoucherService {
     const voucher = await Voucher.findByIdAndDelete(voucherId);
 
     if (!voucher) {
-      throw new Error("Voucher not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Voucher not found");
     }
+
 
     return { message: "Voucher permanently deleted" };
   }
@@ -298,32 +318,43 @@ class VoucherService {
    */
   async applyVoucher(code, userId, orderValue, shopId = null) {
     const voucher = await Voucher.findOne({ code, isActive: true });
-    if (!voucher) throw new Error("Voucher not found or inactive");
+    if (!voucher) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Voucher not found or inactive");
+    }
 
     // 1. Check Date
     const now = new Date();
     if (now < voucher.startDate || now > voucher.endDate) {
-      throw new Error("Voucher is expired or not yet valid");
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Voucher is expired or not yet valid"
+      );
     }
 
     // 2. Check Scope
     if (voucher.scope === "shop") {
-      if (!shopId) throw new Error("This is a shop voucher");
+      if (!shopId) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, "This is a shop voucher");
+      }
       if (voucher.shopId.toString() !== shopId.toString()) {
-        throw new Error("Voucher does not apply to this shop");
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Voucher does not apply to this shop"
+        );
       }
     }
 
     // 3. Check Min Order Value
     if (orderValue < voucher.minOrderValue) {
-      throw new Error(
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
         `Order value must be at least ${voucher.minOrderValue}`
       );
     }
 
     // 4. Check Usage Limit (Global)
     if (voucher.usageLimit > 0 && voucher.usageCount >= voucher.usageLimit) {
-      throw new Error("Voucher usage limit reached");
+      throw new ApiError(StatusCodes.CONFLICT, "Voucher usage limit reached");
     }
 
     // 5. Check Usage Limit (Per User)
@@ -335,10 +366,12 @@ class VoucherService {
       voucher.usageLimitPerUser > 0 &&
       usedCount >= voucher.usageLimitPerUser
     ) {
-      throw new Error(
+      throw new ApiError(
+        StatusCodes.CONFLICT,
         "You have reached the usage limit for this voucher"
       );
     }
+
 
     // 6. Calculate Discount
     let discountAmount = 0;

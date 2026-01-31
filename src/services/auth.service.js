@@ -1,7 +1,9 @@
-﻿const User = require("../models/user.model");
+const User = require("../models/user.model");
 const comparePassword = require("../utils/comparePassword");
 const hashPassword = require("../utils/hashPasword");
 const { getIO } = require("../socket/index");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
 const {
   sendEmailVerificationCode,
   sendPasswordResetCode,
@@ -37,17 +39,18 @@ class AuthService {
     // Check if email already exists
     const existingUser = await User.findOne({ email: data.email });
     if (existingUser) {
-      throw new Error("Email already in use");
+      throw new ApiError(StatusCodes.CONFLICT, "Email already in use");
     }
 
     // Check if username already exists
     const existingUsername = await User.findOne({ username: data.username });
     if (existingUsername) {
-      throw new Error("Username already in use");
+      throw new ApiError(StatusCodes.CONFLICT, "Username already in use");
     }
 
     // Hash password
-    const hashedPassword = hashPassword(data.password);
+    const hashedPassword = await hashPassword(data.password);
+
 
     // Create new user (without verification code)
     const newUser = new User({
@@ -101,18 +104,27 @@ class AuthService {
     // Find user by email
     const user = await User.findOne({ email }).lean();
     if (!user) {
-      throw new Error("Invalid email or password");
+      throw new ApiError(
+        StatusCodes.UNAUTHORIZED,
+        "Invalid email or password"
+      );
     }
 
     // Verify password
     const isMatch = comparePassword(password, user.password);
     if (!isMatch) {
-      throw new Error("Invalid email or password");
+      throw new ApiError(
+        StatusCodes.UNAUTHORIZED,
+        "Invalid email or password"
+      );
     }
 
     // Check if email is verified
     if (!user.isVerifiedEmail) {
-      throw new Error("Please verify your email before logging in");
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        "Please verify your email before logging in"
+      );
     }
 
     // Generate tokens with permissions
@@ -157,11 +169,11 @@ class AuthService {
   async verifyEmail(email, code) {
     const user = await User.findOne({ email });
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     if (user.isVerifiedEmail) {
-      throw new Error("Email already verified");
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Email already verified");
     }
 
     // Check code in Redis
@@ -169,7 +181,10 @@ class AuthService {
     const storedCode = await cacheService.get(cacheKey);
 
     if (!storedCode || storedCode !== code) {
-      throw new Error("Invalid or expired verification code");
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Invalid or expired verification code"
+      );
     }
 
     // Update user
@@ -193,11 +208,11 @@ class AuthService {
     // Find user by verification code
     const user = await User.findOne({ codeVerifiEmail: code });
     if (!user) {
-      throw new Error("Invalid verification code");
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid verification code");
     }
 
     if (user.isVerifiedEmail) {
-      throw new Error("Email already verified");
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Email already verified");
     }
 
     // Check if code expired
@@ -205,7 +220,10 @@ class AuthService {
       user.expiresCodeVerifiEmail &&
       user.expiresCodeVerifiEmail < new Date()
     ) {
-      throw new Error("Verification code has expired");
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Verification code has expired"
+      );
     }
 
     // Update user
@@ -228,11 +246,11 @@ class AuthService {
   async sendVerificationCode(email) {
     const user = await User.findOne({ email });
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     if (user.isVerifiedEmail) {
-      throw new Error("Email already verified");
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Email already verified");
     }
 
     // Generate new code
@@ -254,7 +272,10 @@ class AuthService {
       user.codeVerifiEmail = undefined;
       user.expiresCodeVerifiEmail = undefined;
       await user.save();
-      throw new Error("Failed to send verification email. Please try again.");
+      throw new ApiError(
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        "Failed to send verification email. Please try again."
+      );
     }
 
     return {
@@ -268,7 +289,7 @@ class AuthService {
   async forgotPassword(email) {
     const user = await User.findOne({ email });
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     // Generate password reset code
@@ -282,7 +303,10 @@ class AuthService {
       await sendPasswordResetCode(email, resetCode);
     } catch (error) {
       logger.error("Failed to send password reset email:", error);
-      throw new Error("Failed to send password reset email. Please try again.");
+      throw new ApiError(
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        "Failed to send password reset email. Please try again."
+      );
     }
 
     return { email };
@@ -292,7 +316,7 @@ class AuthService {
   async resetPassword(email, code, newPassword) {
     const user = await User.findOne({ email });
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     // Check code in Redis
@@ -300,11 +324,15 @@ class AuthService {
     const storedCode = await cacheService.get(cacheKey);
 
     if (!storedCode || storedCode !== code) {
-      throw new Error("Invalid or expired reset code");
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Invalid or expired reset code"
+      );
     }
 
     // Hash new password
-    const hashedPassword = hashPassword(newPassword);
+    const hashedPassword = await hashPassword(newPassword);
+
 
     // Update password and clear reset code
     user.password = hashedPassword;
@@ -320,17 +348,21 @@ class AuthService {
   async changePassword(userId, currentPassword, newPassword) {
     const user = await User.findById(userId);
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     // Verify current password
     const isMatch = comparePassword(currentPassword, user.password);
     if (!isMatch) {
-      throw new Error("Current password is incorrect");
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Current password is incorrect"
+      );
     }
 
     // Hash and update new password
-    const hashedPassword = hashPassword(newPassword);
+    const hashedPassword = await hashPassword(newPassword);
+
     user.password = hashedPassword;
     await user.save();
 

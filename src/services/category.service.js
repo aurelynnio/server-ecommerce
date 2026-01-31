@@ -3,6 +3,9 @@ const Product = require("../models/product.model");
 const slugify = require("slugify");
 const { getPaginationParams } = require("../utils/pagination");
 const cacheService = require("./cache.service");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
+
 
 /**
  * Service handling category operations
@@ -46,7 +49,8 @@ class CategoryService {
     if (categoryData.parentCategory) {
       const parentExists = await Category.findById(categoryData.parentCategory);
       if (!parentExists) {
-        throw new Error("Parent category not found");
+        throw new ApiError(StatusCodes.NOT_FOUND, "Parent category not found");
+
       }
     }
 
@@ -185,8 +189,9 @@ class CategoryService {
       .lean();
 
     if (!category) {
-      throw new Error("Category not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Category not found");
     }
+
 
     return category;
   }
@@ -203,8 +208,9 @@ class CategoryService {
       .lean();
 
     if (!category) {
-      throw new Error("Category not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Category not found");
     }
+
 
     return category;
   }
@@ -219,8 +225,9 @@ class CategoryService {
     const category = await Category.findById(categoryId);
 
     if (!category) {
-      throw new Error("Category not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Category not found");
     }
+
 
     // Get subcategories
     const subcategories = await Category.find({
@@ -248,8 +255,9 @@ class CategoryService {
     const category = await Category.findById(categoryId);
 
     if (!category) {
-      throw new Error("Category not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Category not found");
     }
+
 
     // If updating name and no slug provided, regenerate slug
     if (updateData.name && !updateData.slug) {
@@ -268,7 +276,8 @@ class CategoryService {
       });
 
       if (existingCategory) {
-        throw new Error("Slug already exists");
+        throw new ApiError(StatusCodes.CONFLICT, "Slug already exists");
+
       }
     }
 
@@ -277,17 +286,26 @@ class CategoryService {
       // Check if parent category exists
       const parentExists = await Category.findById(updateData.parentCategory);
       if (!parentExists) {
-        throw new Error("Parent category not found");
+        throw new ApiError(StatusCodes.NOT_FOUND, "Parent category not found");
+
       }
 
       // Prevent setting self as parent
       if (updateData.parentCategory === categoryId) {
-        throw new Error("Category cannot be its own parent");
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Category cannot be its own parent"
+        );
+
       }
 
       // Prevent circular reference (parent's parent is this category)
       if (parentExists.parentCategory?.toString() === categoryId) {
-        throw new Error("Circular parent-child relationship detected");
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Circular parent-child relationship detected"
+        );
+
       }
     }
 
@@ -310,8 +328,9 @@ class CategoryService {
     const category = await Category.findById(categoryId);
 
     if (!category) {
-      throw new Error("Category not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Category not found");
     }
+
 
     // Check if category has subcategories
     const hasSubcategories = await Category.exists({
@@ -319,7 +338,8 @@ class CategoryService {
     });
 
     if (hasSubcategories) {
-      throw new Error(
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
         "Cannot delete category with subcategories. Please delete or reassign subcategories first."
       );
     }
@@ -328,10 +348,12 @@ class CategoryService {
     const hasProducts = await Product.exists({ category: categoryId });
 
     if (hasProducts) {
-      throw new Error(
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
         "Cannot delete category with products. Please reassign or delete products first."
       );
     }
+
 
     await category.deleteOne();
 

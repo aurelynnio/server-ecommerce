@@ -2,6 +2,9 @@ const Product = require("../models/product.model");
 const Order = require("../models/order.model");
 const User = require("../models/user.model");
 const cacheService = require("./cache.service");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
+
 
 /**
  * Service handling product recommendations
@@ -162,7 +165,10 @@ class RecommendationService {
    */
   async getSimilarProducts(productId, limit = 10) {
     const product = await Product.findById(productId);
-    if (!product) throw new Error("Product not found");
+    if (!product) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+    }
+
 
     const priceRange = 0.3; // 30% price difference
     const minPrice = product.price.currentPrice * (1 - priceRange);

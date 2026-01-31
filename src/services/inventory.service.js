@@ -1,5 +1,7 @@
 const Product = require("../models/product.model");
 const logger = require("../utils/logger");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
 
 /**
  * Service handling inventory operations
@@ -21,7 +23,10 @@ class InventoryService {
       const product = productMap.get(item.productId.toString());
       
       if (!product || product.status !== "published") {
-        throw new Error(`Product unavailable: ${item.productId}`);
+        throw new ApiError(
+          StatusCodes.NOT_FOUND,
+          `Product unavailable: ${item.productId}`
+        );
       }
 
       const quantity = item.quantity;
@@ -33,16 +38,25 @@ class InventoryService {
         );
 
         if (!variant) {
-          throw new Error(`Variation not found for product ${product.name}`);
+          throw new ApiError(
+            StatusCodes.NOT_FOUND,
+            `Variation not found for product ${product.name}`
+          );
         }
 
         if (variant.stock < quantity) {
-          throw new Error(`Out of stock for ${product.name} - ${variant.name}`);
+          throw new ApiError(
+            StatusCodes.CONFLICT,
+            `Out of stock for ${product.name} - ${variant.name}`
+          );
         }
       } else {
         // Base product stock check
         if (product.stock < quantity) {
-          throw new Error(`Out of stock for ${product.name}`);
+          throw new ApiError(
+            StatusCodes.CONFLICT,
+            `Out of stock for ${product.name}`
+          );
         }
       }
     }
@@ -83,14 +97,20 @@ class InventoryService {
         if (variant) {
             // Check again for safety inside transaction
             if (variant.stock < quantity) {
-                throw new Error(`Out of stock for ${product.name} - ${variant.name}`);
+                throw new ApiError(
+                  StatusCodes.CONFLICT,
+                  `Out of stock for ${product.name} - ${variant.name}`
+                );
             }
             variant.stock -= quantity;
             variant.sold = (variant.sold || 0) + quantity;
         }
       } else {
         if (product.stock < quantity) {
-            throw new Error(`Out of stock for ${product.name}`);
+            throw new ApiError(
+              StatusCodes.CONFLICT,
+              `Out of stock for ${product.name}`
+            );
         }
         product.stock -= quantity;
       }

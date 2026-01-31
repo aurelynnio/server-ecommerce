@@ -1,5 +1,8 @@
 const Product = require("../models/product.model");
 const cacheService = require("./cache.service");
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
+
 const { getPaginationParams } = require("../utils/pagination");
 
 /**
@@ -189,7 +192,10 @@ class FlashSaleService {
     const { salePrice, discountPercent, stock, startTime, endTime } = flashSaleData;
 
     const product = await Product.findById(productId);
-    if (!product) throw new Error("Product not found");
+    if (!product) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+    }
+
 
     product.flashSale = {
       isActive: true,
@@ -219,7 +225,10 @@ class FlashSaleService {
       { new: true }
     );
 
-    if (!product) throw new Error("Product not found");
+    if (!product) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+    }
+
 
     await cacheService.delByPattern("flash-sale:*");
     return product;
