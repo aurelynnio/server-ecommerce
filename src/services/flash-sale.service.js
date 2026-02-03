@@ -3,7 +3,8 @@ const cacheService = require("./cache.service");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
 
-const { getPaginationParams } = require("../utils/pagination");
+const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
+
 
 /**
  * Service handling flash sale operations
@@ -63,21 +64,8 @@ class FlashSaleService {
       },
     }));
 
-    const totalPages = paginationParams.totalPages;
-    const currentPage = paginationParams.currentPage;
-
     const result = {
-      data: enrichedProducts,
-      pagination: {
-        currentPage,
-        pageSize: paginationParams.pageSize,
-        totalItems: total,
-        totalPages,
-        hasNextPage: currentPage < totalPages,
-        hasPrevPage: currentPage > 1,
-        nextPage: currentPage < totalPages ? currentPage + 1 : null,
-        prevPage: currentPage > 1 ? currentPage - 1 : null,
-      },
+      ...buildPaginationResponse(enrichedProducts, paginationParams),
       saleInfo: {
         currentTime: now,
         nextSaleTime: this.getNextSaleTime(),

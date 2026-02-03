@@ -1,7 +1,10 @@
 const userModel = require("../models/user.model");
 const hashPassword = require("../utils/hashPasword");
 const comparePassword = require("../utils/comparePassword");
-const { getPaginationParams } = require("../utils/pagination");
+const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
+
+const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require("../middlewares/errorHandler.middleware");
 
 /**
  * Service handling user management operations
@@ -13,6 +16,7 @@ class UserService {
    * @param {Object} userData - User details
    * @param {string} userData.username - Username
    * @param {string} userData.email - Email address
+   * @param {string} userData.password - Password
    * @param {string} [userData.roles="user"] - User role
    * @param {string} [userData.phone] - Phone number
    * @param {boolean} [userData.isVerifiedEmail=false] - Email verification status
@@ -24,6 +28,7 @@ class UserService {
     const {
       username,
       email,
+      password,
       roles = "user",
       phone,
       isVerifiedEmail = false,
@@ -33,18 +38,20 @@ class UserService {
     // Check if username already exists
     const existingUsername = await userModel.findOne({ username });
     if (existingUsername) {
-      throw new Error("Username already exists");
+      throw new ApiError(StatusCodes.CONFLICT, "Username already exists");
     }
 
     // Check if email already exists
     const existingEmail = await userModel.findOne({ email });
     if (existingEmail) {
-      throw new Error("Email already exists");
+      throw new ApiError(StatusCodes.CONFLICT, "Email already exists");
     }
 
-    // Generate default password (username + "123456")
-    const defaultPassword = `${username}123456`;
-    const hashedPassword = await hashPassword(defaultPassword);
+    if (!password) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Password is required");
+    }
+
+    const hashedPassword = await hashPassword(password);
 
     // Create user
     const user = await userModel.create({
@@ -79,7 +86,7 @@ class UserService {
     );
 
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     return user;
@@ -95,7 +102,7 @@ class UserService {
     const user = await userModel.findById(userId).select("-password");
 
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     return user;
@@ -118,7 +125,7 @@ class UserService {
         _id: { $ne: userId },
       });
       if (existingUser) {
-        throw new Error("Username already exists");
+        throw new ApiError(StatusCodes.CONFLICT, "Username already exists");
       }
     }
 
@@ -128,7 +135,7 @@ class UserService {
         _id: { $ne: userId },
       });
       if (existingUser) {
-        throw new Error("Email already exists");
+        throw new ApiError(StatusCodes.CONFLICT, "Email already exists");
       }
     }
 
@@ -139,7 +146,7 @@ class UserService {
     });
 
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     return user;
@@ -160,7 +167,7 @@ class UserService {
     );
 
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     return user;
@@ -178,12 +185,12 @@ class UserService {
     const user = await userModel.findById(userId);
 
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     const address = user.addresses.id(addressId);
     if (!address) {
-      throw new Error("Address not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Address not found");
     }
 
     // Update only provided fields
@@ -206,7 +213,7 @@ class UserService {
    * @throws {Error} If user not found
    */
   async deleteAddress(userId, addressId) {
-    // Thực hiện xóa
+    // Thá»±c hiá»‡n xÃ³a
     const userAfter = await userModel.findByIdAndUpdate(
       userId,
       { $pull: { addresses: { _id: addressId } } },
@@ -214,7 +221,7 @@ class UserService {
     );
 
     if (!userAfter) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     return userAfter;
@@ -230,7 +237,7 @@ class UserService {
     const user = await userModel.findById(userId).select("addresses");
 
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     return user.addresses;
@@ -247,12 +254,12 @@ class UserService {
     const user = await userModel.findById(userId);
 
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     const address = user.addresses.id(addressId);
     if (!address) {
-      throw new Error("Address not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Address not found");
     }
 
     // Reset all addresses to non-default
@@ -280,13 +287,13 @@ class UserService {
     const user = await userModel.findById(userId);
 
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     // Verify old password
     const isMatch = await comparePassword(oldPassword, user.password);
     if (!isMatch) {
-      throw new Error("Old password is incorrect");
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Old password is incorrect");
     }
 
     // Hash new password
@@ -346,19 +353,8 @@ class UserService {
       .limit(paginationParams.limit)
       .sort({ createdAt: -1 });
 
-    return {
-      data: users,
-      pagination: {
-        currentPage: paginationParams.currentPage,
-        pageSize: paginationParams.pageSize,
-        totalPages: paginationParams.totalPages,
-        totalItems: paginationParams.totalItems,
-        hasNextPage: paginationParams.hasNextPage,
-        hasPrevPage: paginationParams.hasPrevPage,
-        nextPage: paginationParams.nextPage,
-        prevPage: paginationParams.prevPage,
-      },
-    };
+    return buildPaginationResponse(users, paginationParams);
+
   }
 
   /**
@@ -371,7 +367,7 @@ class UserService {
     const user = await userModel.findById(userId).select("-password");
 
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     return user;
@@ -388,7 +384,7 @@ class UserService {
     // Check if user exists
     const user = await userModel.findById(userId);
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     // Check if updating username and it already exists
@@ -398,7 +394,7 @@ class UserService {
         _id: { $ne: userId },
       });
       if (existingUsername) {
-        throw new Error("Username already exists");
+        throw new ApiError(StatusCodes.CONFLICT, "Username already exists");
       }
     }
 
@@ -409,7 +405,7 @@ class UserService {
         _id: { $ne: userId },
       });
       if (existingEmail) {
-        throw new Error("Email already exists");
+        throw new ApiError(StatusCodes.CONFLICT, "Email already exists");
       }
     }
 
@@ -438,7 +434,7 @@ class UserService {
     );
 
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     return user;
@@ -459,7 +455,7 @@ class UserService {
     );
 
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     return user;
@@ -475,7 +471,7 @@ class UserService {
     const user = await userModel.findByIdAndDelete(userId);
 
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     return { message: "User deleted successfully" };

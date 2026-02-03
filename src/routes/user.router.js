@@ -17,6 +17,7 @@ const {
   mongoIdParamValidator,
   addressIdParamValidator,
   paginationQueryValidator,
+  changePasswordValidator,
 } = require("../validations/user.validator");
 const upload = require("../configs/upload");
 
@@ -53,7 +54,7 @@ router.put(
  * @access  Private
  */
 router.post(
-  "/address",
+  "/addresses",
   verifyAccessToken,
   validate(addAddressValidator),
   userController.addAddress
@@ -64,7 +65,7 @@ router.post(
  * @access  Private
  */
 router.put(
-  "/address/:addressId",
+  "/addresses/:addressId",
   verifyAccessToken,
   validate({
     params: addressIdParamValidator,
@@ -78,7 +79,7 @@ router.put(
  * @access  Private
  */
 router.delete(
-  "/address/:addressId",
+  "/addresses/:addressId",
   verifyAccessToken,
   validate({ params: addressIdParamValidator }),
   userController.deleteAddress
@@ -88,14 +89,14 @@ router.delete(
  * @desc    Get all addresses for current user
  * @access  Private
  */
-router.get("/address", verifyAccessToken, userController.getAddresses);
+router.get("/addresses", verifyAccessToken, userController.getAddresses);
 
 /**
  * @desc    Set address as default
  * @access  Private
  */
 router.put(
-  "/address/:addressId/default",
+  "/addresses/:addressId/default",
   verifyAccessToken,
   validate({ params: addressIdParamValidator }),
   userController.setDefaultAddress
@@ -108,7 +109,7 @@ router.put(
 router.put(
   "/change-password",
   verifyAccessToken,
-  validate(require("../validations/user.validator").changePasswordValidator),
+  validate(changePasswordValidator),
   userController.changePassword
 );
 
@@ -129,7 +130,7 @@ router.get(
  * @access  Private (Admin)
  */
 router.post(
-  "/create",
+  "/",
   verifyAccessToken,
   requireRole("admin"),
   validate(createUserValidator),
@@ -140,12 +141,28 @@ router.post(
  * @desc    Update user by ID (Admin)
  * @access  Private (Admin)
  */
-router.post(
-  "/update",
+router.put(
+  "/",
   verifyAccessToken,
   requireRole("admin"),
   validate(updateUserValidator),
   userController.updateUser
+);
+
+/**
+ * @desc    Update user by ID
+ * @access  Private (Admin)
+ * @param   id - User ID
+ */
+router.put(
+  "/:id",
+  verifyAccessToken,
+  requireRole("admin"),
+  validate({
+    params: mongoIdParamValidator,
+    body: updateUserByIdValidator,
+  }),
+  userController.updateUserById
 );
 
 /**
@@ -173,21 +190,6 @@ router.get(
   requireRole("admin"),
   validate({ params: mongoIdParamValidator }),
   userController.getUserById
-);
-
-/**
- * @desc    Update user by ID
- * @access  Private (Admin)
- */
-router.put(
-  "/:id",
-  verifyAccessToken,
-  requireRole("admin"),
-  validate({
-    params: mongoIdParamValidator,
-    body: updateUserByIdValidator,
-  }),
-  userController.updateUserById
 );
 
 /**

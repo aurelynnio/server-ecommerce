@@ -13,11 +13,13 @@ const createBannerValidator = Joi.object({
 
 const updateBannerValidator = createBannerValidator.fork(
   ["title", "subtitle"],
-  (schema) => schema.optional()
+  (schema) => schema.optional(),
 );
+
+const bannerIdParamValidator = Joi.object({ id: objectId.required() });
 
 module.exports = {
   createBannerValidator,
   updateBannerValidator,
-  bannerIdParamValidator: Joi.object({ id: objectId.required() }),
+  bannerIdParamValidator,
 };

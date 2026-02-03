@@ -30,13 +30,40 @@ class TokenService {
   }
 
   /**
+   * Get permissions for user
+   * @param {any} user
+   * @returns {any}
+   */
+  getPermissionsForUser(user) {
+    return permissionService.getUserPermissions(user);
+  }
+
+  /**
+   * Verify refresh token
+   * @param {any} token
+   * @returns {string}
+   */
+  verifyRefreshToken(token) {
+    return jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+  }
+
+  /**
+   * Verify access token
+   * @param {any} token
+   * @returns {string}
+   */
+  verifyAccessToken(token) {
+    return jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+  }
+
+  /**
    * Generate an access token with permissions included
    * @param {Object} user - User document or user object
    * @returns {string} Signed JWT access token with permissions
    */
   generateAccessTokenWithPermissions(user) {
-    const permissions = permissionService.getUserPermissions(user);
-    
+    const permissions = this.getPermissionsForUser(user);
+
     const payload = {
       userId: user._id || user.userId,
       username: user.username,
@@ -54,8 +81,8 @@ class TokenService {
    * @returns {Object} Object containing accessToken and refreshToken
    */
   generateTokensWithPermissions(user) {
-    const permissions = permissionService.getUserPermissions(user);
-    
+    const permissions = this.getPermissionsForUser(user);
+
     const payload = {
       userId: user._id,
       username: user.username,
@@ -70,5 +97,6 @@ class TokenService {
     };
   }
 }
+
 
 module.exports = new TokenService();

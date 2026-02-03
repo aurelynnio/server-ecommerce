@@ -6,6 +6,12 @@ const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
 
 class ShopCategoryService {
+  /**
+   * Create category
+   * @param {string} userId
+   * @param {any} categoryData
+   * @returns {Promise<any>}
+   */
   async createCategory(userId, categoryData) {
     const shop = await Shop.findOne({ owner: userId });
     if (!shop) throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
@@ -19,6 +25,12 @@ class ShopCategoryService {
     return categories;
   }
 
+  /**
+   * Get shop categories
+   * @param {string} userId
+   * @param {any} shopIdParam
+   * @returns {Promise<any>}
+   */
   async getShopCategories(userId, shopIdParam) {
     let shopId = shopIdParam;
 
@@ -83,6 +95,13 @@ class ShopCategoryService {
     };
   }
 
+  /**
+   * Update category
+   * @param {string} userId
+   * @param {string} categoryId
+   * @param {Object} updates
+   * @returns {Promise<any>}
+   */
   async updateCategory(userId, categoryId, updates) {
     const shop = await Shop.findOne({ owner: userId });
 
@@ -102,6 +121,12 @@ class ShopCategoryService {
     return updated;
   }
 
+  /**
+   * Delete category
+   * @param {string} userId
+   * @param {string} categoryId
+   * @returns {Promise<any>}
+   */
   async deleteCategory(userId, categoryId) {
     const shop = await Shop.findOne({ owner: userId });
     if (!shop) throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");

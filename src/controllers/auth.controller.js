@@ -3,16 +3,13 @@ const authService = require("../services/auth.service");
 const { sendFail, sendSuccess } = require("../shared/res/formatResponse");
 
 const { StatusCodes } = require("http-status-codes");
-const jwt = require("jsonwebtoken");
 
-/**
- * Authentication Controller
- * Handles user registration, login, password management, and token operations
- */
 const AuthController = {
   /**
-   * Register a new user
-   * @access Public
+   * Register
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   register: catchAsync(async (req, res) => {
     const result = await authService.register(req.body);
@@ -25,28 +22,28 @@ const AuthController = {
   }),
 
   /**
-   * Authenticate user and return tokens
-   * @access Public
+   * Login
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   login: catchAsync(async (req, res) => {
     const { email, password } = req.body;
     const result = await authService.login(email, password);
     const { accessToken, refreshToken, user } = result;
 
-    // Set refresh token in HTTP-only cookie (long-lived)
     res.cookie("refreshToken", refreshToken, {
-      httpOnly: true, // Không thể truy cập từ JavaScript
-      secure: process.env.NODE_ENV === "production", // Chỉ gửi qua HTTPS trong production
-      sameSite: "strict", // CSRF protection
-      maxAge: 16 * 24 * 60 * 60 * 1000, // 16 days
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 16 * 24 * 60 * 60 * 1000,
     });
 
-    // Set access token in HTTP-only cookie (short-lived)
     res.cookie("accessToken", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 1 * 60 * 1000, // 1 minute
+      maxAge: 1 * 60 * 1000,
     });
 
     return sendSuccess(
@@ -58,8 +55,10 @@ const AuthController = {
   }),
 
   /**
-   * Send email verification code
-   * @access Public
+   * Send verification code
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   sendVerificationCode: catchAsync(async (req, res) => {
     const { email } = req.body;
@@ -73,8 +72,10 @@ const AuthController = {
   }),
 
   /**
-   * Verify email with verification code
-   * @access Public
+   * Verify email
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   verifyEmail: catchAsync(async (req, res) => {
     const { code } = req.body;
@@ -88,8 +89,10 @@ const AuthController = {
   }),
 
   /**
-   * Request password reset (forgot password)
-   * @access Public
+   * Forgot password
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   forgotPassword: catchAsync(async (req, res) => {
     const { email } = req.body;
@@ -103,8 +106,10 @@ const AuthController = {
   }),
 
   /**
-   * Reset password with verification code
-   * @access Public
+   * Reset password
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   resetPassword: catchAsync(async (req, res) => {
     const { email, code, newPassword } = req.body;
@@ -118,12 +123,12 @@ const AuthController = {
   }),
 
   /**
-   * Refresh access token using refresh token
-   * @access Public (requires valid refresh token)
-   * @cookie refreshToken - HTTP-only refresh token
+   * Refresh token
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   refreshToken: catchAsync(async (req, res) => {
-    // Lấy refresh token từ cookie (ưu tiên) hoặc body (fallback)
     const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
 
     if (!refreshToken) {
@@ -134,60 +139,28 @@ const AuthController = {
       );
     }
 
-    // Verify refresh token
-    let payload;
-    try {
-      payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-    } catch (error) {
-      return sendFail(
-        res,
-        "Invalid or expired refresh token",
-        StatusCodes.UNAUTHORIZED
-      );
-    }
+    const result = await authService.refreshAccessToken(refreshToken);
 
-    // Get user from database to get fresh permissions
-    const User = require("../models/user.model");
-    const user = await User.findById(payload.userId).lean();
-    
-    if (!user) {
-      return sendFail(res, "User not found", StatusCodes.UNAUTHORIZED);
-    }
-
-    // Get fresh permissions
-    const permissionService = require("../services/permission.service");
-    const permissions = permissionService.getUserPermissions(user);
-
-    // Generate new access token with fresh permissions
-    const tokenService = require("../services/token.service");
-    const newPayload = {
-      userId: user._id,
-      username: user.username,
-      email: user.email,
-      role: user.roles,
-      permissions: permissions,
-    };
-    const newAccessToken = tokenService.generateAccessToken(newPayload);
-
-    // Set access token mới vào cookie (refresh token cookie giữ nguyên)
-    res.cookie("accessToken", newAccessToken, {
+    res.cookie("accessToken", result.accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 30 * 60 * 1000, // 30 minutes
+      maxAge: 30 * 60 * 1000,
     });
 
     return sendSuccess(
       res,
-      { accessToken: newAccessToken, permissions },
+      { accessToken: result.accessToken, permissions: result.permissions },
       "Access token refreshed successfully",
       StatusCodes.OK
     );
   }),
 
   /**
-   * Logout user and clear tokens
-   * @access Private (requires authentication)
+   * Logout
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   logout: catchAsync(async (req, res) => {
     res.clearCookie("accessToken", {
@@ -206,11 +179,13 @@ const AuthController = {
   }),
 
   /**
-   * Change password for authenticated user
-   * @access Private (requires authentication)
+   * Change password
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   changePassword: catchAsync(async (req, res) => {
-    const { currentPassword, newPassword } = req.body;
+    const { oldPassword, newPassword } = req.body;
     const userId = req.user?.userId;
 
     if (!userId) {
@@ -219,7 +194,7 @@ const AuthController = {
 
     const result = await authService.changePassword(
       userId,
-      currentPassword,
+      oldPassword,
       newPassword
     );
     return sendSuccess(

@@ -39,7 +39,6 @@ const getPaginationParams = (
  */
 const buildPaginationResponse = (data, params) => {
   return {
-    success: true,
     data,
     pagination: {
       currentPage: params.currentPage,

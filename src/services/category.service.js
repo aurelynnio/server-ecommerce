@@ -1,10 +1,11 @@
 const Category = require("../models/category.model");
 const Product = require("../models/product.model");
 const slugify = require("slugify");
-const { getPaginationParams } = require("../utils/pagination");
+const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
 const cacheService = require("./cache.service");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
+
 
 
 /**
@@ -167,22 +168,15 @@ class CategoryService {
       { $project: { parentCategoryData: 0, productCountData: 0 } }
     ]);
 
-    return {
-      data: categoriesWithData,
-      pagination: {
-        currentPage: paginationParams.currentPage,
-        pageSize: paginationParams.pageSize,
-        totalPages: paginationParams.totalPages,
-        totalItems: paginationParams.totalItems,
-        hasNextPage: paginationParams.hasNextPage,
-        hasPrevPage: paginationParams.hasPrevPage,
-        nextPage: paginationParams.nextPage,
-        prevPage: paginationParams.prevPage,
-      },
-    };
+    return buildPaginationResponse(categoriesWithData, paginationParams);
   }
 
-  // Get category by ID
+  /**
+   * Get category by ID
+   * @param {string} categoryId - Category ID
+   * @returns {Promise<Object>} Category with parent info
+   * @throws {Error} If category not found
+   */
   async getCategoryById(categoryId) {
     const category = await Category.findById(categoryId)
       .populate("parentCategory", "name slug")
@@ -441,37 +435,18 @@ class CategoryService {
       query.parentCategory = parentCategory;
     }
 
-    // Get pagination params
-    const { skip, limit: pageLimit } = getPaginationParams(page, limit);
+    const total = await Category.countDocuments(query);
+    const paginationParams = getPaginationParams(page, limit, total);
 
-    // Execute query
-    const [categories, total] = await Promise.all([
-      Category.find(query)
-        .populate("parentCategory", "name slug")
-        .select("-__v")
-        .sort({ name: 1 })
-        .skip(skip)
-        .limit(pageLimit)
-        .lean(),
-      Category.countDocuments(query),
-    ]);
+    const categories = await Category.find(query)
+      .populate("parentCategory", "name slug")
+      .select("-__v")
+      .sort({ name: 1 })
+      .skip(paginationParams.skip)
+      .limit(paginationParams.limit)
+      .lean();
 
-    const totalPages = Math.ceil(total / pageLimit);
-    const currentPage = parseInt(page);
-
-    return {
-      data: categories,
-      pagination: {
-        currentPage,
-        pageSize: pageLimit,
-        totalItems: total,
-        totalPages,
-        hasNextPage: currentPage < totalPages,
-        hasPrevPage: currentPage > 1,
-        nextPage: currentPage < totalPages ? currentPage + 1 : null,
-        prevPage: currentPage > 1 ? currentPage - 1 : null,
-      },
-    };
+    return buildPaginationResponse(categories, paginationParams);
   }
 
   /**

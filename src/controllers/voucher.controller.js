@@ -1,16 +1,14 @@
 const voucherService = require("../services/voucher.service");
 const catchAsync = require("../configs/catchAsync");
-const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
+const { sendSuccess } = require("../shared/res/formatResponse");
 const { StatusCodes } = require("http-status-codes");
 
-/**
- * Voucher Controller
- * Handles voucher/coupon operations including CRUD, application, and statistics
- */
 const VoucherController = {
   /**
-   * Create a new voucher
-   * @access Private (Admin or Seller)
+   * Create voucher
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   createVoucher: catchAsync(async (req, res) => {
     const newVoucher = await voucherService.createVoucher(
@@ -22,8 +20,10 @@ const VoucherController = {
   }),
 
   /**
-   * Get voucher by ID
-   * @access Private (Authenticated users)
+   * Get voucher by id
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getVoucherById: catchAsync(async (req, res) => {
     const voucher = await voucherService.getVoucherById(req.params.id);
@@ -31,8 +31,10 @@ const VoucherController = {
   }),
 
   /**
-   * Get all vouchers with pagination
-   * @access Private (Admin only)
+   * Get all vouchers
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getAllVouchers: catchAsync(async (req, res) => {
     const result = await voucherService.getAllVouchers(req.query);
@@ -40,8 +42,10 @@ const VoucherController = {
   }),
 
   /**
-   * Update voucher by ID
-   * @access Private (Owner or Admin)
+   * Update voucher
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   updateVoucher: catchAsync(async (req, res) => {
     const voucher = await voucherService.updateVoucher(
@@ -54,8 +58,10 @@ const VoucherController = {
   }),
 
   /**
-   * Delete voucher (soft delete)
-   * @access Private (Owner or Admin)
+   * Delete voucher
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   deleteVoucher: catchAsync(async (req, res) => {
     const result = await voucherService.deleteVoucher(
@@ -67,8 +73,10 @@ const VoucherController = {
   }),
 
   /**
-   * Permanently delete voucher
-   * @access Private (Admin only)
+   * Permanent delete voucher
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   permanentDeleteVoucher: catchAsync(async (req, res) => {
     const result = await voucherService.permanentDeleteVoucher(req.params.id);
@@ -76,8 +84,10 @@ const VoucherController = {
   }),
 
   /**
-   * Get vouchers by shop
-   * @access Public
+   * Get shop vouchers
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getShopVouchers: catchAsync(async (req, res) => {
     const vouchers = await voucherService.getShopVouchers(req.params.shopId);
@@ -86,7 +96,9 @@ const VoucherController = {
 
   /**
    * Get platform vouchers
-   * @access Public
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getPlatformVouchers: catchAsync(async (req, res) => {
     const vouchers = await voucherService.getPlatformVouchers();
@@ -94,8 +106,10 @@ const VoucherController = {
   }),
 
   /**
-   * Get available vouchers for current user
-   * @access Private (Authenticated users)
+   * Get available vouchers
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getAvailableVouchers: catchAsync(async (req, res) => {
     const { shopId } = req.query;
@@ -107,8 +121,10 @@ const VoucherController = {
   }),
 
   /**
-   * Apply voucher to check discount amount
-   * @access Private (Authenticated users)
+   * Apply voucher
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   applyVoucher: catchAsync(async (req, res) => {
     const { code, orderValue, shopId } = req.body;
@@ -122,8 +138,10 @@ const VoucherController = {
   }),
 
   /**
-   * Get voucher statistics overview
-   * @access Private (Admin only)
+   * Get voucher statistics
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getVoucherStatistics: catchAsync(async (req, res) => {
     const stats = await voucherService.getVoucherStatistics();

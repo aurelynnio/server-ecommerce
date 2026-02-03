@@ -22,6 +22,11 @@ let vnpayInstance = null;
  * @returns {Object} VNPay instance
  */
 const getVNPayInstance = () => {
+  /**
+   * If
+   * @param {any} !vnpayInstance
+   * @returns {any}
+   */
   if (!vnpayInstance) {
     vnpayInstance = new VNPay({
       tmnCode: process.env.VNP_TMNCODE,

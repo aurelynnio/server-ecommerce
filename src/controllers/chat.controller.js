@@ -3,14 +3,12 @@ const catchAsync = require("../configs/catchAsync");
 const { sendSuccess } = require("../shared/res/formatResponse");
 const { StatusCodes } = require("http-status-codes");
 
-/**
- * Chat Controller
- * Handles real-time chat operations including conversations and messages
- */
 const ChatController = {
   /**
-   * Start or get an existing conversation
-   * @access Private (Authenticated users)
+   * Start conversation
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   startConversation: catchAsync(async (req, res) => {
     const conversation = await chatService.startConversation(
@@ -26,8 +24,10 @@ const ChatController = {
   }),
 
   /**
-   * Send a message in a conversation
-   * @access Private (Authenticated users)
+   * Send message
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   sendMessage: catchAsync(async (req, res) => {
     const info = await chatService.sendMessage(req.user.userId, req.body);
@@ -35,8 +35,10 @@ const ChatController = {
   }),
 
   /**
-   * Get all conversations for current user
-   * @access Private (Authenticated users)
+   * Get my conversations
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getMyConversations: catchAsync(async (req, res) => {
     const conversations = await chatService.getMyConversations(req.user.userId);
@@ -49,8 +51,10 @@ const ChatController = {
   }),
 
   /**
-   * Get all messages in a conversation
-   * @access Private (Authenticated users - participants only)
+   * Get messages
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getMessages: catchAsync(async (req, res) => {
     const messages = await chatService.getMessages(req.params.conversationId, req.query);
@@ -58,8 +62,10 @@ const ChatController = {
   }),
 
   /**
-   * Mark all messages in a conversation as read
-   * @access Private (Authenticated users - participants only)
+   * Mark as read
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   markAsRead: catchAsync(async (req, res) => {
     const { conversationId } = req.params;

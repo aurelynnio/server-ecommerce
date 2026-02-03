@@ -3,14 +3,12 @@ const flashSaleService = require("../services/flash-sale.service");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const { StatusCodes } = require("http-status-codes");
 
-/**
- * Flash Sale Controller
- * Handles flash sale operations including product management and scheduling
- */
 const FlashSaleController = {
   /**
-   * Get active flash sale products
-   * @access Public
+   * Get active flash sale
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getActiveFlashSale: catchAsync(async (req, res) => {
     const { page, limit } = req.query;
@@ -24,8 +22,10 @@ const FlashSaleController = {
   }),
 
   /**
-   * Get flash sale schedule
-   * @access Public
+   * Get schedule
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getSchedule: catchAsync(async (req, res) => {
     const schedule = await flashSaleService.getFlashSaleSchedule();
@@ -33,8 +33,10 @@ const FlashSaleController = {
   }),
 
   /**
-   * Get flash sale by time slot
-   * @access Public
+   * Get by slot
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getBySlot: catchAsync(async (req, res) => {
     const { timeSlot } = req.params;
@@ -44,14 +46,15 @@ const FlashSaleController = {
   }),
 
   /**
-   * Add product to flash sale (Seller/Admin)
-   * @access Private (Seller or Admin)
+   * Add to flash sale
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   addToFlashSale: catchAsync(async (req, res) => {
     const { productId } = req.params;
     const flashSaleData = req.body;
 
-    
     if (!flashSaleData.salePrice || !flashSaleData.startTime || !flashSaleData.endTime) {
       return sendFail(
         res,
@@ -65,8 +68,10 @@ const FlashSaleController = {
   }),
 
   /**
-   * Remove product from flash sale (Seller/Admin)
-   * @access Private (Seller or Admin)
+   * Remove from flash sale
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   removeFromFlashSale: catchAsync(async (req, res) => {
     const { productId } = req.params;
@@ -76,8 +81,10 @@ const FlashSaleController = {
   }),
 
   /**
-   * Get flash sale statistics (Admin)
-   * @access Private (Admin only)
+   * Get stats
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getStats: catchAsync(async (req, res) => {
     const stats = await flashSaleService.getFlashSaleStats();

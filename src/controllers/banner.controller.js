@@ -3,14 +3,12 @@ const bannerService = require("../services/banner.service");
 const { StatusCodes } = require("http-status-codes");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 
-/**
- * Banner Controller
- * Handles banner CRUD operations for homepage and promotional displays
- */
 const BannerController = {
   /**
-   * Create a new banner
-   * @access Private (Admin only)
+   * Create banner
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   createBanner: catchAsync(async (req, res) => {
     const banner = await bannerService.createBanner(req.body, req.file);
@@ -23,8 +21,10 @@ const BannerController = {
   }),
 
   /**
-   * Get active banners for public display
-   * @access Public
+   * Get banners
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getBanners: catchAsync(async (req, res) => {
     const { limit, page, ...filter } = req.query;
@@ -33,28 +33,32 @@ const BannerController = {
       page: parseInt(page) || 1,
       filter: { isActive: true, ...filter },
     });
-    
+
     return sendSuccess(res, result, "Get banners successfully", StatusCodes.OK);
   }),
-   
-  /**
-   * Get all banners for admin management
-   * @access Private (Admin only)
-   */
-  getAllBannersAdmin: catchAsync(async (req, res) => {
-     const { limit, page, ...filter } = req.query;
-     const result = await bannerService.getBanners({
-       limit: parseInt(limit) || 20,
-       page: parseInt(page) || 1,
-       filter: filter, 
-     });
-     
-     return sendSuccess(res, result, "Get all banners for admin successfully", StatusCodes.OK);
-   }),
 
   /**
-   * Get banner by ID
-   * @access Public
+   * Get all banners admin
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  getAllBannersAdmin: catchAsync(async (req, res) => {
+    const { limit, page, ...filter } = req.query;
+    const result = await bannerService.getBanners({
+      limit: parseInt(limit) || 20,
+      page: parseInt(page) || 1,
+      filter,
+    });
+
+    return sendSuccess(res, result, "Get all banners for admin successfully", StatusCodes.OK);
+  }),
+
+  /**
+   * Get banner by id
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getBannerById: catchAsync(async (req, res) => {
     const banner = await bannerService.getBannerById(req.params.id);
@@ -66,8 +70,10 @@ const BannerController = {
   }),
 
   /**
-   * Update a banner
-   * @access Private (Admin only)
+   * Update banner
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   updateBanner: catchAsync(async (req, res) => {
     const banner = await bannerService.updateBanner(req.params.id, req.body, req.file);
@@ -79,8 +85,10 @@ const BannerController = {
   }),
 
   /**
-   * Delete a banner
-   * @access Private (Admin only)
+   * Delete banner
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   deleteBanner: catchAsync(async (req, res) => {
     const result = await bannerService.deleteBanner(req.params.id);

@@ -3,7 +3,8 @@ const User = require("../models/user.model");
 const Product = require("../models/product.model");
 const Order = require("../models/order.model");
 const Review = require("../models/review.model");
-const { getPaginationParams } = require("../utils/pagination");
+const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
+
 
 const slugify = require("slugify");
 const { StatusCodes } = require("http-status-codes");
@@ -11,6 +12,12 @@ const { ApiError } = require("../middlewares/errorHandler.middleware");
 
 
 class ShopService {
+  /**
+   * Create shop
+   * @param {string} userId
+   * @param {any} shopData
+   * @returns {Promise<any>}
+   */
   async createShop(userId, shopData) {
     const { name, ...otherDetails } = shopData;
 
@@ -45,6 +52,11 @@ class ShopService {
     return newShop;
   }
 
+  /**
+   * Get shop info
+   * @param {string} shopId
+   * @returns {Promise<any>}
+   */
   async getShopInfo(shopId) {
     const findShop = await Shop.findById(shopId).lean();
     if (!findShop) {
@@ -54,6 +66,11 @@ class ShopService {
 
   }
 
+  /**
+   * Get my shop
+   * @param {string} userId
+   * @returns {Promise<any>}
+   */
   async getMyShop(userId) {
     const findShop = await Shop.findOne({ owner: userId }).lean();
     if (!findShop) {
@@ -63,6 +80,12 @@ class ShopService {
 
   }
 
+  /**
+   * Update shop
+   * @param {string} userId
+   * @param {Object} updates
+   * @returns {Promise<any>}
+   */
   async updateShop(userId, updates) {
     // Remove sensitive fields
     delete updates.owner;
@@ -116,19 +139,7 @@ class ShopService {
       .limit(paginationParams.limit)
       .lean();
 
-    return {
-      data: shops,
-      pagination: {
-        currentPage: paginationParams.currentPage,
-        pageSize: paginationParams.pageSize,
-        totalItems: total,
-        totalPages: paginationParams.totalPages,
-        hasNextPage: paginationParams.hasNextPage,
-        hasPrevPage: paginationParams.hasPrevPage,
-        nextPage: paginationParams.nextPage,
-        prevPage: paginationParams.prevPage,
-      },
-    };
+    return buildPaginationResponse(shops, paginationParams);
   }
 
   /**
@@ -184,19 +195,7 @@ class ShopService {
       .limit(paginationParams.limit)
       .lean();
 
-    return {
-      data: products,
-      pagination: {
-        currentPage: paginationParams.currentPage,
-        pageSize: paginationParams.pageSize,
-        totalItems: total,
-        totalPages: paginationParams.totalPages,
-        hasNextPage: paginationParams.hasNextPage,
-        hasPrevPage: paginationParams.hasPrevPage,
-        nextPage: paginationParams.nextPage,
-        prevPage: paginationParams.prevPage,
-      },
-    };
+    return buildPaginationResponse(products, paginationParams);
   }
 
   /**

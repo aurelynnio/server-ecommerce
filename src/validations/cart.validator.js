@@ -14,8 +14,12 @@ const updateCartItemValidator = Joi.object({
   quantity: Joi.number().integer().min(1).required(),
 });
 
+const cartItemIdValidator = Joi.object({
+  itemId: objectId.required(),
+});
+
 module.exports = {
   addToCartValidator,
   updateCartItemValidator,
-  cartItemIdValidator: Joi.object({ itemId: objectId.required() }),
+  cartItemIdValidator,
 };

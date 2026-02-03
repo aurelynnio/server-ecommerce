@@ -24,16 +24,19 @@ const createVoucherValidator = Joi.object({
 
 const updateVoucherValidator = createVoucherValidator.fork(
   ["code", "name", "type", "value", "startDate", "endDate"],
-  (schema) => schema.optional()
+  (schema) => schema.optional(),
 );
+
+const voucherIdParamValidator = Joi.object({ id: objectId.required() });
+const getVouchersQueryValidator = Joi.object({
+  ...pagination,
+  scope: Joi.string().valid("shop", "platform", "all"),
+  isActive: Joi.boolean(),
+});
 
 module.exports = {
   createVoucherValidator,
   updateVoucherValidator,
-  voucherIdParamValidator: Joi.object({ id: objectId.required() }),
-  getVouchersQueryValidator: Joi.object({
-    ...pagination,
-    scope: Joi.string().valid("shop", "platform", "all"),
-    isActive: Joi.boolean(),
-  }),
+  voucherIdParamValidator,
+  getVouchersQueryValidator,
 };

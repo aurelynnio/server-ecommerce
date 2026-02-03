@@ -1,7 +1,14 @@
-const jwt = require("jsonwebtoken");
 const cookie = require("cookie");
 const logger = require("../utils/logger");
+const tokenService = require("../services/token.service");
 
+
+/**
+ * Socket auth middleware
+ * @param {any} socket
+ * @param {Function} next
+ * @returns {any}
+ */
 const socketAuthMiddleware = (socket, next) => {
   try {
     // 1. Lấy token từ cookie hoặc header
@@ -23,7 +30,8 @@ const socketAuthMiddleware = (socket, next) => {
     }
 
     // 2. Verify token
-    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+    const decoded = tokenService.verifyAccessToken(token);
+
 
     // 3. Lưu thông tin user vào socket để dùng sau này
     socket.user = {

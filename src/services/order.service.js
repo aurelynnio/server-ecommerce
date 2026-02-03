@@ -10,6 +10,7 @@ const Voucher = require("../models/voucher.model");
 const inventoryService = require("./inventory.service");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
+const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
 
 /**
  * Service handling order operations
@@ -343,7 +344,6 @@ class OrderService {
    */
   async getOrdersByShop(shopId, filters = {}) {
     const { page = 1, limit = 10, status, paymentStatus } = filters;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const query = { shopId };
 
@@ -355,34 +355,18 @@ class OrderService {
       query.paymentStatus = paymentStatus;
     }
 
-    const [orders, total] = await Promise.all([
-      Order.find(query)
-        .populate("userId", "username email avatar")
-        .populate("products.productId", "name slug images")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit))
-        .lean(),
-      Order.countDocuments(query),
-    ]);
+    const total = await Order.countDocuments(query);
+    const paginationParams = getPaginationParams(page, limit, total);
 
-    const totalPages = Math.ceil(total / parseInt(limit));
-    const currentPage = parseInt(page);
-    const pageSize = parseInt(limit);
+    const orders = await Order.find(query)
+      .populate("userId", "username email avatar")
+      .populate("products.productId", "name slug images")
+      .sort({ createdAt: -1 })
+      .skip(paginationParams.skip)
+      .limit(paginationParams.limit)
+      .lean();
 
-    return {
-      data: orders,
-      pagination: {
-        currentPage,
-        pageSize,
-        totalItems: total,
-        totalPages,
-        hasNextPage: currentPage < totalPages,
-        hasPrevPage: currentPage > 1,
-        nextPage: currentPage < totalPages ? currentPage + 1 : null,
-        prevPage: currentPage > 1 ? currentPage - 1 : null,
-      },
-    };
+    return buildPaginationResponse(orders, paginationParams);
   }
 
   /**
@@ -610,9 +594,7 @@ class OrderService {
    */
   async getAllOrders(filters = {}) {
     const { shop, status, page = 1, limit = 20 } = filters;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Build query
     const query = {};
     if (shop) {
       query.shopId = shop;
@@ -621,34 +603,18 @@ class OrderService {
       query.status = status;
     }
 
-    const [orders, total] = await Promise.all([
-      Order.find(query)
-        .populate("userId", "username email")
-        .populate("shopId", "name logo slug") // Added logo and slug for admin panel
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit))
-        .lean(),
-      Order.countDocuments(query),
-    ]);
+    const total = await Order.countDocuments(query);
+    const paginationParams = getPaginationParams(page, limit, total);
 
-    const totalPages = Math.ceil(total / parseInt(limit));
-    const currentPage = parseInt(page);
-    const pageSize = parseInt(limit);
+    const orders = await Order.find(query)
+      .populate("userId", "username email")
+      .populate("shopId", "name logo slug")
+      .sort({ createdAt: -1 })
+      .skip(paginationParams.skip)
+      .limit(paginationParams.limit)
+      .lean();
 
-    return {
-      data: orders,
-      pagination: {
-        currentPage,
-        pageSize,
-        totalItems: total,
-        totalPages,
-        hasNextPage: currentPage < totalPages,
-        hasPrevPage: currentPage > 1,
-        nextPage: currentPage < totalPages ? currentPage + 1 : null,
-        prevPage: currentPage > 1 ? currentPage - 1 : null,
-      },
-    };
+    return buildPaginationResponse(orders, paginationParams);
   }
 
   /**

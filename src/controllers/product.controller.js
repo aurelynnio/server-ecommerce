@@ -1,17 +1,14 @@
 const catchAsync = require("../configs/catchAsync");
 const productService = require("../services/product.service");
 const { StatusCodes } = require("http-status-codes");
-const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
-const { ApiError } = require("../middlewares/errorHandler.middleware");
+const { sendSuccess } = require("../shared/res/formatResponse");
 
-/**
- * Product Controller
- * Handles product CRUD operations, variants, and product queries
- */
 const ProductController = {
   /**
-   * Get all products with filtering, sorting, and pagination
-   * @access Public
+   * Get all products
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getAllProducts: catchAsync(async (req, res) => {
 
@@ -25,8 +22,10 @@ const ProductController = {
   }),
 
   /**
-   * Get single product by ID
-   * @access Public
+   * Get product by id
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getProductById: catchAsync(async (req, res) => {
     const product = await productService.getProductById(req.params.id);
@@ -39,8 +38,10 @@ const ProductController = {
   }),
 
   /**
-   * Get single product by slug
-   * @access Public
+   * Get product by slug
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getProductBySlug: catchAsync(async (req, res) => {
     const product = await productService.getProductBySlug(req.params.slug);
@@ -53,35 +54,16 @@ const ProductController = {
   }),
 
   /**
-   * Create a new product
-   * @access Private (Seller only)
+   * Create product
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   createProduct: catchAsync(async (req, res) => {
-    const User = require("../models/user.model");
-    const Shop = require("../models/shop.model");
-    
-    const user = await User.findById(req.user.userId);
-    let shopId = user?.shop;
-    
-    if (!shopId) {
-      const shop = await Shop.findOne({ owner: req.user.userId });
-      if (shop) {
-        await User.findByIdAndUpdate(req.user.userId, { shop: shop._id });
-        shopId = shop._id;
-      }
-    }
-    
-    if (!shopId) {
-      throw new ApiError(
-        StatusCodes.BAD_REQUEST,
-        "User does not have a shop. Please register a shop first."
-      );
-    }
-
     const product = await productService.createProduct(
       req.body,
       req.files,
-      shopId
+      req.user.userId
     );
 
     return sendSuccess(
@@ -93,8 +75,10 @@ const ProductController = {
   }),
 
   /**
-   * Permanently delete a product
-   * @access Private (Admin only)
+   * Permanent delete product
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   permanentDeleteProduct: catchAsync(async (req, res) => {
     await productService.permanentDeleteProduct(req.params.id);
@@ -107,8 +91,10 @@ const ProductController = {
   }),
 
   /**
-   * Get products by category ID
-   * @access Public
+   * Get products by category
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getProductsByCategory: catchAsync(async (req, res) => {
     const result = await productService.getProductsByCategory(
@@ -125,7 +111,9 @@ const ProductController = {
 
   /**
    * Get products by category slug
-   * @access Public
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getProductsByCategorySlug: catchAsync(async (req, res) => {
     const result = await productService.getProductsByCategorySlug(
@@ -142,7 +130,9 @@ const ProductController = {
 
   /**
    * Get featured products
-   * @access Public
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getFeaturedProducts: catchAsync(async (req, res) => {
     const products = await productService.getFeaturedProductsSimple(
@@ -158,7 +148,9 @@ const ProductController = {
 
   /**
    * Get new arrival products
-   * @access Public
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getNewArrivalProducts: catchAsync(async (req, res) => {
     const result = await productService.getNewArrivalProducts();
@@ -171,8 +163,10 @@ const ProductController = {
   }),
 
   /**
-   * Get products on sale
-   * @access Public
+   * Get on sale products
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getOnSaleProducts: catchAsync(async (req, res) => {
     const result = await productService.getOnSaleProducts();
@@ -185,8 +179,10 @@ const ProductController = {
   }),
 
   /**
-   * Search products by keyword
-   * @access Public
+   * Search products
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   searchProducts: catchAsync(async (req, res) => {
     const result = await productService.searchProducts(
@@ -203,7 +199,9 @@ const ProductController = {
 
   /**
    * Get related products
-   * @access Public
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getRelatedProducts: catchAsync(async (req, res) => {
     const { id } = req.params;
@@ -219,8 +217,10 @@ const ProductController = {
   }),
 
   /**
-   * Update product by seller (own shop only)
-   * @access Private (Seller or Admin)
+   * Update product by seller
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   updateProductBySeller: catchAsync(async (req, res) => {
     const { id } = req.params;
@@ -241,8 +241,10 @@ const ProductController = {
   }),
 
   /**
-   * Delete product by seller (own shop only, soft delete)
-   * @access Private (Seller or Admin)
+   * Delete product by seller
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   deleteProductBySeller: catchAsync(async (req, res) => {
     const { id } = req.params;
@@ -259,7 +261,9 @@ const ProductController = {
 
   /**
    * Add variant by seller
-   * @access Private (Seller)
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   addVariantBySeller: catchAsync(async (req, res) => {
     const { id } = req.params;
@@ -271,7 +275,9 @@ const ProductController = {
 
   /**
    * Update variant by seller
-   * @access Private (Seller)
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   updateVariantBySeller: catchAsync(async (req, res) => {
     const { id, variantId } = req.params;
@@ -283,7 +289,9 @@ const ProductController = {
 
   /**
    * Delete variant by seller
-   * @access Private (Seller)
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   deleteVariantBySeller: catchAsync(async (req, res) => {
     const { id, variantId } = req.params;

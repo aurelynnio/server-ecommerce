@@ -2,6 +2,8 @@ const Product = require("../models/product.model");
 const Category = require("../models/category.model");
 const Shop = require("../models/shop.model");
 const cacheService = require("./cache.service");
+const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
+
 
 /**
  * Service handling advanced search operations
@@ -207,7 +209,7 @@ class SearchService {
     }
 
     const total = await Product.countDocuments(query);
-    const skip = (page - 1) * limit;
+    const paginationParams = getPaginationParams(page, limit, total);
 
     let productsQuery = Product.find(query)
       .populate("category", "name slug")
@@ -219,28 +221,14 @@ class SearchService {
 
     const products = await productsQuery
       .sort(sort)
-      .skip(skip)
-      .limit(limit)
+      .skip(paginationParams.skip)
+      .limit(paginationParams.limit)
       .lean();
 
-    // Get facets (aggregations for filters)
     const facets = await this.getSearchFacets(query);
 
-    const totalPages = Math.ceil(total / limit);
-    const currentPage = page;
-
     return {
-      data: products,
-      pagination: {
-        currentPage,
-        pageSize: limit,
-        totalItems: total,
-        totalPages,
-        hasNextPage: currentPage < totalPages,
-        hasPrevPage: currentPage > 1,
-        nextPage: currentPage < totalPages ? currentPage + 1 : null,
-        prevPage: currentPage > 1 ? currentPage - 1 : null,
-      },
+      ...buildPaginationResponse(products, paginationParams),
       facets,
     };
   }

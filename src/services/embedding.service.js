@@ -1,5 +1,4 @@
 const { MistralAIEmbeddings } = require("@langchain/mistralai");
-const { MongoDBAtlasVectorSearch } = require("@langchain/mongodb");
 const mongoose = require("mongoose");
 const Product = require("../models/product.model");
 const Category = require("../models/category.model");
@@ -13,6 +12,11 @@ let embeddingModel = null;
  * @returns {MistralAIEmbeddings}
  */
 function getEmbeddingModel() {
+  /**
+   * If
+   * @param {any} !embeddingModel
+   * @returns {any}
+   */
   if (!embeddingModel) {
     embeddingModel = new MistralAIEmbeddings({
       apiKey: process.env.MISTRAL_API_KEY,
@@ -41,43 +45,78 @@ function createProductTextContent(product) {
   const parts = [];
   
   // Product name is most important
+  /**
+   * If
+   * @param {any} product.name
+   * @returns {any}
+   */
   if (product.name) {
     parts.push(`Tên sản phẩm: ${product.name}`);
   }
   
-  // Brand
+  /**
+   * If
+   * @param {any} product.brand
+   * @returns {any}
+   */
   if (product.brand) {
     parts.push(`Thương hiệu: ${product.brand}`);
   }
   
-  // Category
+  /**
+   * If
+   * @param {any} product.category?.name
+   * @returns {any}
+   */
   if (product.category?.name) {
     parts.push(`Danh mục: ${product.category.name}`);
   }
   
-  // Tags
+  /**
+   * If
+   * @param {any} product.tags && product.tags.length > 0
+   * @returns {any}
+   */
   if (product.tags && product.tags.length > 0) {
     parts.push(`Tags: ${product.tags.join(", ")}`);
   }
   
-  // Sizes
+  /**
+   * If
+   * @param {any} product.sizes && product.sizes.length > 0
+   * @returns {any}
+   */
   if (product.sizes && product.sizes.length > 0) {
     parts.push(`Kích cỡ: ${product.sizes.join(", ")}`);
   }
   
   // Colors from variants
   const colors = [...new Set(product.variants?.map(v => v.color).filter(Boolean))];
+  /**
+   * If
+   * @param {any} colors.length > 0
+   * @returns {any}
+   */
   if (colors.length > 0) {
     parts.push(`Màu sắc: ${colors.join(", ")}`);
   }
   
   // Price range
   const price = product.price?.discountPrice || product.price?.currentPrice;
+  /**
+   * If
+   * @param {number} price
+   * @returns {any}
+   */
   if (price) {
     parts.push(`Giá: ${price.toLocaleString("vi-VN")}đ`);
   }
   
-  // Description (truncated for embedding efficiency)
+  /**
+   * If
+   * @param {any} product.description
+   * @returns {any}
+   */
   if (product.description) {
     const truncatedDesc = product.description.substring(0, 500);
     parts.push(`Mô tả: ${truncatedDesc}`);

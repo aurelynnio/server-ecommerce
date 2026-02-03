@@ -1,66 +1,62 @@
-const { ProductCode, VnpLocale, dateFormat } = require("vnpay");
 const catchAsync = require("../configs/catchAsync");
 const PaymentService = require("../services/payment.service");
 const { VNPay } = require("vnpay");
 const { StatusCodes } = require("http-status-codes");
+const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 
-/**
- * Payment Controller
- * Handles VNPay payment operations including creation, callbacks, and retrieval
- */
 const PaymentController = {
   /**
-   * Create payment URL for VNPay
-   * @access Private (Authenticated users)
+   * Create payment
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   createPayment: catchAsync(async (req, res) => {
     const { orderId } = req.body;
-    const userId = req.user.userId; // From auth middleware
+    const userId = req.user.userId;
 
-    // Get client IP address
     const ipAddress =
       req.headers["x-forwarded-for"] ||
       req.connection.remoteAddress ||
       req.socket.remoteAddress ||
       req.ip;
 
-    // Create payment URL
     const payment = await PaymentService.createPaymentUrl(
       orderId,
       userId,
       ipAddress
     );
 
-    res.status(StatusCodes.OK).json({
-      success: true,
-      message: "Payment URL created successfully",
-      data: {
+    return sendSuccess(
+      res,
+      {
         paymentUrl: payment.paymentUrl,
         transactionId: payment.transactionId,
         amount: payment.amount,
       },
-    });
+      "Payment URL created successfully",
+      StatusCodes.OK
+    );
   }),
 
   /**
-   * Handle VNPay return callback (user redirect after payment)
-   * @access Public
+   * Handle vnpay return
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   handleVnpayReturn: catchAsync(async (req, res) => {
     const vnpayParams = req.query;
 
     try {
-      // Verify and process payment
       const result = await PaymentService.verifyReturnUrl(vnpayParams);
 
-      // Redirect to frontend with result
       const clientUrl = process.env.FRONTEND_URL || "http://localhost:3000";
       const status = result.success ? "success" : "failed";
       const redirectUrl = `${clientUrl}/payment/${status}?orderId=${result.order._id}&transactionId=${result.payment.transactionId}`;
 
       res.redirect(redirectUrl);
     } catch (error) {
-      // Redirect to error page
       const clientUrl = process.env.FRONTEND_URL || "http://localhost:3000";
       const redirectUrl = `${clientUrl}/payment/error?message=${encodeURIComponent(
         error.message
@@ -70,22 +66,24 @@ const PaymentController = {
   }),
 
   /**
-   * Handle VNPay IPN (Instant Payment Notification)
-   * @access Public
+   * Handle vnpay ipn
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   handleVnpayIPN: catchAsync(async (req, res) => {
     const vnpayParams = req.query;
 
-    // Process IPN
     const result = await PaymentService.handleIPN(vnpayParams);
 
-    // Return response to VNPay
     res.status(StatusCodes.OK).json(result);
   }),
 
   /**
-   * Get payment details by order ID
-   * @access Private (Owner or Admin)
+   * Get payment by order
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getPaymentByOrder: catchAsync(async (req, res) => {
     const { orderId } = req.params;
@@ -94,27 +92,17 @@ const PaymentController = {
     const payment = await PaymentService.getPaymentByOrderId(orderId);
 
     if (!payment) {
-      return res.status(StatusCodes.NOT_FOUND).json({
-        success: false,
-        message: "Payment not found",
-      });
+      return sendFail(res, "Payment not found", StatusCodes.NOT_FOUND);
     }
 
-    // Check if user owns this payment
     if (
       payment.userId._id.toString() !== userId.toString() &&
       !req.user.isAdmin
     ) {
-      return res.status(StatusCodes.FORBIDDEN).json({
-        success: false,
-        message: "Unauthorized access",
-      });
+      return sendFail(res, "Unauthorized access", StatusCodes.FORBIDDEN);
     }
 
-    res.status(StatusCodes.OK).json({
-      success: true,
-      data: payment,
-    });
+    return sendSuccess(res, payment, "Get payment details successfully");
   }),
 };
 

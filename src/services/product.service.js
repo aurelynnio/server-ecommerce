@@ -1,10 +1,6 @@
 const Product = require("../models/product.model");
-const {
-  getPaginationParams,
-  buildPaginationResponse,
-} = require("../utils/pagination");
+const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
 const Category = require("../models/category.model");
-const Review = require("../models/review.model");
 const { multiUpload } = require("../configs/cloudinary");
 const { getIO } = require("../socket/index");
 const cacheService = require("./cache.service");
@@ -13,26 +9,12 @@ const { embedProduct, deleteProductEmbedding } = require("./embedding.service");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
 
-/**
- * Service handling product operations
- * Manages product retrieval, filtering, and search
- */
 class ProductService {
   /**
-   * Get all products with advanced filtering, sorting, and pagination
-   * @param {Object} filters - Filter criteria
-   * @param {string} [filters.category] - Filter by category ID
-   * @param {string} [filters.brand] - Filter by brand
-   * @param {number} [filters.minPrice] - Minimum price
-   * @param {number} [filters.maxPrice] - Maximum price
-   * @param {string|string[]} [filters.tags] - Filter by tags
-   * @param {string} [filters.search] - Search term
-   * @param {string} [filters.status="published"] - Filter by status
-   * @param {Object} options - Pagination and sorting options
-   * @param {number} [options.page=1] - Page number
-   * @param {number} [options.limit=10] - Items per page
-   * @param {string} [options.sort="-createdAt"] - Sort field
-   * @returns {Promise<Object>} List of products with pagination metadata
+   * Get all products
+   * @param {Object} filters
+   * @param {Object} options
+   * @returns {Promise<any>}
    */
   async getAllProducts(filters = {}, options = {}) {
     const {
@@ -51,63 +33,51 @@ class ProductService {
       rating,
     } = { ...filters, ...options };
 
-    // Redis Cache Key
     const cacheKey = `products:all:${JSON.stringify({ filters, options })}`;
     const cachedData = await cacheService.get(cacheKey);
     if (cachedData) return cachedData;
 
-    // Build query - if status is "all", don't filter by status (for seller dashboard)
     const query =
       status === "all" ? { status: { $ne: "deleted" } } : { status };
 
-    // Filter by category
     if (category) {
       query.category = category;
     }
 
-    // Filter by brand
     if (brand) {
       query.brand = brand;
     }
 
-    // Filter by Shop
     if (filters.shop) {
       query.shop = filters.shop;
     }
 
-    // Filter by Shop Category
     if (filters.shopCategory) {
       query.shopCategory = filters.shopCategory;
     }
 
-    // Filter by price range
     if (minPrice || maxPrice) {
       query["price.currentPrice"] = {};
       if (minPrice) query["price.currentPrice"].$gte = Number(minPrice);
       if (maxPrice) query["price.currentPrice"].$lte = Number(maxPrice);
     }
 
-    // Filter by tags
     if (tags) {
       const tagArray = Array.isArray(tags) ? tags : tags.split(",");
       query.tags = { $in: tagArray };
     }
 
-    // Filter by colors
     if (colors) {
       const colorArray = Array.isArray(colors) ? colors : colors.split(",");
-      // Using regex for case-insensitive matching
       const colorRegexArray = colorArray.map((c) => new RegExp(`^${c}$`, "i"));
       query["variants.color"] = { $in: colorRegexArray };
     }
 
-    // Filter by sizes
     if (sizes) {
       const sizeArray = Array.isArray(sizes) ? sizes : sizes.split(",");
       query["variants.size"] = { $in: sizeArray };
     }
 
-    // Filter by rating
     if (rating) {
       const ratingArray = Array.isArray(rating)
         ? rating
@@ -118,23 +88,17 @@ class ProductService {
       }
     }
 
-    // Search by name, description, or brand using Text Index
     if (search) {
       query.$text = { $search: search };
     }
 
-    // Get total count for pagination
     const total = await Product.countDocuments(query);
-
-    // Calculate pagination parameters
     const paginationParams = getPaginationParams(page, limit, total);
 
-    // Execute query
     let productsQuery = Product.find(query)
       .populate("category", "name slug")
       .populate("shopCategory", "name slug");
 
-    // If searching, sort by relevance score
     if (search) {
       productsQuery = productsQuery
         .select({ score: { $meta: "textScore" } })
@@ -143,31 +107,19 @@ class ProductService {
       productsQuery = productsQuery.sort(sort);
     }
 
+
     const products = await productsQuery
       .skip(paginationParams.skip)
       .limit(paginationParams.limit)
       .lean();
 
-    return {
-      data: products,
-      pagination: {
-        currentPage: paginationParams.currentPage,
-        pageSize: paginationParams.pageSize,
-        totalItems: paginationParams.totalItems,
-        totalPages: paginationParams.totalPages,
-        hasNextPage: paginationParams.hasNextPage,
-        hasPrevPage: paginationParams.hasPrevPage,
-        nextPage: paginationParams.nextPage,
-        prevPage: paginationParams.prevPage,
-      },
-    };
+    return buildPaginationResponse(products, paginationParams);
   }
 
   /**
-   * Get single product by ID
-   * @param {string} id - Product ID
-   * @returns {Promise<Object>} Product object with populated fields
-   * @throws {Error} If product not found
+   * Get product by id
+   * @param {string} id
+   * @returns {Promise<any>}
    */
   async getProductById(id) {
     const cacheKey = `products:id:${id}`;
@@ -189,12 +141,12 @@ class ProductService {
   }
 
   /**
-   * Get single product by slug
-   * @param {string} slug - Product slug
-   * @returns {Promise<Object>} Product object with populated fields
-   * @throws {Error} If product not found
+   * Get product by slug
+   * @param {any} slug
+   * @returns {Promise<any>}
    */
   async getProductBySlug(slug) {
+
     const cacheKey = `products:slug:${slug}`;
     const cachedProduct = await cacheService.get(cacheKey);
     if (cachedProduct) return cachedProduct;
@@ -214,13 +166,14 @@ class ProductService {
   }
 
   /**
-   * Generate SKU from slug and color
-   * @param {string} slug - Product slug
-   * @param {string} color - Variant color
-   * @param {number} index - Variant index
-   * @returns {string} Generated SKU
+   * Generate sku
+   * @param {any} slug
+   * @param {any} color
+   * @param {number} index
+   * @returns {string}
    */
   generateSku(slug, color, index) {
+
     const slugPart = slug
       ? slug.substring(0, 20).toUpperCase().replace(/-/g, "")
       : "PROD";
@@ -231,17 +184,46 @@ class ProductService {
   }
 
   /**
-   * Create a new product
-   * @param {Object} data - Product data
-   * @param {string} data.name - Product name
-   * @param {string} [data.slug] - Product slug (optional)
-   * @param {Object} data.price - Price information
-   * @param {Array} [files] - Image files to upload
-   * @param {string} shopId - Shop ID creating the product
-   * @returns {Promise<Object>} Created product object
-   * @throws {Error} If slug already exists
+   * Ensure shop for user
+   * @param {string} userId
+   * @returns {Promise<any>}
    */
-  async createProduct(data, files, shopId) {
+  async ensureShopForUser(userId) {
+    const User = require("../models/user.model");
+    const Shop = require("../models/shop.model");
+
+    const user = await User.findById(userId).lean();
+    let shopId = user?.shop;
+
+    if (!shopId) {
+      const shop = await Shop.findOne({ owner: userId }).lean();
+      if (shop) {
+        await User.findByIdAndUpdate(userId, { shop: shop._id });
+        shopId = shop._id;
+      }
+    }
+
+    if (!shopId) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "User does not have a shop. Please register a shop first."
+      );
+    }
+
+    return shopId;
+  }
+
+
+  /**
+   * Create product
+   * @param {Object} data
+   * @param {Array} files
+   * @param {string} userId
+   * @returns {Promise<any>}
+   */
+  async createProduct(data, files, userId) {
+
+    const shopId = await this.ensureShopForUser(userId);
     const productData = { ...data, shop: shopId };
 
     // Generate slug if not provided
@@ -253,6 +235,7 @@ class ProductService {
         locale: "vi",
       });
     }
+
 
     // Clean up and process variants
     if (productData.variants && Array.isArray(productData.variants)) {
@@ -382,14 +365,14 @@ class ProductService {
   }
 
   /**
-   * Update an existing product
-   * @param {string} id - Product ID
-   * @param {Object} data - Data to update
-   * @param {Array} [files] - New image files to upload
-   * @returns {Promise<Object>} Updated product object
-   * @throws {Error} If product not found or slug already exists
+   * Update product
+   * @param {string} id
+   * @param {Object} data
+   * @param {Array} files
+   * @returns {Promise<any>}
    */
   async updateProduct(id, data, files) {
+
     try {
       const updateData = { ...data };
 
@@ -461,28 +444,27 @@ class ProductService {
         updateData.variants = updateData.variants.map((variant, index) => {
           const variantData = { ...variant };
 
-          // Remove temp _id - MongoDB will generate real ObjectId
-          if (
-            variantData._id &&
-            typeof variantData._id === "string" &&
-            variantData._id.startsWith("temp-")
-          ) {
-            delete variantData._id;
-          }
+      if (
+        variantData._id &&
+        typeof variantData._id === "string" &&
+        variantData._id.startsWith("temp-")
+      ) {
+        delete variantData._id;
+      }
 
-          // Combine existing + new uploaded images
-          const existingImages =
-            existingVariantImagesMap[index] || variantData.images || [];
-          const newImages = variantUploadMap[index] || [];
-          variantData.images = [...existingImages, ...newImages];
+      const existingImages =
+        existingVariantImagesMap[index] || variantData.images || [];
+      const newImages = variantUploadMap[index] || [];
+      variantData.images = [...existingImages, ...newImages];
+
 
           return variantData;
         });
 
-        // Update product main images from first variant if needed
-        if (updateData.variants[0]?.images?.length > 0) {
-          updateData.images = updateData.variants[0].images;
-        }
+      if (updateData.variants[0]?.images?.length > 0) {
+        updateData.images = updateData.variants[0].images;
+      }
+
       }
 
       const product = await Product.findByIdAndUpdate(id, updateData, {
@@ -494,10 +476,8 @@ class ProductService {
         throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
       }
 
-      // Invalidate cache
       await cacheService.delByPattern("products:*");
 
-      // Update embedding for the product (async, don't wait)
       if (product.status === "published") {
         const populatedProduct = await Product.findById(product._id)
           .populate("category", "name")
@@ -506,7 +486,6 @@ class ProductService {
           logger.error("[ProductService] Error updating product embedding:", err.message);
         });
       } else {
-        // If product is no longer published, delete its embedding
         deleteProductEmbedding(product._id).catch((err) => {
           logger.error("[ProductService] Error deleting product embedding:", err.message);
         });
@@ -520,12 +499,12 @@ class ProductService {
   }
 
   /**
-   * Soft delete a product (sets status to "deleted")
-   * @param {string} id - Product ID
-   * @returns {Promise<Object>} Deleted product object
-   * @throws {Error} If product not found
+   * Delete product
+   * @param {string} id
+   * @returns {Promise<any>}
    */
   async deleteProduct(id) {
+
     const product = await Product.findByIdAndUpdate(
       id,
       { status: "deleted" },
@@ -538,7 +517,6 @@ class ProductService {
 
     await cacheService.delByPattern("products:*");
 
-    // Delete embedding for the deleted product (async, don't wait)
     deleteProductEmbedding(id).catch((err) => {
       logger.error("[ProductService] Error deleting product embedding:", err.message);
     });
@@ -547,12 +525,12 @@ class ProductService {
   }
 
   /**
-   * Permanently delete a product from database
-   * @param {string} id - Product ID
-   * @returns {Promise<Object>} Deleted product object
-   * @throws {Error} If product not found
+   * Permanent delete product
+   * @param {string} id
+   * @returns {Promise<any>}
    */
   async permanentDeleteProduct(id) {
+
     const product = await Product.findByIdAndDelete(id);
 
     if (!product) {
@@ -566,14 +544,14 @@ class ProductService {
   }
 
   /**
-   * Add a new variant to a product
-   * @param {string} productId - Product ID
-   * @param {Object} variantData - Variant details (sku, color, size, price, stock)
-   * @param {Array} [files] - Variant image files
-   * @returns {Promise<Object>} Updated product with new variant
-   * @throws {Error} If product not found or SKU already exists
+   * Add variant
+   * @param {string} productId
+   * @param {any} variantData
+   * @param {Array} files
+   * @returns {Promise<any>}
    */
   async addVariant(productId, variantData, files) {
+
     const allowedVariantData = { ...variantData };
 
     if (files && files.length > 0) {
@@ -608,14 +586,14 @@ class ProductService {
   }
 
   /**
-   * Update an existing variant
-   * @param {string} productId - Product ID
-   * @param {string} variantId - Variant ID
-   * @param {Object} variantData - Data to update
-   * @returns {Promise<Object>} Updated product
-   * @throws {Error} If product or variant not found
+   * Update variant
+   * @param {string} productId
+   * @param {string} variantId
+   * @param {any} variantData
+   * @returns {Promise<any>}
    */
   async updateVariant(productId, variantId, variantData) {
+
     const allowedVariantData = {
       ...variantData,
       _id: variantId,
@@ -636,13 +614,13 @@ class ProductService {
   }
 
   /**
-   * Delete a variant from a product
-   * @param {string} productId - Product ID
-   * @param {string} variantId - Variant ID to delete
-   * @returns {Promise<Object>} Updated product
-   * @throws {Error} If product not found
+   * Delete variant
+   * @param {string} productId
+   * @param {string} variantId
+   * @returns {Promise<any>}
    */
   async deleteVariant(productId, variantId) {
+
     const product = await Product.findByIdAndUpdate(
       productId,
       { $pull: { variants: { _id: variantId } } },
@@ -658,15 +636,13 @@ class ProductService {
   }
 
   /**
-   * Get products by category ID
-   * @param {string} categoryId - Category ID
-   * @param {Object} [options] - Pagination and sorting options
-   * @param {number} [options.page=1] - Page number
-   * @param {number} [options.limit=10] - Items per page
-   * @param {string} [options.sort="-createdAt"] - Sort field
-   * @returns {Promise<Object>} Products with pagination metadata
+   * Get products by category
+   * @param {string} categoryId
+   * @param {Object} options
+   * @returns {Promise<any>}
    */
   async getProductsByCategory(categoryId, options = {}) {
+
     const { page = 1, limit = 10, sort = "-createdAt" } = options;
 
     const query = {
@@ -674,11 +650,9 @@ class ProductService {
       status: "published",
     };
 
-    // Get total count for pagination
     const total = await Product.countDocuments(query);
-
-    // Calculate pagination parameters
     const paginationParams = getPaginationParams(page, limit, total);
+
 
     const products = await Product.find(query)
       .populate("category", "name slug")
@@ -687,63 +661,43 @@ class ProductService {
       .limit(paginationParams.limit)
       .lean();
 
-    return {
-      data: products,
-      pagination: {
-        currentPage: paginationParams.currentPage,
-        pageSize: paginationParams.pageSize,
-        totalItems: paginationParams.totalItems,
-        totalPages: paginationParams.totalPages,
-        hasNextPage: paginationParams.hasNextPage,
-        hasPrevPage: paginationParams.hasPrevPage,
-        nextPage: paginationParams.nextPage,
-        prevPage: paginationParams.prevPage,
-      },
-    };
+    return buildPaginationResponse(products, paginationParams);
   }
 
   /**
-   * Get products by category slug (includes child categories)
-   * @param {string} slug - Category slug
-   * @param {Object} [options] - Pagination and sorting options
-   * @param {number} [options.page=1] - Page number
-   * @param {number} [options.limit=10] - Items per page
-   * @param {string} [options.sort="-createdAt"] - Sort field
-   * @returns {Promise<Object>} Products with category info and pagination
-   * @throws {Error} If category not found
+   * Get products by category slug
+   * @param {any} slug
+   * @param {Object} options
+   * @returns {Promise<any>}
    */
   async getProductsByCategorySlug(slug, options = {}) {
+
     const { page = 1, limit = 10, sort = "-createdAt" } = options;
 
-    // First, find the category by slug
     const category = await Category.findOne({ slug, isActive: true });
     if (!category) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Category not found");
     }
 
-
-    // Get all child categories as well
     const childCategories = await Category.find({
       parentCategory: category._id,
       isActive: true,
     }).select("_id");
 
-    // Create array of category IDs (parent + children)
     const categoryIds = [
       category._id,
       ...childCategories.map((child) => child._id),
     ];
+
 
     const query = {
       category: { $in: categoryIds },
       status: "published",
     };
 
-    // Get total count for pagination
     const total = await Product.countDocuments(query);
-
-    // Calculate pagination parameters
     const paginationParams = getPaginationParams(page, limit, total);
+
 
     const products = await Product.find(query)
       .populate("category", "name slug")
@@ -753,33 +707,23 @@ class ProductService {
       .lean();
 
     return {
-      data: products,
+      ...buildPaginationResponse(products, paginationParams),
       category: {
         _id: category._id,
         name: category.name,
         slug: category.slug,
         description: category.description,
       },
-      pagination: {
-        currentPage: paginationParams.currentPage,
-        pageSize: paginationParams.pageSize,
-        totalItems: paginationParams.totalItems,
-        totalPages: paginationParams.totalPages,
-        hasNextPage: paginationParams.hasNextPage,
-        hasPrevPage: paginationParams.hasPrevPage,
-        nextPage: paginationParams.nextPage,
-        prevPage: paginationParams.prevPage,
-      },
     };
   }
 
   /**
-   * Get featured products (simple version, sorted by creation date)
-   * @param {number} [limit=10] - Maximum number of products to return
-   * @returns {Promise<Array>} List of featured products
-   * @throws {Error} If no products found
+   * Get featured products simple
+   * @param {number} limit
+   * @returns {Promise<any>}
    */
   async getFeaturedProductsSimple(limit = 10) {
+
     const products = await Product.find({ status: "published" })
       .populate("category", "name slug")
       .sort("-createdAt")
@@ -794,11 +738,12 @@ class ProductService {
   }
 
   /**
-   * Get featured products (with caching)
-   * @param {Object} [query] - Query parameters (unused, for API compatibility)
-   * @returns {Promise<Array>} List of featured products (max 10)
+   * Get featured products
+   * @param {Object} query
+   * @returns {Promise<any>}
    */
   async getFeaturedProducts(query) {
+
     const cacheKey = "products:featured";
     const cachedProducts = await cacheService.get(cacheKey);
     if (cachedProducts) return cachedProducts;
@@ -814,16 +759,18 @@ class ProductService {
       .limit(10)
       .lean();
 
-    await cacheService.set(cacheKey, products, 1800); // 30 mins cache
+    await cacheService.set(cacheKey, products, 1800);
     return products;
+
   }
 
   /**
-   * Get new arrival products (with caching)
-   * @param {Object} [query] - Query parameters (unused, for API compatibility)
-   * @returns {Promise<Array>} List of new arrival products (max 10)
+   * Get new arrival products
+   * @param {Object} query
+   * @returns {Promise<any>}
    */
   async getNewArrivalProducts(query) {
+
     const cacheKey = "products:new-arrivals";
     const cachedProducts = await cacheService.get(cacheKey);
     if (cachedProducts) return cachedProducts;
@@ -844,12 +791,12 @@ class ProductService {
   }
 
   /**
-   * Get products currently on sale (with caching)
-   * Uses virtual onSale field or checks discountPrice/flashSale
-   * @param {Object} [query] - Query parameters (unused, for API compatibility)
-   * @returns {Promise<Array>} List of on-sale products (max 10)
+   * Get on sale products
+   * @param {Object} query
+   * @returns {Promise<any>}
    */
   async getOnSaleProducts(query) {
+
     const cacheKey = "products:on-sale";
     const cachedProducts = await cacheService.get(cacheKey);
     if (cachedProducts) return cachedProducts;
@@ -878,14 +825,12 @@ class ProductService {
   }
 
   /**
-   * Search products by keyword (optimized for autocomplete)
-   * PERFORMANCE FIX: Re-enabled cache for better performance
-   * @param {string} keyword - Search keyword
-   * @param {number} [limit=10] - Maximum results to return
-   * @returns {Promise<Array>} Matching products with basic info
+   * Search products
+   * @param {any} keyword
+   * @param {number} limit
+   * @returns {Promise<any>}
    */
   async searchProducts(keyword, limit = 10) {
-    // PERFORMANCE FIX: Re-enable cache
     const cacheKey = `products:search:${keyword}:${limit}`;
     const cachedProducts = await cacheService.get(cacheKey);
     if (cachedProducts) return cachedProducts;
@@ -905,24 +850,22 @@ class ProductService {
       .limit(Number(limit))
       .lean();
 
-    // Map products to include first variant image
     const productsWithImages = products.map((product) => ({
       ...product,
       image: product.variants?.[0]?.images?.[0] || null,
     }));
 
-    // PERFORMANCE FIX: Cache for 5 minutes
     await cacheService.set(cacheKey, productsWithImages, 300);
     return productsWithImages;
   }
 
   /**
-   * Get related products based on category and price range
-   * @param {string} productId - Current product ID
-   * @returns {Promise<Array>} List of related products (max 10)
-   * @throws {Error} If product not found
+   * Get related products
+   * @param {string} productId
+   * @returns {Promise<any>}
    */
   async getRelatedProducts(productId) {
+
     const limit = 10;
     const currentProduct = await Product.findById(productId);
     if (!currentProduct) {
@@ -930,7 +873,8 @@ class ProductService {
     }
 
 
-    const priceBuffer = 0.2; // 20% price difference
+    const priceBuffer = 0.2;
+
     const currentPrice = currentProduct.price?.currentPrice || 0;
     const minPrice = currentPrice * (1 - priceBuffer);
     const maxPrice = currentPrice * (1 + priceBuffer);
@@ -952,21 +896,19 @@ class ProductService {
   }
 
   /**
-   * Update product by seller (with ownership verification)
-   * Seller cannot change certain fields like status
-   * @param {string} productId - Product ID
-   * @param {string} shopId - Shop ID (for verification)
-   * @param {Object} data - Data to update
-   * @param {Array} [files] - New image files to upload
-   * @returns {Promise<Object>} Updated product object
-   * @throws {Error} If product not found or not owned by shop
+   * Update product by seller
+   * @param {string} productId
+   * @param {string} shopId
+   * @param {Object} data
+   * @param {Array} files
+   * @returns {Promise<any>}
    */
   async updateProductBySeller(productId, shopId, data, files) {
-    // Verify ownership
     const existingProduct = await Product.findOne({
       _id: productId,
       shop: shopId,
     });
+
 
     if (!existingProduct) {
       throw new ApiError(
@@ -976,32 +918,29 @@ class ProductService {
     }
 
 
-    // Remove fields that seller shouldn't modify
     const updateData = { ...data };
-    delete updateData.shop; // Cannot change shop
-    delete updateData.status; // Only admin can change status
-    delete updateData.soldCount; // System managed
-    delete updateData.averageRating; // System managed
-    delete updateData.reviewCount; // System managed
+    delete updateData.shop;
+    delete updateData.status;
+    delete updateData.soldCount;
+    delete updateData.averageRating;
+    delete updateData.reviewCount;
 
-    // Use the existing updateProduct method for the actual update
     return this.updateProduct(productId, updateData, files);
   }
 
   /**
-   * Delete product by seller (soft delete with ownership verification)
-   * @param {string} productId - Product ID
-   * @param {string} shopId - Shop ID (for verification)
-   * @returns {Promise<Object>} Deleted product object
-   * @throws {Error} If product not found or not owned by shop
+   * Delete product by seller
+   * @param {string} productId
+   * @param {string} shopId
+   * @returns {Promise<any>}
    */
   async deleteProductBySeller(productId, shopId) {
-    // Verify ownership and soft delete
     const product = await Product.findOneAndUpdate(
       { _id: productId, shop: shopId },
       { status: "deleted" },
       { new: true },
     );
+
 
     if (!product) {
       throw new ApiError(
@@ -1010,10 +949,8 @@ class ProductService {
       );
     }
 
-    // Invalidate cache
     await cacheService.delByPattern("products:*");
 
-    // Delete embedding
     deleteProductEmbedding(productId).catch((err) => {
       logger.error("[ProductService] Error deleting product embedding:", err.message);
     });
@@ -1025,8 +962,9 @@ class ProductService {
    * Add variant by seller
    * @param {string} productId
    * @param {string} shopId
-   * @param {Object} variantData
+   * @param {any} variantData
    * @param {Array} files
+   * @returns {Promise<any>}
    */
   async addVariantBySeller(productId, shopId, variantData, files) {
     const product = await Product.findOne({ _id: productId, shop: shopId });
@@ -1041,7 +979,8 @@ class ProductService {
    * @param {string} productId
    * @param {string} shopId
    * @param {string} variantId
-   * @param {Object} variantData
+   * @param {any} variantData
+   * @returns {Promise<any>}
    */
   async updateVariantBySeller(productId, shopId, variantId, variantData) {
     const product = await Product.findOne({ _id: productId, shop: shopId });
@@ -1056,6 +995,7 @@ class ProductService {
    * @param {string} productId
    * @param {string} shopId
    * @param {string} variantId
+   * @returns {Promise<any>}
    */
   async deleteVariantBySeller(productId, shopId, variantId) {
     const product = await Product.findOne({ _id: productId, shop: shopId });

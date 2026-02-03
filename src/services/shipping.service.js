@@ -5,6 +5,12 @@ const { ApiError } = require("../middlewares/errorHandler.middleware");
 
 
 class ShippingService {
+  /**
+   * Create template
+   * @param {string} userId
+   * @param {any} templateData
+   * @returns {Promise<any>}
+   */
   async createTemplate(userId, templateData) {
     const shop = await Shop.findOne({ owner: userId });
     if (!shop) {
@@ -20,6 +26,11 @@ class ShippingService {
     return newTemplate;
   }
 
+  /**
+   * Get my templates
+   * @param {string} userId
+   * @returns {Promise<any>}
+   */
   async getMyTemplates(userId) {
     const shop = await Shop.findOne({ owner: userId });
     if (!shop) {
@@ -31,6 +42,13 @@ class ShippingService {
     return templates;
   }
 
+  /**
+   * Update template
+   * @param {string} userId
+   * @param {string} templateId
+   * @param {Object} updates
+   * @returns {Promise<any>}
+   */
   async updateTemplate(userId, templateId, updates) {
     // Verify ownership via shop
     const shop = await Shop.findOne({ owner: userId });
@@ -56,6 +74,12 @@ class ShippingService {
     return updated;
   }
 
+  /**
+   * Delete template
+   * @param {string} userId
+   * @param {string} templateId
+   * @returns {Promise<any>}
+   */
   async deleteTemplate(userId, templateId) {
     const shop = await Shop.findOne({ owner: userId });
     if (!shop) {

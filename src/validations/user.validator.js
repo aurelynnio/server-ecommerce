@@ -26,7 +26,7 @@ const changePasswordValidator = Joi.object({
 const adminCreateUserValidator = Joi.object({
   username: sanitizedString().min(3).max(50).required(),
   email: sanitizedString().email().required(),
-  password: Joi.string().min(6),
+  password: Joi.string().min(6).required(),
   roles: Joi.string().valid("user", "admin", "seller").default("user"),
   isVerifiedEmail: Joi.boolean().default(false),
 });

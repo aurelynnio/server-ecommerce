@@ -12,119 +12,98 @@ const {
 
 const validate = require("../middlewares/validate.middleware");
 
-const { createVoucherValidator, updateVoucherValidator } = require("../validations/voucher.validator");
-/**
- * Public Routes
- */
-/**
-* @desc Get all active platform vouchers
-* @accessPublic
- */
+const { createVoucherValidator } = require("../validations/voucher.validator");
 
+/**
+ * @desc    Get platform vouchers
+ * @access  Public
+ */
 router.get("/platform", voucherController.getPlatformVouchers);
-/**
-* @desc Get all active vouchers for a specific shop
-* @accessPublic
- * @param   shopId - Shop ID to get vouchers for
- */
 
+/**
+ * @desc    Get vouchers for a shop
+ * @access  Public
+ * @param   shopId - Shop ID
+ */
 router.get("/shop/:shopId", voucherController.getShopVouchers);
-/**
- * Authenticated Routes
- */
-/**
-* @desc Get available vouchers for current user
-* @accessPrivate (Authenticated users)
- * @query   shopId - Optional shop ID to filter vouchers
- */
 
+/**
+ * @desc    Get available vouchers for current user
+ * @access  Private
+ */
 router.get("/available", verifyAccessToken, voucherController.getAvailableVouchers);
-/**
-* @desc Apply voucher to check discount amount
-* @accessPrivate (Authenticated users)
- * @body    { code, orderValue, shopId? }
- */
 
+/**
+ * @desc    Apply voucher to current cart/order
+ * @access  Private
+ */
 router.post("/apply", verifyAccessToken, voucherController.applyVoucher);
-/**
- * Admin/Seller Routes
- */
-/**
-* @desc Get all vouchers with pagination (Admin)
-* @accessPrivate (Admin only)
- * @query   page, limit, type, isActive, search
- */
 
+/**
+ * @desc    Get all vouchers (Admin)
+ * @access  Private (Admin)
+ */
 router.get(
   "/",
   verifyAccessToken,
   requireRole(["admin"]),
   voucherController.getAllVouchers
 );
-/**
-* @desc Get voucher statistics overview
-* @accessPrivate (Admin only)
- */
 
+/**
+ * @desc    Get voucher statistics (Admin)
+ * @access  Private (Admin)
+ */
 router.get(
   "/statistics",
   verifyAccessToken,
   requireRole(["admin"]),
   voucherController.getVoucherStatistics
 );
+
 /**
-* @desc Get voucher by ID
-* @accessPrivate (Authenticated users)
+ * @desc    Get voucher by ID
+ * @access  Private
  * @param   id - Voucher ID
  */
-
 router.get("/:id", verifyAccessToken, voucherController.getVoucherById);
-/**
-* @desc Create a new voucher
-* @accessPrivate (Admin or Seller)
- * @body    { code, type, discountType, discountValue, minOrderValue?, maxDiscount?, startDate, endDate, usageLimit?, ... }
- */
 
+/**
+ * @desc    Create voucher
+ * @access  Private
+ */
 router.post(
   "/",
   verifyAccessToken,
   validate(createVoucherValidator),
   voucherController.createVoucher
 );
-/**
-* @desc Update voucher by ID
-* @accessPrivate (Owner or Admin)
- * @param   id - Voucher ID to update
- * @body    { code?, discountType?, discountValue?, minOrderValue?, maxDiscount?, startDate?, endDate?, isActive?, ... }
- */
 
-router.put(
-  "/:id",
-  verifyAccessToken,
-  voucherController.updateVoucher
-);
 /**
-* @desc Delete voucher (soft delete)
-* @accessPrivate (Owner or Admin)
- * @param   id - Voucher ID to delete
+ * @desc    Update voucher
+ * @access  Private
+ * @param   id - Voucher ID
  */
+router.put("/:id", verifyAccessToken, voucherController.updateVoucher);
 
-router.delete(
-  "/:id",
-  verifyAccessToken,
-  voucherController.deleteVoucher
-);
 /**
-* @desc Permanently delete voucher
-* @accessPrivate (Admin only)
- * @param   id - Voucher ID to permanently delete
+ * @desc    Delete voucher (soft delete)
+ * @access  Private
+ * @param   id - Voucher ID
  */
+router.delete("/:id", verifyAccessToken, voucherController.deleteVoucher);
 
+/**
+ * @desc    Delete voucher permanently (Admin)
+ * @access  Private (Admin)
+ * @param   id - Voucher ID
+ */
 router.delete(
   "/:id/permanent",
   verifyAccessToken,
   requireRole(["admin"]),
   voucherController.permanentDeleteVoucher
 );
+
 
 module.exports = router;

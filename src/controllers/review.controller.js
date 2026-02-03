@@ -1,16 +1,14 @@
 const catchAsync = require("../configs/catchAsync");
 const reviewService = require("../services/review.service");
 const { StatusCodes } = require("http-status-codes");
-const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
+const { sendSuccess } = require("../shared/res/formatResponse");
 
-/**
- * Review Controller
- * Handles product review operations including CRUD, statistics, and eligibility checks
- */
 const ReviewController = {
   /**
-   * Create a new review for a product
-   * @access Private (Authenticated users - must have purchased product)
+   * Create review
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   createReview: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -25,8 +23,10 @@ const ReviewController = {
   }),
 
   /**
-   * Get all reviews for a specific product
-   * @access Public
+   * Get product reviews
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getProductReviews: catchAsync(async (req, res) => {
     const result = await reviewService.getProductReviews(
@@ -43,8 +43,10 @@ const ReviewController = {
   }),
 
   /**
-   * Get current user's reviews
-   * @access Private (Authenticated users)
+   * Get user reviews
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getUserReviews: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -59,8 +61,10 @@ const ReviewController = {
   }),
 
   /**
-   * Get a single review by ID
-   * @access Public
+   * Get review by id
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getReviewById: catchAsync(async (req, res) => {
     const review = await reviewService.getReviewById(req.params.reviewId);
@@ -74,8 +78,10 @@ const ReviewController = {
   }),
 
   /**
-   * Update an existing review
-   * @access Private (Owner only)
+   * Update review
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   updateReview: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -94,8 +100,10 @@ const ReviewController = {
   }),
 
   /**
-   * Delete a review
-   * @access Private (Owner or Admin)
+   * Delete review
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   deleteReview: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -110,8 +118,10 @@ const ReviewController = {
   }),
 
   /**
-   * Check if current user can review a product
-   * @access Private (Authenticated users)
+   * Can user review
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   canUserReview: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -126,8 +136,10 @@ const ReviewController = {
   }),
 
   /**
-   * Get all reviews (Admin)
-   * @access Private (Admin)
+   * Get all reviews
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getAllReviews: catchAsync(async (req, res) => {
     const result = await reviewService.getAllReviews(req.query);
@@ -141,8 +153,10 @@ const ReviewController = {
   }),
 
   /**
-   * Get reviews for seller's shop
-   * @access Private (Seller only)
+   * Get shop reviews
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getShopReviews: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -157,8 +171,10 @@ const ReviewController = {
   }),
 
   /**
-   * Reply to a review
-   * @access Private (Seller only)
+   * Reply review
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   replyReview: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -176,8 +192,10 @@ const ReviewController = {
   }),
 
   /**
-   * Get review statistics overview
-   * @access Private (Admin only)
+   * Get review statistics
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getReviewStatistics: catchAsync(async (req, res) => {
     const stats = await reviewService.getReviewStatistics();

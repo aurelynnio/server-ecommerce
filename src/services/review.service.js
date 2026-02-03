@@ -1,8 +1,7 @@
 const Review = require("../models/review.model");
 const Product = require("../models/product.model");
 const Order = require("../models/order.model");
-const Shop = require("../models/shop.model");
-const { getPaginationParams } = require("../utils/pagination");
+const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
 const cacheService = require("./cache.service");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
@@ -77,7 +76,8 @@ class ReviewService {
     });
 
     // Update product average rating
-    await this.updateProductRating(product);
+    await this.updateProductRating(productId);
+
 
     // Populate user info
     await review.populate("user", "username email");
@@ -175,23 +175,14 @@ class ReviewService {
     }
 
     return {
-      data: reviews,
-      pagination: {
-        currentPage: paginationParams.currentPage,
-        pageSize: paginationParams.pageSize,
-        totalPages: paginationParams.totalPages,
-        totalItems: paginationParams.totalItems,
-        hasNextPage: paginationParams.hasNextPage,
-        hasPrevPage: paginationParams.hasPrevPage,
-        nextPage: paginationParams.nextPage,
-        prevPage: paginationParams.prevPage,
-      },
+      ...buildPaginationResponse(reviews, paginationParams),
       metadata: {
         ratingDistribution: distribution,
         averageRating: productExists.averageRating || 0,
         totalReviews: total,
       },
     };
+
   }
 
   /**
@@ -226,19 +217,17 @@ class ReviewService {
       .skip(paginationParams.skip)
       .limit(paginationParams.limit);
 
-    return {
-      data: reviews,
-      pagination: {
-        currentPage: paginationParams.currentPage,
-        pageSize: paginationParams.pageSize,
-        totalPages: paginationParams.totalPages,
-        totalItems: paginationParams.totalItems,
-      },
-    };
+    return buildPaginationResponse(reviews, paginationParams);
   }
 
-  // Get user's reviews
-
+  /**
+   * Get reviews created by a user
+   * @param {string} userId - User ID
+   * @param {Object} filters - Pagination options
+   * @param {number} [filters.page=1] - Page number
+   * @param {number} [filters.limit=10] - Items per page
+   * @returns {Promise<Object>} Reviews with pagination
+   */
   async getUserReviews(userId, filters = {}) {
     const { page = 1, limit = 10 } = filters;
 
@@ -255,22 +244,15 @@ class ReviewService {
       .skip(paginationParams.skip)
       .limit(paginationParams.limit);
 
-    return {
-      data: reviews,
-      pagination: {
-        currentPage: paginationParams.currentPage,
-        pageSize: paginationParams.pageSize,
-        totalPages: paginationParams.totalPages,
-        totalItems: paginationParams.totalItems,
-        hasNextPage: paginationParams.hasNextPage,
-        hasPrevPage: paginationParams.hasPrevPage,
-        nextPage: paginationParams.nextPage,
-        prevPage: paginationParams.prevPage,
-      },
-    };
+    return buildPaginationResponse(reviews, paginationParams);
   }
 
-  // Get single review by ID
+  /**
+   * Get single review by ID
+   * @param {string} reviewId - Review ID
+   * @returns {Promise<Object>} Review with user and product info
+   * @throws {Error} If review not found
+   */
   async getReviewById(reviewId) {
     const review = await Review.findById(reviewId)
       .populate("user", "username email")
@@ -284,7 +266,16 @@ class ReviewService {
     return review;
   }
 
-  // Update review
+  /**
+   * Update review content or rating
+   * @param {string} reviewId - Review ID
+   * @param {string} userId - User ID
+   * @param {Object} updateData - Update payload
+   * @param {number} [updateData.rating] - Rating value (1-5)
+   * @param {string} [updateData.comment] - Review comment
+   * @returns {Promise<Object>} Updated review
+   * @throws {Error} If review not found or user unauthorized
+   */
   async updateReview(reviewId, userId, updateData) {
     const review = await Review.findById(reviewId);
 
@@ -321,7 +312,14 @@ class ReviewService {
     return review;
   }
 
-  // Delete review
+  /**
+   * Delete review
+   * @param {string} reviewId - Review ID
+   * @param {string} userId - User ID
+   * @param {boolean} [isAdmin=false] - Allow admin deletion
+   * @returns {Promise<{ message: string }>} Deletion result
+   * @throws {Error} If review not found or user unauthorized
+   */
   async deleteReview(reviewId, userId, isAdmin = false) {
     const review = await Review.findById(reviewId);
 
@@ -348,7 +346,11 @@ class ReviewService {
     return { message: "Review deleted successfully" };
   }
 
-  // Update product average rating
+  /**
+   * Update product average rating and total reviews
+   * @param {string} productId - Product ID
+   * @returns {Promise<{ averageRating: number, totalReviews: number }>}
+   */
   async updateProductRating(productId) {
     const stats = await Review.aggregate([
       { $match: { product: productId } },
@@ -376,7 +378,12 @@ class ReviewService {
     return stats.length > 0 ? stats[0] : { averageRating: 0, totalReviews: 0 };
   }
 
-  // Check if user can review product
+  /**
+   * Check if user can review a product
+   * @param {string} userId - User ID
+   * @param {string} productId - Product ID
+   * @returns {Promise<Object>} Eligibility result
+   */
   async canUserReview(userId, productId) {
     // Check if product exists
     const productExists = await Product.findById(productId);
@@ -416,7 +423,17 @@ class ReviewService {
     return { canReview: true };
   }
 
-  // Get reviews for a specific shop
+  /**
+   * Get reviews for a specific shop
+   * @param {string} userId - Shop owner user ID
+   * @param {Object} filters - Filter and pagination options
+   * @param {number} [filters.page=1] - Page number
+   * @param {number} [filters.limit=10] - Items per page
+   * @param {number} [filters.rating] - Filter by rating
+   * @param {string} [filters.replyStatus] - "replied" or "unreplied"
+   * @param {string} [filters.search] - Search term
+   * @returns {Promise<Object>} Reviews with pagination
+   */
   async getShopReviews(userId, filters = {}) {
     // 1. Find the shop owned by this user
     const shop = await Shop.findOne({ owner: userId });
@@ -457,18 +474,17 @@ class ReviewService {
       .skip(paginationParams.skip)
       .limit(paginationParams.limit);
 
-    return {
-      data: reviews,
-      pagination: {
-        currentPage: paginationParams.currentPage,
-        pageSize: paginationParams.pageSize,
-        totalPages: paginationParams.totalPages,
-        totalItems: paginationParams.totalItems,
-      },
-    };
+    return buildPaginationResponse(reviews, paginationParams);
   }
 
-  // Reply to a review (Shop owner only)
+  /**
+   * Reply to a review (shop owner only)
+   * @param {string} userId - Shop owner user ID
+   * @param {string} reviewId - Review ID
+   * @param {string} content - Reply content
+   * @returns {Promise<Object>} Updated review
+   * @throws {Error} If review or shop not found, or unauthorized
+   */
   async replyReview(userId, reviewId, content) {
     if (!content || !content.trim()) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Reply content is required");
@@ -504,8 +520,10 @@ class ReviewService {
     return review;
   }
 
-  // Get review statistics (Admin)
-
+  /**
+   * Get review statistics (Admin)
+   * @returns {Promise<Object>} Review statistics summary
+   */
   async getReviewStatistics() {
     const totalReviews = await Review.countDocuments();
 

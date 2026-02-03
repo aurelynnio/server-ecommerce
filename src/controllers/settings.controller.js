@@ -1,16 +1,14 @@
 const settingsService = require("../services/settings.service");
 const catchAsync = require("../configs/catchAsync");
-const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
+const { sendSuccess } = require("../shared/res/formatResponse");
 const { StatusCodes } = require("http-status-codes");
 
-/**
- * Settings Controller
- * Handles system settings management (Admin only)
- */
 const SettingsController = {
   /**
-   * Get all settings
-   * @access Private (Admin only)
+   * Get settings
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getSettings: catchAsync(async (req, res) => {
     const settings = await settingsService.getSettings();
@@ -18,8 +16,10 @@ const SettingsController = {
   }),
 
   /**
-   * Update settings (partial update)
-   * @access Private (Admin only)
+   * Update settings
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   updateSettings: catchAsync(async (req, res) => {
     const settings = await settingsService.updateSettings(
@@ -35,8 +35,10 @@ const SettingsController = {
   }),
 
   /**
-   * Get specific settings section
-   * @access Private (Admin only)
+   * Get section
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getSection: catchAsync(async (req, res) => {
     const { section } = req.params;
@@ -45,8 +47,10 @@ const SettingsController = {
   }),
 
   /**
-   * Update specific settings section
-   * @access Private (Admin only)
+   * Update section
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   updateSection: catchAsync(async (req, res) => {
     const { section } = req.params;
@@ -64,8 +68,10 @@ const SettingsController = {
   }),
 
   /**
-   * Reset settings to default
-   * @access Private (Admin only)
+   * Reset settings
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   resetSettings: catchAsync(async (req, res) => {
     const settings = await settingsService.resetSettings(req.user.userId);

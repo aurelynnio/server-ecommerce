@@ -1,16 +1,14 @@
 const notificationService = require("../services/notification.service");
 const catchAsync = require("../configs/catchAsync");
 const { StatusCodes } = require("http-status-codes");
-const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
+const { sendSuccess } = require("../shared/res/formatResponse");
 
-/**
- * Notification Controller
- * Handles notification operations for users
- */
 const NotificationController = {
   /**
-   * Create a new notification
-   * @access Private (requires authentication)
+   * Create notification
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   createNotification: catchAsync(async (req, res) => {
     const notification = await notificationService.createNotification({
@@ -27,8 +25,10 @@ const NotificationController = {
   }),
 
   /**
-   * Get list of notifications for current user
-   * @access Private (requires authentication)
+   * Get list notification
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getListNotification: catchAsync(async (req, res) => {
     const result = await notificationService.getListNotification(
@@ -39,7 +39,6 @@ const NotificationController = {
       }
     );
 
-    // Service already returns proper structure: { data, pagination, metadata }
     const response = {
       data: result.data,
       pagination: result.pagination,
@@ -55,8 +54,10 @@ const NotificationController = {
   }),
 
   /**
-   * Mark all notifications as read
-   * @access Private (requires authentication)
+   * Mark read all
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   markReadAll: catchAsync(async (req, res) => {
     await notificationService.markReadAll(req.user.userId);
@@ -70,8 +71,10 @@ const NotificationController = {
   }),
 
   /**
-   * Delete all notifications for current user
-   * @access Private (requires authentication)
+   * Clean notification
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   cleanNotification: catchAsync(async (req, res) => {
     await notificationService.cleanNotification(req.user.userId);
@@ -85,8 +88,10 @@ const NotificationController = {
   }),
 
   /**
-   * Count unread notifications
-   * @access Private (requires authentication)
+   * Count unread
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   countUnread: catchAsync(async (req, res) => {
     const count = await notificationService.countUnread(req.user.userId);
@@ -100,8 +105,10 @@ const NotificationController = {
   }),
 
   /**
-   * Get notification by ID
-   * @access Private (requires authentication)
+   * Get notification by id
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getNotificationById: catchAsync(async (req, res) => {
     const { id } = req.params;
@@ -118,8 +125,10 @@ const NotificationController = {
   }),
 
   /**
-   * Update notification by ID
-   * @access Private (requires authentication)
+   * Update notification
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   updateNotification: catchAsync(async (req, res) => {
     const { id } = req.params;

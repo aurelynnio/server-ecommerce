@@ -31,6 +31,11 @@ class ChatbotService {
     this.chain = this.prompt.pipe(this.model).pipe(new StringOutputParser());
   }
 
+  /**
+   * Get message history
+   * @param {string} sessionId
+   * @returns {any}
+   */
   getMessageHistory(sessionId) {
     const client = mongoose.connection.getClient();
     const collection = client.db().collection("chatbot_messages");
@@ -327,7 +332,12 @@ Link mua: ${item.checkoutUrl}`;
     return response;
   }
 
-  // Keep the old method for backward compatibility, but redirect to new RAG method
+  /**
+   * Backward-compatible wrapper for legacy tool detection
+   * Redirects to RAG-based product retrieval
+   * @param {string} message - User message
+   * @returns {Promise<Array>} Retrieved products
+   */
   async detectAndCallTools(message) {
     return await this.retrieveProducts(message);
   }

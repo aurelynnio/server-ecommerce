@@ -283,7 +283,14 @@ class CartService {
     return this.getCart(userId); // Return full populated cart
   }
 
-  // Update cart item quantity
+  /**
+   * Update cart item quantity
+   * @param {string} userId - User ID
+   * @param {string} itemId - Cart item ID
+   * @param {number} quantity - New quantity
+   * @returns {Promise<Object>} Updated cart
+   * @throws {Error} If cart or item not found, or stock is insufficient
+   */
   async updateCartItem(userId, itemId, quantity) {
     const cart = await Cart.findOne({ userId });
     if (!cart) {
@@ -362,7 +369,13 @@ class CartService {
     return this.getCart(userId);
   }
 
-  // Remove item from cart
+  /**
+   * Remove an item from cart
+   * @param {string} userId - User ID
+   * @param {string} itemId - Cart item ID
+   * @returns {Promise<Object>} Updated cart
+   * @throws {Error} If cart not found
+   */
   async removeCartItem(userId, itemId) {
     const cart = await Cart.findOne({ userId });
     if (!cart) {
@@ -385,7 +398,12 @@ class CartService {
     return cart;
   }
 
-  // Clear cart
+  /**
+   * Clear all items from cart
+   * @param {string} userId - User ID
+   * @returns {Promise<Object>} Cleared cart
+   * @throws {Error} If cart not found
+   */
   async clearCart(userId) {
     const cart = await Cart.findOne({ userId });
     if (!cart) {
@@ -400,7 +418,11 @@ class CartService {
     return cart;
   }
 
-  // Calculate total amount helper
+  /**
+   * Calculate total amount for cart items
+   * @param {Array} items - Cart items
+   * @returns {number} Total amount
+   */
   calculateTotal(items) {
     return items.reduce((total, item) => {
       const price = item.price?.discountPrice || item.price?.currentPrice || 0;
@@ -408,7 +430,11 @@ class CartService {
     }, 0);
   }
 
-  // Get cart item count
+  /**
+   * Get total item count in user's cart
+   * @param {string} userId - User ID
+   * @returns {Promise<number>} Total item count
+   */
   async getCartItemCount(userId) {
     const cart = await Cart.findOne({ userId }).lean();
     if (!cart) {
@@ -418,6 +444,12 @@ class CartService {
     return cart.items.reduce((count, item) => count + item.quantity, 0);
   }
 
+  /**
+   * Find a cart item by a list of item IDs
+   * @param {Object} cart - Cart document
+   * @param {string[]} listIds - List of cart item IDs
+   * @returns {Object|null} Matching cart item or null
+   */
   getCartItemWithListIds(cart, listIds) {
     if (!cart || !cart.items) return null;
     return cart.items.find((item) => listIds.includes(item._id.toString()));

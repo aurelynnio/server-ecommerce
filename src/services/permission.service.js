@@ -1,8 +1,3 @@
-/**
- * Permission Service
- * Handles permission checking, granting, revoking, and audit logging
- */
-
 const User = require("../models/user.model");
 const PermissionAudit = require("../models/permission-audit.model");
 const {
@@ -14,13 +9,13 @@ const {
 const logger = require("../utils/logger");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
+const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
 
 class PermissionService {
   /**
-   * Get all effective permissions for a user
-   * Combines role-based permissions with user-specific permissions
-   * @param {Object} user - User document or user object with roles and permissions
-   * @returns {string[]} Array of all effective permission strings
+   * Get user permissions
+   * @param {any} user
+   * @returns {any}
    */
   getUserPermissions(user) {
     if (!user) return [];
@@ -29,158 +24,148 @@ class PermissionService {
     const rolePermissions = ROLE_PERMISSIONS[role] || [];
     const userPermissions = user.permissions || [];
 
-    // Admin has all permissions (wildcard)
     if (rolePermissions.includes("*")) {
       return this.getAllPermissions();
     }
 
-    // Combine role and user-specific permissions
     const combined = new Set([...rolePermissions, ...userPermissions]);
 
-    // Filter out negative permissions (those starting with '-')
     const positivePerms = [...combined].filter((p) => !p.startsWith("-"));
     const negativePerms = [...combined]
       .filter((p) => p.startsWith("-"))
-      .map((p) => p.substring(1)); // Remove the '-' prefix
+      .map((p) => p.substring(1));
 
-    // Remove negated permissions from positive permissions
     const finalPerms = positivePerms.filter((p) => !negativePerms.includes(p));
 
-    // Expand 'manage' permissions to CRUD
     return expandManagePermissions(finalPerms);
+
   }
 
   /**
-   * Get all available permissions in the system
-   * @returns {string[]} Array of all permission strings
+   * Get all permissions
+   * @returns {any}
    */
   getAllPermissions() {
     return getAllPermissionsList();
   }
 
   /**
-   * Check if user has a specific permission
-   * @param {Object} user - User document or user object
-   * @param {string} permission - Permission to check
-   * @returns {boolean} True if user has the permission
+   * Has permission
+   * @param {any} user
+   * @param {any} permission
+   * @returns {boolean}
    */
   hasPermission(user, permission) {
+
     if (!user || !permission) return false;
 
     const permissions = this.getUserPermissions(user);
 
-    // Check for wildcard (admin)
     if (permissions.includes("*")) return true;
-
-    // Check for exact match
     if (permissions.includes(permission)) return true;
-
-    // Check for manage permission (grants all CRUD)
     const [resource] = permission.split(":");
     if (permissions.includes(`${resource}:manage`)) return true;
 
     return false;
+
   }
 
   /**
-   * Check if user has any of the specified permissions (OR logic)
-   * @param {Object} user - User document or user object
-   * @param {string[]} permissions - Array of permissions to check
-   * @returns {boolean} True if user has at least one permission
+   * Has any permission
+   * @param {any} user
+   * @param {Array} permissions
+   * @returns {boolean}
    */
   hasAnyPermission(user, permissions) {
+
     if (!user || !permissions || permissions.length === 0) return false;
     return permissions.some((p) => this.hasPermission(user, p));
   }
 
   /**
-   * Check if user has all specified permissions (AND logic)
-   * @param {Object} user - User document or user object
-   * @param {string[]} permissions - Array of permissions to check
-   * @returns {boolean} True if user has all permissions
+   * Has all permissions
+   * @param {any} user
+   * @param {Array} permissions
+   * @returns {boolean}
    */
   hasAllPermissions(user, permissions) {
+
     if (!user || !permissions || permissions.length === 0) return false;
     return permissions.every((p) => this.hasPermission(user, p));
   }
 
   /**
-   * Grant a permission to a user
-   * @param {string} userId - Target user ID
-   * @param {string} permission - Permission to grant
-   * @param {string} adminId - Admin user ID performing the action
-   * @returns {Promise<Object>} Updated user document
+   * Grant permission
+   * @param {string} userId
+   * @param {any} permission
+   * @param {string} adminId
+   * @returns {Promise<any>}
    */
   async grantPermission(userId, permission, adminId) {
-    // Validate permission exists
     if (!isValidPermission(permission)) {
       throw new ApiError(StatusCodes.BAD_REQUEST, `Invalid permission: ${permission}`);
     }
 
 
+
     const user = await User.findById(userId);
     if (!user) {
       throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
-    // Check if permission already exists
     if (user.permissions.includes(permission)) {
       throw new ApiError(StatusCodes.CONFLICT, "Permission already granted");
     }
 
-
-    // Add permission
     user.permissions.push(permission);
     await user.save();
 
-    // Log audit
     await this.logAudit("grant", adminId, userId, permission);
 
     return user;
+
   }
 
   /**
-   * Revoke a permission from a user
-   * @param {string} userId - Target user ID
-   * @param {string} permission - Permission to revoke
-   * @param {string} adminId - Admin user ID performing the action
-   * @returns {Promise<Object>} Updated user document
+   * Revoke permission
+   * @param {string} userId
+   * @param {any} permission
+   * @param {string} adminId
+   * @returns {Promise<any>}
    */
   async revokePermission(userId, permission, adminId) {
+
     const user = await User.findById(userId);
     if (!user) {
       throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
-    // Check if permission exists on user
     const permIndex = user.permissions.indexOf(permission);
     if (permIndex === -1) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Permission not found on user");
     }
 
-
-    // Remove permission
     user.permissions.splice(permIndex, 1);
     await user.save();
 
-    // Log audit
     await this.logAudit("revoke", adminId, userId, permission);
 
     return user;
+
   }
 
   /**
-   * Update all permissions for a user
-   * @param {string} userId - Target user ID
-   * @param {string[]} permissions - New permissions array
-   * @param {string} adminId - Admin user ID performing the action
-   * @returns {Promise<Object>} Updated user document
+   * Update user permissions
+   * @param {string} userId
+   * @param {Array} permissions
+   * @param {string} adminId
+   * @returns {Promise<any>}
    */
   async updateUserPermissions(userId, permissions, adminId) {
-    // Validate all permissions
     const invalidPerms = permissions.filter(
       (p) => !isValidPermission(p) && !p.startsWith("-"),
     );
+
     if (invalidPerms.length > 0) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
@@ -188,31 +173,31 @@ class PermissionService {
       );
     }
 
-
     const user = await User.findByIdAndUpdate(
       userId,
       { permissions },
       { new: true },
     );
 
+
     if (!user) {
       throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
 
-    // Log bulk update audit
     await this.logBulkUpdate(adminId, userId, permissions);
+
 
     return user;
   }
 
   /**
-   * Log a permission change to audit log
-   * PERFORMANCE FIX: Use top-level require instead of dynamic require
-   * @param {string} action - 'grant' or 'revoke'
-   * @param {string} adminId - Admin user ID
-   * @param {string} targetUserId - Target user ID
-   * @param {string} permission - Permission that was changed
+   * Log audit
+   * @param {any} action
+   * @param {string} adminId
+   * @param {string} targetUserId
+   * @param {any} permission
+   * @returns {Promise<any>}
    */
   async logAudit(action, adminId, targetUserId, permission) {
     try {
@@ -224,17 +209,16 @@ class PermissionService {
         timestamp: new Date(),
       });
     } catch (error) {
-      // Log error but don't fail the operation
       logger.error("Failed to log permission audit:", { error: error.message });
     }
   }
 
   /**
-   * Log a bulk permission update
-   * PERFORMANCE FIX: Use top-level require instead of dynamic require
-   * @param {string} adminId - Admin user ID
-   * @param {string} targetUserId - Target user ID
-   * @param {string[]} permissions - New permissions array
+   * Log bulk update
+   * @param {string} adminId
+   * @param {string} targetUserId
+   * @param {Array} permissions
+   * @returns {Promise<any>}
    */
   async logBulkUpdate(adminId, targetUserId, permissions) {
     try {
@@ -253,14 +237,36 @@ class PermissionService {
   }
 
   /**
-   * Get audit logs with pagination and filters
-   * PERFORMANCE FIX: Use top-level require instead of dynamic require
-   * @param {Object} options - Query options
-   * @param {number} options.page - Page number
-   * @param {number} options.limit - Items per page
-   * @param {string} options.userId - Filter by target user ID
-   * @param {string} options.action - Filter by action type
-   * @returns {Promise<Object>} Paginated audit logs
+   * Get user permissions summary
+   * @param {string} userId
+   * @returns {Promise<any>}
+   */
+  async getUserPermissionsSummary(userId) {
+    const user = await User.findById(userId).select("-password");
+    if (!user) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
+    }
+
+    const effectivePermissions = this.getUserPermissions(user);
+    const rolePermissions = ROLE_PERMISSIONS[user.roles] || [];
+
+    return {
+      user: {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        roles: user.roles,
+      },
+      effectivePermissions,
+      userPermissions: user.permissions || [],
+      rolePermissions,
+    };
+  }
+
+  /**
+   * Get audit logs
+   * @param {Object} options
+   * @returns {Promise<any>}
    */
   async getAuditLogs({ page = 1, limit = 20, userId, action }) {
     try {
@@ -268,51 +274,23 @@ class PermissionService {
       if (userId) query.targetUserId = userId;
       if (action) query.action = action;
 
-      const skip = (page - 1) * limit;
+      const total = await PermissionAudit.countDocuments(query);
+      const paginationParams = getPaginationParams(page, limit, total);
 
-      const [logs, total] = await Promise.all([
-        PermissionAudit.find(query)
-          .sort({ timestamp: -1 })
-          .skip(skip)
-          .limit(limit)
-          .populate("adminId", "username email")
-          .populate("targetUserId", "username email"),
-        PermissionAudit.countDocuments(query),
-      ]);
+      const logs = await PermissionAudit.find(query)
+        .sort({ timestamp: -1 })
+        .skip(paginationParams.skip)
+        .limit(paginationParams.limit)
+        .populate("adminId", "username email")
+        .populate("targetUserId", "username email");
 
-      const totalPages = Math.ceil(total / limit);
-      const currentPage = parseInt(page);
-
-      return {
-        data: logs,
-        pagination: {
-          currentPage,
-          pageSize: limit,
-          totalItems: total,
-          totalPages,
-          hasNextPage: currentPage < totalPages,
-          hasPrevPage: currentPage > 1,
-          nextPage: currentPage < totalPages ? currentPage + 1 : null,
-          prevPage: currentPage > 1 ? currentPage - 1 : null,
-        },
-      };
+      return buildPaginationResponse(logs, paginationParams);
     } catch (error) {
       logger.error("Failed to get audit logs:", { error: error.message });
-      return {
-        data: [],
-        pagination: {
-          currentPage: page,
-          pageSize: limit,
-          totalItems: 0,
-          totalPages: 0,
-          hasNextPage: false,
-          hasPrevPage: false,
-          nextPage: null,
-          prevPage: null,
-        },
-      };
+      return buildPaginationResponse([], getPaginationParams(page, limit, 0));
     }
   }
 }
+
 
 module.exports = new PermissionService();

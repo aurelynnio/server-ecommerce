@@ -12,9 +12,7 @@ import {
   ROLE_PERMISSIONS,
   getAllPermissionsList,
   isValidPermission,
-  isValidPermissionFormat,
   expandManagePermissions,
-  getCrudPermissions,
   permission,
 } from '../../src/configs/permission.js';
 
@@ -35,7 +33,7 @@ describe('Permission System - Property Tests', () => {
           fc.constantFrom(...allPermissions),
           (perm) => {
             // All permissions should pass format validation
-            expect(isValidPermissionFormat(perm)).toBe(true);
+            expect(isValidPermission(perm)).toBe(true);
             
             // Should contain exactly one colon
             const colonCount = (perm.match(/:/g) || []).length;
@@ -45,6 +43,7 @@ describe('Permission System - Property Tests', () => {
             const [resource, action] = perm.split(':');
             expect(resource.length).toBeGreaterThan(0);
             expect(action.length).toBeGreaterThan(0);
+
           }
         ),
         { numRuns: 100 }
@@ -61,8 +60,9 @@ describe('Permission System - Property Tests', () => {
           fc.constantFrom(...actions),
           (resource, action) => {
             const perm = permission(resource, action);
-            expect(isValidPermissionFormat(perm)).toBe(true);
+            expect(isValidPermission(perm)).toBe(true);
             expect(perm).toBe(`${resource}:${action}`);
+
           }
         ),
         { numRuns: 100 }
@@ -81,8 +81,9 @@ describe('Permission System - Property Tests', () => {
             fc.constant('::'),
           ),
           (invalidPerm) => {
-            expect(isValidPermissionFormat(invalidPerm)).toBe(false);
+            expect(isValidPermission(invalidPerm)).toBe(false);
           }
+
         ),
         { numRuns: 100 }
       );
@@ -111,10 +112,16 @@ describe('Permission System - Property Tests', () => {
             expect(expanded).toContain(managePermission);
             
             // Should contain all CRUD permissions
-            const crudPerms = getCrudPermissions(resource);
+            const crudPerms = [
+              permission(resource, ACTIONS.CREATE),
+              permission(resource, ACTIONS.READ),
+              permission(resource, ACTIONS.UPDATE),
+              permission(resource, ACTIONS.DELETE),
+            ];
             for (const crud of crudPerms) {
               expect(expanded).toContain(crud);
             }
+
           }
         ),
         { numRuns: 100 }
@@ -142,24 +149,36 @@ describe('Permission System - Property Tests', () => {
       );
     });
 
-    it('getCrudPermissions should return exactly 4 permissions', () => {
+    it('manage permission should include exactly 4 CRUD permissions', () => {
       const resources = Object.values(RESOURCES);
       
       fc.assert(
         fc.property(
           fc.constantFrom(...resources),
           (resource) => {
-            const crudPerms = getCrudPermissions(resource);
-            expect(crudPerms).toHaveLength(4);
-            expect(crudPerms).toContain(`${resource}:create`);
-            expect(crudPerms).toContain(`${resource}:read`);
-            expect(crudPerms).toContain(`${resource}:update`);
-            expect(crudPerms).toContain(`${resource}:delete`);
+            const managePermission = permission(resource, ACTIONS.MANAGE);
+            const expanded = expandManagePermissions([managePermission]);
+            const crudPerms = [
+              permission(resource, ACTIONS.CREATE),
+              permission(resource, ACTIONS.READ),
+              permission(resource, ACTIONS.UPDATE),
+              permission(resource, ACTIONS.DELETE),
+            ];
+            const expandedCrud = expanded.filter((perm) =>
+              crudPerms.includes(perm),
+            );
+
+            expect(expandedCrud).toHaveLength(4);
+            expect(expandedCrud).toContain(permission(resource, ACTIONS.CREATE));
+            expect(expandedCrud).toContain(permission(resource, ACTIONS.READ));
+            expect(expandedCrud).toContain(permission(resource, ACTIONS.UPDATE));
+            expect(expandedCrud).toContain(permission(resource, ACTIONS.DELETE));
           }
         ),
         { numRuns: 100 }
       );
     });
+
   });
 });
 

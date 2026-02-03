@@ -5,14 +5,12 @@ const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const { StatusCodes } = require("http-status-codes");
 const logger = require("../utils/logger");
 
-/**
- * Chatbot Controller
- * Handles AI chatbot operations including messaging and session management
- */
 const ChatbotController = {
   /**
-   * Send message to chatbot (non-streaming)
-   * @access Public
+   * Send message
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   sendMessage: catchAsync(async (req, res) => {
     const { message, sessionId } = req.body;
@@ -39,8 +37,10 @@ const ChatbotController = {
   }),
 
   /**
-   * Stream message to chatbot using SSE
-   * @access Public
+   * Stream message
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   streamMessage: catchAsync(async (req, res) => {
     const { message, sessionId } = req.body;
@@ -53,14 +53,12 @@ const ChatbotController = {
       sessionId ||
       `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
-    // Set SSE headers
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
-    res.setHeader("X-Accel-Buffering", "no"); // Disable nginx buffering
+    res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders();
 
-    // Send sessionId first
     res.write(
       `data: ${JSON.stringify({ type: "session", sessionId: chatSessionId })}\n\n`,
     );
@@ -70,14 +68,12 @@ const ChatbotController = {
         chatSessionId,
         message.trim(),
         (token) => {
-          // Send each token as SSE event
           res.write(
             `data: ${JSON.stringify({ type: "token", content: token })}\n\n`,
           );
         },
       );
 
-      // Send completion event
       res.write(
         `data: ${JSON.stringify({ type: "done", success: response.success })}\n\n`,
       );
@@ -92,8 +88,10 @@ const ChatbotController = {
   }),
 
   /**
-   * Get chat history
-   * @access Public
+   * Get history
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getHistory: catchAsync(async (req, res) => {
     const { sessionId } = req.params;
@@ -119,8 +117,10 @@ const ChatbotController = {
   }),
 
   /**
-   * Clear chat session
-   * @access Public
+   * Clear session
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   clearSession: catchAsync(async (req, res) => {
     const { sessionId } = req.params;
@@ -137,8 +137,10 @@ const ChatbotController = {
   }),
 
   /**
-   * Get chat suggestions
-   * @access Public
+   * Get suggestions
+   * @param {any} _req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getSuggestions: catchAsync(async (_req, res) => {
     const suggestions = [
@@ -158,8 +160,10 @@ const ChatbotController = {
   }),
 
   /**
-   * Get all chat sessions (Admin)
-   * @access Private (Admin only)
+   * Get all sessions
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getAllSessions: catchAsync(async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
@@ -167,11 +171,10 @@ const ChatbotController = {
 
     const collection = mongoose.connection.collection("chatbot_messages");
 
-    // Aggregate to get unique sessions with metadata
     const sessions = await collection
       .aggregate([
         {
-          $sort: { _id: 1 }, // Sort by time to ensure first/last logic works
+          $sort: { _id: 1 },
         },
         {
           $group: {
@@ -183,7 +186,7 @@ const ChatbotController = {
           },
         },
         {
-          $sort: { lastMessageAt: -1 }, // Sort sessions by latest activity
+          $sort: { lastMessageAt: -1 },
         },
         {
           $facet: {

@@ -1,5 +1,3 @@
-const { StatusCodes } = require("http-status-codes");
-
 /**
  * Async error wrapper for Express route handlers
  * Catches async errors and passes them to the global error handler
@@ -12,7 +10,5 @@ const catchAsync = (fn) => {
   };
 };
 
-
-
-
 module.exports = catchAsync;
+

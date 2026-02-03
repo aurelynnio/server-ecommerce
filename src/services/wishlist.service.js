@@ -2,6 +2,8 @@ const User = require("../models/user.model");
 const Product = require("../models/product.model");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
+const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
+
 
 
 /**
@@ -26,10 +28,13 @@ class WishlistService {
 
     const wishlistIds = user.wishlist || [];
     const total = wishlistIds.length;
-    const skip = (page - 1) * limit;
+    const paginationParams = getPaginationParams(page, limit, total);
 
     // Get paginated product IDs
-    const paginatedIds = wishlistIds.slice(skip, skip + limit);
+    const paginatedIds = wishlistIds.slice(
+      paginationParams.skip,
+      paginationParams.skip + paginationParams.limit
+    );
 
     // Fetch products with details - Note: images are in variants[].images
     const products = await Product.find({
@@ -42,27 +47,13 @@ class WishlistService {
       .lean();
 
     // Map products to include first variant image
-    const productsWithImages = products.map(product => ({
+    const productsWithImages = products.map((product) => ({
       ...product,
       image: product.variants?.[0]?.images?.[0] || null,
     }));
 
-    const totalPages = Math.ceil(total / limit);
-    const currentPage = page;
+    return buildPaginationResponse(productsWithImages, paginationParams);
 
-    return {
-      data: productsWithImages,
-      pagination: {
-        currentPage,
-        pageSize: limit,
-        totalItems: total,
-        totalPages,
-        hasNextPage: currentPage < totalPages,
-        hasPrevPage: currentPage > 1,
-        nextPage: currentPage < totalPages ? currentPage + 1 : null,
-        prevPage: currentPage > 1 ? currentPage - 1 : null,
-      },
-    };
   }
 
   /**

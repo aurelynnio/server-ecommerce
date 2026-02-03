@@ -1,12 +1,15 @@
 const bcrypt = require("bcrypt");
 
+const SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 10;
+
 /**
  * Hash a password using bcrypt
  * @param {string} password - The plain text password to hash
- * @returns {string} The hashed password string
+ * @returns {Promise<string>} The hashed password string
  */
-const hashPassword = (password) => {
-  const saltRounds = 10;
-  return bcrypt.hashSync(password, saltRounds);
+const hashPassword = async (password) => {
+  return bcrypt.hash(password, SALT_ROUNDS);
 };
+
 module.exports = hashPassword;
+

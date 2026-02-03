@@ -3,14 +3,12 @@ const catchAsync = require("../configs/catchAsync");
 const { sendSuccess } = require("../shared/res/formatResponse");
 const { StatusCodes } = require("http-status-codes");
 
-/**
- * Shipping Controller
- * Handles shipping template operations for sellers
- */
 const ShippingController = {
   /**
-   * Create a new shipping template
-   * @access Private (Seller only)
+   * Create template
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   createTemplate: catchAsync(async (req, res) => {
     const newTemplate = await shippingService.createTemplate(
@@ -26,8 +24,10 @@ const ShippingController = {
   }),
 
   /**
-   * Get all shipping templates for current seller's shop
-   * @access Private (Seller only)
+   * Get my templates
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getMyTemplates: catchAsync(async (req, res) => {
     const templates = await shippingService.getMyTemplates(req.user.userId);
@@ -35,8 +35,10 @@ const ShippingController = {
   }),
 
   /**
-   * Update a shipping template
-   * @access Private (Seller only - own templates)
+   * Update template
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   updateTemplate: catchAsync(async (req, res) => {
     const updated = await shippingService.updateTemplate(
@@ -48,8 +50,10 @@ const ShippingController = {
   }),
 
   /**
-   * Delete a shipping template
-   * @access Private (Seller only - own templates)
+   * Delete template
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   deleteTemplate: catchAsync(async (req, res) => {
     const deleted = await shippingService.deleteTemplate(

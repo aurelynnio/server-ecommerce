@@ -57,11 +57,6 @@ Anh/chị muốn xem thêm thông tin sản phẩm nào ạ?"
 - Bịa link: "/products/ao-dep" (không có trong dữ liệu)
 - Nói "có nhiều sản phẩm" khi dữ liệu rỗng`;
 
-const CONTEXT_TEMPLATE = (context) => `
-## THÔNG TIN KHÁCH HÀNG
-- Sản phẩm đã xem: ${context.viewedProducts?.map(p => p.name).join(", ") || "Chưa có"}
-- Sở thích: ${context.interests?.join(", ") || "Chưa xác định"}
-`;
 
 // Định nghĩa các tools cho AI
 const toolDefinitions = [
@@ -186,4 +181,4 @@ const toolDefinitions = [
   },
 ];
 
-module.exports = { SYSTEM_PROMPT, CONTEXT_TEMPLATE, toolDefinitions };
+module.exports = { SYSTEM_PROMPT, toolDefinitions };

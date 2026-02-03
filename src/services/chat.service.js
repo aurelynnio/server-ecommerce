@@ -3,9 +3,16 @@ const Shop = require("../models/shop.model");
 const { getIO } = require("../socket/index");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
+const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
 
 
 class ChatService {
+  /**
+   * Start conversation
+   * @param {string} userId
+   * @param {Object} options
+   * @returns {Promise<any>}
+   */
   async startConversation(userId, { shopId, productId }) {
     const shop = await Shop.findById(shopId);
     if (!shop) throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
@@ -30,6 +37,12 @@ class ChatService {
     return conversation;
   }
 
+  /**
+   * Send message
+   * @param {string} senderId
+   * @param {Object} options
+   * @returns {Promise<any>}
+   */
   async sendMessage(senderId, { conversationId, content, attachments }) {
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
@@ -69,6 +82,11 @@ class ChatService {
     return info;
   }
 
+  /**
+   * Get my conversations
+   * @param {string} userId
+   * @returns {Promise<any>}
+   */
   async getMyConversations(userId) {
     const conversations = await Conversation.find({ members: userId })
       .populate("shopId", "name logo")
@@ -87,36 +105,26 @@ class ChatService {
    * @returns {Promise<Object>} Messages with pagination
    */
   async getMessages(conversationId, { page = 1, limit = 50 } = {}) {
-    // Basic check omitted, but usually verify user membership here too
-    const skip = (page - 1) * limit;
+    const total = await Message.countDocuments({ conversationId });
+    const paginationParams = getPaginationParams(page, limit, total);
 
-    const [messages, total] = await Promise.all([
-      Message.find({ conversationId })
-        .sort({ createdAt: -1 }) // Latest first
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Message.countDocuments({ conversationId })
-    ]);
+    const messages = await Message.find({ conversationId })
+      .sort({ createdAt: -1 })
+      .skip(paginationParams.skip)
+      .limit(paginationParams.limit)
+      .lean();
 
-    // Reverse to show oldest first within the page
     const reversedMessages = messages.reverse();
 
-    const totalPages = Math.ceil(total / limit);
-
-    return {
-      data: reversedMessages,
-      pagination: {
-        currentPage: page,
-        pageSize: limit,
-        totalItems: total,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1,
-      }
-    };
+    return buildPaginationResponse(reversedMessages, paginationParams);
   }
 
+  /**
+   * Mark as read
+   * @param {string} conversationId
+   * @param {string} userId
+   * @returns {Promise<any>}
+   */
   async markAsRead(conversationId, userId) {
     // Find the conversation by ID
     const conversation = await Conversation.findById(conversationId);

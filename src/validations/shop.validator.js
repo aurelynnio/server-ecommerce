@@ -4,7 +4,9 @@ const { sanitizedString } = require("./sanitize");
 
 const addressSchema = Joi.object({
   fullName: sanitizedString().required(),
-  phone: Joi.string().pattern(/^[0-9]{10,11}$/).required(),
+  phone: Joi.string()
+    .pattern(/^[0-9]{10,11}$/)
+    .required(),
   address: sanitizedString().required(),
   city: sanitizedString().required(),
   district: sanitizedString().required(),
@@ -19,15 +21,16 @@ const createShopValidator = Joi.object({
   banner: Joi.string().allow(""),
 });
 
-const updateShopValidator = createShopValidator.fork(
-  ["name", "pickupAddress"],
-  (schema) => schema.optional()
-).keys({
-  isActive: Joi.boolean()
-});
+const updateShopValidator = createShopValidator
+  .fork(["name", "pickupAddress"], (schema) => schema.optional())
+  .keys({
+    isActive: Joi.boolean(),
+  });
+
+const shopIdParamValidator = Joi.object({ shopId: objectId.required() });
 
 module.exports = {
   createShopValidator,
   updateShopValidator,
-  shopIdParamValidator: Joi.object({ shopId: objectId.required() }),
+  shopIdParamValidator,
 };

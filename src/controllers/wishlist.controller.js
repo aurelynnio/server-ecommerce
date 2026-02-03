@@ -3,14 +3,12 @@ const wishlistService = require("../services/wishlist.service");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const { StatusCodes } = require("http-status-codes");
 
-/**
- * Wishlist Controller
- * Handles user wishlist operations
- */
 const WishlistController = {
   /**
-   * Get user's wishlist
-   * @access Private (requires authentication)
+   * Get wishlist
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getWishlist: catchAsync(async (req, res) => {
     const userId = req.user._id;
@@ -25,8 +23,10 @@ const WishlistController = {
   }),
 
   /**
-   * Add product to wishlist
-   * @access Private (requires authentication)
+   * Add to wishlist
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   addToWishlist: catchAsync(async (req, res) => {
     const userId = req.user._id;
@@ -37,8 +37,10 @@ const WishlistController = {
   }),
 
   /**
-   * Remove product from wishlist
-   * @access Private (requires authentication)
+   * Remove from wishlist
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   removeFromWishlist: catchAsync(async (req, res) => {
     const userId = req.user._id;
@@ -49,8 +51,10 @@ const WishlistController = {
   }),
 
   /**
-   * Check if product is in wishlist
-   * @access Private (requires authentication)
+   * Check in wishlist
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   checkInWishlist: catchAsync(async (req, res) => {
     const userId = req.user._id;
@@ -61,8 +65,10 @@ const WishlistController = {
   }),
 
   /**
-   * Clear entire wishlist
-   * @access Private (requires authentication)
+   * Clear wishlist
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   clearWishlist: catchAsync(async (req, res) => {
     const userId = req.user._id;
@@ -73,7 +79,9 @@ const WishlistController = {
 
   /**
    * Get wishlist count
-   * @access Private (requires authentication)
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getWishlistCount: catchAsync(async (req, res) => {
     const userId = req.user._id;
@@ -83,8 +91,10 @@ const WishlistController = {
   }),
 
   /**
-   * Check multiple products in wishlist
-   * @access Private (requires authentication)
+   * Check multiple
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   checkMultiple: catchAsync(async (req, res) => {
     const userId = req.user._id;

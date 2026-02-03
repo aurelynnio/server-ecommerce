@@ -2,14 +2,12 @@ const catchAsync = require("../configs/catchAsync");
 const recommendationService = require("../services/recommendation.service");
 const { sendSuccess } = require("../shared/res/formatResponse");
 
-/**
- * Recommendation Controller
- * Handles product recommendation operations
- */
 const RecommendationController = {
   /**
-   * Get personalized recommendations ("Guess You Like")
-   * @access Public (personalized if authenticated)
+   * Get for you
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getForYou: catchAsync(async (req, res) => {
     const userId = req.user?._id;
@@ -31,8 +29,10 @@ const RecommendationController = {
   }),
 
   /**
-   * Get frequently bought together products
-   * @access Public
+   * Get frequently bought together
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getFrequentlyBoughtTogether: catchAsync(async (req, res) => {
     const { productId } = req.params;
@@ -47,8 +47,10 @@ const RecommendationController = {
   }),
 
   /**
-   * Get similar products
-   * @access Public
+   * Get similar
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getSimilar: catchAsync(async (req, res) => {
     const { productId } = req.params;
@@ -63,8 +65,10 @@ const RecommendationController = {
   }),
 
   /**
-   * Get recently viewed products
-   * @access Private (requires authentication)
+   * Get recently viewed
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getRecentlyViewed: catchAsync(async (req, res) => {
     const userId = req.user?._id;
@@ -83,8 +87,10 @@ const RecommendationController = {
   }),
 
   /**
-   * Track product view
-   * @access Public (tracks if authenticated)
+   * Track view
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   trackView: catchAsync(async (req, res) => {
     const userId = req.user?._id;
@@ -99,7 +105,9 @@ const RecommendationController = {
 
   /**
    * Get category recommendations
-   * @access Public
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getCategoryRecommendations: catchAsync(async (req, res) => {
     const { categoryId } = req.params;
@@ -114,8 +122,10 @@ const RecommendationController = {
   }),
 
   /**
-   * Get homepage recommendations
-   * @access Public (personalized if authenticated)
+   * Get homepage
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getHomepage: catchAsync(async (req, res) => {
     const userId = req.user?._id;

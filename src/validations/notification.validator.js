@@ -2,7 +2,9 @@ const Joi = require("joi");
 const { objectId, pagination } = require("./common.validator");
 
 const createNotificationValidator = Joi.object({
-  type: Joi.string().valid("order_status", "promotion", "system", "chat").default("system"),
+  type: Joi.string()
+    .valid("order_status", "promotion", "system", "chat")
+    .default("system"),
   title: Joi.string().required(),
   message: Joi.string().required(),
   orderId: objectId,
@@ -17,10 +19,15 @@ const updateNotificationValidator = Joi.object({
   link: Joi.string().allow(""),
   isRead: Joi.boolean(),
 });
+const getListNotificationValidator = Joi.object({ ...pagination });
+
+const notificationIdParamValidator = Joi.object({
+  id: objectId.required(),
+});
 
 module.exports = {
   createNotificationValidator,
   updateNotificationValidator,
-  getListNotificationValidator: Joi.object({ ...pagination }),
-  notificationIdParamValidator: Joi.object({ id: objectId.required() }),
+  getListNotificationValidator,
+  notificationIdParamValidator,
 };

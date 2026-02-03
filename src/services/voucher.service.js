@@ -1,6 +1,6 @@
 const Voucher = require("../models/voucher.model");
 const Shop = require("../models/shop.model");
-const { getPaginationParams } = require("../utils/pagination");
+const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
 
@@ -113,19 +113,7 @@ class VoucherService {
       .limit(paginationParams.limit)
       .lean();
 
-    return {
-      data: vouchers,
-      pagination: {
-        currentPage: paginationParams.currentPage,
-        pageSize: paginationParams.pageSize,
-        totalItems: paginationParams.totalItems,
-        totalPages: paginationParams.totalPages,
-        hasNextPage: paginationParams.hasNextPage,
-        hasPrevPage: paginationParams.hasPrevPage,
-        nextPage: paginationParams.nextPage,
-        prevPage: paginationParams.prevPage,
-      },
-    };
+    return buildPaginationResponse(vouchers, paginationParams);
   }
 
   /**

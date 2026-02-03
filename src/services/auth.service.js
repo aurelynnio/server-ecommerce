@@ -10,6 +10,8 @@ const {
 } = require("./email.service");
 const cacheService = require("./cache.service");
 const logger = require("../utils/logger");
+const tokenService = require("./token.service");
+
 
 /**
  * Service handling authentication logic
@@ -101,7 +103,6 @@ class AuthService {
    * @throws {Error} If credentials are invalid or email is not verified
    */
   async login(email, password) {
-    // Find user by email
     const user = await User.findOne({ email }).lean();
     if (!user) {
       throw new ApiError(
@@ -110,8 +111,7 @@ class AuthService {
       );
     }
 
-    // Verify password
-    const isMatch = comparePassword(password, user.password);
+    const isMatch = await comparePassword(password, user.password);
     if (!isMatch) {
       throw new ApiError(
         StatusCodes.UNAUTHORIZED,
@@ -119,7 +119,6 @@ class AuthService {
       );
     }
 
-    // Check if email is verified
     if (!user.isVerifiedEmail) {
       throw new ApiError(
         StatusCodes.FORBIDDEN,
@@ -127,27 +126,9 @@ class AuthService {
       );
     }
 
-    // Generate tokens with permissions
-    const tokenService = require("./token.service");
-    const permissionService = require("./permission.service");
+    const permissions = tokenService.getPermissionsForUser(user);
+    const tokens = tokenService.generateTokensWithPermissions(user);
 
-    // Get user permissions
-    const permissions = permissionService.getUserPermissions(user);
-
-    const payload = {
-      userId: user._id,
-      username: user.username,
-      email: user.email,
-      role: user.roles,
-      permissions: permissions,
-    };
-
-    const accessToken = tokenService.generateAccessToken(payload);
-    const refreshToken = tokenService.generateRefreshToken({
-      userId: user._id,
-    });
-
-    // Remove sensitive data
     const {
       password: _,
       codeVerifiEmail,
@@ -158,14 +139,21 @@ class AuthService {
     return {
       user: {
         ...userWithoutPassword,
-        permissions: permissions,
+        permissions,
       },
-      accessToken,
-      refreshToken,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
     };
   }
 
-  // Verify email with code
+
+  /**
+   * Verify email using a code tied to the email address
+   * @param {string} email - User email
+   * @param {string} code - Verification code
+   * @returns {Promise<{ user: Object }>} Verified user data
+   * @throws {Error} If user not found, already verified, or code invalid/expired
+   */
   async verifyEmail(email, code) {
     const user = await User.findOne({ email });
     if (!user) {
@@ -176,24 +164,13 @@ class AuthService {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Email already verified");
     }
 
-    // Check code in Redis
-    const cacheKey = `otp:email:${email}`;
-    const storedCode = await cacheService.get(cacheKey);
+    await this.ensureValidOtp(`otp:email:${email}`, code);
 
-    if (!storedCode || storedCode !== code) {
-      throw new ApiError(
-        StatusCodes.BAD_REQUEST,
-        "Invalid or expired verification code"
-      );
-    }
-
-    // Update user
     user.isVerifiedEmail = true;
     user.codeVerifiEmail = undefined;
     user.expiresCodeVerifiEmail = undefined;
     await user.save();
 
-    // Return user info without sensitive data
     const {
       password,
       codeVerifiEmail,
@@ -203,9 +180,14 @@ class AuthService {
     return { user: userWithoutPassword };
   }
 
-  // Verify email by code only (no email required)
+
+  /**
+   * Verify email using code only (no email required)
+   * @param {string} code - Verification code
+   * @returns {Promise<{ user: Object }>} Verified user data
+   * @throws {Error} If code is invalid or email already verified
+   */
   async verifyEmailByCode(code) {
-    // Find user by verification code
     const user = await User.findOne({ codeVerifiEmail: code });
     if (!user) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid verification code");
@@ -215,7 +197,6 @@ class AuthService {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Email already verified");
     }
 
-    // Check if code expired
     if (
       user.expiresCodeVerifiEmail &&
       user.expiresCodeVerifiEmail < new Date()
@@ -226,13 +207,11 @@ class AuthService {
       );
     }
 
-    // Update user
     user.isVerifiedEmail = true;
     user.codeVerifiEmail = undefined;
     user.expiresCodeVerifiEmail = undefined;
     await user.save();
 
-    // Return user info without sensitive data
     const {
       password,
       codeVerifiEmail,
@@ -242,7 +221,13 @@ class AuthService {
     return { user: userWithoutPassword };
   }
 
-  // Send verification code to email (for both new users and resend)
+
+  /**
+   * Send verification code to email (new or resend)
+   * @param {string} email - User email
+   * @returns {Promise<{ email: string, message: string, expiresIn: string }>}
+   * @throws {Error} If user not found, already verified, or email sending fails
+   */
   async sendVerificationCode(email) {
     const user = await User.findOne({ email });
     if (!user) {
@@ -253,22 +238,17 @@ class AuthService {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Email already verified");
     }
 
-    // Generate new code
     const verificationCode = this._generateVerificationCode();
 
-    // Save to Redis (expire in 10 minutes)
     await cacheService.set(`otp:email:${email}`, verificationCode, 600);
 
-    // Save to User document for verifyEmailByCode
     user.codeVerifiEmail = verificationCode;
-    user.expiresCodeVerifiEmail = Date.now() + 10 * 60 * 1000; // 10 minutes
+    user.expiresCodeVerifiEmail = Date.now() + 10 * 60 * 1000;
     await user.save();
 
-    // Send verification email
     try {
       await sendEmailVerificationCode(email, verificationCode);
     } catch (error) {
-      // Rollback user update if email fails
       user.codeVerifiEmail = undefined;
       user.expiresCodeVerifiEmail = undefined;
       await user.save();
@@ -285,7 +265,65 @@ class AuthService {
     };
   }
 
-  // Forgot password - send reset code
+  /**
+   * Validate OTP code stored in cache
+   * @param {string} cacheKey - Cache key for OTP
+   * @param {string} code - OTP code
+   * @returns {Promise<void>}
+   * @throws {Error} If OTP is invalid or expired
+   */
+  async ensureValidOtp(cacheKey, code) {
+    const storedCode = await cacheService.get(cacheKey);
+
+    if (!storedCode || storedCode !== code) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Invalid or expired verification code"
+      );
+    }
+  }
+
+  /**
+   * Refresh access token using a refresh token
+   * @param {string} refreshToken - Refresh token
+   * @returns {Promise<{ accessToken: string, permissions: string[] }>}
+   * @throws {Error} If refresh token is invalid or user not found
+   */
+  async refreshAccessToken(refreshToken) {
+    let payload;
+    try {
+      payload = tokenService.verifyRefreshToken(refreshToken);
+    } catch (error) {
+      throw new ApiError(
+        StatusCodes.UNAUTHORIZED,
+        "Invalid or expired refresh token"
+      );
+    }
+
+    const user = await User.findById(payload.userId).lean();
+    if (!user) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not found");
+    }
+
+    const permissions = tokenService.getPermissionsForUser(user);
+    const accessToken = tokenService.generateAccessToken({
+      userId: user._id,
+      username: user.username,
+      email: user.email,
+      role: user.roles,
+      permissions,
+    });
+
+    return { accessToken, permissions };
+  }
+
+
+  /**
+   * Send password reset code to email
+   * @param {string} email - User email
+   * @returns {Promise<{ email: string }>}
+   * @throws {Error} If user not found or email sending fails
+   */
   async forgotPassword(email) {
     const user = await User.findOne({ email });
     if (!user) {
@@ -312,23 +350,23 @@ class AuthService {
     return { email };
   }
 
-  // Reset password with code
+  /**
+   * Reset password using verification code
+   * @param {string} email - User email
+   * @param {string} code - Reset code
+   * @param {string} newPassword - New password
+   * @returns {Promise<{ email: string }>}
+   * @throws {Error} If user not found or code invalid
+   */
   async resetPassword(email, code, newPassword) {
     const user = await User.findOne({ email });
     if (!user) {
       throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
-    // Check code in Redis
     const cacheKey = `otp:reset-password:${email}`;
-    const storedCode = await cacheService.get(cacheKey);
+    await this.ensureValidOtp(cacheKey, code);
 
-    if (!storedCode || storedCode !== code) {
-      throw new ApiError(
-        StatusCodes.BAD_REQUEST,
-        "Invalid or expired reset code"
-      );
-    }
 
     // Hash new password
     const hashedPassword = await hashPassword(newPassword);
@@ -344,7 +382,14 @@ class AuthService {
     return { email: user.email };
   }
 
-  // Change password (authenticated user)
+  /**
+   * Change password for authenticated user
+   * @param {string} userId - User ID
+   * @param {string} currentPassword - Current password
+   * @param {string} newPassword - New password
+   * @returns {Promise<{ userId: string }>}
+   * @throws {Error} If user not found or current password invalid
+   */
   async changePassword(userId, currentPassword, newPassword) {
     const user = await User.findById(userId);
     if (!user) {
@@ -352,7 +397,8 @@ class AuthService {
     }
 
     // Verify current password
-    const isMatch = comparePassword(currentPassword, user.password);
+    const isMatch = await comparePassword(currentPassword, user.password);
+
     if (!isMatch) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,

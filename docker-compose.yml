@@ -1,6 +1,26 @@
 version: "3.8"
 
 services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ecommerce_server
+    env_file: .env
+    environment:
+      - PORT=5000
+      - REDIS_HOST=redis
+      - RABBITMQ_URI=amqp://guest:guest@rabbitmq:5672
+      - MONGODB_URI=mongodb://root:root@mongodb:27017/ecommerce?authSource=admin
+    ports:
+      - "5000:5000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
   mongodb:
     image: mongo:latest
     container_name: mongodb
@@ -8,10 +28,16 @@ services:
       - "27017:27017"
     environment:
       MONGO_INITDB_DATABASE: ${MONGODB_DATABASE:-ecommerce}
-      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:-root}
     volumes:
       - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   redis:
     image: redis:alpine
@@ -19,9 +45,14 @@ services:
     ports:
       - "6379:6379"
     command: >
-      sh -c "redis-server --requirepass \"$${REDIS_PASSWORD}\" --loglevel warning"
+      sh -c "if [ -z \"$REDIS_PASSWORD\" ]; then redis-server --loglevel warning; else redis-server --requirepass \"$REDIS_PASSWORD\" --loglevel warning; fi"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -30,10 +61,16 @@ services:
       - "5672:5672"
       - "15672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
 
 volumes:
   mongodb_data:

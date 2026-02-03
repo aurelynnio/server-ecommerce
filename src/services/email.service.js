@@ -23,6 +23,11 @@ let transporter = null;
  * @returns {Object} Nodemailer transporter instance
  */
 const getTransporter = () => {
+  /**
+   * If
+   * @param {any} !transporter
+   * @returns {any}
+   */
   if (!transporter) {
     transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",

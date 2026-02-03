@@ -8,10 +8,10 @@ const createShopCategoryValidator = Joi.object({
 
 const updateShopCategoryValidator = createShopCategoryValidator.fork(
   ["name"],
-  (schema) => schema.optional()
+  (schema) => schema.optional(),
 );
 
 module.exports = {
-  createCategoryValidator: createShopCategoryValidator,
-  updateCategoryValidator: updateShopCategoryValidator,
+  createShopCategoryValidator,
+  updateShopCategoryValidator,
 };

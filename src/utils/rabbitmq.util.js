@@ -1,31 +1,36 @@
 const { getConnection } = require("../configs/rabbitmq.config");
 const logger = require("./logger");
 
-const publishToQueue = async (queueName, data) => {
+const consumeFromQueue = async (queueName, handler) => {
   try {
     const connection = getConnection();
     if (!connection) {
-      logger.warn("RabbitMQ connection not established, skipping message publish");
-      return false;
+      logger.warn("RabbitMQ connection not established, skipping consumption");
+      return;
     }
 
     const channel = await connection.createChannel();
     await channel.assertQueue(queueName, { durable: true });
-    
-    const content = Buffer.from(JSON.stringify(data));
-    channel.sendToQueue(queueName, content, { persistent: true });
-    
-    // Close channel after use to prevent leak
-    await channel.close();
-    return true;
+
+    await channel.consume(queueName, async (msg) => {
+      if (!msg) return;
+
+      try {
+        const data = JSON.parse(msg.content.toString());
+        await handler(data);
+        channel.ack(msg);
+      } catch (error) {
+        logger.error("Failed to process queue message", { error: error.message });
+        channel.nack(msg, false, false);
+      }
+    });
   } catch (error) {
-    logger.error(`Error publishing to queue ${queueName}`, {
+    logger.error(`Error consuming from queue ${queueName}`, {
       error: error.message,
     });
-    return false;
   }
 };
 
 module.exports = {
-  publishToQueue,
+  consumeFromQueue,
 };

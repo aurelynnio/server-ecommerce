@@ -4,6 +4,8 @@ const mongoose = require("mongoose");
 const logger = require("../utils/logger");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
+const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
+
 
 
 /**
@@ -135,43 +137,28 @@ class NotificationService {
    * @throws {Error} If userId is missing
    */
   async getListNotification(userId, { page = 1, limit = 10 } = {}) {
-    const skip = (page - 1) * limit;
+    const total = await Notification.countDocuments({ userId });
+    const paginationParams = getPaginationParams(page, limit, total || 0);
 
     const notifications = await Notification.find({ userId })
       .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
+      .skip(paginationParams.skip)
+      .limit(paginationParams.limit)
       .populate("orderId", "orderCode totalAmount status");
 
-    const total = await Notification.countDocuments({ userId });
-
-    // Safety check for counts
     const unreadCount = await Notification.countDocuments({
       userId,
       isRead: false,
     });
 
-    const totalPages = Math.ceil((total || 0) / limit);
-    const currentPage = Number(page);
-    const pageSize = Number(limit);
-
     return {
-      data: notifications,
-      pagination: {
-        currentPage,
-        pageSize,
-        totalItems: total || 0,
-        totalPages,
-        hasNextPage: currentPage < totalPages,
-        hasPrevPage: currentPage > 1,
-        nextPage: currentPage < totalPages ? currentPage + 1 : null,
-        prevPage: currentPage > 1 ? currentPage - 1 : null,
-      },
+      ...buildPaginationResponse(notifications, paginationParams),
       metadata: {
         unreadCount: unreadCount || 0,
       },
     };
   }
+
 
   /**
    * Mark all notifications as read for a user

@@ -4,14 +4,12 @@ const { uploadImage } = require("../configs/cloudinary");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const { StatusCodes } = require("http-status-codes");
 
-/**
- * Shop Controller
- * Handles shop registration, retrieval, and management operations
- */
 const ShopController = {
   /**
-   * Get all shops (Admin)
-   * @access Private (Admin only)
+   * Get all shops
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getAllShops: catchAsync(async (req, res) => {
     const { page, limit, status, search, sort } = req.query;
@@ -26,15 +24,17 @@ const ShopController = {
   }),
 
   /**
-   * Get public shops list (only active shops)
-   * @access Public
+   * Get public shops
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getPublicShops: catchAsync(async (req, res) => {
     const { page, limit, search, sort } = req.query;
     const result = await shopService.getAllShops({
       page,
       limit,
-      status: "active", // Only show active shops to public
+      status: "active",
       search,
       sort,
     });
@@ -42,8 +42,10 @@ const ShopController = {
   }),
 
   /**
-   * Update shop status (Admin)
-   * @access Private (Admin only)
+   * Update shop status
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   updateShopStatus: catchAsync(async (req, res) => {
     const { shopId } = req.params;
@@ -53,8 +55,10 @@ const ShopController = {
   }),
 
   /**
-   * Register a new shop (become a seller)
-   * @access Private (Authenticated users)
+   * Create shop
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   createShop: catchAsync(async (req, res) => {
     const newShop = await shopService.createShop(req.user.userId, req.body);
@@ -67,8 +71,10 @@ const ShopController = {
   }),
 
   /**
-   * Get shop information by ID
-   * @access Public
+   * Get shop info
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getShopInfo: catchAsync(async (req, res) => {
     const shop = await shopService.getShopInfo(req.params.shopId);
@@ -76,8 +82,10 @@ const ShopController = {
   }),
 
   /**
-   * Get shop information by slug
-   * @access Public
+   * Get shop by slug
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getShopBySlug: catchAsync(async (req, res) => {
     const shop = await shopService.getShopBySlug(req.params.slug);
@@ -85,8 +93,10 @@ const ShopController = {
   }),
 
   /**
-   * Get current user's shop information
-   * @access Private (Seller only)
+   * Get my shop
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getMyShop: catchAsync(async (req, res) => {
     const shop = await shopService.getMyShop(req.user.userId);
@@ -94,8 +104,10 @@ const ShopController = {
   }),
 
   /**
-   * Update current user's shop information
-   * @access Private (Seller only)
+   * Update shop
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   updateShop: catchAsync(async (req, res) => {
     const updatedShop = await shopService.updateShop(req.user.userId, req.body);
@@ -103,8 +115,10 @@ const ShopController = {
   }),
 
   /**
-   * Get shop statistics for seller dashboard
-   * @access Private (Seller or Admin)
+   * Get shop statistics
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getShopStatistics: catchAsync(async (req, res) => {
     const statistics = await shopService.getShopStatistics(req.user.userId);
@@ -117,8 +131,10 @@ const ShopController = {
   }),
 
   /**
-   * Upload shop image (logo or banner)
-   * @access Private (Seller or Admin)
+   * Upload image
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   uploadImage: catchAsync(async (req, res) => {
     const file = req.file;

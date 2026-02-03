@@ -1,15 +1,14 @@
 const catchAsync = require("../configs/catchAsync");
 const cartService = require("../services/cart.service");
 const { StatusCodes } = require("http-status-codes");
-const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
+const { sendSuccess } = require("../shared/res/formatResponse");
 
-/**
- * Controller for handling shopping cart operations
- */
 const CartController = {
   /**
-   * Get user's shopping cart
-   * @access Private (requires authentication)
+   * Get cart
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getCart: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -24,8 +23,10 @@ const CartController = {
   }),
 
   /**
-   * Add item to cart
-   * @access Private (requires authentication)
+   * Add to cart
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   addToCart: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -40,8 +41,10 @@ const CartController = {
   }),
 
   /**
-   * Update cart item quantity
-   * @access Private (requires authentication)
+   * Update cart item
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   updateCartItem: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -60,8 +63,10 @@ const CartController = {
   }),
 
   /**
-   * Remove item from cart
-   * @access Private (requires authentication)
+   * Remove cart item
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   removeCartItem: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -78,8 +83,10 @@ const CartController = {
   }),
 
   /**
-   * Clear all items from cart
-   * @access Private (requires authentication)
+   * Clear cart
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   clearCart: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -90,7 +97,9 @@ const CartController = {
 
   /**
    * Get cart item count
-   * @access Private (requires authentication)
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getCartItemCount: catchAsync(async (req, res) => {
     const userId = req.user.userId;

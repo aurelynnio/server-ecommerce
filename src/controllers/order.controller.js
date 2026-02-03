@@ -1,16 +1,14 @@
 const catchAsync = require("../configs/catchAsync");
 const orderService = require("../services/order.service");
 const { StatusCodes } = require("http-status-codes");
-const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
+const { sendSuccess } = require("../shared/res/formatResponse");
 
-/**
- * Order Controller
- * Handles order creation, retrieval, status updates, and statistics
- */
 const OrderController = {
   /**
-   * Create order from cart items
-   * @access Private (requires authentication)
+   * Create order
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   createOrder: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -25,8 +23,10 @@ const OrderController = {
   }),
 
   /**
-   * Get all orders (Admin only)
-   * @access Private (Admin only)
+   * Get all orders
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getAllOrders: catchAsync(async (req, res) => {
     const result = await orderService.getAllOrders(req.query);
@@ -40,8 +40,10 @@ const OrderController = {
   }),
 
   /**
-   * Get current user's orders
-   * @access Private (requires authentication)
+   * Get user orders
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getUserOrders: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -56,8 +58,10 @@ const OrderController = {
   }),
 
   /**
-   * Get single order by ID
-   * @access Private (Owner or Admin)
+   * Get order by id
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getOrderById: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -77,8 +81,10 @@ const OrderController = {
   }),
 
   /**
-   * Cancel an order
-   * @access Private (Owner or Admin)
+   * Cancel order
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   cancelOrder: catchAsync(async (req, res) => {
     const userId = req.user.userId;
@@ -98,8 +104,10 @@ const OrderController = {
   }),
 
   /**
-   * Get order statistics for admin dashboard
-   * @access Private (Admin only)
+   * Get order statistics
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getOrderStatistics: catchAsync(async (req, res) => {
     const stats = await orderService.getOrderStatistics();
@@ -113,8 +121,10 @@ const OrderController = {
   }),
 
   /**
-   * Get orders for seller's shop
-   * @access Private (Seller only)
+   * Get seller orders
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getSellerOrders: catchAsync(async (req, res) => {
     const shopId = req.shop._id;
@@ -130,7 +140,9 @@ const OrderController = {
 
   /**
    * Update order status by seller
-   * @access Private (Seller only)
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   updateOrderStatusBySeller: catchAsync(async (req, res) => {
     const shopId = req.shop._id;
@@ -152,8 +164,10 @@ const OrderController = {
   }),
 
   /**
-   * Get order statistics for seller's shop
-   * @access Private (Seller only)
+   * Get seller order statistics
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getSellerOrderStatistics: catchAsync(async (req, res) => {
     const shopId = req.shop._id;

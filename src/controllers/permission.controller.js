@@ -1,8 +1,3 @@
-/**
- * Permission Controller
- * Handles API requests for permission management
- */
-
 const { StatusCodes } = require("http-status-codes");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const permissionService = require("../services/permission.service");
@@ -13,14 +8,9 @@ const {
   getPermissionsByResource,
   isValidPermission,
 } = require("../configs/permission");
-const User = require("../models/user.model");
 const logger = require("../utils/logger");
 
 class PermissionController {
-  /**
-   * Get all available permissions
-   * @access Public
-   */
   async getAllPermissions(req, res) {
     try {
       const permissions = getAllPermissionsList();
@@ -41,10 +31,6 @@ class PermissionController {
     }
   }
 
-  /**
-   * Get default permissions for each role
-   * @access Public
-   */
   async getRolePermissions(req, res) {
     try {
       return sendSuccess(
@@ -58,10 +44,6 @@ class PermissionController {
     }
   }
 
-  /**
-   * Get current user's effective permissions
-   * @access Private (Authenticated users)
-   */
   async getMyPermissions(req, res) {
     try {
       const permissions = permissionService.getUserPermissions(req.user);
@@ -81,35 +63,15 @@ class PermissionController {
     }
   }
 
-  /**
-   * Get specific user's permissions (Admin only)
-   * @access Private (Admin only)
-   */
   async getUserPermissions(req, res) {
     try {
       const { userId } = req.params;
 
-      const user = await User.findById(userId).select("-password");
-      if (!user) {
-        return sendFail(res, "User not found", StatusCodes.NOT_FOUND);
-      }
-
-      const effectivePermissions = permissionService.getUserPermissions(user);
-      const rolePermissions = ROLE_PERMISSIONS[user.roles] || [];
+      const result = await permissionService.getUserPermissionsSummary(userId);
 
       return sendSuccess(
         res,
-        {
-          user: {
-            _id: user._id,
-            username: user.username,
-            email: user.email,
-            roles: user.roles,
-          },
-          effectivePermissions,
-          userPermissions: user.permissions || [],
-          rolePermissions,
-        },
+        result,
         "User permissions retrieved successfully",
       );
     } catch (error) {
@@ -118,10 +80,6 @@ class PermissionController {
     }
   }
 
-  /**
-   * Update user's permissions (Admin only)
-   * @access Private (Admin only)
-   */
   async updateUserPermissions(req, res) {
     try {
       const { userId } = req.params;
@@ -135,7 +93,6 @@ class PermissionController {
         );
       }
 
-      
       const invalidPerms = permissions.filter(
         (p) => !isValidPermission(p) && !p.startsWith("-"),
       );
@@ -173,10 +130,6 @@ class PermissionController {
     }
   }
 
-  /**
-   * Grant single permission to user (Admin only)
-   * @access Private (Admin only)
-   */
   async grantPermission(req, res) {
     try {
       const { userId } = req.params;
@@ -211,10 +164,6 @@ class PermissionController {
     }
   }
 
-  /**
-   * Revoke single permission from user (Admin only)
-   * @access Private (Admin only)
-   */
   async revokePermission(req, res) {
     try {
       const { userId } = req.params;
@@ -249,10 +198,6 @@ class PermissionController {
     }
   }
 
-  /**
-   * Get permission audit logs (Admin only)
-   * @access Private (Admin only)
-   */
   async getAuditLogs(req, res) {
     try {
       const { page = 1, limit = 20, userId, action } = req.query;

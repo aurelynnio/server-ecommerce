@@ -3,14 +3,12 @@ const catchAsync = require("../configs/catchAsync");
 const { sendSuccess } = require("../shared/res/formatResponse");
 const { StatusCodes } = require("http-status-codes");
 
-/**
- * Shop Category Controller
- * Handles shop-specific category operations for sellers
- */
 const ShopCategoryController = {
   /**
-   * Create a new shop category
-   * @access Private (Seller only)
+   * Create category
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   createCategory: catchAsync(async (req, res) => {
     const newCategory = await shopCategoryService.createCategory(
@@ -26,8 +24,10 @@ const ShopCategoryController = {
   }),
 
   /**
-   * Get all categories for current seller's shop
-   * @access Private (Seller only)
+   * Get my shop categories
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getMyShopCategories: catchAsync(async (req, res) => {
     const categories = await shopCategoryService.getMyShopCategories(
@@ -42,8 +42,10 @@ const ShopCategoryController = {
   }),
 
   /**
-   * Get all categories for a specific shop
-   * @access Public
+   * Get shop categories
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   getShopCategories: catchAsync(async (req, res) => {
     const categories = await shopCategoryService.getShopCategories(
@@ -59,8 +61,10 @@ const ShopCategoryController = {
   }),
 
   /**
-   * Update a shop category
-   * @access Private (Seller only - own categories)
+   * Update category
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   updateCategory: catchAsync(async (req, res) => {
     const updated = await shopCategoryService.updateCategory(
@@ -72,8 +76,10 @@ const ShopCategoryController = {
   }),
 
   /**
-   * Delete a shop category
-   * @access Private (Seller only - own categories)
+   * Delete category
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
    */
   deleteCategory: catchAsync(async (req, res) => {
     const deleted = await shopCategoryService.deleteCategory(

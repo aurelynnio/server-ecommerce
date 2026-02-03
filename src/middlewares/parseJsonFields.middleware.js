@@ -1,5 +1,5 @@
 const { StatusCodes } = require("http-status-codes");
-const { sendFail } = require("../shared/res/formatResponse");
+const { ApiError } = require("./errorHandler.middleware");
 
 /**
  * Middleware to parse JSON string fields from multipart/form-data
@@ -22,10 +22,11 @@ const parseJsonFields = (fields = []) => (req, res, next) => {
   });
 
   if (errors.length > 0) {
-    return sendFail(res, errors.join(", "), StatusCodes.BAD_REQUEST);
+    throw new ApiError(StatusCodes.BAD_REQUEST, errors.join(", "));
   }
 
   next();
 };
 
 module.exports = parseJsonFields;
+

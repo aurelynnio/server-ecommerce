@@ -1,5 +1,7 @@
 const Banner = require("../models/banner.model");
 const { uploadImage } = require("../configs/cloudinary");
+const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
+
 
 /**
  * Service handling banner operations
@@ -47,30 +49,17 @@ class BannerService {
       ];
     }
 
-    const skip = (page - 1) * limit;
+    const total = await Banner.countDocuments(query);
+    const paginationParams = getPaginationParams(page, limit, total);
+
     const banners = await Banner.find(query)
       .sort({ order: 1, createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+      .skip(paginationParams.skip)
+      .limit(paginationParams.limit);
 
-    const total = await Banner.countDocuments(query);
-    const totalPages = Math.ceil(total / limit);
-
-    // Standardized response format matching other services
-    return {
-      data: banners,
-      pagination: {
-        currentPage: page,
-        pageSize: limit,
-        totalItems: total,
-        totalPages: totalPages,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1,
-        nextPage: page < totalPages ? page + 1 : null,
-        prevPage: page > 1 ? page - 1 : null,
-      },
-    };
+    return buildPaginationResponse(banners, paginationParams);
   }
+
 
   /**
    * Get banner by ID

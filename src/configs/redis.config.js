@@ -1,7 +1,5 @@
 const Redis = require("ioredis");
-const dotenv = require("dotenv");
-
-dotenv.config();
+const logger = require("../utils/logger");
 
 const redisConfig = {
   host: process.env.REDIS_HOST || "localhost",
@@ -12,13 +10,18 @@ const redisConfig = {
 const redis = new Redis(redisConfig);
 
 redis.on("connect", () => {
-  const logger = require("../utils/logger");
   logger.info("Redis client connected");
 });
 
 redis.on("error", (err) => {
-  const logger = require("../utils/logger");
   logger.error("Redis client error:", err);
+});
+
+redis.on("ready", () => {
+  logger.info("Redis client ready to use");
+});
+redis.on("end", () => {
+  logger.info("Redis client disconnected");
 });
 
 module.exports = redis;
