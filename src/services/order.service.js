@@ -12,6 +12,20 @@ const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
 const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
 
+const MAX_TX_RETRIES = Number(process.env.TXN_MAX_RETRIES) || 3;
+const TX_RETRY_DELAY_MS = Number(process.env.TXN_RETRY_DELAY_MS) || 50;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const getErrorLabels = (error) =>
+  error?.errorLabels || error?.result?.errorLabels || [];
+
+const isRetryableTransactionError = (error) =>
+  getErrorLabels(error).includes("TransientTransactionError");
+
+const isUnknownCommitResult = (error) =>
+  getErrorLabels(error).includes("UnknownTransactionCommitResult");
+
 /**
  * Service handling order operations
  * Manages order creation, retrieval, status updates, and statistics
@@ -32,154 +46,228 @@ class OrderService {
    * @throws {Error} If cart is empty, items unavailable, or out of stock
    */
   async createOrder(userId, orderData) {
-    const session = await mongoose.startSession();
-    
-    try {
-      session.startTransaction();
-      
-      const {
-        cartItemIds,
-        shippingAddress,
-        paymentMethod = "cod",
-        shopVouchers = [], // Array of { shopId, code }
-        platformVoucher, // String (code)
-        note,
-      } = orderData;
+    const orderGroupId = new Types.ObjectId();
 
-      // 1. Get Selected Items from Cart
-      const cart = await Cart.findOne({ userId }).populate("items.productId").session(session);
-      if (!cart) {
-        throw new ApiError(StatusCodes.NOT_FOUND, "Cart is empty");
-      }
+    for (let attempt = 0; attempt <= MAX_TX_RETRIES; attempt++) {
+      const session = await mongoose.startSession();
+      try {
+        session.startTransaction();
 
-      const itemsToCheckout = cart.items.filter((item) =>
-        cartItemIds.includes(item._id.toString())
-      );
+        const {
+          cartItemIds,
+          shippingAddress,
+          paymentMethod = "cod",
+          shopVouchers = [], // Array of { shopId, code }
+          platformVoucher, // String (code)
+          note,
+        } = orderData;
 
-      if (itemsToCheckout.length === 0) {
-        throw new ApiError(StatusCodes.BAD_REQUEST, "No items selected");
-      }
-
-      // 2. Group items by Shop
-      const shopItemsMap = new Map(); // shopId -> [items]
-
-      for (const item of itemsToCheckout) {
-        const product = item.productId;
-        if (!product) {
-          throw new ApiError(StatusCodes.NOT_FOUND, "Product info missing");
+        // 1. Get Selected Items from Cart
+        const cart = await Cart.findOne({ userId })
+          .populate("items.productId")
+          .session(session);
+        if (!cart) {
+          throw new ApiError(StatusCodes.NOT_FOUND, "Cart is empty");
         }
 
-        // Ensure shopId is available
-        let shopId = item.shopId;
-        if (!shopId && product.shop) shopId = product.shop;
+        const itemsToCheckout = cart.items.filter((item) =>
+          cartItemIds.includes(item._id.toString())
+        );
 
-        if (!shopId) {
-          throw new ApiError(
-            StatusCodes.UNPROCESSABLE_ENTITY,
-            `Product ${product.name} has no shop`
-          );
+        if (itemsToCheckout.length === 0) {
+          throw new ApiError(StatusCodes.BAD_REQUEST, "No items selected");
         }
 
-        const shopIdStr = shopId.toString();
-        if (!shopItemsMap.has(shopIdStr)) {
-          shopItemsMap.set(shopIdStr, []);
-        }
-        shopItemsMap.get(shopIdStr).push(item);
-      }
+        // 2. Group items by Shop
+        const shopItemsMap = new Map(); // shopId -> [items]
 
-      // 3. Create Orders per Shop
-      const orderGroupId = new Types.ObjectId();
-      const createdOrders = [];
-      let totalPlatformOrderValue = 0; // To check platform voucher condition
+        for (const item of itemsToCheckout) {
+          const product = item.productId;
+          if (!product) {
+            throw new ApiError(StatusCodes.NOT_FOUND, "Product info missing");
+          }
 
-      // Temporary storage for created orders to update them later with Platform Discount
-      const tempOrders = [];
+          // Ensure shopId is available
+          let shopId = item.shopId;
+          if (!shopId && product.shop) shopId = product.shop;
 
-      // Loop through confirmed shop groups
-      for (const [shopId, items] of shopItemsMap.entries()) {
-        const orderProducts = [];
-        let subtotal = 0;
-        const inventoryItems = [];
-
-        // Batch fetch products to optimize performance
-        const productIds = items.map(item => item.productId._id);
-        const products = await Product.find({ _id: { $in: productIds } }).session(session);
-        const productMap = new Map(products.map(p => [p._id.toString(), p]));
-
-        // Verify Price & Build Inventory List
-        for (const item of items) {
-          const product = productMap.get(item.productId._id.toString());
-          if (!product || product.status !== "published") {
+          if (!shopId) {
             throw new ApiError(
-              StatusCodes.CONFLICT,
-              `${item.productId.name} unavailable`
+              StatusCodes.UNPROCESSABLE_ENTITY,
+              `Product ${product.name} has no shop`
             );
           }
 
-          let price = product.price.currentPrice;
-          let skuCode = "";
-          let tierIndex = [];
+          const shopIdStr = shopId.toString();
+          if (!shopItemsMap.has(shopIdStr)) {
+            shopItemsMap.set(shopIdStr, []);
+          }
+          shopItemsMap.get(shopIdStr).push(item);
+        }
 
-          if (item.modelId) {
-            const variant = product.variants?.find(
-              (v) => v._id.toString() === item.modelId.toString()
-            );
+        // 3. Create Orders per Shop
+        const createdOrders = [];
+        let totalPlatformOrderValue = 0; // To check platform voucher condition
 
-            if (!variant) {
+        // Temporary storage for created orders to update them later with Platform Discount
+        const tempOrders = [];
+
+        // Loop through confirmed shop groups
+        for (const [shopId, items] of shopItemsMap.entries()) {
+          const orderProducts = [];
+          let subtotal = 0;
+          const inventoryItems = [];
+
+          // Batch fetch products to optimize performance
+          const productIds = items.map((item) => item.productId._id);
+          const products = await Product.find({
+            _id: { $in: productIds },
+          }).session(session);
+          const productMap = new Map(
+            products.map((p) => [p._id.toString(), p])
+          );
+
+          // Verify Price & Build Inventory List
+          for (const item of items) {
+            const product = productMap.get(item.productId._id.toString());
+            if (!product || product.status !== "published") {
               throw new ApiError(
-                StatusCodes.NOT_FOUND,
-                `Variation for ${product.name} no longer exists`
+                StatusCodes.CONFLICT,
+                `${item.productId.name} unavailable`
               );
             }
 
-            // Note: Stock check is now handled by inventoryService.deductStock
+            let price = product.price.currentPrice;
+            let skuCode = "";
+            let tierIndex = [];
 
-            price = variant.price;
-            skuCode = variant.sku;
-            tierIndex = variant.tierIndex || []; // Handle optional tierIndex
+            if (item.modelId) {
+              const variant = product.variants?.find(
+                (v) => v._id.toString() === item.modelId.toString()
+              );
 
-            inventoryItems.push({
+              if (!variant) {
+                throw new ApiError(
+                  StatusCodes.NOT_FOUND,
+                  `Variation for ${product.name} no longer exists`
+                );
+              }
+
+              // Note: Stock check is now handled by inventoryService.deductStock
+
+              price = variant.price;
+              skuCode = variant.sku;
+              tierIndex = variant.tierIndex || []; // Handle optional tierIndex
+
+              inventoryItems.push({
                 productId: product._id,
                 modelId: item.modelId,
-                quantity: item.quantity
-            });
-          } else {
-            // Base product
-            inventoryItems.push({
+                quantity: item.quantity,
+              });
+            } else {
+              // Base product
+              inventoryItems.push({
                 productId: product._id,
-                quantity: item.quantity
+                quantity: item.quantity,
+              });
+            }
+
+            subtotal += price * item.quantity;
+
+            orderProducts.push({
+              productId: product._id,
+              sku: skuCode,
+              modelId: item.modelId,
+              name: product.name, // Snapshot name
+              image: product.images?.[0] || "", // simplified
+              tierIndex,
+              quantity: item.quantity,
+              price,
+              totalPrice: price * item.quantity,
             });
           }
 
-          subtotal += price * item.quantity;
+          // --- DEDUCT STOCK (via InventoryService) ---
+          await inventoryService.deductStock(inventoryItems, session);
 
-          orderProducts.push({
-            productId: product._id,
-            sku: skuCode,
-            modelId: item.modelId,
-            name: product.name, // Snapshot name
-            image: product.images?.[0] || "", // simplified
-            tierIndex,
-            quantity: item.quantity,
-            price,
-            totalPrice: price * item.quantity,
+          // --- APPLY SHOP VOUCHER ---
+          let discountShop = 0;
+          const shopVoucherEntry = shopVouchers.find((v) => v.shopId === shopId);
+          if (shopVoucherEntry) {
+            const voucherResult = await voucherService.applyVoucher(
+              shopVoucherEntry.code,
+              userId,
+              subtotal,
+              shopId
+            );
+            discountShop = voucherResult.discountAmount;
+
+            // Increment usage
+            await Voucher.findByIdAndUpdate(
+              voucherResult.voucherId,
+              {
+                $inc: { usageCount: 1 },
+                $push: { usedBy: userId },
+              },
+              { session }
+            );
+          }
+
+          const totalAmount = Math.max(0, subtotal - discountShop);
+          totalPlatformOrderValue += totalAmount; // Platform discount applies on total after shop discount
+
+          // 4. Create Order Object (Not save yet)
+          const newOrder = new Order({
+            orderGroupId,
+            userId,
+            shopId,
+            products: orderProducts,
+            shippingAddress: { ...shippingAddress, note },
+            paymentMethod,
+            subtotal,
+            discountShop, // Saved here
+            discountPlatform: 0,
+            totalAmount, // Temporary, will subtract platform discount later
+            status: "pending",
           });
+
+          tempOrders.push(newOrder);
         }
 
-        // --- DEDUCT STOCK (via InventoryService) ---
-        await inventoryService.deductStock(inventoryItems, session);
-
-        // --- APPLY SHOP VOUCHER ---
-        let discountShop = 0;
-        const shopVoucherEntry = shopVouchers.find((v) => v.shopId === shopId);
-        if (shopVoucherEntry) {
+        // --- APPLY PLATFORM VOUCHER (One for all) ---
+        if (platformVoucher) {
           const voucherResult = await voucherService.applyVoucher(
-            shopVoucherEntry.code,
+            platformVoucher,
             userId,
-            subtotal,
-            shopId
+            totalPlatformOrderValue
           );
-          discountShop = voucherResult.discountAmount;
+
+          const totalPlatformDiscount = voucherResult.discountAmount;
+
+          // Distribute platform discount to each order proportionally
+          // Weight = Order.totalAmount / totalPlatformOrderValue
+          let distributedDiscount = 0;
+
+          tempOrders.forEach((order, index) => {
+            if (index === tempOrders.length - 1) {
+              // Last order takes the remainder to handle rounding issues
+              order.discountPlatform = Math.max(
+                0,
+                totalPlatformDiscount - distributedDiscount
+              );
+            } else {
+              const ratio = order.totalAmount / totalPlatformOrderValue;
+              const portion = Math.floor(totalPlatformDiscount * ratio);
+              order.discountPlatform = portion;
+              distributedDiscount += portion;
+            }
+
+            // Recalculate Final Total per Order
+            order.totalAmount = Math.max(
+              0,
+              order.totalAmount - order.discountPlatform
+            );
+          });
 
           // Increment usage
           await Voucher.findByIdAndUpdate(
@@ -192,103 +280,66 @@ class OrderService {
           );
         }
 
-        const totalAmount = Math.max(0, subtotal - discountShop);
-        totalPlatformOrderValue += totalAmount; // Platform discount applies on total after shop discount
+        // Save All Orders within transaction
+        for (const order of tempOrders) {
+          await order.save({ session });
+          createdOrders.push(order);
+        }
 
-        // 4. Create Order Object (Not save yet)
-        const newOrder = new Order({
+        // 5. Cleanup Cart
+        // Filter out checked out items
+        cart.items = cart.items.filter(
+          (item) => !cartItemIds.includes(item._id.toString())
+        );
+        cart.totalAmount = this.calculateTotal(cart.items);
+        await cart.save({ session });
+
+        // Commit the transaction
+        await session.commitTransaction();
+
+        // Return group details
+        return {
+          message: "Orders created successfully",
           orderGroupId,
-          userId,
-          shopId,
-          products: orderProducts,
-          shippingAddress: { ...shippingAddress, note },
-          paymentMethod,
-          subtotal,
-          discountShop, // Saved here
-          discountPlatform: 0,
-          totalAmount, // Temporary, will subtract platform discount later
-          status: "pending",
-        });
+          orders: createdOrders,
+        };
+      } catch (error) {
+        // Abort transaction on error - all changes will be rolled back
+        try {
+          await session.abortTransaction();
+        } catch {
+          // no-op
+        }
 
-        tempOrders.push(newOrder);
-      }
-
-      // --- APPLY PLATFORM VOUCHER (One for all) ---
-      if (platformVoucher) {
-        const voucherResult = await voucherService.applyVoucher(
-          platformVoucher,
-          userId,
-          totalPlatformOrderValue
-        );
-
-        const totalPlatformDiscount = voucherResult.discountAmount;
-
-        // Distribute platform discount to each order proportionally
-        // Weight = Order.totalAmount / totalPlatformOrderValue
-        let distributedDiscount = 0;
-
-        tempOrders.forEach((order, index) => {
-          if (index === tempOrders.length - 1) {
-            // Last order takes the remainder to handle rounding issues
-            order.discountPlatform = Math.max(
-              0,
-              totalPlatformDiscount - distributedDiscount
-            );
-          } else {
-            const ratio = order.totalAmount / totalPlatformOrderValue;
-            const portion = Math.floor(totalPlatformDiscount * ratio);
-            order.discountPlatform = portion;
-            distributedDiscount += portion;
+        if (isUnknownCommitResult(error)) {
+          const existingOrders = await Order.find({ orderGroupId }).lean();
+          if (existingOrders.length > 0) {
+            return {
+              message: "Orders created successfully",
+              orderGroupId,
+              orders: existingOrders,
+            };
           }
+        }
 
-          // Recalculate Final Total per Order
-          order.totalAmount = Math.max(
-            0,
-            order.totalAmount - order.discountPlatform
-          );
-        });
+        const canRetry =
+          isRetryableTransactionError(error) || isUnknownCommitResult(error);
 
-        // Increment usage
-        await Voucher.findByIdAndUpdate(
-          voucherResult.voucherId,
-          {
-            $inc: { usageCount: 1 },
-            $push: { usedBy: userId },
-          },
-          { session }
-        );
+        if (canRetry && attempt < MAX_TX_RETRIES) {
+          await sleep(TX_RETRY_DELAY_MS * (attempt + 1));
+          continue;
+        }
+
+        throw error;
+      } finally {
+        session.endSession();
       }
-
-      // Save All Orders within transaction
-      for (const order of tempOrders) {
-        await order.save({ session });
-        createdOrders.push(order);
-      }
-
-      // 5. Cleanup Cart
-      // Filter out checked out items
-      cart.items = cart.items.filter(
-        (item) => !cartItemIds.includes(item._id.toString())
-      );
-      cart.totalAmount = this.calculateTotal(cart.items);
-      await cart.save({ session });
-
-      // Commit the transaction
-      await session.commitTransaction();
-
-      // Return group details
-      return {
-        message: "Orders created successfully",
-        orderGroupId,
-        orders: createdOrders,
-      };
-    } catch (error) {
-      // Abort transaction on error - all changes will be rolled back
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
     }
+
+    throw new ApiError(
+      StatusCodes.INTERNAL_SERVER_ERROR,
+      "Failed to create order after retries"
+    );
   }
 
   /**

@@ -12,34 +12,34 @@ const {
 } = require("../middlewares/auth.middleware");
 
 /**
- * @desc Send message to AI chatbot (non-streaming)
-* @accessPublic
+ * @desc    Send message to AI chatbot (non-streaming)
+ * @access  Public
  * @body    { message, sessionId? }
  */
-
 router.post("/message", chatbotLimiter, chatbotController.sendMessage);
+
 /**
-* @desc Send message to AI chatbot with streaming response (SSE)
-* @accessPublic
+ * @desc    Send message to AI chatbot with streaming response (SSE)
+ * @access  Public
  * @body    { message, sessionId? }
  */
-
 router.post("/stream", chatbotLimiter, chatbotController.streamMessage);
-/**
-* @desc Get chat history by session ID
-* @accessPublic
- */
 
+/**
+ * @desc    Get chat history by session ID
+ * @access  Public
+ */
 router.get("/history/:sessionId", chatbotController.getHistory);
-/**
-* @desc Clear chat session
-* @accessPublic
- */
 
-router.delete("/session/:sessionId", chatbotController.clearSession);
 /**
- * @desc Get chat suggestions for user
- * @access Public
+ * @desc    Clear chat session
+ * @access  Public
+ */
+router.delete("/session/:sessionId", chatbotController.clearSession);
+
+/**
+ * @desc    Get chat suggestions for user
+ * @access  Public
  */
 router.get("/suggestions", chatbotController.getSuggestions);
 

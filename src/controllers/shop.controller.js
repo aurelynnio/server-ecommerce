@@ -4,6 +4,42 @@ const { uploadImage } = require("../configs/cloudinary");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
 const { StatusCodes } = require("http-status-codes");
 
+const handleUploadShopImage = async (req, res, type) => {
+  const file = req.file;
+
+  if (!file) {
+    return sendFail(res, "No file uploaded", StatusCodes.BAD_REQUEST);
+  }
+
+  if (!type || !["logo", "banner"].includes(type)) {
+    return sendFail(
+      res,
+      "Invalid image type. Must be 'logo' or 'banner'",
+      StatusCodes.BAD_REQUEST
+    );
+  }
+
+  const folder = type === "logo" ? "shop-logos" : "shop-banners";
+  const result = await uploadImage(file.buffer, folder);
+
+  if (!result) {
+    return sendFail(
+      res,
+      "Image upload failed",
+      StatusCodes.INTERNAL_SERVER_ERROR
+    );
+  }
+
+  const payload = type === "logo" ? { logo: result.secure_url } : { banner: result.secure_url };
+
+  return sendSuccess(
+    res,
+    payload,
+    "Image uploaded successfully",
+    StatusCodes.OK
+  );
+};
+
 const ShopController = {
   /**
    * Get all shops
@@ -137,38 +173,28 @@ const ShopController = {
    * @returns {Promise<any>}
    */
   uploadImage: catchAsync(async (req, res) => {
-    const file = req.file;
     const { type } = req.body;
+    return handleUploadShopImage(req, res, type);
+  }),
 
-    if (!file) {
-      return sendFail(res, "No file uploaded", StatusCodes.BAD_REQUEST);
-    }
+  /**
+   * Upload logo (alias)
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  uploadLogo: catchAsync(async (req, res) => {
+    return handleUploadShopImage(req, res, "logo");
+  }),
 
-    if (!type || !["logo", "banner"].includes(type)) {
-      return sendFail(
-        res,
-        "Invalid image type. Must be 'logo' or 'banner'",
-        StatusCodes.BAD_REQUEST,
-      );
-    }
-
-    const folder = type === "logo" ? "shop-logos" : "shop-banners";
-    const result = await uploadImage(file.buffer, folder);
-
-    if (!result) {
-      return sendFail(
-        res,
-        "Image upload failed",
-        StatusCodes.INTERNAL_SERVER_ERROR,
-      );
-    }
-
-    return sendSuccess(
-      res,
-      { url: result.secure_url, type },
-      "Image uploaded successfully",
-      StatusCodes.OK,
-    );
+  /**
+   * Upload banner (alias)
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  uploadBanner: catchAsync(async (req, res) => {
+    return handleUploadShopImage(req, res, "banner");
   }),
 };
 

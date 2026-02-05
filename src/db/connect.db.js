@@ -3,11 +3,15 @@ const logger = require("../utils/logger");
 
 const connectDB = async () => {
   const uri = process.env.MONGODB_URI;
+  const maxPoolSize = Number(process.env.MONGO_MAX_POOL_SIZE) || 10;
+  const minPoolSize = Number(process.env.MONGO_MIN_POOL_SIZE) || 0;
+  const maxConnecting = Number(process.env.MONGO_MAX_CONNECTING) || 10;
 
   return await mongoose
     .connect(uri, {
-      maxConnecting: 10,
-      maxPoolSize: 10,
+      maxConnecting,
+      maxPoolSize,
+      minPoolSize,
     })
     .then(() => {
       logger.info(

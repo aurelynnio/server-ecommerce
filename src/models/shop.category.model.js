@@ -4,6 +4,8 @@ const shopCategorySchema = new Schema(
   {
     shopId: { type: Types.ObjectId, ref: "Shop", required: true },
     name: { type: String, required: true, trim: true },
+    description: { type: String, default: "" },
+    image: { type: String, default: "" },
     isActive: { type: Boolean, default: true },
     displayOrder: { type: Number, default: 0 },
   },

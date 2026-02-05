@@ -19,39 +19,39 @@ const {
   grantRevokePermissionValidator,
   auditLogsQueryValidator,
 } = require("../validations/permission.validator");
+
 /**
  * Public Routes
  */
 /**
- * @desc Get all available permissions
- * @accessPublic
+ * @desc    Get all available permissions
+ * @access  Public
  */
-
 router.get("/", permissionController.getAllPermissions);
-/**
- * @desc Get default permissions for each role
- * @accessPublic
- */
 
+/**
+ * @desc    Get default permissions for each role
+ * @access  Public
+ */
 router.get("/roles", permissionController.getRolePermissions);
+
 /**
  * Protected Routes (Authenticated users)
  */
 /**
- * @desc Get current user's effective permissions
- * @accessPrivate (Authenticated users)
+ * @desc    Get current user's effective permissions
+ * @access  Private (Authenticated users)
  */
-
 router.get("/me", verifyAccessToken, permissionController.getMyPermissions);
+
 /**
  * Admin Routes
  */
 /**
- * @desc Get permission audit logs
- * @accessPrivate (Admin only)
+ * @desc    Get permission audit logs
+ * @access  Private (Admin only)
  * @query   { page, limit, userId, action }
  */
-
 router.get(
   "/audit",
   verifyAccessToken,
@@ -59,12 +59,12 @@ router.get(
   validate({ query: auditLogsQueryValidator }),
   permissionController.getAuditLogs,
 );
+
 /**
- * @desc Get specific user's permissions
- * @accessPrivate (Admin only)
+ * @desc    Get specific user's permissions
+ * @access  Private (Admin only)
  * @param   userId - User ID
  */
-
 router.get(
   "/user/:userId",
   verifyAccessToken,
@@ -72,13 +72,13 @@ router.get(
   validate({ params: userIdParamValidator }),
   permissionController.getUserPermissions,
 );
+
 /**
- * @desc Update user's permissions
- * @accessPrivate (Admin only)
+ * @desc    Update user's permissions
+ * @access  Private (Admin only)
  * @param   userId - User ID
  * @body    { permissions: string[] }
  */
-
 router.put(
   "/user/:userId",
   verifyAccessToken,
@@ -86,13 +86,13 @@ router.put(
   validate({ params: userIdParamValidator, body: updatePermissionsValidator }),
   permissionController.updateUserPermissions,
 );
+
 /**
- * @desc Grant single permission to user
- * @accessPrivate (Admin only)
+ * @desc    Grant single permission to user
+ * @access  Private (Admin only)
  * @param   userId - User ID
  * @body    { permission: string }
  */
-
 router.post(
   "/user/:userId/grant",
   verifyAccessToken,
@@ -103,13 +103,13 @@ router.post(
   }),
   permissionController.grantPermission,
 );
+
 /**
- * @desc Revoke single permission from user
- * @accessPrivate (Admin only)
+ * @desc    Revoke single permission from user
+ * @access  Private (Admin only)
  * @param   userId - User ID
  * @body    { permission: string }
  */
-
 router.post(
   "/user/:userId/revoke",
   verifyAccessToken,

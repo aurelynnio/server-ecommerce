@@ -31,6 +31,10 @@ const sendVerificationCodeValidator = Joi.object({
 });
 
 const verifyEmailValidator = Joi.object({
+  email: sanitizedString().email().required().messages({
+    "string.email": "Email không hợp lệ",
+    "any.required": "Email là bắt buộc",
+  }),
   code: sanitizedString().length(6).pattern(/^\d+$/).required().messages({
     "string.length": "Mã xác thực phải đúng 6 ký tự",
     "string.pattern.base": "Mã xác thực chỉ được chứa số",

@@ -128,8 +128,14 @@ const requireRole = (...allowedRoles) => {
         userRoles = [...userRoles, ...roles];
       }
 
+      // If user already has any allowed role, skip extra lookups
+      const alreadyAllowed = flatRoles.some((role) => userRoles.includes(role));
+      if (alreadyAllowed) {
+        return next();
+      }
+
       // If checking for seller role and user has a shop, treat them as seller
-      if (flatRoles.includes("seller")) {
+      if (flatRoles.includes("seller") && !userRoles.includes("seller")) {
         try {
           const Shop = require("../models/shop.model");
           const shop = await Shop.findOne({ owner: req.user.userId });

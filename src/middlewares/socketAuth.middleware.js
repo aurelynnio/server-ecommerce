@@ -11,18 +11,12 @@ const tokenService = require("../services/token.service");
  */
 const socketAuthMiddleware = (socket, next) => {
   try {
-    // 1. Lấy token từ cookie hoặc header
+    // 1. Lấy token từ cookie (cookie-only auth)
     let token = null;
 
-    // Thử lấy từ cookie (nếu client gửi cookie)
     if (socket.handshake.headers.cookie) {
       const cookies = cookie.parse(socket.handshake.headers.cookie);
       token = cookies.accessToken;
-    }
-
-    // Nếu không có cookie, thử lấy từ auth header (Bearer token)
-    if (!token && socket.handshake.auth?.token) {
-      token = socket.handshake.auth.token;
     }
 
     if (!token) {

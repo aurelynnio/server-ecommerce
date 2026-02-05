@@ -201,8 +201,9 @@ class UserService {
     });
 
     await user.save();
-
-    return user.toObject({ transform: true, versionKey: false });
+    const userObj = user.toObject({ transform: true, versionKey: false });
+    delete userObj.password;
+    return userObj;
   }
 
   /**
@@ -316,16 +317,22 @@ class UserService {
    */
   async getAllUsers(query) {
     const { page, limit, search = "", role, isVerifiedEmail } = query;
-
-
+    const normalizedSearch = String(search || "").trim();
+    if (normalizedSearch.length > 100) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Search query is too long"
+      );
+    }
 
     const filter = {};
 
     // Search by username or email
-    if (search) {
+    if (normalizedSearch) {
+      const escapedSearch = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       filter.$or = [
-        { username: { $regex: search, $options: "i" } },
-        { email: { $regex: search, $options: "i" } },
+        { username: { $regex: escapedSearch, $options: "i" } },
+        { email: { $regex: escapedSearch, $options: "i" } },
       ];
     }
 

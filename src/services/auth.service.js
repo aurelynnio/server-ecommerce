@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const User = require("../models/user.model");
 const comparePassword = require("../utils/comparePassword");
 const hashPassword = require("../utils/hashPasword");
@@ -11,6 +12,7 @@ const {
 const cacheService = require("./cache.service");
 const logger = require("../utils/logger");
 const tokenService = require("./token.service");
+const parseDurationMs = require("../utils/parseDurationMs");
 
 
 /**
@@ -24,7 +26,28 @@ class AuthService {
    * @returns {string} 6-digit code
    */
   _generateVerificationCode() {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return crypto.randomInt(100000, 1000000).toString();
+  }
+
+  /**
+   * Hash token for safe storage
+   * @param {string} token
+   * @returns {string}
+   */
+  _hashToken(token) {
+    return crypto.createHash("sha256").update(token).digest("hex");
+  }
+
+  /**
+   * Get refresh token expiration date
+   * @returns {Date}
+   */
+  _getRefreshTokenExpiresAt() {
+    const ttlMs = parseDurationMs(
+      process.env.JWT_REFRESH_EXPIRES_IN,
+      16 * 24 * 60 * 60 * 1000
+    );
+    return new Date(Date.now() + ttlMs);
   }
 
   /**
@@ -66,12 +89,16 @@ class AuthService {
     await newUser.save();
 
     // Emit socket event
-    const io = getIO();
-    if (io) {
-      io.emit("new_user", {
-        username: newUser.username,
-        _id: newUser._id,
-      });
+    try {
+      const io = getIO();
+      if (io) {
+        io.emit("new_user", {
+          username: newUser.username,
+          _id: newUser._id,
+        });
+      }
+    } catch (error) {
+      logger.warn("[AuthService] Socket not initialized, skipping emit");
     }
 
     // Send verification email
@@ -103,7 +130,7 @@ class AuthService {
    * @throws {Error} If credentials are invalid or email is not verified
    */
   async login(email, password) {
-    const user = await User.findOne({ email }).lean();
+    const user = await User.findOne({ email });
     if (!user) {
       throw new ApiError(
         StatusCodes.UNAUTHORIZED,
@@ -129,12 +156,18 @@ class AuthService {
     const permissions = tokenService.getPermissionsForUser(user);
     const tokens = tokenService.generateTokensWithPermissions(user);
 
+    user.refreshTokenHash = this._hashToken(tokens.refreshToken);
+    user.refreshTokenExpiresAt = this._getRefreshTokenExpiresAt();
+    await user.save();
+
     const {
       password: _,
       codeVerifiEmail,
       codeVerifiPassword,
+      refreshTokenHash,
+      refreshTokenExpiresAt,
       ...userWithoutPassword
-    } = user;
+    } = user.toObject();
 
     return {
       user: {
@@ -164,12 +197,14 @@ class AuthService {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Email already verified");
     }
 
-    await this.ensureValidOtp(`otp:email:${email}`, code);
+    const cacheKey = `otp:email:${email}`;
+    await this.ensureValidOtp(cacheKey, code);
 
     user.isVerifiedEmail = true;
     user.codeVerifiEmail = undefined;
     user.expiresCodeVerifiEmail = undefined;
     await user.save();
+    await cacheService.del(cacheKey);
 
     const {
       password,
@@ -300,21 +335,60 @@ class AuthService {
       );
     }
 
-    const user = await User.findById(payload.userId).lean();
+    const user = await User.findById(payload.userId).select(
+      "+refreshTokenHash +refreshTokenExpiresAt"
+    );
     if (!user) {
       throw new ApiError(StatusCodes.UNAUTHORIZED, "User not found");
     }
 
-    const permissions = tokenService.getPermissionsForUser(user);
-    const accessToken = tokenService.generateAccessToken({
-      userId: user._id,
-      username: user.username,
-      email: user.email,
-      role: user.roles,
-      permissions,
-    });
+    const tokenHash = this._hashToken(refreshToken);
+    if (user.refreshTokenHash && user.refreshTokenHash !== tokenHash) {
+      throw new ApiError(
+        StatusCodes.UNAUTHORIZED,
+        "Invalid or revoked refresh token"
+      );
+    }
 
-    return { accessToken, permissions };
+    if (
+      user.refreshTokenExpiresAt &&
+      user.refreshTokenExpiresAt < new Date()
+    ) {
+      throw new ApiError(
+        StatusCodes.UNAUTHORIZED,
+        "Refresh token has expired"
+      );
+    }
+
+    const permissions = tokenService.getPermissionsForUser(user);
+    const tokens = tokenService.generateTokensWithPermissions(user);
+
+    user.refreshTokenHash = this._hashToken(tokens.refreshToken);
+    user.refreshTokenExpiresAt = this._getRefreshTokenExpiresAt();
+    await user.save();
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      permissions,
+    };
+  }
+
+  /**
+   * Revoke refresh token (logout)
+   * @param {string} refreshToken
+   * @returns {Promise<void>}
+   */
+  async revokeRefreshToken(refreshToken) {
+    try {
+      const payload = tokenService.verifyRefreshToken(refreshToken);
+      await User.findByIdAndUpdate(payload.userId, {
+        refreshTokenHash: null,
+        refreshTokenExpiresAt: null,
+      });
+    } catch (error) {
+      // Ignore invalid token on logout
+    }
   }
 
 

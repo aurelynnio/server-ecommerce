@@ -9,19 +9,27 @@ const redisConfig = {
 
 const redis = new Redis(redisConfig);
 
+let redisReady = false;
+
 redis.on("connect", () => {
   logger.info("Redis client connected");
 });
 
 redis.on("error", (err) => {
+  redisReady = false;
   logger.error("Redis client error:", err);
 });
 
 redis.on("ready", () => {
+  redisReady = true;
   logger.info("Redis client ready to use");
 });
+
 redis.on("end", () => {
+  redisReady = false;
   logger.info("Redis client disconnected");
 });
+
+redis.isReady = () => redisReady;
 
 module.exports = redis;

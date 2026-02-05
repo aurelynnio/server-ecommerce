@@ -16,13 +16,81 @@ class ShopCategoryService {
     const shop = await Shop.findOne({ owner: userId });
     if (!shop) throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
 
+    const existing = await ShopCategory.findOne({
+      shopId: shop._id,
+      name: categoryData?.name,
+    });
+    if (existing) {
+      throw new ApiError(StatusCodes.CONFLICT, "Category name already exists");
+    }
 
-    // Seller sees ALL categories (including inactive) for management
-    const categories = await ShopCategory.find({ shopId: shop._id }).sort(
-      { displayOrder: 1 }
-    );
+    const created = await ShopCategory.create({
+      shopId: shop._id,
+      name: categoryData.name,
+      description: categoryData?.description || "",
+      image: categoryData?.image || "",
+      isActive:
+        typeof categoryData.isActive === "boolean"
+          ? categoryData.isActive
+          : true,
+      displayOrder:
+        typeof categoryData.displayOrder === "number"
+          ? categoryData.displayOrder
+          : 0,
+    });
 
-    return categories;
+    return created;
+  }
+
+  /**
+   * Get categories for current seller's shop (include inactive)
+   * @param {string} userId
+   * @returns {Promise<any>}
+   */
+  async getMyShopCategories(userId) {
+    const shop = await Shop.findOne({ owner: userId });
+    if (!shop) throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
+
+    const categories = await ShopCategory.find({ shopId: shop._id })
+      .sort({ displayOrder: 1 })
+      .lean();
+
+    const categoryIds = categories.map((c) => c._id);
+    const productCounts = await Product.aggregate([
+      {
+        $match: {
+          shop: shop._id,
+          shopCategory: { $in: categoryIds },
+          status: "published",
+        },
+      },
+      {
+        $group: {
+          _id: "$shopCategory",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const countMap = {};
+    productCounts.forEach((p) => {
+      countMap[p._id.toString()] = p.count;
+    });
+
+    const totalProducts = await Product.countDocuments({
+      shop: shop._id,
+      status: "published",
+    });
+
+    const categoriesWithCount = categories.map((cat) => ({
+      ...cat,
+      productCount: countMap[cat._id.toString()] || 0,
+    }));
+
+    return {
+      categories: categoriesWithCount,
+      totalProducts,
+    };
   }
 
   /**
@@ -107,6 +175,8 @@ class ShopCategoryService {
 
     if (!shop) throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
 
+    if (updates?.description === undefined) delete updates.description;
+    if (updates?.image === undefined) delete updates.image;
 
     const updated = await ShopCategory.findOneAndUpdate(
       { _id: categoryId, shopId: shop._id },

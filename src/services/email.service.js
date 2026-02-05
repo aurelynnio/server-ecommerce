@@ -13,10 +13,22 @@ const logger = require("../utils/logger");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
 
-/**
- * PERFORMANCE FIX: Singleton transporter - reuse connection pool
- */
 let transporter = null;
+
+// Hardcoded email configuration (per request)
+const EMAIL_CONFIG = {
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: "cyhin2508@gmail.com",
+    pass: "qanqnxjxrdlogwdz",
+  },
+  from: "cyhincdr@gmail.com",
+  baseUrl: "https://cyhin.engineer",
+  maxConnections: 5,
+  maxMessages: 100,
+};
 
 /**
  * Get or create email transporter (singleton pattern)
@@ -30,15 +42,15 @@ const getTransporter = () => {
    */
   if (!transporter) {
     transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false,
+      host: EMAIL_CONFIG.host,
+      port: EMAIL_CONFIG.port,
+      secure: EMAIL_CONFIG.secure,
       pool: true, // Use connection pooling
-      maxConnections: 5, // Max 5 concurrent connections
-      maxMessages: 100, // Max 100 messages per connection
+      maxConnections: EMAIL_CONFIG.maxConnections,
+      maxMessages: EMAIL_CONFIG.maxMessages,
       auth: {
-        user: "cyhincdr@gmail.com",
-        pass: "plnbqekohbjynjlt",
+        user: EMAIL_CONFIG.auth.user,
+        pass: EMAIL_CONFIG.auth.pass,
       },
     });
   }
@@ -60,8 +72,7 @@ const sendVerificationCode = async (to, code, type = "email_verification") => {
         ? "Verify Your Email Address"
         : "Reset Your Password";
 
-    const baseUrl = process.env.CLIENT_URL || "http://localhost:3000";
-    const verificationLink = `${baseUrl}/verify-code?email=${to}&code=${code}`;
+    const verificationLink = `${EMAIL_CONFIG.baseUrl}/verify-code?email=${to}&code=${code}`;
 
     const emailHtml = await render(
       React.createElement(VerificationEmail, {
@@ -71,7 +82,7 @@ const sendVerificationCode = async (to, code, type = "email_verification") => {
     );
 
     const mailOptions = {
-      from: `"E-commerce App" <cyhin2508@gmail.com>`,
+      from: EMAIL_CONFIG.from,
       to: to,
       subject: subject,
       html: emailHtml,
@@ -87,10 +98,9 @@ const sendVerificationCode = async (to, code, type = "email_verification") => {
     logger.error("Error sending email:", { error: error.message });
     throw new ApiError(
       StatusCodes.SERVICE_UNAVAILABLE,
-      `Failed to send email: ${error.message}`
+      `Failed to send email: ${error.message}`,
     );
   }
-
 };
 
 /**

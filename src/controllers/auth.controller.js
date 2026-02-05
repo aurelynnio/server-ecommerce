@@ -1,6 +1,7 @@
 const catchAsync = require("../configs/catchAsync");
 const authService = require("../services/auth.service");
 const { sendFail, sendSuccess } = require("../shared/res/formatResponse");
+const parseDurationMs = require("../utils/parseDurationMs");
 
 const { StatusCodes } = require("http-status-codes");
 
@@ -32,23 +33,32 @@ const AuthController = {
     const result = await authService.login(email, password);
     const { accessToken, refreshToken, user } = result;
 
+    const refreshTtlMs = parseDurationMs(
+      process.env.JWT_REFRESH_EXPIRES_IN,
+      16 * 24 * 60 * 60 * 1000
+    );
+    const accessTtlMs = parseDurationMs(
+      process.env.JWT_ACCESS_EXPIRES_IN,
+      30 * 60 * 1000
+    );
+
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 16 * 24 * 60 * 60 * 1000,
+      maxAge: refreshTtlMs,
     });
 
     res.cookie("accessToken", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 1 * 60 * 1000,
+      maxAge: accessTtlMs,
     });
 
     return sendSuccess(
       res,
-      { ...user, accessToken, refreshToken },
+      user,
       "Login successful",
       StatusCodes.OK
     );
@@ -78,8 +88,8 @@ const AuthController = {
    * @returns {Promise<any>}
    */
   verifyEmail: catchAsync(async (req, res) => {
-    const { code } = req.body;
-    const result = await authService.verifyEmailByCode(code);
+    const { email, code } = req.body;
+    const result = await authService.verifyEmail(email, code);
     return sendSuccess(
       res,
       result.user,
@@ -129,7 +139,7 @@ const AuthController = {
    * @returns {Promise<any>}
    */
   refreshToken: catchAsync(async (req, res) => {
-    const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+    const refreshToken = req.cookies?.refreshToken;
 
     if (!refreshToken) {
       return sendFail(
@@ -141,16 +151,34 @@ const AuthController = {
 
     const result = await authService.refreshAccessToken(refreshToken);
 
+    const accessTtlMs = parseDurationMs(
+      process.env.JWT_ACCESS_EXPIRES_IN,
+      30 * 60 * 1000
+    );
+    const refreshTtlMs = parseDurationMs(
+      process.env.JWT_REFRESH_EXPIRES_IN,
+      16 * 24 * 60 * 60 * 1000
+    );
+
     res.cookie("accessToken", result.accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 30 * 60 * 1000,
+      maxAge: accessTtlMs,
     });
+
+    if (result.refreshToken) {
+      res.cookie("refreshToken", result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: refreshTtlMs,
+      });
+    }
 
     return sendSuccess(
       res,
-      { accessToken: result.accessToken, permissions: result.permissions },
+      { permissions: result.permissions },
       "Access token refreshed successfully",
       StatusCodes.OK
     );
@@ -163,6 +191,11 @@ const AuthController = {
    * @returns {Promise<any>}
    */
   logout: catchAsync(async (req, res) => {
+    const refreshToken = req.cookies?.refreshToken;
+    if (refreshToken) {
+      await authService.revokeRefreshToken(refreshToken);
+    }
+
     res.clearCookie("accessToken", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

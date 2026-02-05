@@ -65,80 +65,81 @@ class InventoryService {
   }
 
   /**
+   * Aggregate quantities for identical product+variant pairs
+   * @param {Array} items
+   * @returns {Array}
+   */
+  aggregateItems(items) {
+    const map = new Map();
+    for (const item of items) {
+      const productId = item.productId.toString();
+      const modelId = item.modelId ? item.modelId.toString() : null;
+      const key = `${productId}:${modelId || "base"}`;
+      const current = map.get(key) || { productId, modelId, quantity: 0 };
+      current.quantity += item.quantity;
+      map.set(key, current);
+    }
+    return Array.from(map.values());
+  }
+
+  /**
    * Deduct stock for multiple items in a transaction
    * @param {Array} items - List of items [{ productId, modelId, quantity }]
    * @param {Object} session - Mongoose session
    */
   async deductStock(items, session) {
-    const bulkOps = [];
+    const aggregatedItems = this.aggregateItems(items);
 
-    // Group items by product to handle multiple variants of same product
-    // OR just process sequentially in bulkOps logic
-    // Since we need to read current state to update correctly if using $inc, we can use $inc directly
-    // But for nested arrays (variants), we need to be careful.
-
-    // Better approach: Read products, update in memory, then bulkWrite specific fields
-    // This ensures consistency consistent with current logic
-    
-    const productIds = items.map(item => item.productId);
-    const products = await Product.find({ _id: { $in: productIds } }).session(session);
-    const productMap = new Map(products.map(p => [p._id.toString(), p]));
-
-    for (const item of items) {
-      const product = productMap.get(item.productId.toString());
-      if (!product) continue;
-
+    for (const item of aggregatedItems) {
       const quantity = item.quantity;
-
       if (item.modelId) {
-        const variant = product.variants.find(
-          (v) => v._id.toString() === item.modelId.toString()
+        const result = await Product.updateOne(
+          {
+            _id: item.productId,
+            status: "published",
+            "variants._id": item.modelId,
+            "variants.stock": { $gte: quantity },
+          },
+          {
+            $inc: {
+              "variants.$.stock": -quantity,
+              "variants.$.sold": quantity,
+              stock: -quantity,
+              soldCount: quantity,
+            },
+          },
+          { session }
         );
-        if (variant) {
-            // Check again for safety inside transaction
-            if (variant.stock < quantity) {
-                throw new ApiError(
-                  StatusCodes.CONFLICT,
-                  `Out of stock for ${product.name} - ${variant.name}`
-                );
-            }
-            variant.stock -= quantity;
-            variant.sold = (variant.sold || 0) + quantity;
+
+        if (!result.matchedCount) {
+          throw new ApiError(
+            StatusCodes.CONFLICT,
+            "Out of stock or variation unavailable"
+          );
         }
       } else {
-        if (product.stock < quantity) {
-            throw new ApiError(
-              StatusCodes.CONFLICT,
-              `Out of stock for ${product.name}`
-            );
+        const result = await Product.updateOne(
+          {
+            _id: item.productId,
+            status: "published",
+            stock: { $gte: quantity },
+          },
+          {
+            $inc: {
+              stock: -quantity,
+              soldCount: quantity,
+            },
+          },
+          { session }
+        );
+
+        if (!result.matchedCount) {
+          throw new ApiError(
+            StatusCodes.CONFLICT,
+            "Out of stock or product unavailable"
+          );
         }
-        product.stock -= quantity;
       }
-      
-      product.soldCount += quantity;
-      
-      // We will add to bulkOps later. 
-      // Since product object is reference, we can iterate all items first then generate bulkOps
-    }
-
-    // Generate bulk operations from modified products
-    for (const product of productMap.values()) {
-        bulkOps.push({
-            updateOne: {
-                filter: { _id: product._id },
-                update: {
-                    $set: {
-                        stock: product.stock,
-                        soldCount: product.soldCount,
-                        variants: product.variants // models in schema is actually variants
-                    }
-                }
-            }
-        });
-    }
-
-    if (bulkOps.length > 0) {
-      await Product.bulkWrite(bulkOps, { session });
     }
   }
 
@@ -148,54 +149,39 @@ class InventoryService {
    * @param {Object} session - Mongoose session (optional)
    */
   async restoreStock(items, session = null) {
-    const productIds = items.map(item => item.productId);
-    // If session provided use it, otherwise don't
-    const query = Product.find({ _id: { $in: productIds } });
-    if (session) query.session(session);
-    
-    const products = await query;
-    const productMap = new Map(products.map(p => [p._id.toString(), p]));
-    const bulkOps = [];
+    const aggregatedItems = this.aggregateItems(items);
+    const options = session ? { session } : {};
 
-    for (const item of items) {
-      const product = productMap.get(item.productId.toString());
-      if (!product) continue;
-
+    for (const item of aggregatedItems) {
       const quantity = item.quantity;
-
       if (item.modelId) {
-        const variant = product.variants.find(
-          (v) => v._id.toString() === item.modelId.toString()
+        await Product.updateOne(
+          {
+            _id: item.productId,
+            "variants._id": item.modelId,
+          },
+          {
+            $inc: {
+              "variants.$.stock": quantity,
+              "variants.$.sold": -quantity,
+              stock: quantity,
+              soldCount: -quantity,
+            },
+          },
+          options
         );
-        if (variant) {
-          variant.stock += quantity;
-          variant.sold = Math.max(0, (variant.sold || 0) - quantity);
-        }
       } else {
-        product.stock += quantity;
+        await Product.updateOne(
+          { _id: item.productId },
+          {
+            $inc: {
+              stock: quantity,
+              soldCount: -quantity,
+            },
+          },
+          options
+        );
       }
-      
-      product.soldCount = Math.max(0, product.soldCount - quantity);
-    }
-
-    for (const product of productMap.values()) {
-        bulkOps.push({
-            updateOne: {
-                filter: { _id: product._id },
-                update: {
-                    $set: {
-                        stock: product.stock,
-                        soldCount: product.soldCount,
-                        variants: product.variants
-                    }
-                }
-            }
-        });
-    }
-
-    if (bulkOps.length > 0) {
-      const options = session ? { session } : {};
-      await Product.bulkWrite(bulkOps, options);
     }
   }
 }

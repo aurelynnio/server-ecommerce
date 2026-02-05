@@ -83,6 +83,16 @@ const userSchema = new Schema(
       enum: ["local", "google"],
       default: "local",
     },
+    refreshTokenHash: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    refreshTokenExpiresAt: {
+      type: Date,
+      default: null,
+      select: false,
+    },
   },
   {
     timestamps: true,

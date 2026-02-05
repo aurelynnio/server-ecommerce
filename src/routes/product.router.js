@@ -10,6 +10,7 @@ const {
   verifyProductOwnership,
 } = require("../middlewares/ownership.middleware");
 const upload = require("../configs/upload");
+const { validateImageSignature } = require("../middlewares/uploadSignature.middleware");
 const validate = require("../middlewares/validate.middleware");
 const parseJsonFields = require("../middlewares/parseJsonFields.middleware");
 const {
@@ -91,6 +92,7 @@ router.put(
   verifyShopOwnership,
   verifyProductOwnership,
   upload.any(),
+  validateImageSignature,
   parseJsonFields(["price", "variants", "tags", "tierVariations", "models", "attributes", "dimensions", "variantImageMapping", "existingDescriptionImages", "existingVariantImages"]),
   validate({ params: mongoIdParamValidator, body: updateProductValidator }),
   productController.updateProductBySeller
@@ -125,6 +127,7 @@ router.post(
   verifyAccessToken,
   requireRole("seller", "admin"),
   upload.any(),
+  validateImageSignature,
   parseJsonFields(["price", "variants", "tags", "tierVariations", "models", "attributes", "dimensions", "variantImageMapping"]),
   validate(createProductValidator),
   productController.createProduct
@@ -141,6 +144,7 @@ router.post(
   verifyShopOwnership,
   verifyProductOwnership,
   upload.array("images", 10),
+  validateImageSignature,
   parseJsonFields(["price"]),
   validate({ params: mongoIdParamValidator, body: addVariantValidator }),
   productController.addVariantBySeller

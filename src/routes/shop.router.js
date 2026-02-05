@@ -11,6 +11,18 @@ const {
   updateShopValidator,
 } = require("../validations/shop.validator");
 const upload = require("../configs/upload");
+const { validateImageSignature } = require("../middlewares/uploadSignature.middleware");
+
+const normalizeSingleFile = (req, res, next) => {
+  if (req.file) return next();
+  const files = req.files || {};
+  if (files.image && Array.isArray(files.image) && files.image[0]) {
+    req.file = files.image[0];
+  } else if (files.file && Array.isArray(files.file) && files.file[0]) {
+    req.file = files.file[0];
+  }
+  return next();
+};
 
 /**
  * @desc    Get all public shops (active only)
@@ -58,7 +70,9 @@ router.post(
 router.post(
   "/upload-register-image",
   verifyAccessToken,
-  upload.single("image"),
+  upload.fields([{ name: "image", maxCount: 1 }, { name: "file", maxCount: 1 }]),
+  normalizeSingleFile,
+  validateImageSignature,
   shopController.uploadImage,
 );
 
@@ -108,6 +122,18 @@ router.put(
 );
 
 /**
+ * @desc    Update current user's shop information (Alias for /)
+ * @access  Private (Seller/Admin)
+ */
+router.put(
+  "/my",
+  verifyAccessToken,
+  requireRole("seller", "admin"),
+  validate(updateShopValidator),
+  shopController.updateShop,
+);
+
+/**
  * @desc    Upload shop image (logo or banner)
  * @access  Private (Seller/Admin)
  */
@@ -115,8 +141,36 @@ router.post(
   "/upload-image",
   verifyAccessToken,
   requireRole("seller", "admin"),
-  upload.single("image"),
+  upload.fields([{ name: "image", maxCount: 1 }, { name: "file", maxCount: 1 }]),
+  normalizeSingleFile,
+  validateImageSignature,
   shopController.uploadImage,
+);
+
+/**
+ * @desc    Upload shop logo (Alias for /upload-image with type=logo)
+ * @access  Private (Seller/Admin)
+ */
+router.post(
+  "/upload-logo",
+  verifyAccessToken,
+  upload.fields([{ name: "image", maxCount: 1 }, { name: "file", maxCount: 1 }]),
+  normalizeSingleFile,
+  validateImageSignature,
+  shopController.uploadLogo,
+);
+
+/**
+ * @desc    Upload shop banner (Alias for /upload-image with type=banner)
+ * @access  Private (Seller/Admin)
+ */
+router.post(
+  "/upload-banner",
+  verifyAccessToken,
+  upload.fields([{ name: "image", maxCount: 1 }, { name: "file", maxCount: 1 }]),
+  normalizeSingleFile,
+  validateImageSignature,
+  shopController.uploadBanner,
 );
 
 /**

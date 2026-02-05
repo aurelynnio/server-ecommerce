@@ -19,6 +19,8 @@ const createLimiter = ({
     limit: max,
     standardHeaders: true,
     legacyHeaders: false,
+    // Fail-open if Redis is not ready to avoid blocking API
+    skip: () => !redis.isReady?.(),
     handler: (req, res) => {
       return sendFail(res, message, StatusCodes.TOO_MANY_REQUESTS);
     },

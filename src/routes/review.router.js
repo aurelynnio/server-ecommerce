@@ -19,16 +19,16 @@ const {
   productIdParamValidator,
   getReviewsQueryValidator,
 } = require("../validations/review.validator");
+
 /**
  * Public Routes
  */
 /**
-* @desc Get all reviews for a specific product
-* @accessPublic
+ * @desc    Get all reviews for a specific product
+ * @access  Public
  * @param   productId - Product ID to get reviews for
  * @query   page, limit, rating, sort
  */
-
 router.get(
   "/product/:productId",
   validate({
@@ -37,63 +37,63 @@ router.get(
   }),
   reviewController.getProductReviews
 );
+
 /**
-* @desc Get a single review by ID
-* @accessPublic
+ * @desc    Get a single review by ID
+ * @access  Public
  * @param   reviewId - Review ID
  */
-
 router.get(
   "/:reviewId",
   validate({ params: reviewIdParamValidator }),
   reviewController.getReviewById
 );
+
 /**
  * User Routes (Authenticated)
  */
 /**
-* @desc Create a new review for a product
-* @accessPrivate (Authenticated users - must have purchased product)
+ * @desc    Create a new review for a product
+ * @access  Private (Authenticated users - must have purchased product)
  * @body    { productId, rating, comment, images? }
  */
-
 router.post(
   "/",
   verifyAccessToken,
   validate(createReviewValidator),
   reviewController.createReview
 );
+
 /**
-* @desc Get current user's reviews
-* @accessPrivate (Authenticated users)
+ * @desc    Get current user's reviews
+ * @access  Private (Authenticated users)
  * @query   page, limit
  */
-
 router.get(
   "/user/me",
   verifyAccessToken,
   validate({ query: getReviewsQueryValidator }),
   reviewController.getUserReviews
 );
+
 /**
-* @desc Check if current user can review a product
-* @accessPrivate (Authenticated users)
+ * @desc    Check if current user can review a product
+ * @access  Private (Authenticated users)
  * @param   productId - Product ID to check
  */
-
 router.get(
   "/check/:productId",
   verifyAccessToken,
   validate({ params: productIdParamValidator }),
   reviewController.canUserReview
 );
+
 /**
-* @desc Update an existing review
-* @accessPrivate (Authenticated users - own review only)
+ * @desc    Update an existing review
+ * @access  Private (Authenticated users - own review only)
  * @param   reviewId - Review ID to update
  * @body    { rating?, comment?, images? }
  */
-
 router.put(
   "/:reviewId",
   verifyAccessToken,
@@ -103,18 +103,19 @@ router.put(
   }),
   reviewController.updateReview
 );
+
 /**
-* @desc Delete a review
-* @accessPrivate (Owner or Admin)
+ * @desc    Delete a review
+ * @access  Private (Owner or Admin)
  * @param   reviewId - Review ID to delete
  */
-
 router.delete(
   "/:reviewId",
   verifyAccessToken,
   validate({ params: reviewIdParamValidator }),
   reviewController.deleteReview
 );
+
 /**
  * Seller Routes
  */
@@ -158,11 +159,9 @@ router.get(
 );
 
 /**
- * @desc Get review statistics overview
- * @accessPrivate (Admin only)
+ * @desc    Get review statistics overview
+ * @access  Private (Admin only)
  */
-
-
 router.get(
   "/statistics/overview",
   verifyAccessToken,

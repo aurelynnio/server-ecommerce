@@ -20,6 +20,7 @@ const {
   changePasswordValidator,
 } = require("../validations/user.validator");
 const upload = require("../configs/upload");
+const { validateImageSignature } = require("../middlewares/uploadSignature.middleware");
 
 /**
  * @desc    Upload user avatar image
@@ -29,6 +30,7 @@ router.post(
   "/upload-avatar",
   verifyAccessToken,
   upload.single("avatar"),
+  validateImageSignature,
   userController.uploadAvatar
 );
 
