@@ -16,6 +16,10 @@ const messageSchema = new Schema(
   { timestamps: true, collection: "messages" }
 );
 
+// Message Indexes
+messageSchema.index({ conversationId: 1, createdAt: -1 }); // Loading messages in conversation
+messageSchema.index({ conversationId: 1, isRead: 1 }); // Counting unread messages
+
 // Conversation Schema
 const conversationSchema = new Schema(
   {

@@ -43,9 +43,9 @@ const itemSchema = new Schema(
       min: 1,
       default: 1,
     },
-    // Price can be Number (old) or Object (new)
+    // Price stored as structured object
     price: {
-      type: Schema.Types.Mixed, // Allow both Number and Object
+      type: priceSchema,
       required: false,
     },
   },

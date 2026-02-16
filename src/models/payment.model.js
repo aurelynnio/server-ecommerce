@@ -22,10 +22,10 @@ const paymentSchema = new Schema({
     },
     paymentMethod: {
         type: String,
-        enum: ["cod", "vnpay"],
+        enum: ["cod", "vnpay", "momo"],
         default: "cod",
     },
-    // VNPay specific fields
+    // Payment gateway specific fields
     transactionId: {
         type: String,
         unique: true,
@@ -35,7 +35,7 @@ const paymentSchema = new Schema({
         type: String,
         default: null,
     },
-    vnpayData: {
+    gatewayData: {
         type: Schema.Types.Mixed,
         default: null,
     },
@@ -50,7 +50,6 @@ const paymentSchema = new Schema({
 });
 
 // Index for quick lookup by transaction ID
-paymentSchema.index({ transactionId: 1 });
 paymentSchema.index({ orderId: 1 });
 paymentSchema.index({ userId: 1 });
 paymentSchema.index({ status: 1 });

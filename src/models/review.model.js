@@ -9,7 +9,7 @@ const reviewSchema = new Schema(
     reply: { type: String, default: "" },
     replyAt: { type: Date },
   },
-  { timestamps: true }
+  { timestamps: true, collection: "reviews" }
 
 );
 

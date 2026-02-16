@@ -39,8 +39,7 @@ const voucherSchema = new Schema(
 
     isActive: { type: Boolean, default: true },
 
-    // Users who have used this (simple tracking, or move to separate collection for scale)
-    usedBy: [{ type: Types.ObjectId, ref: "User" }],
+    // Usage tracking is now in VoucherUsage collection
   },
   {
     timestamps: true,
@@ -48,7 +47,6 @@ const voucherSchema = new Schema(
   }
 );
 
-voucherSchema.index({ code: 1 });
 voucherSchema.index({ shopId: 1 });
 voucherSchema.index({ startDate: 1, endDate: 1 });
 

@@ -37,7 +37,7 @@ class FlashSaleService {
     const paginationParams = getPaginationParams(page, limit, total);
 
     const products = await Product.find(query)
-      .select("name slug images price flashSale soldCount stock shop")
+      .select("name slug price flashSale soldCount stock shop variants descriptionImages")
       .populate("shop", "name logo")
       .sort({ "flashSale.soldCount": -1 })
       .skip(paginationParams.skip)

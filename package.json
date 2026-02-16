@@ -9,6 +9,11 @@
     "test:coverage": "vitest run --coverage",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "seed:products": "node src/scripts/seed-products.js",
+    "seed:quick": "node src/scripts/seed-products.js --quick",
+    "seed:dev": "node src/scripts/seed-dev.js",
+    "seed:dev:quick": "node src/scripts/seed-dev.js --quick",
+    "seed:dev:reset": "node src/scripts/seed-dev.js --reset",
     "embeddings:init": "node src/scripts/init-embeddings.js",
     "embeddings:rebuild": "node src/scripts/init-embeddings.js --force"
   },
@@ -22,6 +27,7 @@
     "vitest": "^4.0.16"
   },
   "dependencies": {
+    "@faker-js/faker": "^10.3.0",
     "@babel/preset-env": "^7.28.6",
     "@babel/preset-react": "^7.28.5",
     "@babel/register": "^7.28.3",
@@ -49,11 +55,11 @@
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.10",
-    "redis": "^4.7.1",
     "rate-limit-redis": "^4.3.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-email": "^5.2.1",
+    "redis": "^4.7.1",
     "slugify": "^1.6.6",
     "socket.io": "^4.8.1",
     "vnpay": "^2.4.4"

@@ -1,6 +1,7 @@
 const Product = require("../models/product.model");
 const Order = require("../models/order.model");
 const User = require("../models/user.model");
+const Wishlist = require("../models/wishlist.model");
 const cacheService = require("./cache.service");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
@@ -42,9 +43,9 @@ class RecommendationService {
 
     const categoryIds = [...new Set(purchasedProducts.map((p) => p.category?.toString()))];
 
-    // Get user's wishlist
-    const user = await User.findById(userId).select("wishlist");
-    const wishlistIds = user?.wishlist?.map((id) => id.toString()) || [];
+    // Get user's wishlist from Wishlist collection
+    const wishlistEntries = await Wishlist.find({ userId }).select("productId").lean();
+    const wishlistIds = wishlistEntries.map((e) => e.productId.toString());
 
     // Exclude already purchased and wishlisted products
     const excludeIds = [...new Set([...purchasedProductIds, ...wishlistIds])];

@@ -3,6 +3,7 @@ const User = require("../models/user.model");
 const Product = require("../models/product.model");
 const Order = require("../models/order.model");
 const Review = require("../models/review.model");
+const ShopFollower = require("../models/shop-follower.model");
 const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
 
 
@@ -163,8 +164,8 @@ class ShopService {
       status: "published",
     });
 
-    // Get follower count (if implemented)
-    const followerCount = shop.followers?.length || 0;
+    // Get follower count from ShopFollower collection
+    const followerCount = await ShopFollower.countDocuments({ shopId: shop._id });
 
     return {
       ...shop,
@@ -346,7 +347,7 @@ class ShopService {
         banner: shop.banner,
         rating: shop.rating || 0,
         status: shop.status,
-        followers: shop.followers?.length || 0,
+        followers: shop.followerCount || 0,
         responseRate: shop.metrics?.responseRate || 0,
       },
       stats: {
@@ -373,24 +374,22 @@ class ShopService {
       throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
     }
 
-
     // Check if already following
-    if (shop.followers?.includes(userId)) {
+    const existing = await ShopFollower.findOne({ shopId, userId });
+    if (existing) {
       throw new ApiError(StatusCodes.CONFLICT, "Already following this shop");
     }
 
+    await ShopFollower.create({ shopId, userId });
 
-    await Shop.findByIdAndUpdate(shopId, {
-      $addToSet: { followers: userId },
-    });
+    // Increment cached follower count
+    await Shop.findByIdAndUpdate(shopId, { $inc: { followerCount: 1 } });
 
-    await User.findByIdAndUpdate(userId, {
-      $addToSet: { followingShops: shopId },
-    });
+    const followerCount = await ShopFollower.countDocuments({ shopId });
 
     return {
       message: "Shop followed successfully",
-      followerCount: (shop.followers?.length || 0) + 1,
+      followerCount,
     };
   }
 
@@ -401,13 +400,11 @@ class ShopService {
    * @returns {Promise<Object>} Unfollow result
    */
   async unfollowShop(userId, shopId) {
-    await Shop.findByIdAndUpdate(shopId, {
-      $pull: { followers: userId },
-    });
+    const result = await ShopFollower.deleteOne({ shopId, userId });
 
-    await User.findByIdAndUpdate(userId, {
-      $pull: { followingShops: shopId },
-    });
+    if (result.deletedCount > 0) {
+      await Shop.findByIdAndUpdate(shopId, { $inc: { followerCount: -1 } });
+    }
 
     return { message: "Shop unfollowed successfully" };
   }
@@ -418,14 +415,14 @@ class ShopService {
    * @returns {Promise<Array>} Followed shops
    */
   async getFollowedShops(userId) {
-    const user = await User.findById(userId).select("followingShops");
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
-    }
+    const followedEntries = await ShopFollower.find({ userId })
+      .select("shopId")
+      .lean();
 
+    const shopIds = followedEntries.map((entry) => entry.shopId);
 
     const shops = await Shop.find({
-      _id: { $in: user.followingShops || [] },
+      _id: { $in: shopIds },
       status: "active",
     })
       .select("name slug logo rating")

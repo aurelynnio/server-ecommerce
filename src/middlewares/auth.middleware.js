@@ -35,6 +35,8 @@ const verifyAccessToken = (req, res, next) => {
 
     // Attach user info to request
     req.user = {
+      // Keep both keys for backward compatibility across controllers.
+      _id: decoded.userId,
       userId: decoded.userId,
       username: decoded.username,
       email: decoded.email,

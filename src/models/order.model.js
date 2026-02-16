@@ -3,7 +3,7 @@ const { Schema, model, Types } = require("mongoose");
 const orderSchema = new Schema(
   {
     // Grouping for finding all orders in one checkout transaction
-    orderGroupId: { type: Types.ObjectId, index: true },
+    orderGroupId: { type: Types.ObjectId },
 
     userId: {
       type: Types.ObjectId,
@@ -25,13 +25,12 @@ const orderSchema = new Schema(
           ref: "Product",
           required: true,
         },
-        // For Tier Variations
+        // Variant identification
         sku: { type: String }, // specific sku code
-        modelId: { type: Types.ObjectId }, // maps to product.models._id
+        variantId: { type: Types.ObjectId }, // maps to product.variants._id (color variant)
 
         name: { type: String, required: true },
         image: { type: String },
-        tierIndex: { type: [Number] }, // e.g. [0, 1] for Blue, M
 
         quantity: { type: Number, required: true, min: 1 },
         price: { type: Number, required: true }, // Snapshot price at purchase
@@ -94,8 +93,10 @@ const orderSchema = new Schema(
 );
 
 // Indexes
-orderSchema.index({ userId: 1 });
-orderSchema.index({ shopId: 1 }); // Shop owner identifying their orders
+orderSchema.index({ userId: 1, createdAt: -1 }); // User order history
+orderSchema.index({ userId: 1, status: 1 }); // User filtering by status
+orderSchema.index({ shopId: 1, status: 1 }); // Seller dashboard filtering
+orderSchema.index({ shopId: 1, createdAt: -1 }); // Seller order history
 orderSchema.index({ orderGroupId: 1 }); // User finding their "checkout history"
 orderSchema.index({ status: 1 });
 orderSchema.index({ paymentStatus: 1 });

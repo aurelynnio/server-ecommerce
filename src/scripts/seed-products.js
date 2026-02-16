@@ -1,6 +1,10 @@
 /**
- * Script to seed 100 Shops, Shop Categories, and 5000 Products
- * Usage: node src/scripts/seed-products.js
+ * Script to seed Shops, Shop Categories, and Products
+ * Usage:
+ *   node src/scripts/seed-products.js
+ *   node src/scripts/seed-products.js --quick
+ *   node src/scripts/seed-products.js --shops 10 --products-per-shop 30
+ *   node src/scripts/seed-products.js --reset
  */
 
 require("dotenv").config();
@@ -21,6 +25,26 @@ const adjectives = ["Premium", "Ultra", "Lite", "Pro", "Max", "Super", "Smart", 
 const nouns = ["Laptop", "Smartphone", "Headphones", "Keyboard", "Mouse", "Monitor", "Chair", "Desk", "Backpack", "Watch", "Shoes", "Jacket", "T-Shirt", "Jeans", "Dress", "Camera", "Lens", "Speaker", "Tablet", "Charger", "Cable", "Perfume", "Lipstick", "Serum", "Shampoo", "Sofa", "Bed", "Lamp", "Table", "Shelf"];
 const brands = ["Samsung", "Apple", "Sony", "LG", "Dell", "HP", "Asus", "Acer", "Lenovo", "Nike", "Adidas", "Puma", "Zara", "H&M", "Gucci", "Dior", "Chanel", "L'Oreal", "Dove", "Nivea", "IKEA", "Logitech", "Razer", "Corsair", "Canon", "Nikon", "JBL", "Bose"];
 const shopTypes = ["Tech Store", "Fashion Hub", "Beauty Bar", "Home Decor", "Gadget World", "Style Loft", "Digital Zone", "Green Life", "Kids Corner", "Sports Gear"];
+const defaultGlobalCategories = [
+  { name: "Điện thoại & Phụ kiện", slug: "dien-thoai-phu-kien" },
+  { name: "Thời trang", slug: "thoi-trang" },
+  { name: "Làm đẹp", slug: "lam-dep" },
+  { name: "Nhà cửa & Đời sống", slug: "nha-cua-doi-song" },
+  { name: "Máy tính & Thiết bị", slug: "may-tinh-thiet-bi" },
+  { name: "Thể thao & Du lịch", slug: "the-thao-du-lich" },
+];
+
+function parseArgInt(flag, fallback) {
+  const idx = process.argv.indexOf(flag);
+  if (idx === -1) return fallback;
+  const raw = process.argv[idx + 1];
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function hasFlag(flag) {
+  return process.argv.includes(flag);
+}
 
 function getRandom(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -41,25 +65,71 @@ function generateProductName() {
   return `${brand} ${adj} ${noun} ${modelCode} ${year}`;
 }
 
+async function ensureGlobalCategories() {
+  const globalCategories = await Category.find({ isActive: true }).select("_id");
+  if (globalCategories.length > 0) return globalCategories;
+
+  console.log("ℹ️ No global categories found. Creating default categories...");
+  try {
+    await Category.insertMany(
+      defaultGlobalCategories.map((c) => ({
+        name: c.name,
+        slug: c.slug,
+        description: "",
+        images: [],
+        isActive: true,
+      })),
+      { ordered: false },
+    );
+  } catch (e) {
+    // Ignore duplicate key errors if categories were created concurrently or partially exist.
+  }
+
+  return await Category.find({ isActive: true }).select("_id");
+}
+
+async function resetSeedData() {
+  console.log("⚠️ Reset enabled: deleting previously seeded data (safe scope)...");
+  const seededUsers = await User.find({
+    $or: [{ email: /@fake\.com$/i }, { username: /^seller_/i }],
+  }).select("_id");
+  const seededUserIds = seededUsers.map((u) => u._id);
+
+  // Delete in dependency order
+  await Product.deleteMany({});
+  await ShopCategory.deleteMany({});
+  await Shop.deleteMany({ owner: { $in: seededUserIds } });
+  await User.deleteMany({ _id: { $in: seededUserIds } });
+}
+
 async function seedData() {
-  console.log("🚀 Starting MASSIVE seeding (100 Shops, 5000 Products)...");
+  const quick = hasFlag("--quick");
+  const TOTAL_SHOPS = quick ? 5 : parseArgInt("--shops", 100);
+  const PRODUCTS_PER_SHOP = quick ? 20 : parseArgInt("--products-per-shop", 50);
+  const doReset = hasFlag("--reset");
+
+  console.log(
+    `🚀 Seeding: shops=${TOTAL_SHOPS}, products/shop=${PRODUCTS_PER_SHOP}, reset=${doReset}`,
+  );
 
   try {
     // 1. Connect DB
     await mongoose.connect(process.env.MONGODB_URI);
     console.log("✅ Connected to MongoDB");
 
-    // 2. Fetch Global Categories (Must exist)
-    const globalCategories = await Category.find({ isActive: true }).select("_id");
+    if (doReset) {
+      await resetSeedData();
+    }
+
+    // 2. Fetch/Create Global Categories
+    const globalCategories = await ensureGlobalCategories();
     if (globalCategories.length === 0) {
-      throw new Error("❌ No global categories found. Please create some first.");
+      throw new Error("❌ Failed to create global categories. Check unique constraints / DB permissions.");
     }
 
     // 3. Pre-calculate password hash for speed
     const passwordHash = await bcrypt.hash("123456", 10);
 
-    const TOTAL_SHOPS = 100;
-    const PRODUCTS_PER_SHOP = 50; // Total 5000
     let totalProductsCreated = 0;
 
     console.log(`ℹ️ Creating ${TOTAL_SHOPS} Shops with ${PRODUCTS_PER_SHOP} products each...`);
@@ -78,7 +148,6 @@ async function seedData() {
         password: passwordHash,
         roles: "seller", // Schema uses 'roles'
         isVerifiedEmail: true, // Schema uses 'isVerifiedEmail'
-        status: "active", // Note: Schema doesn't have 'status', might be ignored or handled by default
         provider: "local"
       });
 
@@ -89,9 +158,7 @@ async function seedData() {
         slug: slugify(shopName, { lower: true, strict: true, locale: 'vi' }),
         description: `Official store for ${shopName}`,
         owner: user._id,
-        status: "active",
-        email: userEmail,
-        phone: `09${getRandomInt(10000000, 99999999)}`
+        status: "active"
       });
 
       // Update user with shopId
@@ -119,6 +186,13 @@ async function seedData() {
       for (let p = 0; p < PRODUCTS_PER_SHOP; p++) {
         const name = generateProductName() + ` [${i}-${p}]`; // Ensure absolute uniqueness
         const price = getRandomInt(100, 20000) * 1000;
+        const now = new Date();
+        const flashSaleEnabled = Math.random() > 0.9;
+        const discountPercent = flashSaleEnabled ? getRandomInt(5, 30) : null;
+        const salePrice =
+          flashSaleEnabled && discountPercent
+            ? Math.max(1000, Math.round(price * (1 - discountPercent / 100)))
+            : null;
         
         productsToInsert.push({
           name: name,
@@ -137,6 +211,17 @@ async function seedData() {
           soldCount: getRandomInt(0, 500),
           status: "published",
           isFeatured: Math.random() > 0.8,
+          flashSale: flashSaleEnabled
+            ? {
+                isActive: true,
+                salePrice,
+                discountPercent,
+                stock: getRandomInt(5, 50),
+                soldCount: getRandomInt(0, 30),
+                startTime: new Date(now.getTime() - 60 * 60 * 1000),
+                endTime: new Date(now.getTime() + 6 * 60 * 60 * 1000),
+              }
+            : { isActive: false },
           variants: [
             {
               name: "Standard",

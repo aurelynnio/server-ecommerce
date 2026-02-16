@@ -2,11 +2,7 @@ const { Schema, model, Types } = require("mongoose");
 
 const addressSchema = new Schema({
   fullName: { type: String, required: true },
-  phone: {
-    type: String,
-    unique: true,
-    sparse: true,
-  },
+  phone: { type: String },
   address: String,
   city: String,
   district: String,
@@ -52,16 +48,9 @@ const userSchema = new Schema(
       type: String,
       default: null,
     },
-    // Wishlist - favorite products
-    wishlist: {
-      type: [{ type: Schema.Types.ObjectId, ref: "Product" }],
-      default: [],
-    },
-    // Following shops
-    followingShops: {
-      type: [{ type: Schema.Types.ObjectId, ref: "Shop" }],
-      default: [],
-    },
+    // Wishlist and followingShops are now in separate collections:
+    // - Wishlist model (wishlists collection)
+    // - ShopFollower model (shop_followers collection)
     codeVerifiEmail: {
       type: String,
     },
@@ -101,8 +90,6 @@ const userSchema = new Schema(
 );
 
 // Indexes
-userSchema.index({ email: 1 });
-userSchema.index({ username: 1 });
 userSchema.index({ roles: 1 });
 userSchema.index({ isVerifiedEmail: 1 });
 

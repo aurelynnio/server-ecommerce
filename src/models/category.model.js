@@ -2,7 +2,7 @@ const { Schema, model, Types } = require("mongoose");
 
 const categorySchema = new Schema(
   {
-    name: { type: String, required: true, unique: true, trim: true },
+    name: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
     slug: { type: String, required: true, unique: true },
     parentCategory: { type: Types.ObjectId, ref: "Category", default: null },
@@ -16,7 +16,7 @@ const categorySchema = new Schema(
 );
 
 // Indexes
-categorySchema.index({ slug: 1 });
+categorySchema.index({ name: 1, parentCategory: 1 }, { unique: true }); // Same name allowed under different parents
 categorySchema.index({ parentCategory: 1 });
 categorySchema.index({ isActive: 1 });
 

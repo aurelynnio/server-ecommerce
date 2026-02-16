@@ -1,4 +1,5 @@
 const Voucher = require("../models/voucher.model");
+const VoucherUsage = require("../models/voucher-usage.model");
 const Shop = require("../models/shop.model");
 const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
 const { StatusCodes } = require("http-status-codes");
@@ -279,19 +280,24 @@ class VoucherService {
     }
 
     // Filter out vouchers user has exceeded usage limit
-    const filterByUserUsage = (vouchers) => {
+    const filterByUserUsage = async (vouchers) => {
+      if (vouchers.length === 0) return vouchers;
+      const voucherIds = vouchers.map((v) => v._id);
+      const usages = await VoucherUsage.aggregate([
+        { $match: { voucherId: { $in: voucherIds }, userId: new (require("mongoose").Types.ObjectId)(userId) } },
+        { $group: { _id: "$voucherId", count: { $sum: 1 } } },
+      ]);
+      const usageMap = new Map(usages.map((u) => [u._id.toString(), u.count]));
       return vouchers.filter((voucher) => {
         if (voucher.usageLimitPerUser === 0) return true;
-        const usedCount = voucher.usedBy.filter(
-          (id) => id.toString() === userId.toString()
-        ).length;
+        const usedCount = usageMap.get(voucher._id.toString()) || 0;
         return usedCount < voucher.usageLimitPerUser;
       });
     };
 
     return {
-      platform: filterByUserUsage(platformVouchers),
-      shop: filterByUserUsage(shopVouchers),
+      platform: await filterByUserUsage(platformVouchers),
+      shop: await filterByUserUsage(shopVouchers),
     };
   }
 
@@ -345,10 +351,11 @@ class VoucherService {
       throw new ApiError(StatusCodes.CONFLICT, "Voucher usage limit reached");
     }
 
-    // 5. Check Usage Limit (Per User)
-    const usedCount = voucher.usedBy.filter(
-      (id) => id.toString() === userId.toString()
-    ).length;
+    // 5. Check Usage Limit (Per User) via VoucherUsage collection
+    const usedCount = await VoucherUsage.countDocuments({
+      voucherId: voucher._id,
+      userId,
+    });
 
     if (
       voucher.usageLimitPerUser > 0 &&

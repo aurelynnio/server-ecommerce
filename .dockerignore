@@ -1,2 +1,11 @@
 .env
 node_modules
+.git
+.github
+.gitignore
+*.md
+tests
+__tests__
+vitest.config.js
+jest.config.js
+.vscode

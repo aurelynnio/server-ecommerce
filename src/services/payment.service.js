@@ -31,7 +31,7 @@ const getVNPayInstance = () => {
     vnpayInstance = new VNPay({
       tmnCode: process.env.VNP_TMNCODE,
       secureSecret: process.env.VNP_HASHSECRET,
-      vnpayHost: process.env.VNP_URL || "https://sandbox.vnpayment.vn",
+      vnpayHost: "https://sandbox.vnpayment.vn",
       testMode: process.env.NODE_ENV !== "production",
       hashAlgorithm: "SHA512",
     });

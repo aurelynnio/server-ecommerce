@@ -14,6 +14,23 @@ const LOG_LEVELS = {
 const currentLevel =
   process.env.NODE_ENV === "production" ? LOG_LEVELS.INFO : LOG_LEVELS.DEBUG;
 
+const normalizeError = (err) => {
+  if (!(err instanceof Error)) return err;
+  return { name: err.name, message: err.message, stack: err.stack };
+};
+
+const normalizeMeta = (meta) => {
+  if (!meta) return {};
+  if (meta instanceof Error) return normalizeError(meta);
+  if (typeof meta !== "object") return { meta };
+
+  const out = {};
+  for (const [k, v] of Object.entries(meta)) {
+    out[k] = v instanceof Error ? normalizeError(v) : v;
+  }
+  return out;
+};
+
 /**
  * Format log message with timestamp and level
  * @param {string} level - Log level
@@ -23,8 +40,11 @@ const currentLevel =
  */
 const formatMessage = (level, message, meta = {}) => {
   const timestamp = new Date().toISOString();
+  const normalizedMeta = normalizeMeta(meta);
   const metaStr =
-    Object.keys(meta).length > 0 ? ` ${JSON.stringify(meta)}` : "";
+    Object.keys(normalizedMeta).length > 0
+      ? ` ${JSON.stringify(normalizedMeta)}`
+      : "";
   return `[${timestamp}] [${level}] ${message}${metaStr}`;
 };
 

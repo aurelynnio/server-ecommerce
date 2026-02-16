@@ -7,6 +7,7 @@ const mongoose = require("mongoose");
 
 const voucherService = require("./voucher.service");
 const Voucher = require("../models/voucher.model");
+const VoucherUsage = require("../models/voucher-usage.model");
 const inventoryService = require("./inventory.service");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
@@ -139,7 +140,6 @@ class OrderService {
 
             let price = product.price.currentPrice;
             let skuCode = "";
-            let tierIndex = [];
 
             if (item.modelId) {
               const variant = product.variants?.find(
@@ -157,7 +157,6 @@ class OrderService {
 
               price = variant.price;
               skuCode = variant.sku;
-              tierIndex = variant.tierIndex || []; // Handle optional tierIndex
 
               inventoryItems.push({
                 productId: product._id,
@@ -177,10 +176,9 @@ class OrderService {
             orderProducts.push({
               productId: product._id,
               sku: skuCode,
-              modelId: item.modelId,
+              variantId: item.modelId,
               name: product.name, // Snapshot name
               image: product.images?.[0] || "", // simplified
-              tierIndex,
               quantity: item.quantity,
               price,
               totalPrice: price * item.quantity,
@@ -202,13 +200,14 @@ class OrderService {
             );
             discountShop = voucherResult.discountAmount;
 
-            // Increment usage
+            // Increment usage count and record in VoucherUsage collection
             await Voucher.findByIdAndUpdate(
               voucherResult.voucherId,
-              {
-                $inc: { usageCount: 1 },
-                $push: { usedBy: userId },
-              },
+              { $inc: { usageCount: 1 } },
+              { session }
+            );
+            await VoucherUsage.create(
+              [{ voucherId: voucherResult.voucherId, userId }],
               { session }
             );
           }
@@ -269,13 +268,14 @@ class OrderService {
             );
           });
 
-          // Increment usage
+          // Increment usage count and record in VoucherUsage collection
           await Voucher.findByIdAndUpdate(
             voucherResult.voucherId,
-            {
-              $inc: { usageCount: 1 },
-              $push: { usedBy: userId },
-            },
+            { $inc: { usageCount: 1 } },
+            { session }
+          );
+          await VoucherUsage.create(
+            [{ voucherId: voucherResult.voucherId, userId }],
             { session }
           );
         }
@@ -484,7 +484,7 @@ class OrderService {
   async restoreOrderStock(order) {
     const inventoryItems = order.products.map(item => ({
         productId: item.productId,
-        modelId: item.modelId,
+        modelId: item.variantId,
         quantity: item.quantity
     }));
 

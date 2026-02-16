@@ -1,4 +1,4 @@
-const User = require("../models/user.model");
+const Wishlist = require("../models/wishlist.model");
 const Product = require("../models/product.model");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
@@ -8,7 +8,7 @@ const { getPaginationParams, buildPaginationResponse } = require("../utils/pagin
 
 /**
  * Service handling wishlist/favorites operations
- * Manages user's favorite products list
+ * Manages user's favorite products list using separate Wishlist collection
  */
 class WishlistService {
   /**
@@ -20,25 +20,22 @@ class WishlistService {
    * @returns {Promise<Object>} Wishlist with pagination
    */
   async getWishlist(userId, { page = 1, limit = 10 } = {}) {
-    const user = await User.findById(userId).select("wishlist");
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
-    }
-
-
-    const wishlistIds = user.wishlist || [];
-    const total = wishlistIds.length;
+    const total = await Wishlist.countDocuments({ userId });
     const paginationParams = getPaginationParams(page, limit, total);
 
-    // Get paginated product IDs
-    const paginatedIds = wishlistIds.slice(
-      paginationParams.skip,
-      paginationParams.skip + paginationParams.limit
-    );
+    // Get paginated wishlist entries
+    const wishlistEntries = await Wishlist.find({ userId })
+      .sort({ createdAt: -1 })
+      .skip(paginationParams.skip)
+      .limit(paginationParams.limit)
+      .select("productId")
+      .lean();
 
-    // Fetch products with details - Note: images are in variants[].images
+    const productIds = wishlistEntries.map((entry) => entry.productId);
+
+    // Fetch products with details
     const products = await Product.find({
-      _id: { $in: paginatedIds },
+      _id: { $in: productIds },
       status: "published",
     })
       .select("name slug price ratingAverage reviewCount soldCount shop variants.images variants.name variants.color")
@@ -53,7 +50,6 @@ class WishlistService {
     }));
 
     return buildPaginationResponse(productsWithImages, paginationParams);
-
   }
 
   /**
@@ -72,26 +68,20 @@ class WishlistService {
       throw new ApiError(StatusCodes.CONFLICT, "Product is not available");
     }
 
-    const user = await User.findById(userId);
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
-    }
-
     // Check if already in wishlist
-    if (user.wishlist && user.wishlist.includes(productId)) {
+    const existing = await Wishlist.findOne({ userId, productId });
+    if (existing) {
       throw new ApiError(StatusCodes.CONFLICT, "Product already in wishlist");
     }
 
+    await Wishlist.create({ userId, productId });
 
-    // Add to wishlist
-    await User.findByIdAndUpdate(userId, {
-      $addToSet: { wishlist: productId },
-    });
+    const wishlistCount = await Wishlist.countDocuments({ userId });
 
     return {
       message: "Product added to wishlist",
       productId,
-      wishlistCount: (user.wishlist?.length || 0) + 1,
+      wishlistCount,
     };
   }
 
@@ -102,20 +92,14 @@ class WishlistService {
    * @returns {Promise<Object>} Updated wishlist info
    */
   async removeFromWishlist(userId, productId) {
-    const user = await User.findById(userId);
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
-    }
+    await Wishlist.deleteOne({ userId, productId });
 
-
-    await User.findByIdAndUpdate(userId, {
-      $pull: { wishlist: productId },
-    });
+    const wishlistCount = await Wishlist.countDocuments({ userId });
 
     return {
       message: "Product removed from wishlist",
       productId,
-      wishlistCount: Math.max(0, (user.wishlist?.length || 1) - 1),
+      wishlistCount,
     };
   }
 
@@ -126,9 +110,8 @@ class WishlistService {
    * @returns {Promise<boolean>} True if in wishlist
    */
   async isInWishlist(userId, productId) {
-    const user = await User.findById(userId).select("wishlist");
-    if (!user) return false;
-    return user.wishlist?.includes(productId) || false;
+    const entry = await Wishlist.findOne({ userId, productId }).lean();
+    return !!entry;
   }
 
   /**
@@ -137,7 +120,7 @@ class WishlistService {
    * @returns {Promise<Object>} Confirmation message
    */
   async clearWishlist(userId) {
-    await User.findByIdAndUpdate(userId, { wishlist: [] });
+    await Wishlist.deleteMany({ userId });
     return { message: "Wishlist cleared successfully" };
   }
 
@@ -147,8 +130,7 @@ class WishlistService {
    * @returns {Promise<number>} Number of items in wishlist
    */
   async getWishlistCount(userId) {
-    const user = await User.findById(userId).select("wishlist");
-    return user?.wishlist?.length || 0;
+    return await Wishlist.countDocuments({ userId });
   }
 
   /**
@@ -158,10 +140,14 @@ class WishlistService {
    * @returns {Promise<Object>} Map of productId to boolean
    */
   async checkMultipleInWishlist(userId, productIds) {
-    const user = await User.findById(userId).select("wishlist");
-    if (!user) return {};
+    const entries = await Wishlist.find({
+      userId,
+      productId: { $in: productIds },
+    })
+      .select("productId")
+      .lean();
 
-    const wishlistSet = new Set(user.wishlist?.map((id) => id.toString()) || []);
+    const wishlistSet = new Set(entries.map((e) => e.productId.toString()));
     const result = {};
     productIds.forEach((id) => {
       result[id] = wishlistSet.has(id.toString());

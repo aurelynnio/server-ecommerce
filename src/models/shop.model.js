@@ -42,8 +42,8 @@ const shopSchema = new Schema(
     // Reputation Metrics
     rating: {
       type: Number,
-      default: 4.5,
-      min: 1,
+      default: 0,
+      min: 0,
       max: 5,
     },
     metrics: {
@@ -52,11 +52,7 @@ const shopSchema = new Schema(
       ratingCount: { type: Number, default: 0 },
     },
 
-    // Followers - array of user IDs
-    followers: {
-      type: [{ type: Types.ObjectId, ref: "User" }],
-      default: [],
-    },
+    // Followers count - actual followers stored in ShopFollower collection
     followerCount: { type: Number, default: 0 },
   },
   {
@@ -67,6 +63,5 @@ const shopSchema = new Schema(
 
 // Indexes
 shopSchema.index({ name: "text" });
-shopSchema.index({ owner: 1 });
 
 module.exports = model("Shop", shopSchema);
