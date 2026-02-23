@@ -9,9 +9,24 @@ const {
 const logger = require("../utils/logger");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
-const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
+const {
+  getPaginationParams,
+  buildPaginationResponse,
+} = require("../utils/pagination");
 
 class PermissionService {
+  _normalizeRoles(roleOrRoles) {
+    if (Array.isArray(roleOrRoles)) {
+      return roleOrRoles.filter(Boolean);
+    }
+    return roleOrRoles ? [roleOrRoles] : [];
+  }
+
+  _getPermissionsForRoles(roleOrRoles) {
+    const roles = this._normalizeRoles(roleOrRoles);
+    return [...new Set(roles.flatMap((role) => ROLE_PERMISSIONS[role] || []))];
+  }
+
   /**
    * Get user permissions
    * @param {any} user
@@ -20,9 +35,10 @@ class PermissionService {
   getUserPermissions(user) {
     if (!user) return [];
 
-    const role = user.roles || user.role;
-    const rolePermissions = ROLE_PERMISSIONS[role] || [];
-    const userPermissions = user.permissions || [];
+    const rolePermissions = this._getPermissionsForRoles(user.roles || user.role);
+    const userPermissions = Array.isArray(user.permissions)
+      ? user.permissions
+      : [];
 
     if (rolePermissions.includes("*")) {
       return this.getAllPermissions();
@@ -38,7 +54,6 @@ class PermissionService {
     const finalPerms = positivePerms.filter((p) => !negativePerms.includes(p));
 
     return expandManagePermissions(finalPerms);
-
   }
 
   /**
@@ -56,7 +71,6 @@ class PermissionService {
    * @returns {boolean}
    */
   hasPermission(user, permission) {
-
     if (!user || !permission) return false;
 
     const permissions = this.getUserPermissions(user);
@@ -67,7 +81,6 @@ class PermissionService {
     if (permissions.includes(`${resource}:manage`)) return true;
 
     return false;
-
   }
 
   /**
@@ -77,7 +90,6 @@ class PermissionService {
    * @returns {boolean}
    */
   hasAnyPermission(user, permissions) {
-
     if (!user || !permissions || permissions.length === 0) return false;
     return permissions.some((p) => this.hasPermission(user, p));
   }
@@ -89,7 +101,6 @@ class PermissionService {
    * @returns {boolean}
    */
   hasAllPermissions(user, permissions) {
-
     if (!user || !permissions || permissions.length === 0) return false;
     return permissions.every((p) => this.hasPermission(user, p));
   }
@@ -103,10 +114,11 @@ class PermissionService {
    */
   async grantPermission(userId, permission, adminId) {
     if (!isValidPermission(permission)) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, `Invalid permission: ${permission}`);
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        `Invalid permission: ${permission}`,
+      );
     }
-
-
 
     const user = await User.findById(userId);
     if (!user) {
@@ -123,7 +135,6 @@ class PermissionService {
     await this.logAudit("grant", adminId, userId, permission);
 
     return user;
-
   }
 
   /**
@@ -134,7 +145,6 @@ class PermissionService {
    * @returns {Promise<any>}
    */
   async revokePermission(userId, permission, adminId) {
-
     const user = await User.findById(userId);
     if (!user) {
       throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
@@ -151,7 +161,6 @@ class PermissionService {
     await this.logAudit("revoke", adminId, userId, permission);
 
     return user;
-
   }
 
   /**
@@ -169,7 +178,7 @@ class PermissionService {
     if (invalidPerms.length > 0) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
-        `Invalid permissions: ${invalidPerms.join(", ")}`
+        `Invalid permissions: ${invalidPerms.join(", ")}`,
       );
     }
 
@@ -179,14 +188,11 @@ class PermissionService {
       { new: true },
     );
 
-
     if (!user) {
       throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
-
     await this.logBulkUpdate(adminId, userId, permissions);
-
 
     return user;
   }
@@ -248,7 +254,7 @@ class PermissionService {
     }
 
     const effectivePermissions = this.getUserPermissions(user);
-    const rolePermissions = ROLE_PERMISSIONS[user.roles] || [];
+    const rolePermissions = this._getPermissionsForRoles(user.roles || user.role);
 
     return {
       user: {
@@ -269,28 +275,22 @@ class PermissionService {
    * @returns {Promise<any>}
    */
   async getAuditLogs({ page = 1, limit = 20, userId, action }) {
-    try {
-      const query = {};
-      if (userId) query.targetUserId = userId;
-      if (action) query.action = action;
+    const query = {};
+    if (userId) query.targetUserId = userId;
+    if (action) query.action = action;
 
-      const total = await PermissionAudit.countDocuments(query);
-      const paginationParams = getPaginationParams(page, limit, total);
+    const total = await PermissionAudit.countDocuments(query);
+    const paginationParams = getPaginationParams(page, limit, total);
 
-      const logs = await PermissionAudit.find(query)
-        .sort({ timestamp: -1 })
-        .skip(paginationParams.skip)
-        .limit(paginationParams.limit)
-        .populate("adminId", "username email")
-        .populate("targetUserId", "username email");
+    const logs = await PermissionAudit.find(query)
+      .sort({ timestamp: -1 })
+      .skip(paginationParams.skip)
+      .limit(paginationParams.limit)
+      .populate("adminId", "username email")
+      .populate("targetUserId", "username email");
 
-      return buildPaginationResponse(logs, paginationParams);
-    } catch (error) {
-      logger.error("Failed to get audit logs:", { error: error.message });
-      return buildPaginationResponse([], getPaginationParams(page, limit, 0));
-    }
+    return buildPaginationResponse(logs, paginationParams);
   }
 }
-
 
 module.exports = new PermissionService();

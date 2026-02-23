@@ -2,6 +2,7 @@ const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("./errorHandler.middleware");
 const permissionService = require("../services/permission.service");
 const logger = require("../utils/logger");
+const { sendFail } = require("../shared/res/formatResponse");
 
 /**
  * Require permission
@@ -13,15 +14,20 @@ const requirePermission = (requiredPermissions, options = { mode: "all" }) => {
   const permissions = Array.isArray(requiredPermissions)
     ? requiredPermissions
     : [requiredPermissions];
+  const mode = options?.mode === "any" ? "any" : "all";
 
-  return async (req, res, next) => {
+  return (req, res, next) => {
     try {
       if (!req.user) {
-        throw new ApiError(StatusCodes.UNAUTHORIZED, "Authentication required");
+        return sendFail(
+          res,
+          "Authentication required",
+          StatusCodes.UNAUTHORIZED,
+        );
       }
 
       let hasPermission;
-      if (options.mode === "any") {
+      if (mode === "any") {
         hasPermission = permissionService.hasAnyPermission(
           req.user,
           permissions,
@@ -34,16 +40,25 @@ const requirePermission = (requiredPermissions, options = { mode: "all" }) => {
       }
 
       if (!hasPermission) {
-        throw new ApiError(
-          StatusCodes.FORBIDDEN,
+        return sendFail(
+          res,
           `Access denied. Required permission: ${permissions.join(", ")}`,
+          StatusCodes.FORBIDDEN,
         );
       }
 
-      next();
+      return next();
     } catch (error) {
-      logger.error("Permission check error:", { error });
-      next(error);
+      logger.error("Permission check error", {
+        name: error.name,
+        message: error.message,
+      });
+      return next(
+        new ApiError(
+          StatusCodes.INTERNAL_SERVER_ERROR,
+          "Permission check failed",
+        ),
+      );
     }
   };
 };

@@ -1,8 +1,25 @@
 const catchAsync = require("../configs/catchAsync");
 const PaymentService = require("../services/payment.service");
-const { VNPay } = require("vnpay");
 const { StatusCodes } = require("http-status-codes");
 const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
+
+const getClientUrl = () => process.env.FRONTEND_URL || "http://localhost:3000";
+
+const buildPaymentResultUrl = ({ status, orderId, transactionId }) => {
+  const clientUrl = getClientUrl();
+  const query = new URLSearchParams({
+    orderId: String(orderId || ""),
+    transactionId: String(transactionId || ""),
+  });
+
+  return `${clientUrl}/payment/${status}?${query.toString()}`;
+};
+
+const buildPaymentErrorUrl = (message) => {
+  const clientUrl = getClientUrl();
+  const query = new URLSearchParams({ message: message || "Payment failed" });
+  return `${clientUrl}/payment/error?${query.toString()}`;
+};
 
 const PaymentController = {
   /**
@@ -24,7 +41,7 @@ const PaymentController = {
     const payment = await PaymentService.createPaymentUrl(
       orderId,
       userId,
-      ipAddress
+      ipAddress,
     );
 
     return sendSuccess(
@@ -35,7 +52,7 @@ const PaymentController = {
         amount: payment.amount,
       },
       "Payment URL created successfully",
-      StatusCodes.OK
+      StatusCodes.OK,
     );
   }),
 
@@ -51,17 +68,16 @@ const PaymentController = {
     try {
       const result = await PaymentService.verifyReturnUrl(vnpayParams);
 
-      const clientUrl = process.env.FRONTEND_URL || "http://localhost:3000";
       const status = result.success ? "success" : "failed";
-      const redirectUrl = `${clientUrl}/payment/${status}?orderId=${result.order._id}&transactionId=${result.payment.transactionId}`;
+      const redirectUrl = buildPaymentResultUrl({
+        status,
+        orderId: result.order?._id,
+        transactionId: result.payment?.transactionId,
+      });
 
-      res.redirect(redirectUrl);
+      return res.redirect(redirectUrl);
     } catch (error) {
-      const clientUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-      const redirectUrl = `${clientUrl}/payment/error?message=${encodeURIComponent(
-        error.message
-      )}`;
-      res.redirect(redirectUrl);
+      return res.redirect(buildPaymentErrorUrl(error.message));
     }
   }),
 

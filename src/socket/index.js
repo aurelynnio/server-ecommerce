@@ -8,7 +8,6 @@ const logger = require("../utils/logger");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
 
-
 let io = null;
 let redisPubClient = null;
 let redisSubClient = null;
@@ -87,7 +86,10 @@ const initSocket = (httpServer) => {
 
 const getIO = () => {
   if (!io) {
-    throw new ApiError(StatusCodes.SERVICE_UNAVAILABLE, "Socket.io not initialized!");
+    throw new ApiError(
+      StatusCodes.SERVICE_UNAVAILABLE,
+      "Socket.io not initialized!",
+    );
   }
 
   return io;

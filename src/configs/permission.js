@@ -1,123 +1,61 @@
 const RESOURCES = {
-  PRODUCT: 'product',
-  ORDER: 'order',
-  USER: 'user',
-  SHOP: 'shop',
-  CATEGORY: 'category',
-  VOUCHER: 'voucher',
-  BANNER: 'banner',
-  NOTIFICATION: 'notification',
-  FLASH_SALE: 'flash-sale',
-  REVIEW: 'review',
-  CART: 'cart',
-  WISHLIST: 'wishlist',
-  SHIPPING: 'shipping',
-  STATISTICS: 'statistics',
-  CHAT: 'chat',
-  SHOP_CATEGORY: 'shop-category',
-  PAYMENT: 'payment',
+  PRODUCT: "product",
+  ORDER: "order",
+  USER: "user",
+  SHOP: "shop",
+  CATEGORY: "category",
+  VOUCHER: "voucher",
+  BANNER: "banner",
+  NOTIFICATION: "notification",
+  FLASH_SALE: "flash-sale",
+  REVIEW: "review",
+  CART: "cart",
+  WISHLIST: "wishlist",
+  SHIPPING: "shipping",
+  STATISTICS: "statistics",
+  CHAT: "chat",
+  SHOP_CATEGORY: "shop-category",
+  PAYMENT: "payment",
 };
 
 const ACTIONS = {
-  CREATE: 'create',
-  READ: 'read',
-  UPDATE: 'update',
-  DELETE: 'delete',
-  MANAGE: 'manage',
+  CREATE: "create",
+  READ: "read",
+  UPDATE: "update",
+  DELETE: "delete",
+  MANAGE: "manage",
 };
 
 const permission = (resource, action) => `${resource}:${action}`;
 
 const SPECIAL_PERMISSIONS = {
-  ADMIN_ACCESS: 'admin:access',
-  SELLER_ACCESS: 'seller:access',
+  ADMIN_ACCESS: "admin:access",
+  SELLER_ACCESS: "seller:access",
+};
+
+const buildPermissions = () => {
+  const generated = {};
+
+  for (const [resourceKey, resourceValue] of Object.entries(RESOURCES)) {
+    for (const [actionKey, actionValue] of Object.entries(ACTIONS)) {
+      generated[`${resourceKey}_${actionKey}`] = permission(
+        resourceValue,
+        actionValue,
+      );
+    }
+  }
+
+  return generated;
 };
 
 const PERMISSIONS = {
+  ...buildPermissions(),
   ADMIN_ACCESS: SPECIAL_PERMISSIONS.ADMIN_ACCESS,
   SELLER_ACCESS: SPECIAL_PERMISSIONS.SELLER_ACCESS,
-  PRODUCT_CREATE: permission(RESOURCES.PRODUCT, ACTIONS.CREATE),
-  PRODUCT_READ: permission(RESOURCES.PRODUCT, ACTIONS.READ),
-  PRODUCT_UPDATE: permission(RESOURCES.PRODUCT, ACTIONS.UPDATE),
-  PRODUCT_DELETE: permission(RESOURCES.PRODUCT, ACTIONS.DELETE),
-  PRODUCT_MANAGE: permission(RESOURCES.PRODUCT, ACTIONS.MANAGE),
-  ORDER_CREATE: permission(RESOURCES.ORDER, ACTIONS.CREATE),
-  ORDER_READ: permission(RESOURCES.ORDER, ACTIONS.READ),
-  ORDER_UPDATE: permission(RESOURCES.ORDER, ACTIONS.UPDATE),
-  ORDER_DELETE: permission(RESOURCES.ORDER, ACTIONS.DELETE),
-  ORDER_MANAGE: permission(RESOURCES.ORDER, ACTIONS.MANAGE),
-  USER_CREATE: permission(RESOURCES.USER, ACTIONS.CREATE),
-  USER_READ: permission(RESOURCES.USER, ACTIONS.READ),
-  USER_UPDATE: permission(RESOURCES.USER, ACTIONS.UPDATE),
-  USER_DELETE: permission(RESOURCES.USER, ACTIONS.DELETE),
-  USER_MANAGE: permission(RESOURCES.USER, ACTIONS.MANAGE),
-  SHOP_CREATE: permission(RESOURCES.SHOP, ACTIONS.CREATE),
-  SHOP_READ: permission(RESOURCES.SHOP, ACTIONS.READ),
-  SHOP_UPDATE: permission(RESOURCES.SHOP, ACTIONS.UPDATE),
-  SHOP_DELETE: permission(RESOURCES.SHOP, ACTIONS.DELETE),
-  SHOP_MANAGE: permission(RESOURCES.SHOP, ACTIONS.MANAGE),
-  CATEGORY_CREATE: permission(RESOURCES.CATEGORY, ACTIONS.CREATE),
-  CATEGORY_READ: permission(RESOURCES.CATEGORY, ACTIONS.READ),
-  CATEGORY_UPDATE: permission(RESOURCES.CATEGORY, ACTIONS.UPDATE),
-  CATEGORY_DELETE: permission(RESOURCES.CATEGORY, ACTIONS.DELETE),
-  CATEGORY_MANAGE: permission(RESOURCES.CATEGORY, ACTIONS.MANAGE),
-  VOUCHER_CREATE: permission(RESOURCES.VOUCHER, ACTIONS.CREATE),
-  VOUCHER_READ: permission(RESOURCES.VOUCHER, ACTIONS.READ),
-  VOUCHER_UPDATE: permission(RESOURCES.VOUCHER, ACTIONS.UPDATE),
-  VOUCHER_DELETE: permission(RESOURCES.VOUCHER, ACTIONS.DELETE),
-  VOUCHER_MANAGE: permission(RESOURCES.VOUCHER, ACTIONS.MANAGE),
-  BANNER_CREATE: permission(RESOURCES.BANNER, ACTIONS.CREATE),
-  BANNER_READ: permission(RESOURCES.BANNER, ACTIONS.READ),
-  BANNER_UPDATE: permission(RESOURCES.BANNER, ACTIONS.UPDATE),
-  BANNER_DELETE: permission(RESOURCES.BANNER, ACTIONS.DELETE),
-  BANNER_MANAGE: permission(RESOURCES.BANNER, ACTIONS.MANAGE),
-  NOTIFICATION_CREATE: permission(RESOURCES.NOTIFICATION, ACTIONS.CREATE),
-  NOTIFICATION_READ: permission(RESOURCES.NOTIFICATION, ACTIONS.READ),
-  NOTIFICATION_UPDATE: permission(RESOURCES.NOTIFICATION, ACTIONS.UPDATE),
-  NOTIFICATION_DELETE: permission(RESOURCES.NOTIFICATION, ACTIONS.DELETE),
-  NOTIFICATION_MANAGE: permission(RESOURCES.NOTIFICATION, ACTIONS.MANAGE),
-  FLASH_SALE_CREATE: permission(RESOURCES.FLASH_SALE, ACTIONS.CREATE),
-  FLASH_SALE_READ: permission(RESOURCES.FLASH_SALE, ACTIONS.READ),
-  FLASH_SALE_UPDATE: permission(RESOURCES.FLASH_SALE, ACTIONS.UPDATE),
-  FLASH_SALE_DELETE: permission(RESOURCES.FLASH_SALE, ACTIONS.DELETE),
-  FLASH_SALE_MANAGE: permission(RESOURCES.FLASH_SALE, ACTIONS.MANAGE),
-  REVIEW_CREATE: permission(RESOURCES.REVIEW, ACTIONS.CREATE),
-  REVIEW_READ: permission(RESOURCES.REVIEW, ACTIONS.READ),
-  REVIEW_UPDATE: permission(RESOURCES.REVIEW, ACTIONS.UPDATE),
-  REVIEW_DELETE: permission(RESOURCES.REVIEW, ACTIONS.DELETE),
-  REVIEW_MANAGE: permission(RESOURCES.REVIEW, ACTIONS.MANAGE),
-  CART_CREATE: permission(RESOURCES.CART, ACTIONS.CREATE),
-  CART_READ: permission(RESOURCES.CART, ACTIONS.READ),
-  CART_UPDATE: permission(RESOURCES.CART, ACTIONS.UPDATE),
-  CART_DELETE: permission(RESOURCES.CART, ACTIONS.DELETE),
-  CART_MANAGE: permission(RESOURCES.CART, ACTIONS.MANAGE),
-  WISHLIST_CREATE: permission(RESOURCES.WISHLIST, ACTIONS.CREATE),
-  WISHLIST_READ: permission(RESOURCES.WISHLIST, ACTIONS.READ),
-  WISHLIST_UPDATE: permission(RESOURCES.WISHLIST, ACTIONS.UPDATE),
-  WISHLIST_DELETE: permission(RESOURCES.WISHLIST, ACTIONS.DELETE),
-  WISHLIST_MANAGE: permission(RESOURCES.WISHLIST, ACTIONS.MANAGE),
-  SHIPPING_CREATE: permission(RESOURCES.SHIPPING, ACTIONS.CREATE),
-  SHIPPING_READ: permission(RESOURCES.SHIPPING, ACTIONS.READ),
-  SHIPPING_UPDATE: permission(RESOURCES.SHIPPING, ACTIONS.UPDATE),
-  SHIPPING_DELETE: permission(RESOURCES.SHIPPING, ACTIONS.DELETE),
-  SHIPPING_MANAGE: permission(RESOURCES.SHIPPING, ACTIONS.MANAGE),
-  STATISTICS_READ: permission(RESOURCES.STATISTICS, ACTIONS.READ),
-  STATISTICS_MANAGE: permission(RESOURCES.STATISTICS, ACTIONS.MANAGE),
-  CHAT_CREATE: permission(RESOURCES.CHAT, ACTIONS.CREATE),
-  CHAT_READ: permission(RESOURCES.CHAT, ACTIONS.READ),
-  CHAT_MANAGE: permission(RESOURCES.CHAT, ACTIONS.MANAGE),
-  SHOP_CATEGORY_CREATE: permission(RESOURCES.SHOP_CATEGORY, ACTIONS.CREATE),
-  SHOP_CATEGORY_READ: permission(RESOURCES.SHOP_CATEGORY, ACTIONS.READ),
-  SHOP_CATEGORY_UPDATE: permission(RESOURCES.SHOP_CATEGORY, ACTIONS.UPDATE),
-  SHOP_CATEGORY_DELETE: permission(RESOURCES.SHOP_CATEGORY, ACTIONS.DELETE),
-  SHOP_CATEGORY_MANAGE: permission(RESOURCES.SHOP_CATEGORY, ACTIONS.MANAGE),
-  PAYMENT_CREATE: permission(RESOURCES.PAYMENT, ACTIONS.CREATE),
-  PAYMENT_READ: permission(RESOURCES.PAYMENT, ACTIONS.READ),
-  PAYMENT_MANAGE: permission(RESOURCES.PAYMENT, ACTIONS.MANAGE),
 };
 
 const ROLE_PERMISSIONS = {
-  admin: ['*'],
+  admin: ["*"],
   seller: [
     SPECIAL_PERMISSIONS.SELLER_ACCESS,
     PERMISSIONS.PRODUCT_CREATE,
@@ -161,29 +99,30 @@ const ROLE_PERMISSIONS = {
   ],
 };
 
-const getAllPermissionsList = () => Object.values(PERMISSIONS);
+const getAllPermissionsList = () => [...new Set(Object.values(PERMISSIONS))];
+
+const ALL_PERMISSIONS_SET = new Set(getAllPermissionsList());
 
 const getPermissionsByResource = () => {
   const grouped = {};
 
-  for (const [key, value] of Object.entries(PERMISSIONS)) {
-    if (value.includes(':')) {
-      const [resource] = value.split(':');
-      if (!grouped[resource]) {
-        grouped[resource] = [];
-      }
-      grouped[resource].push({ key, value });
+  for (const value of Object.values(PERMISSIONS)) {
+    if (!value.includes(":")) continue;
+    const [resource] = value.split(":");
+
+    if (!grouped[resource]) {
+      grouped[resource] = [];
     }
+    grouped[resource].push(value);
   }
 
   return grouped;
 };
 
 const isValidPermission = (perm) => {
-  if (!perm || typeof perm !== 'string') return false;
-  if (perm === '*') return true;
-  const allPermissions = getAllPermissionsList();
-  return allPermissions.includes(perm);
+  if (!perm || typeof perm !== "string") return false;
+  if (perm === "*") return true;
+  return ALL_PERMISSIONS_SET.has(perm);
 };
 
 const expandManagePermissions = (permissions) => {
@@ -191,20 +130,23 @@ const expandManagePermissions = (permissions) => {
 
   for (const perm of permissions) {
     expanded.add(perm);
-    if (perm.endsWith(':manage')) {
-      const [resource] = perm.split(':');
-      expanded.add(permission(resource, ACTIONS.CREATE));
-      expanded.add(permission(resource, ACTIONS.READ));
-      expanded.add(permission(resource, ACTIONS.UPDATE));
-      expanded.add(permission(resource, ACTIONS.DELETE));
-    }
+    if (!perm.endsWith(":manage")) continue;
+
+    const [resource] = perm.split(":");
+    expanded.add(permission(resource, ACTIONS.CREATE));
+    expanded.add(permission(resource, ACTIONS.READ));
+    expanded.add(permission(resource, ACTIONS.UPDATE));
+    expanded.add(permission(resource, ACTIONS.DELETE));
   }
 
   return [...expanded];
 };
 
-const getRolePermissions = (role) => ROLE_PERMISSIONS[role] || [];
+const getRolePermissions = (role) => {
+  const roles = Array.isArray(role) ? role : [role];
 
+  return [...new Set(roles.flatMap((item) => ROLE_PERMISSIONS[item] || []))];
+};
 
 module.exports = {
   RESOURCES,
