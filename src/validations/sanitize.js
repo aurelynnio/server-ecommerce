@@ -40,7 +40,7 @@ const sanitizedString = () => {
   return joi.string().custom((value, helpers) => {
     if (typeof value !== "string") return value;
     // Trim whitespace
-    let sanitized = value.trim();
+    const sanitized = value.trim();
     return sanitized;
   }, "sanitize");
 };

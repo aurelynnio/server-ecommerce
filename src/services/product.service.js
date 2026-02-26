@@ -390,8 +390,8 @@ class ProductService {
 
       }
 
-      let variantUploadMap = {};
-      let newDescriptionImages = [];
+      const variantUploadMap = {};
+      const newDescriptionImages = [];
 
       if (files && files.length > 0) {
         const buffers = files.map((file) => file.buffer);
@@ -429,7 +429,7 @@ class ProductService {
       // Handle variants update - simple structure with attributes
       if (updateData.variants && Array.isArray(updateData.variants)) {
         // Parse existing variant images if provided
-        let existingVariantImagesMap = {};
+        const existingVariantImagesMap = {};
         if (updateData.existingVariantImages) {
           const mapping =
             typeof updateData.existingVariantImages === "string"

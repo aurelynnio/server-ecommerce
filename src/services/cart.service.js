@@ -151,7 +151,7 @@ class CartService {
    * @throws {Error} If product/variant not found or out of stock
    */
   async addToCart(userId, itemData) {
-    let { productId, modelId, size, quantity } = itemData;
+    const { productId, modelId, size, quantity } = itemData;
 
     // Validate quantity
     if (!quantity || quantity < 1) {

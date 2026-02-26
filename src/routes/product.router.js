@@ -21,7 +21,6 @@ const {
   getProductsQueryValidator,
   mongoIdParamValidator,
   slugParamValidator,
-  categoryIdParamValidator,
   categorySlugParamValidator,
   variantIdsParamValidator,
   paginationQueryValidator,

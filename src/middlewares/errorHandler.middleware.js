@@ -115,7 +115,7 @@ const getErrorMessage = (err) => {
  * @param {Object} res - Express response
  * @param {Function} next - Next middleware
  */
-const errorHandler = (err, req, res, next) => {
+const errorHandler = (err, req, res, _next) => {
   const statusCode = getStatusCode(err);
   const message = getErrorMessage(err);
   const status = `${statusCode}`.startsWith("4") ? "fail" : "error";

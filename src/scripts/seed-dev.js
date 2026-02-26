@@ -107,7 +107,7 @@ async function ensureCategories() {
       })),
       { ordered: false },
     );
-  } catch (e) {
+  } catch (_e) {
     // ignore duplicates
   }
   return await Category.find({ isActive: true }).select("_id slug");
@@ -263,7 +263,7 @@ async function ensureUsers({ sellers, buyers }) {
 async function ensureShopsForSellers(sellerUsers) {
   const shops = [];
   for (const seller of sellerUsers) {
-    let shopId = seller.shop;
+    const shopId = seller.shop;
     let shop = null;
     if (shopId) shop = await Shop.findById(shopId);
     if (!shop) {

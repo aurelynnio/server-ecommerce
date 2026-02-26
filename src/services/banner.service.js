@@ -40,7 +40,7 @@ class BannerService {
    */
   async getBanners({ limit = 10, page = 1, filter = {} }) {
     const { search, ...otherFilters } = filter;
-    let query = { ...otherFilters };
+    const query = { ...otherFilters };
 
     if (search) {
       query.$or = [

@@ -263,7 +263,7 @@ async function migrateOrderProducts(db) {
 
     for await (const order of cursor) {
       const newProducts = order.products.map((p) => {
-        const { modelId, tierIndex, ...rest } = p;
+        const { modelId, tierIndex: _tierIndex, ...rest } = p;
         return { ...rest, variantId: modelId ?? null };
       });
 

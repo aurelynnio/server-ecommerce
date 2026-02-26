@@ -14,7 +14,7 @@ const ChatbotController = {
    */
   sendMessage: catchAsync(async (req, res) => {
     const { message, sessionId } = req.body;
-    const userId = req.user?._id || null;
+    const _userId = req.user?._id || null;
 
     if (!message || !message.trim()) {
       return sendFail(res, "Message is required", StatusCodes.BAD_REQUEST);

@@ -15,7 +15,7 @@ const parseJsonFields = (fields = []) => (req, res, next) => {
     if (req.body[field] && typeof req.body[field] === "string") {
       try {
         req.body[field] = JSON.parse(req.body[field]);
-      } catch (error) {
+      } catch (_error) {
         errors.push(`Invalid JSON format for field '${field}'`);
       }
     }

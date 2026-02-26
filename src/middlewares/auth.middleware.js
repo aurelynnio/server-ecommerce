@@ -90,7 +90,7 @@ const optionalAuth = async (req, res, next) => {
     const user = await User.findById(decoded.userId).select("-password");
     req.user = user || null;
     next();
-  } catch (error) {
+  } catch (_error) {
     req.user = null;
     next();
   }
@@ -143,7 +143,7 @@ const requireRole = (...allowedRoles) => {
           if (shop) {
             userRoles.push("seller");
           }
-        } catch (err) {
+        } catch (_err) {
           return sendFail(
             res,
             "Error verifying seller role",
@@ -164,7 +164,7 @@ const requireRole = (...allowedRoles) => {
       }
 
       next();
-    } catch (error) {
+    } catch (_error) {
       return sendFail(
         res,
         "Authorization check failed",
