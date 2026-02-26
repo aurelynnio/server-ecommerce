@@ -4,13 +4,14 @@ const Product = require("../models/product.model");
 const Order = require("../models/order.model");
 const Review = require("../models/review.model");
 const ShopFollower = require("../models/shop-follower.model");
-const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
-
+const {
+  getPaginationParams,
+  buildPaginationResponse,
+} = require("../utils/pagination");
 
 const slugify = require("slugify");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
-
 
 class ShopService {
   /**
@@ -33,7 +34,6 @@ class ShopService {
     if (existingName) {
       throw new ApiError(StatusCodes.CONFLICT, "Shop name already taken");
     }
-
 
     const slug = slugify(name, { lower: true });
 
@@ -64,7 +64,6 @@ class ShopService {
       throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
     }
     return findShop;
-
   }
 
   /**
@@ -75,10 +74,12 @@ class ShopService {
   async getMyShop(userId) {
     const findShop = await Shop.findOne({ owner: userId }).lean();
     if (!findShop) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "You usually do not have a shop");
+      throw new ApiError(
+        StatusCodes.NOT_FOUND,
+        "You usually do not have a shop",
+      );
     }
     return findShop;
-
   }
 
   /**
@@ -104,7 +105,6 @@ class ShopService {
       throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
     }
     return updatedShop;
-
   }
 
   /**
@@ -157,7 +157,6 @@ class ShopService {
       throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
     }
 
-
     // Get product count
     const productCount = await Product.countDocuments({
       shop: shop._id,
@@ -165,7 +164,9 @@ class ShopService {
     });
 
     // Get follower count from ShopFollower collection
-    const followerCount = await ShopFollower.countDocuments({ shopId: shop._id });
+    const followerCount = await ShopFollower.countDocuments({
+      shopId: shop._id,
+    });
 
     return {
       ...shop,
@@ -209,7 +210,6 @@ class ShopService {
     if (!shop) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
     }
-
 
     const shopId = shop._id;
     const [
@@ -442,7 +442,6 @@ class ShopService {
     if (!validStatuses.includes(status)) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid status");
     }
-
 
     const shop = await Shop.findByIdAndUpdate(
       shopId,

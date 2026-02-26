@@ -2,7 +2,10 @@ const Review = require("../models/review.model");
 const Product = require("../models/product.model");
 const Order = require("../models/order.model");
 const Shop = require("../models/shop.model");
-const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
+const {
+  getPaginationParams,
+  buildPaginationResponse,
+} = require("../utils/pagination");
 const cacheService = require("./cache.service");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
@@ -32,14 +35,6 @@ class ReviewService {
       throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
 
-
-
-
-
-
-
-
-
     // Check if user has purchased this product
     const hasPurchased = await Order.exists({
       userId,
@@ -50,7 +45,7 @@ class ReviewService {
     if (!hasPurchased) {
       throw new ApiError(
         StatusCodes.FORBIDDEN,
-        "You can only review products you have purchased and received"
+        "You can only review products you have purchased and received",
       );
     }
 
@@ -63,10 +58,9 @@ class ReviewService {
     if (existingReview) {
       throw new ApiError(
         StatusCodes.CONFLICT,
-        "You have already reviewed this product"
+        "You have already reviewed this product",
       );
     }
-
 
     // Create review
     const review = await Review.create({
@@ -78,7 +72,6 @@ class ReviewService {
 
     // Update product average rating
     await this.updateProductRating(productId);
-
 
     // Populate user info
     await review.populate("user", "username email");
@@ -105,7 +98,6 @@ class ReviewService {
     if (!productExists) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
-
 
     // Build query
     const query = { product: productId };
@@ -183,7 +175,6 @@ class ReviewService {
         totalReviews: total,
       },
     };
-
   }
 
   /**
@@ -263,7 +254,6 @@ class ReviewService {
       throw new ApiError(StatusCodes.NOT_FOUND, "Review not found");
     }
 
-
     return review;
   }
 
@@ -288,10 +278,9 @@ class ReviewService {
     if (review.user.toString() !== userId) {
       throw new ApiError(
         StatusCodes.FORBIDDEN,
-        "Unauthorized to update this review"
+        "Unauthorized to update this review",
       );
     }
-
 
     // Update review
     if (updateData.rating !== undefined) {
@@ -332,10 +321,9 @@ class ReviewService {
     if (!isAdmin && review.user.toString() !== userId) {
       throw new ApiError(
         StatusCodes.FORBIDDEN,
-        "Unauthorized to delete this review"
+        "Unauthorized to delete this review",
       );
     }
-
 
     const productId = review.product;
 
@@ -392,7 +380,6 @@ class ReviewService {
       throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
 
-
     // Check if user has purchased and received this product
     const hasPurchased = await Order.exists({
       userId,
@@ -448,7 +435,7 @@ class ReviewService {
 
     // 3. Query reviews for these products
     const { page = 1, limit = 10, rating, replyStatus, search } = filters;
-    
+
     const query = { product: { $in: productIds } };
 
     if (rating) {
@@ -504,12 +491,12 @@ class ReviewService {
 
     // Verify product belongs to shop (assuming product has shop field populated or id)
     // If product.shop is ObjectId
-    const productShopId = review.product.shop.toString(); 
-    
+    const productShopId = review.product.shop.toString();
+
     if (productShopId !== shop._id.toString()) {
       throw new ApiError(
         StatusCodes.FORBIDDEN,
-        "Unauthorized: Product does not belong to your shop"
+        "Unauthorized: Product does not belong to your shop",
       );
     }
 
