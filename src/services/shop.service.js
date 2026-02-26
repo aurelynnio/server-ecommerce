@@ -254,7 +254,7 @@ class ShopService {
       returned: 0,
     };
     orderStatusCounts.forEach((item) => {
-      if (ordersByStatus.hasOwnProperty(item._id)) {
+      if (Object.prototype.hasOwnProperty.call(ordersByStatus, item._id)) {
         ordersByStatus[item._id] = item.count;
       }
     });

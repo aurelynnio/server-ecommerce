@@ -1,6 +1,7 @@
 const Review = require("../models/review.model");
 const Product = require("../models/product.model");
 const Order = require("../models/order.model");
+const Shop = require("../models/shop.model");
 const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
 const cacheService = require("./cache.service");
 const { StatusCodes } = require("http-status-codes");
