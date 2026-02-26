@@ -369,7 +369,12 @@ function buildAttributes() {
   }));
 }
 
-async function seedProducts({ shops, shopCategories, categories, productsPerShop }) {
+async function seedProducts({
+  shops,
+  shopCategories,
+  categories,
+  productsPerShop,
+}) {
   for (const shop of shops) {
     const existing = await Product.countDocuments({ shop: shop._id });
     if (existing >= productsPerShop) continue;
@@ -389,12 +394,17 @@ async function seedProducts({ shops, shopCategories, categories, productsPerShop
       const basePrice = faker.number.int({ min: 80, max: 2000 }) * 1000;
       const discountRoll = Math.random() > 0.65;
       const discountPrice = discountRoll
-        ? Math.round(basePrice * faker.number.float({ min: 0.7, max: 0.95, precision: 0.01 }))
+        ? Math.round(
+            basePrice *
+              faker.number.float({ min: 0.7, max: 0.95, precision: 0.01 }),
+          )
         : null;
 
       const now = new Date();
       const flashSaleEnabled = Math.random() > 0.88;
-      const discountPercent = flashSaleEnabled ? faker.number.int({ min: 5, max: 35 }) : null;
+      const discountPercent = flashSaleEnabled
+        ? faker.number.int({ min: 5, max: 35 })
+        : null;
       const salePrice =
         flashSaleEnabled && discountPercent
           ? Math.max(1000, Math.round(basePrice * (1 - discountPercent / 100)))
@@ -403,7 +413,10 @@ async function seedProducts({ shops, shopCategories, categories, productsPerShop
       const variants = buildVariants({ baseSlug: slug, basePrice });
       const stock = variants.reduce((s, v) => s + (v.stock || 0), 0);
       const soldFromVariants = variants.reduce((s, v) => s + (v.sold || 0), 0);
-      const descImages = pickMany(unsplash, faker.number.int({ min: 1, max: 6 }));
+      const descImages = pickMany(
+        unsplash,
+        faker.number.int({ min: 1, max: 6 }),
+      );
 
       batch.push({
         name,
@@ -417,7 +430,10 @@ async function seedProducts({ shops, shopCategories, categories, productsPerShop
           ["seed", "hot", "deal", "new", "best", "sale", "freeship", "auth"],
           faker.number.int({ min: 1, max: 4 }),
         ),
-        sizes: pickMany(["S", "M", "L", "XL", "XXL"], faker.number.int({ min: 0, max: 3 })),
+        sizes: pickMany(
+          ["S", "M", "L", "XL", "XXL"],
+          faker.number.int({ min: 0, max: 3 }),
+        ),
         descriptionImages: descImages,
         video: "",
         price: {
@@ -442,7 +458,10 @@ async function seedProducts({ shops, shopCategories, categories, productsPerShop
               isActive: true,
               salePrice,
               discountPercent,
-              stock: Math.max(1, Math.min(stock, faker.number.int({ min: 10, max: 80 }))),
+              stock: Math.max(
+                1,
+                Math.min(stock, faker.number.int({ min: 10, max: 80 })),
+              ),
               soldCount: faker.number.int({ min: 0, max: 50 }),
               startTime: new Date(now.getTime() - 60 * 60 * 1000),
               endTime: new Date(now.getTime() + 6 * 60 * 60 * 1000),
@@ -461,7 +480,9 @@ async function seedProducts({ shops, shopCategories, categories, productsPerShop
 }
 
 async function seedCarts(buyerUsers) {
-  const products = await Product.find({ status: "published" }).select("_id shop price variants").lean();
+  const products = await Product.find({ status: "published" })
+    .select("_id shop price variants")
+    .lean();
   if (products.length === 0) return;
 
   for (const buyer of buyerUsers) {
@@ -472,7 +493,11 @@ async function seedCarts(buyerUsers) {
     const picked = pickMany(products, itemCount);
     const items = picked.map((p) => {
       const variant = p.variants?.[0];
-      const priceObj = p.price || { currentPrice: variant?.price || 0, discountPrice: null, currency: "VND" };
+      const priceObj = p.price || {
+        currentPrice: variant?.price || 0,
+        discountPrice: null,
+        currency: "VND",
+      };
       return {
         productId: p._id,
         shopId: p.shop,
@@ -511,11 +536,20 @@ async function seedOrdersPaymentsReviews({ buyerUsers, shops }) {
       const chosenShops = pickMany(shops, shopCount);
 
       for (const shop of chosenShops) {
-        const shopProducts = products.filter((p) => p.shop?.toString() === shop._id.toString());
-        const lines = pickMany(shopProducts.length ? shopProducts : products, faker.number.int({ min: 1, max: 3 }));
+        const shopProducts = products.filter(
+          (p) => p.shop?.toString() === shop._id.toString(),
+        );
+        const lines = pickMany(
+          shopProducts.length ? shopProducts : products,
+          faker.number.int({ min: 1, max: 3 }),
+        );
         const orderLines = lines.map((p) => {
           const variant = p.variants?.[0];
-          const unitPrice = variant?.price || p.price?.discountPrice || p.price?.currentPrice || 0;
+          const unitPrice =
+            variant?.price ||
+            p.price?.discountPrice ||
+            p.price?.currentPrice ||
+            0;
           const qty = faker.number.int({ min: 1, max: 3 });
           const img = variant?.images?.[0] || p.descriptionImages?.[0] || "";
           return {
@@ -534,7 +568,10 @@ async function seedOrdersPaymentsReviews({ buyerUsers, shops }) {
         const shippingFee = faker.number.int({ min: 0, max: 4 }) * 10000;
         const discountShop = faker.number.int({ min: 0, max: 2 }) * 10000;
         const discountPlatform = faker.number.int({ min: 0, max: 2 }) * 10000;
-        const totalAmount = Math.max(0, subtotal + shippingFee - discountShop - discountPlatform);
+        const totalAmount = Math.max(
+          0,
+          subtotal + shippingFee - discountShop - discountPlatform,
+        );
 
         const paymentMethod = Math.random() > 0.6 ? "vnpay" : "cod";
         const paymentStatus = paymentMethod === "vnpay" ? "paid" : "unpaid";
@@ -560,7 +597,13 @@ async function seedOrdersPaymentsReviews({ buyerUsers, shops }) {
           discountShop,
           discountPlatform,
           totalAmount,
-          status: pick(["pending", "confirmed", "processing", "shipped", "delivered"]),
+          status: pick([
+            "pending",
+            "confirmed",
+            "processing",
+            "shipped",
+            "delivered",
+          ]),
         });
 
         if (paymentMethod === "vnpay") {
@@ -626,7 +669,10 @@ async function seedOrdersPaymentsReviews({ buyerUsers, shops }) {
               senderId: buyer._id,
               createdAt: new Date(),
             },
-            context: { productId: orderLines[0]?.productId, orderId: order._id },
+            context: {
+              productId: orderLines[0]?.productId,
+              orderId: order._id,
+            },
           });
 
           const msgCount = faker.number.int({ min: 3, max: 8 });
@@ -656,7 +702,10 @@ async function seedOrdersPaymentsReviews({ buyerUsers, shops }) {
 
         // Reviews for some delivered orders
         if (order.status === "delivered" && Math.random() > 0.4) {
-          for (const line of orderLines.slice(0, faker.number.int({ min: 1, max: orderLines.length }))) {
+          for (const line of orderLines.slice(
+            0,
+            faker.number.int({ min: 1, max: orderLines.length }),
+          )) {
             await Review.create({
               user: buyer._id,
               product: line.productId,
@@ -675,7 +724,9 @@ async function seedOrdersPaymentsReviews({ buyerUsers, shops }) {
 
   // Recompute ratingAverage/reviewCount to match seeded reviews
   const stats = await Review.aggregate([
-    { $group: { _id: "$product", avg: { $avg: "$rating" }, count: { $sum: 1 } } },
+    {
+      $group: { _id: "$product", avg: { $avg: "$rating" }, count: { $sum: 1 } },
+    },
   ]);
   for (const s of stats) {
     await Product.findByIdAndUpdate(s._id, {
@@ -692,7 +743,10 @@ async function seedShopFollowers({ buyerUsers, shops }) {
   const docs = [];
   for (const buyer of buyerUsers) {
     // Each buyer follows 1-3 random shops
-    const followed = pickMany(shops, faker.number.int({ min: 1, max: Math.min(3, shops.length) }));
+    const followed = pickMany(
+      shops,
+      faker.number.int({ min: 1, max: Math.min(3, shops.length) }),
+    );
     for (const shop of followed) {
       docs.push({ shopId: shop._id, userId: buyer._id });
     }
@@ -715,13 +769,18 @@ async function seedWishlists({ buyerUsers }) {
   const existing = await Wishlist.estimatedDocumentCount();
   if (existing > 0) return;
 
-  const products = await Product.find({ status: "published" }).select("_id").lean();
+  const products = await Product.find({ status: "published" })
+    .select("_id")
+    .lean();
   if (products.length === 0) return;
 
   const docs = [];
   for (const buyer of buyerUsers) {
     // Each buyer wishlists 2-8 random products
-    const wished = pickMany(products, faker.number.int({ min: 2, max: Math.min(8, products.length) }));
+    const wished = pickMany(
+      products,
+      faker.number.int({ min: 2, max: Math.min(8, products.length) }),
+    );
     for (const p of wished) {
       docs.push({ userId: buyer._id, productId: p._id });
     }
@@ -767,7 +826,9 @@ async function main() {
     const productCount = await Product.estimatedDocumentCount();
     if (productCount > 0 && !force && !reset) {
       await clearCaches();
-      console.log("seed-dev: products already exist, skipping (use --force or --reset).");
+      console.log(
+        "seed-dev: products already exist, skipping (use --force or --reset).",
+      );
       return;
     }
 

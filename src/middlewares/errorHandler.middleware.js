@@ -120,20 +120,22 @@ const errorHandler = (err, req, res, _next) => {
   const message = getErrorMessage(err);
   const status = `${statusCode}`.startsWith("4") ? "fail" : "error";
 
-  // Log error
-  if (process.env.NODE_ENV !== "production") {
-    logger.error("Request error", {
-      name: err.name,
-      message: err.message,
-      statusCode,
-      stack: err.stack,
-    });
-  } else {
-    logger.error("Request error", {
-      name: err.name,
-      message: err.message,
-      statusCode,
-    });
+  // Log error (skip in test environment to keep CI output clean)
+  if (process.env.NODE_ENV !== "test") {
+    if (process.env.NODE_ENV !== "production") {
+      logger.error("Request error", {
+        name: err.name,
+        message: err.message,
+        statusCode,
+        stack: err.stack,
+      });
+    } else {
+      logger.error("Request error", {
+        name: err.name,
+        message: err.message,
+        statusCode,
+      });
+    }
   }
 
   // Send standardized error response
@@ -158,7 +160,7 @@ const errorHandler = (err, req, res, _next) => {
 const notFoundHandler = (req, res, next) => {
   const err = new ApiError(
     StatusCodes.NOT_FOUND,
-    `Route ${req.originalUrl} not found`
+    `Route ${req.originalUrl} not found`,
   );
   next(err);
 };

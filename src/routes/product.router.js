@@ -10,7 +10,9 @@ const {
   verifyProductOwnership,
 } = require("../middlewares/ownership.middleware");
 const upload = require("../configs/upload");
-const { validateImageSignature } = require("../middlewares/uploadSignature.middleware");
+const {
+  validateImageSignature,
+} = require("../middlewares/uploadSignature.middleware");
 const validate = require("../middlewares/validate.middleware");
 const parseJsonFields = require("../middlewares/parseJsonFields.middleware");
 const {
@@ -32,19 +34,31 @@ const {
  * @desc    Get all products with filters and pagination
  * @access  Public
  */
-router.get("/", validate({ query: getProductsQueryValidator }), productController.getAllProducts);
+router.get(
+  "/",
+  validate({ query: getProductsQueryValidator }),
+  productController.getAllProducts,
+);
 
 /**
  * @desc    Search products (autocomplete)
  * @access  Public
  */
-router.get("/search", validate({ query: searchQueryValidator }), productController.searchProducts);
+router.get(
+  "/search",
+  validate({ query: searchQueryValidator }),
+  productController.searchProducts,
+);
 
 /**
  * @desc    Get featured products
  * @access  Public
  */
-router.get("/featured", validate({ query: limitQueryValidator }), productController.getFeaturedProducts);
+router.get(
+  "/featured",
+  validate({ query: limitQueryValidator }),
+  productController.getFeaturedProducts,
+);
 
 /**
  * @desc    Get new arrival products
@@ -62,7 +76,11 @@ router.get("/on-sale", productController.getOnSaleProducts);
  * @desc    Get product by slug
  * @access  Public
  */
-router.get("/slug/:slug", validate({ params: slugParamValidator }), productController.getProductBySlug);
+router.get(
+  "/slug/:slug",
+  validate({ params: slugParamValidator }),
+  productController.getProductBySlug,
+);
 
 /**
  * @desc    Get products by category slug
@@ -70,15 +88,22 @@ router.get("/slug/:slug", validate({ params: slugParamValidator }), productContr
  */
 router.get(
   "/category/:slug",
-  validate({ params: categorySlugParamValidator, query: paginationQueryValidator }),
-  productController.getProductsByCategorySlug
+  validate({
+    params: categorySlugParamValidator,
+    query: paginationQueryValidator,
+  }),
+  productController.getProductsByCategorySlug,
 );
 
 /**
  * @desc    Get related products (same category)
  * @access  Public
  */
-router.get("/related/:id", validate({ params: mongoIdParamValidator }), productController.getRelatedProducts);
+router.get(
+  "/related/:id",
+  validate({ params: mongoIdParamValidator }),
+  productController.getRelatedProducts,
+);
 
 /**
  * @desc    Update product by seller (own shop only)
@@ -92,9 +117,20 @@ router.put(
   verifyProductOwnership,
   upload.any(),
   validateImageSignature,
-  parseJsonFields(["price", "variants", "tags", "tierVariations", "models", "attributes", "dimensions", "variantImageMapping", "existingDescriptionImages", "existingVariantImages"]),
+  parseJsonFields([
+    "price",
+    "variants",
+    "tags",
+    "tierVariations",
+    "models",
+    "attributes",
+    "dimensions",
+    "variantImageMapping",
+    "existingDescriptionImages",
+    "existingVariantImages",
+  ]),
   validate({ params: mongoIdParamValidator, body: updateProductValidator }),
-  productController.updateProductBySeller
+  productController.updateProductBySeller,
 );
 
 /**
@@ -108,14 +144,18 @@ router.delete(
   verifyShopOwnership,
   verifyProductOwnership,
   validate({ params: mongoIdParamValidator }),
-  productController.deleteProductBySeller
+  productController.deleteProductBySeller,
 );
 
 /**
  * @desc    Get product by ID
  * @access  Public
  */
-router.get("/:id", validate({ params: mongoIdParamValidator }), productController.getProductById);
+router.get(
+  "/:id",
+  validate({ params: mongoIdParamValidator }),
+  productController.getProductById,
+);
 
 /**
  * @desc    Create new product
@@ -127,9 +167,18 @@ router.post(
   requireRole("seller", "admin"),
   upload.any(),
   validateImageSignature,
-  parseJsonFields(["price", "variants", "tags", "tierVariations", "models", "attributes", "dimensions", "variantImageMapping"]),
+  parseJsonFields([
+    "price",
+    "variants",
+    "tags",
+    "tierVariations",
+    "models",
+    "attributes",
+    "dimensions",
+    "variantImageMapping",
+  ]),
   validate(createProductValidator),
-  productController.createProduct
+  productController.createProduct,
 );
 
 /**
@@ -146,7 +195,7 @@ router.post(
   validateImageSignature,
   parseJsonFields(["price"]),
   validate({ params: mongoIdParamValidator, body: addVariantValidator }),
-  productController.addVariantBySeller
+  productController.addVariantBySeller,
 );
 
 /**
@@ -160,7 +209,7 @@ router.put(
   verifyShopOwnership,
   verifyProductOwnership,
   validate({ params: variantIdsParamValidator, body: updateVariantValidator }),
-  productController.updateVariantBySeller
+  productController.updateVariantBySeller,
 );
 
 /**
@@ -174,7 +223,7 @@ router.delete(
   verifyShopOwnership,
   verifyProductOwnership,
   validate({ params: variantIdsParamValidator }),
-  productController.deleteVariantBySeller
+  productController.deleteVariantBySeller,
 );
 
 /**
@@ -186,7 +235,7 @@ router.delete(
   verifyAccessToken,
   requireRole("admin"),
   validate({ params: mongoIdParamValidator }),
-  productController.permanentDeleteProduct
+  productController.permanentDeleteProduct,
 );
 
 module.exports = router;

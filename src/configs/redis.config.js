@@ -17,7 +17,9 @@ redis.on("connect", () => {
 
 redis.on("error", (err) => {
   redisReady = false;
-  logger.error("Redis client error:", err);
+  if (process.env.NODE_ENV !== "test") {
+    logger.error("Redis client error:", err);
+  }
 });
 
 redis.on("ready", () => {

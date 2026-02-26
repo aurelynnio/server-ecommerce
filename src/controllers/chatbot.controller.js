@@ -219,7 +219,7 @@ const ChatbotController = {
         },
       },
       "Chat sessions retrieved successfully",
-      StatusCodes.OK
+      StatusCodes.OK,
     );
   }),
 };
