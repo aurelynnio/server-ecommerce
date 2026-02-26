@@ -15,19 +15,19 @@ const { ApiError } = require("../middlewares/errorHandler.middleware");
 
 let transporter = null;
 
-// Hardcoded email configuration (per request)
+// Email configuration from environment variables
 const EMAIL_CONFIG = {
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
+  host: process.env.EMAIL_HOST || "smtp.gmail.com",
+  port: Number(process.env.EMAIL_PORT) || 587,
+  secure: process.env.EMAIL_SECURE === "true",
   auth: {
-    user: "cyhin2508@gmail.com",
-    pass: "qanqnxjxrdlogwdz",
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
   },
-  from: "cyhincdr@gmail.com",
-  baseUrl: "https://cyhin.engineer",
-  maxConnections: 5,
-  maxMessages: 100,
+  from: process.env.EMAIL_FROM,
+  baseUrl: process.env.EMAIL_BASE_URL || "https://cyhin.engineer",
+  maxConnections: Number(process.env.EMAIL_MAX_CONNECTIONS) || 5,
+  maxMessages: Number(process.env.EMAIL_MAX_MESSAGES) || 100,
 };
 
 /**
