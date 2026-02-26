@@ -128,4 +128,3 @@ module.exports = {
   verifyProductOwnership,
   verifyOrderOwnership,
 };
-

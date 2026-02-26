@@ -57,7 +57,6 @@ Anh/chị muốn xem thêm thông tin sản phẩm nào ạ?"
 - Bịa link: "/products/ao-dep" (không có trong dữ liệu)
 - Nói "có nhiều sản phẩm" khi dữ liệu rỗng`;
 
-
 // Định nghĩa các tools cho AI
 const toolDefinitions = [
   {

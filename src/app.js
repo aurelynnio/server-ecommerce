@@ -8,6 +8,7 @@ const { errorHandler, notFoundHandler } = require("./middlewares/errorHandler.mi
 const corsMiddleware = require("./middlewares/cors.middleware");
 const { globalLimiter } = require("./middlewares/rateLimited.middleware");
 const { sanitizeMiddleware } = require("./validations/sanitize");
+const { sendJson } = require("./shared/res/formatResponse");
 const app = ex();
 
 const server = http.createServer(app);
@@ -50,7 +51,7 @@ app.use(helmet());
 initRoutes(app);
 
 app.get("/", (req, res) => {
-  res.status(200).json({ status: "API OK" });
+  return sendJson(res, { status: "API OK" }, 200);
 });
 
 // 404 handler for undefined routes

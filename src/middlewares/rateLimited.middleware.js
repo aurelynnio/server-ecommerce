@@ -63,4 +63,9 @@ const chatbotLimiter = createLimiter({
   prefix: "chatbot",
 });
 
-module.exports = { globalLimiter, authLimiter, sensitiveLimiter, chatbotLimiter };
+module.exports = {
+  globalLimiter,
+  authLimiter,
+  sensitiveLimiter,
+  chatbotLimiter,
+};

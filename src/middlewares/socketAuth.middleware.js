@@ -2,7 +2,6 @@ const cookie = require("cookie");
 const logger = require("../utils/logger");
 const tokenService = require("../services/token.service");
 
-
 /**
  * Socket auth middleware
  * @param {any} socket
@@ -25,7 +24,6 @@ const socketAuthMiddleware = (socket, next) => {
 
     // 2. Verify token
     const decoded = tokenService.verifyAccessToken(token);
-
 
     // 3. Lưu thông tin user vào socket để dùng sau này
     socket.user = {

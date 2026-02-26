@@ -25,9 +25,15 @@ const sendFail = (res, message, code) => {
   return res.json(failResponse(message, code));
 };
 
+const sendJson = (res, data, code = 200) => {
+  res.status(code);
+  return res.json(data);
+};
+
 module.exports = {
   successResponse,
   failResponse,
   sendSuccess,
   sendFail,
+  sendJson,
 };

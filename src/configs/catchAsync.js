@@ -11,4 +11,3 @@ const catchAsync = (fn) => {
 };
 
 module.exports = catchAsync;
-

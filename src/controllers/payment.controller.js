@@ -1,7 +1,7 @@
 const catchAsync = require("../configs/catchAsync");
 const PaymentService = require("../services/payment.service");
 const { StatusCodes } = require("http-status-codes");
-const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
+const { sendSuccess, sendFail, sendJson } = require("../shared/res/formatResponse");
 
 const getClientUrl = () => process.env.FRONTEND_URL || "http://localhost:3000";
 
@@ -92,7 +92,7 @@ const PaymentController = {
 
     const result = await PaymentService.handleIPN(vnpayParams);
 
-    res.status(StatusCodes.OK).json(result);
+    return sendJson(res, result, StatusCodes.OK);
   }),
 
   /**

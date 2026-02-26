@@ -64,7 +64,7 @@ const validateImageSignature = (req, res, next) => {
   const invalid = files.find((file) => !isValidImageSignature(file));
   if (invalid) {
     return next(
-      new ApiError(StatusCodes.UNSUPPORTED_MEDIA_TYPE, "Invalid image file")
+      new ApiError(StatusCodes.UNSUPPORTED_MEDIA_TYPE, "Invalid image file"),
     );
   }
 

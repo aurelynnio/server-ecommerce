@@ -158,15 +158,20 @@ const toolHandlers = {
         .lean();
 
       // Fallback: if query returns empty, get any published products
-      if (products.length === 0 && (type === "featured" || type === "newArrivals")) {
-        logger.info(`[Tool] No ${type} products found, falling back to all products`);
+      if (
+        products.length === 0 &&
+        (type === "featured" || type === "newArrivals")
+      ) {
+        logger.info(
+          `[Tool] No ${type} products found, falling back to all products`,
+        );
         const fallbackProducts = await Product.find({ status: "published" })
           .populate("category", "name")
           .select("name slug price variants brand")
           .sort({ soldCount: -1 })
           .limit(limit)
           .lean();
-        
+
         return fallbackProducts.map((p) => ({
           id: p._id,
           name: p.name,

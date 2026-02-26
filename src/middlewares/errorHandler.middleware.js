@@ -5,6 +5,7 @@
 
 const { StatusCodes } = require("http-status-codes");
 const logger = require("../utils/logger");
+const { sendJson } = require("../shared/res/formatResponse");
 
 /**
  * Custom API Error class for consistent error handling
@@ -136,15 +137,19 @@ const errorHandler = (err, req, res, next) => {
   }
 
   // Send standardized error response
-  res.status(statusCode).json({
-    status,
-    message,
-    code: statusCode,
-    ...(process.env.NODE_ENV !== "production" && {
-      stack: err.stack,
-      error: err.name,
-    }),
-  });
+  return sendJson(
+    res,
+    {
+      status,
+      message,
+      code: statusCode,
+      ...(process.env.NODE_ENV !== "production" && {
+        stack: err.stack,
+        error: err.name,
+      }),
+    },
+    statusCode,
+  );
 };
 
 /**

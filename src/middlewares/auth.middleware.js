@@ -3,7 +3,6 @@ const { sendFail } = require("../shared/res/formatResponse");
 const User = require("../models/user.model");
 const tokenService = require("../services/token.service");
 
-
 /**
  * Verify JWT access token from cookie or Authorization header
  * Attaches user info to req.user if valid

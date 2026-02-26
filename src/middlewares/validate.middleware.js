@@ -7,9 +7,7 @@ const { StatusCodes } = require("http-status-codes");
  * @returns {Function} Express middleware
  */
 const validate = (schemaParam) => (req, res, next) => {
-  const schemas = schemaParam.validate
-    ? { body: schemaParam }
-    : schemaParam;
+  const schemas = schemaParam.validate ? { body: schemaParam } : schemaParam;
 
   const validOptions = {
     abortEarly: false,
@@ -43,4 +41,3 @@ const validate = (schemaParam) => (req, res, next) => {
 };
 
 module.exports = validate;
-
