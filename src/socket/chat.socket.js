@@ -64,7 +64,6 @@ const chatSocket = (io, socket) => {
       socket.emit("error", { message: "Failed to leave conversation" });
     }
   });
-
 };
 
 module.exports = chatSocket;

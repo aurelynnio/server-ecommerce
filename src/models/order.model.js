@@ -89,7 +89,7 @@ const orderSchema = new Schema(
     cancelledAt: { type: Date },
     cancelReason: { type: String },
   },
-  { timestamps: true, collection: "orders" }
+  { timestamps: true, collection: "orders" },
 );
 
 // Indexes

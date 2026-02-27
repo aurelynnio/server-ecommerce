@@ -17,7 +17,7 @@ const shippingRuleSchema = new Schema(
     // Regional restrictions or specific pricing could go here in v2
     // e.g. regions: [{ code: 'HN', fee: 20000 }]
   },
-  { _id: true }
+  { _id: true },
 );
 
 const shippingTemplateSchema = new Schema(
@@ -30,7 +30,7 @@ const shippingTemplateSchema = new Schema(
   {
     timestamps: true,
     collection: "shipping_templates",
-  }
+  },
 );
 
 shippingTemplateSchema.index({ shop: 1 });

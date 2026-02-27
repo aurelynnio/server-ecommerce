@@ -84,6 +84,192 @@ const toolDefinitions = [
   {
     type: "function",
     function: {
+      name: "search_products_advanced",
+      description:
+        "Tìm kiếm sản phẩm nâng cao theo nhiều bộ lọc: từ khóa, danh mục, thương hiệu, khoảng giá, màu, size, tồn kho, giảm giá, sắp xếp.",
+      parameters: {
+        type: "object",
+        properties: {
+          keyword: { type: "string", description: "Từ khóa tìm kiếm" },
+          category: { type: "string", description: "Tên/slug danh mục" },
+          brand: { type: "string", description: "Thương hiệu sản phẩm" },
+          minPrice: { type: "number", description: "Giá tối thiểu" },
+          maxPrice: { type: "number", description: "Giá tối đa" },
+          colors: {
+            type: "array",
+            items: { type: "string" },
+            description: "Danh sách màu cần lọc",
+          },
+          sizes: {
+            type: "array",
+            items: { type: "string" },
+            description: "Danh sách size cần lọc",
+          },
+          tags: {
+            type: "array",
+            items: { type: "string" },
+            description: "Danh sách tag cần lọc",
+          },
+          inStockOnly: {
+            type: "boolean",
+            description: "Chỉ lấy sản phẩm còn hàng",
+          },
+          onlyDiscounted: {
+            type: "boolean",
+            description: "Chỉ lấy sản phẩm đang giảm giá",
+          },
+          sortBy: {
+            type: "string",
+            enum: ["bestselling", "newest", "price_asc", "price_desc", "rating"],
+            description: "Kiểu sắp xếp kết quả",
+          },
+          limit: { type: "number", default: 5 },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_products_by_brand",
+      description:
+        "Tìm kiếm nhanh sản phẩm theo thương hiệu, có thể kết hợp từ khóa và khoảng giá.",
+      parameters: {
+        type: "object",
+        properties: {
+          brand: { type: "string", description: "Tên thương hiệu" },
+          keyword: { type: "string", description: "Từ khóa bổ sung" },
+          minPrice: { type: "number", description: "Giá tối thiểu" },
+          maxPrice: { type: "number", description: "Giá tối đa" },
+          sortBy: {
+            type: "string",
+            enum: ["bestselling", "newest", "price_asc", "price_desc", "rating"],
+            description: "Kiểu sắp xếp kết quả",
+          },
+          limit: { type: "number", default: 5 },
+        },
+        required: ["brand"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_products_by_price_range",
+      description:
+        "Tìm sản phẩm theo ngân sách/khoảng giá, có thể kết hợp từ khóa và danh mục.",
+      parameters: {
+        type: "object",
+        properties: {
+          minPrice: { type: "number", description: "Giá tối thiểu" },
+          maxPrice: { type: "number", description: "Giá tối đa" },
+          keyword: { type: "string", description: "Từ khóa bổ sung" },
+          category: { type: "string", description: "Tên/slug danh mục" },
+          sortBy: {
+            type: "string",
+            enum: ["bestselling", "newest", "price_asc", "price_desc", "rating"],
+            description: "Kiểu sắp xếp kết quả",
+          },
+          limit: { type: "number", default: 5 },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_discounted_products",
+      description:
+        "Lấy danh sách sản phẩm đang giảm giá, có thể lọc theo danh mục/từ khóa và mức giảm tối thiểu.",
+      parameters: {
+        type: "object",
+        properties: {
+          keyword: { type: "string", description: "Từ khóa sản phẩm" },
+          category: { type: "string", description: "Tên/slug danh mục" },
+          minDiscountPercent: {
+            type: "number",
+            description: "Phần trăm giảm tối thiểu",
+            default: 5,
+          },
+          inStockOnly: {
+            type: "boolean",
+            description: "Chỉ lấy sản phẩm còn hàng",
+            default: true,
+          },
+          limit: { type: "number", default: 5 },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_bestseller_products",
+      description:
+        "Lấy danh sách sản phẩm bán chạy theo danh mục hoặc thương hiệu.",
+      parameters: {
+        type: "object",
+        properties: {
+          category: { type: "string", description: "Tên/slug danh mục" },
+          brand: { type: "string", description: "Thương hiệu sản phẩm" },
+          limit: { type: "number", default: 5 },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_new_arrival_products",
+      description:
+        "Lấy danh sách sản phẩm mới nhất theo danh mục hoặc thương hiệu.",
+      parameters: {
+        type: "object",
+        properties: {
+          category: { type: "string", description: "Tên/slug danh mục" },
+          brand: { type: "string", description: "Thương hiệu sản phẩm" },
+          limit: { type: "number", default: 5 },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_related_products",
+      description:
+        "Lấy danh sách sản phẩm liên quan dựa trên sản phẩm gốc (cùng danh mục/thương hiệu).",
+      parameters: {
+        type: "object",
+        properties: {
+          productId: { type: "string", description: "ID hoặc slug sản phẩm gốc" },
+          limit: { type: "number", default: 5 },
+        },
+        required: ["productId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_search_filter_options",
+      description:
+        "Lấy danh sách bộ lọc khả dụng (brand, category, màu, size, khoảng giá) từ tập sản phẩm phù hợp.",
+      parameters: {
+        type: "object",
+        properties: {
+          keyword: { type: "string", description: "Từ khóa tìm kiếm" },
+          category: { type: "string", description: "Tên/slug danh mục" },
+          brand: { type: "string", description: "Thương hiệu sản phẩm" },
+          minPrice: { type: "number", description: "Giá tối thiểu" },
+          maxPrice: { type: "number", description: "Giá tối đa" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "get_product_details",
       description:
         "Lấy chi tiết sản phẩm theo ID hoặc slug. Dùng khi khách muốn biết thêm về sản phẩm cụ thể.",

@@ -12,6 +12,7 @@ const inventoryService = require("./inventory.service");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
 const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
+const { ORDER_ACTORS, canTransition } = require("../shared/order/orderState");
 
 const MAX_TX_RETRIES = Number(process.env.TXN_MAX_RETRIES) || 3;
 const TX_RETRY_DELAY_MS = Number(process.env.TXN_RETRY_DELAY_MS) || 50;
@@ -439,18 +440,7 @@ class OrderService {
       );
     }
 
-    // Seller allowed transitions (more restricted than admin)
-    const allowedTransitions = {
-      pending: ["confirmed", "cancelled"],
-      confirmed: ["processing", "cancelled"],
-      processing: ["shipped"],
-      shipped: ["delivered"],
-      delivered: [],
-      cancelled: [],
-      returned: [],
-    };
-
-    if (!allowedTransitions[order.status]?.includes(newStatus)) {
+    if (!canTransition(order.status, newStatus, ORDER_ACTORS.SELLER)) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
         `Cannot change status from "${order.status}" to "${newStatus}"`
@@ -732,17 +722,8 @@ class OrderService {
       }
     }
 
-    // Validate status transition
-    const validTransitions = {
-      pending: ["confirmed", "cancelled"],
-      confirmed: ["processing", "cancelled"],
-      processing: ["shipped", "cancelled"],
-      shipped: ["delivered"],
-      delivered: [], // Final state
-      cancelled: [], // Final state
-    };
-
-    if (!validTransitions[order.status]?.includes(status)) {
+    const actor = isAdmin ? ORDER_ACTORS.ADMIN : ORDER_ACTORS.SELLER;
+    if (!canTransition(order.status, status, actor)) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
         `Cannot transition from ${order.status} to ${status}`
@@ -775,8 +756,7 @@ class OrderService {
       throw new ApiError(StatusCodes.NOT_FOUND, "Order not found or access denied");
     }
 
-    // Only allow cancel if pending or confirmed
-    if (!["pending", "confirmed"].includes(order.status)) {
+    if (!canTransition(order.status, "cancelled", ORDER_ACTORS.USER)) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
         "Cannot cancel order in this status"

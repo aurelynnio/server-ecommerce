@@ -14,7 +14,7 @@ const SearchController = {
 
     const suggestions = await searchService.getSuggestions(
       q,
-      parseInt(limit) || 10
+      parseInt(limit) || 10,
     );
 
     return sendSuccess(res, suggestions, "Suggestions retrieved");
@@ -30,7 +30,7 @@ const SearchController = {
     const { limit } = req.query;
 
     const trending = await searchService.getTrendingSearches(
-      parseInt(limit) || 10
+      parseInt(limit) || 10,
     );
 
     return sendSuccess(res, trending, "Trending searches retrieved");
