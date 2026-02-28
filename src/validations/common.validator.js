@@ -1,6 +1,8 @@
 const Joi = require("joi");
 
-const objectId = Joi.string().pattern(/^[0-9a-fA-F]{24}$/).message("ID không hợp lệ");
+const objectId = Joi.string()
+  .pattern(/^[0-9a-fA-F]{24}$/)
+  .message("ID không hợp lệ");
 
 const pagination = {
   page: Joi.number().integer().min(1).default(1),

@@ -4,7 +4,10 @@ const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const initRoutes = require("./routes");
 const http = require("http");
-const { errorHandler, notFoundHandler } = require("./middlewares/errorHandler.middleware");
+const {
+  errorHandler,
+  notFoundHandler,
+} = require("./middlewares/errorHandler.middleware");
 const corsMiddleware = require("./middlewares/cors.middleware");
 const { globalLimiter } = require("./middlewares/rateLimited.middleware");
 const { sanitizeMiddleware } = require("./validations/sanitize");
@@ -28,14 +31,13 @@ if (trustProxyEnv) {
 // Server timeouts to protect against slowloris and stalled connections
 server.keepAliveTimeout =
   Number(process.env.KEEP_ALIVE_TIMEOUT_MS) || 65 * 1000;
-server.headersTimeout =
-  Number(process.env.HEADERS_TIMEOUT_MS) || 70 * 1000;
-server.requestTimeout =
-  Number(process.env.REQUEST_TIMEOUT_MS) || 120 * 1000;
+server.headersTimeout = Number(process.env.HEADERS_TIMEOUT_MS) || 70 * 1000;
+server.requestTimeout = Number(process.env.REQUEST_TIMEOUT_MS) || 120 * 1000;
 
 // Middlewares
 const morganEnabled =
-  process.env.MORGAN_ENABLED === "true" || process.env.NODE_ENV !== "production";
+  process.env.MORGAN_ENABLED === "true" ||
+  process.env.NODE_ENV !== "production";
 if (morganEnabled) {
   app.use(morgan(process.env.MORGAN_FORMAT || "dev"));
 }
@@ -46,7 +48,6 @@ app.use(ex.urlencoded({ extended: true }));
 app.use(sanitizeMiddleware);
 app.use(cookieParser());
 app.use(helmet());
-
 
 initRoutes(app);
 

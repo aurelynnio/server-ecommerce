@@ -87,7 +87,9 @@ const mapProductSummary = (product) => {
     variantCount: product.variants?.length || 0,
     sizes: product.sizes || [],
     colors: [
-      ...new Set(product.variants?.map((variant) => variant.color).filter(Boolean)),
+      ...new Set(
+        product.variants?.map((variant) => variant.color).filter(Boolean),
+      ),
     ],
     tags: product.tags || [],
     image: product.variants?.[0]?.images?.[0] || null,
@@ -178,9 +180,7 @@ async function buildSearchQuery({
   const colorList = normalizeStringArray(colors);
   if (colorList.length > 0) {
     query["variants.color"] = {
-      $in: colorList.map(
-        (color) => new RegExp(`^${escapeRegex(color)}$`, "i"),
-      ),
+      $in: colorList.map((color) => new RegExp(`^${escapeRegex(color)}$`, "i")),
     };
   }
 
@@ -348,7 +348,10 @@ const toolHandlers = {
     limit = 5,
   }) {
     try {
-      if (parseNumberValue(minPrice) === null && parseNumberValue(maxPrice) === null) {
+      if (
+        parseNumberValue(minPrice) === null &&
+        parseNumberValue(maxPrice) === null
+      ) {
         return { error: "Thiếu khoảng giá cần tìm" };
       }
       return await searchProductsByQuery({
@@ -520,13 +523,17 @@ const toolHandlers = {
       });
 
       const sizes = [
-        ...new Set(candidates.flatMap((item) => item.sizes || []).filter(Boolean)),
+        ...new Set(
+          candidates.flatMap((item) => item.sizes || []).filter(Boolean),
+        ),
       ].sort((a, b) => a.localeCompare(b, "vi"));
 
       const colors = [
         ...new Set(
           candidates.flatMap((item) =>
-            (item.variants || []).map((variant) => variant.color).filter(Boolean),
+            (item.variants || [])
+              .map((variant) => variant.color)
+              .filter(Boolean),
           ),
         ),
       ].sort((a, b) => a.localeCompare(b, "vi"));

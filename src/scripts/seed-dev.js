@@ -21,7 +21,7 @@ const bcrypt = require("bcrypt");
 const { faker } = require("@faker-js/faker");
 
 // Caches
-const cacheService = require("../services/cache.service");
+const redisService = require("../services/redis.service");
 const redis = require("../configs/redis.config");
 
 // Models
@@ -817,9 +817,9 @@ async function main() {
     const clearCaches = async () => {
       // Best-effort: Redis volumes persist across runs; clear stale keys.
       await Promise.allSettled([
-        cacheService.delByPattern("categories:*"),
-        cacheService.delByPattern("products:*"),
-        cacheService.delByPattern("flash-sale:*"),
+        redisService.delByPattern("categories:*"),
+        redisService.delByPattern("products:*"),
+        redisService.delByPattern("flash-sale:*"),
       ]);
     };
 

@@ -10,19 +10,14 @@ const PORT = process.env.PORT || 3000;
 const SHUTDOWN_TIMEOUT_MS =
   Number(process.env.SHUTDOWN_TIMEOUT_MS) || 10 * 1000;
 
-const { connectRabbitMQ, getConnection } = require("./configs/rabbitmq.config");
 const redis = require("./configs/redis.config");
+const { connectRabbitMQ } = require("./configs/rabbitMQ.config");
+connectRabbitMQ();
 
 const startServer = async () => {
   try {
     await connectDB();
     logger.info("Database connected successfully");
-
-    await connectRabbitMQ();
-
-    // Initialize Workers
-    const { initWorkers } = require("./workers");
-    await initWorkers();
 
     server.listen(PORT, () => {
       logger.info(`Server is running on port ${PORT}`);
@@ -53,12 +48,7 @@ const shutdown = async (signal) => {
 
   await shutdownSocket();
 
-  const rabbitConn = getConnection();
-  await Promise.allSettled([
-    mongoose.connection.close(false),
-    redis.quit?.(),
-    rabbitConn?.close?.(),
-  ]);
+  await Promise.allSettled([mongoose.connection.close(false), redis.quit?.()]);
 
   clearTimeout(forceTimer);
   process.exit(0);

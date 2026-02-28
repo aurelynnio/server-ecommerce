@@ -1,5 +1,5 @@
-const Wishlist = require("../models/wishlist.model");
-const Product = require("../models/product.model");
+const wishlistRepository = require("../repositories/wishlist.repository");
+const productRepository = require("../repositories/product.repository");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
 const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
@@ -20,28 +20,19 @@ class WishlistService {
    * @returns {Promise<Object>} Wishlist with pagination
    */
   async getWishlist(userId, { page = 1, limit = 10 } = {}) {
-    const total = await Wishlist.countDocuments({ userId });
+    const total = await wishlistRepository.countByUserId(userId);
     const paginationParams = getPaginationParams(page, limit, total);
 
     // Get paginated wishlist entries
-    const wishlistEntries = await Wishlist.find({ userId })
-      .sort({ createdAt: -1 })
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit)
-      .select("productId")
-      .lean();
+    const wishlistEntries = await wishlistRepository.findProductIdsByUserId(
+      userId,
+      paginationParams,
+    );
 
     const productIds = wishlistEntries.map((entry) => entry.productId);
 
     // Fetch products with details
-    const products = await Product.find({
-      _id: { $in: productIds },
-      status: "published",
-    })
-      .select("name slug price ratingAverage reviewCount soldCount shop variants.images variants.name variants.color")
-      .populate("shop", "name logo")
-      .populate("category", "name slug")
-      .lean();
+    const products = await productRepository.findPublishedByIdsForWishlist(productIds);
 
     // Map products to include first variant image
     const productsWithImages = products.map((product) => ({
@@ -60,7 +51,7 @@ class WishlistService {
    */
   async addToWishlist(userId, productId) {
     // Verify product exists
-    const product = await Product.findById(productId);
+    const product = await productRepository.findById(productId);
     if (!product) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
@@ -69,14 +60,14 @@ class WishlistService {
     }
 
     // Check if already in wishlist
-    const existing = await Wishlist.findOne({ userId, productId });
+    const existing = await wishlistRepository.findByUserIdAndProductId(userId, productId);
     if (existing) {
       throw new ApiError(StatusCodes.CONFLICT, "Product already in wishlist");
     }
 
-    await Wishlist.create({ userId, productId });
+    await wishlistRepository.create({ userId, productId });
 
-    const wishlistCount = await Wishlist.countDocuments({ userId });
+    const wishlistCount = await wishlistRepository.countByUserId(userId);
 
     return {
       message: "Product added to wishlist",
@@ -92,9 +83,9 @@ class WishlistService {
    * @returns {Promise<Object>} Updated wishlist info
    */
   async removeFromWishlist(userId, productId) {
-    await Wishlist.deleteOne({ userId, productId });
+    await wishlistRepository.deleteByUserIdAndProductId(userId, productId);
 
-    const wishlistCount = await Wishlist.countDocuments({ userId });
+    const wishlistCount = await wishlistRepository.countByUserId(userId);
 
     return {
       message: "Product removed from wishlist",
@@ -110,7 +101,7 @@ class WishlistService {
    * @returns {Promise<boolean>} True if in wishlist
    */
   async isInWishlist(userId, productId) {
-    const entry = await Wishlist.findOne({ userId, productId }).lean();
+    const entry = await wishlistRepository.findByUserIdAndProductId(userId, productId);
     return !!entry;
   }
 
@@ -120,7 +111,7 @@ class WishlistService {
    * @returns {Promise<Object>} Confirmation message
    */
   async clearWishlist(userId) {
-    await Wishlist.deleteMany({ userId });
+    await wishlistRepository.deleteManyByUserId(userId);
     return { message: "Wishlist cleared successfully" };
   }
 
@@ -130,7 +121,7 @@ class WishlistService {
    * @returns {Promise<number>} Number of items in wishlist
    */
   async getWishlistCount(userId) {
-    return await Wishlist.countDocuments({ userId });
+    return await wishlistRepository.countByUserId(userId);
   }
 
   /**
@@ -140,12 +131,7 @@ class WishlistService {
    * @returns {Promise<Object>} Map of productId to boolean
    */
   async checkMultipleInWishlist(userId, productIds) {
-    const entries = await Wishlist.find({
-      userId,
-      productId: { $in: productIds },
-    })
-      .select("productId")
-      .lean();
+    const entries = await wishlistRepository.findByUserIdAndProductIds(userId, productIds);
 
     const wishlistSet = new Set(entries.map((e) => e.productId.toString()));
     const result = {};

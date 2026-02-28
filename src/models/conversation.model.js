@@ -13,7 +13,7 @@ const messageSchema = new Schema(
     attachments: [String], // images/files
     isRead: { type: Boolean, default: false },
   },
-  { timestamps: true, collection: "messages" }
+  { timestamps: true, collection: "messages" },
 );
 
 // Message Indexes
@@ -36,7 +36,7 @@ const conversationSchema = new Schema(
       orderId: { type: Types.ObjectId, ref: "Order" },
     },
   },
-  { timestamps: true, collection: "conversations" }
+  { timestamps: true, collection: "conversations" },
 );
 
 conversationSchema.index({ members: 1 });

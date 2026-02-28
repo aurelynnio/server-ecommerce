@@ -1,5 +1,5 @@
-const ShippingTemplate = require("../models/shipping.template.model");
-const Shop = require("../models/shop.model");
+const shippingTemplateRepository = require("../repositories/shipping-template.repository");
+const shopRepository = require("../repositories/shop.repository");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
 
@@ -12,13 +12,13 @@ class ShippingService {
    * @returns {Promise<any>}
    */
   async createTemplate(userId, templateData) {
-    const shop = await Shop.findOne({ owner: userId });
+    const shop = await shopRepository.findByOwnerId(userId);
     if (!shop) {
       throw new ApiError(StatusCodes.NOT_FOUND, "No shop found for this user");
     }
 
 
-    const newTemplate = await ShippingTemplate.create({
+    const newTemplate = await shippingTemplateRepository.create({
       ...templateData,
       shop: shop._id,
     });
@@ -32,13 +32,13 @@ class ShippingService {
    * @returns {Promise<any>}
    */
   async getMyTemplates(userId) {
-    const shop = await Shop.findOne({ owner: userId });
+    const shop = await shopRepository.findByOwnerId(userId);
     if (!shop) {
       throw new ApiError(StatusCodes.NOT_FOUND, "No shop found");
     }
 
 
-    const templates = await ShippingTemplate.find({ shop: shop._id });
+    const templates = await shippingTemplateRepository.findByShopId(shop._id);
     return templates;
   }
 
@@ -51,16 +51,16 @@ class ShippingService {
    */
   async updateTemplate(userId, templateId, updates) {
     // Verify ownership via shop
-    const shop = await Shop.findOne({ owner: userId });
+    const shop = await shopRepository.findByOwnerId(userId);
     if (!shop) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
     }
 
 
-    const updated = await ShippingTemplate.findOneAndUpdate(
-      { _id: templateId, shop: shop._id },
+    const updated = await shippingTemplateRepository.findByIdAndShopIdAndUpdate(
+      templateId,
+      shop._id,
       updates,
-      { new: true }
     );
 
     if (!updated) {
@@ -81,16 +81,16 @@ class ShippingService {
    * @returns {Promise<any>}
    */
   async deleteTemplate(userId, templateId) {
-    const shop = await Shop.findOne({ owner: userId });
+    const shop = await shopRepository.findByOwnerId(userId);
     if (!shop) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
     }
 
 
-    const deleted = await ShippingTemplate.findOneAndDelete({
-      _id: templateId,
-      shop: shop._id,
-    });
+    const deleted = await shippingTemplateRepository.findByIdAndShopIdAndDelete(
+      templateId,
+      shop._id,
+    );
     if (!deleted) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Template not found");
     }

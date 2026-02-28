@@ -45,4 +45,15 @@ export default [
   {
     ignores: ["node_modules/", "coverage/", "tests/"],
   },
+  {
+    files: ["src/services/**/*.js"],
+    rules: {
+      "no-restricted-modules": [
+        "error",
+        {
+          patterns: ["../models/*"],
+        },
+      ],
+    },
+  },
 ];

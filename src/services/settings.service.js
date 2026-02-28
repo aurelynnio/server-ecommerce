@@ -1,4 +1,4 @@
-const Settings = require("../models/settings.model");
+const settingsRepository = require("../repositories/settings.repository");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
 
@@ -9,10 +9,10 @@ class SettingsService {
    */
   async getSettings() {
     // Find existing settings or create default
-    let settings = await Settings.findOne({ key: "main" });
+    let settings = await settingsRepository.findMain();
 
     if (!settings) {
-      settings = await Settings.create({ key: "main" });
+      settings = await settingsRepository.createMain();
     }
 
     return settings;
@@ -56,11 +56,7 @@ class SettingsService {
 
     updateData.updatedBy = userId;
 
-    const settings = await Settings.findOneAndUpdate(
-      { key: "main" },
-      { $set: updateData },
-      { new: true, upsert: true },
-    );
+    const settings = await settingsRepository.upsertMainBySet(updateData);
 
     return settings;
   }
@@ -99,11 +95,7 @@ class SettingsService {
     });
     updateData.updatedBy = userId;
 
-    const settings = await Settings.findOneAndUpdate(
-      { key: "main" },
-      { $set: updateData },
-      { new: true, upsert: true },
-    );
+    const settings = await settingsRepository.upsertMainBySet(updateData);
 
     return settings;
   }
@@ -114,9 +106,8 @@ class SettingsService {
    * @returns {Promise<Object>} Reset settings
    */
   async resetSettings(userId) {
-    await Settings.deleteOne({ key: "main" });
-    const settings = await Settings.create({
-      key: "main",
+    await settingsRepository.deleteMain();
+    const settings = await settingsRepository.createMain({
       updatedBy: userId,
     });
     return settings;
