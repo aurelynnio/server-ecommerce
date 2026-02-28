@@ -638,7 +638,7 @@ class ProductService {
    * @param {Object} query
    * @returns {Promise<any>}
    */
-  async getFeaturedProducts(query) {
+  async getFeaturedProducts(_query) {
     const cacheKey = "products:featured";
     const cachedProducts = await redisService.get(cacheKey);
     if (cachedProducts) return cachedProducts;
@@ -654,7 +654,7 @@ class ProductService {
    * @param {Object} query
    * @returns {Promise<any>}
    */
-  async getNewArrivalProducts(query) {
+  async getNewArrivalProducts(_query) {
     const cacheKey = "products:new-arrivals";
     const cachedProducts = await redisService.get(cacheKey);
     if (cachedProducts) return cachedProducts;
@@ -670,7 +670,7 @@ class ProductService {
    * @param {Object} query
    * @returns {Promise<any>}
    */
-  async getOnSaleProducts(query) {
+  async getOnSaleProducts(_query) {
     const cacheKey = "products:on-sale";
     const cachedProducts = await redisService.get(cacheKey);
     if (cachedProducts) return cachedProducts;

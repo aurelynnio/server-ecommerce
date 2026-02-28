@@ -1,7 +1,6 @@
 const Order = require("../repositories/order.repository");
 const Cart = require("../repositories/cart.repository");
 const Product = require("../repositories/product.repository");
-const User = require("../repositories/user.repository");
 const { Types } = require("mongoose");
 const mongoose = require("mongoose");
 
@@ -30,8 +29,6 @@ const isRetryableTransactionError = (error) =>
 
 const isUnknownCommitResult = (error) =>
   getErrorLabels(error).includes("UnknownTransactionCommitResult");
-
-const order_queue = "order_queue";
 
 /**
  * Service handling order operations
@@ -364,7 +361,7 @@ class OrderService {
    * @param {Object} [filters] - Optional filters (unused, for future expansion)
    * @returns {Promise<Object>} User's orders
    */
-  async getUserOrders(userId, filters = {}) {
+  async getUserOrders(userId, _filters = {}) {
     const orders = await Order.findByUserIdWithShopAndProducts(userId);
     return { data: orders }; // Unified response structure
   }
@@ -375,7 +372,7 @@ class OrderService {
    * @param {Object} [filters] - Optional filters (unused, for future expansion)
    * @returns {Promise<Object>} Shop's orders
    */
-  async getShopOrders(shopId, filters = {}) {
+  async getShopOrders(shopId, _filters = {}) {
     const orders = await Order.findByShopIdWithUser(shopId);
     return { data: orders };
   }

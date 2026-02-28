@@ -80,7 +80,7 @@ if (cluster.isPrimary && process.env.NODE_ENV === "production") {
     cluster.fork();
   }
 
-  cluster.on("exit", (worker, code, signal) => {
+  cluster.on("exit", (worker, _code, _signal) => {
     logger.warn(`Worker ${worker.process.pid} died. Forking a new worker...`);
     cluster.fork();
   });

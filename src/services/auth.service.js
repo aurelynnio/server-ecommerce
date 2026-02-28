@@ -97,7 +97,7 @@ class AuthService {
           _id: newUser._id,
         });
       }
-    } catch (error) {
+    } catch (_error) {
       logger.warn("[AuthService] Socket not initialized, skipping emit");
     }
 
@@ -162,10 +162,10 @@ class AuthService {
 
     const {
       password: _,
-      codeVerifiEmail,
-      codeVerifiPassword,
-      refreshTokenHash,
-      refreshTokenExpiresAt,
+      codeVerifiEmail: _codeVerifiEmail,
+      codeVerifiPassword: _codeVerifiPassword,
+      refreshTokenHash: _refreshTokenHash,
+      refreshTokenExpiresAt: _refreshTokenExpiresAt,
       ...userWithoutPassword
     } = user.toObject();
 
@@ -207,9 +207,9 @@ class AuthService {
     await redisService.del(cacheKey);
 
     const {
-      password,
-      codeVerifiEmail,
-      codeVerifiPassword,
+      password: _password,
+      codeVerifiEmail: _codeVerifiEmail,
+      codeVerifiPassword: _codeVerifiPassword,
       ...userWithoutPassword
     } = user.toObject();
     return { user: userWithoutPassword };
@@ -248,9 +248,9 @@ class AuthService {
     await user.save();
 
     const {
-      password,
-      codeVerifiEmail,
-      codeVerifiPassword,
+      password: _password,
+      codeVerifiEmail: _codeVerifiEmail,
+      codeVerifiPassword: _codeVerifiPassword,
       ...userWithoutPassword
     } = user.toObject();
     return { user: userWithoutPassword };
@@ -283,7 +283,7 @@ class AuthService {
 
     try {
       await sendEmailVerificationCode(email, verificationCode);
-    } catch (error) {
+    } catch (_error) {
       user.codeVerifiEmail = undefined;
       user.expiresCodeVerifiEmail = undefined;
       await user.save();
@@ -328,7 +328,7 @@ class AuthService {
     let payload;
     try {
       payload = tokenService.verifyRefreshToken(refreshToken);
-    } catch (error) {
+    } catch (_error) {
       throw new ApiError(
         StatusCodes.UNAUTHORIZED,
         "Invalid or expired refresh token"
@@ -381,7 +381,7 @@ class AuthService {
     try {
       const payload = tokenService.verifyRefreshToken(refreshToken);
       await User.clearRefreshToken(payload.userId);
-    } catch (error) {
+    } catch (_error) {
       // Ignore invalid token on logout
     }
   }

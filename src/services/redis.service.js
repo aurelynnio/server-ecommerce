@@ -1,4 +1,5 @@
 const logger = require("../utils/logger");
+const redisClient = require("../configs/redis.config");
 
 class RedisService {
   constructor(redisClient) {
@@ -68,4 +69,4 @@ class RedisService {
   }
 }
 
-module.exports = new RedisService(redis);
+module.exports = new RedisService(redisClient);

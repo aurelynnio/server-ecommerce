@@ -37,7 +37,7 @@ const sanitizeMongoOperators = (str) => {
  * Automatically trims whitespace and optionally escapes HTML
  */
 const sanitizedString = () => {
-  return joi.string().custom((value, helpers) => {
+  return joi.string().custom((value, _helpers) => {
     if (typeof value !== "string") return value;
     // Trim whitespace
     const sanitized = value.trim();
@@ -50,7 +50,7 @@ const sanitizedString = () => {
  * Use for user-generated content that will be displayed
  */
 const escapedString = () => {
-  return joi.string().custom((value, helpers) => {
+  return joi.string().custom((value, _helpers) => {
     if (typeof value !== "string") return value;
     // Trim and escape HTML
     let sanitized = value.trim();
@@ -64,7 +64,7 @@ const escapedString = () => {
  * Sanitizes against NoSQL injection
  */
 const searchString = () => {
-  return joi.string().custom((value, helpers) => {
+  return joi.string().custom((value, _helpers) => {
     if (typeof value !== "string") return value;
     // Trim and remove MongoDB operators
     let sanitized = value.trim();

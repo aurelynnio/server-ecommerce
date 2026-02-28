@@ -81,7 +81,7 @@ async function ensureGlobalCategories() {
       })),
       { ordered: false },
     );
-  } catch (e) {
+  } catch (_e) {
     // Ignore duplicate key errors if categories were created concurrently or partially exist.
   }
 

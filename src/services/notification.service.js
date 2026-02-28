@@ -169,7 +169,7 @@ class NotificationService {
       const { getIO } = require("../socket/index");
       const io = getIO();
       io.to(userId).emit("unread_count", 0);
-    } catch (e) {}
+    } catch (_error) {}
 
     return result;
   }
@@ -186,7 +186,7 @@ class NotificationService {
       const { getIO } = require("../socket/index");
       const io = getIO();
       io.to(userId).emit("unread_count", 0);
-    } catch (e) {}
+    } catch (_error) {}
 
     return result;
   }
@@ -234,7 +234,7 @@ class NotificationService {
         const io = getIO();
         const count = await this.countUnread(userId);
         io.to(userId).emit("unread_count", count);
-      } catch (e) {}
+      } catch (_error) {}
     }
 
     return notification;

@@ -330,7 +330,7 @@ async function ensureShopCategories(shops) {
   return all;
 }
 
-function buildVariants({ baseSlug, basePrice }) {
+function buildVariants({ basePrice }) {
   const variantCount = faker.number.int({ min: 1, max: 4 });
   const colors = pickMany(
     ["Đen", "Trắng", "Đỏ", "Xanh", "Vàng", "Tím", "Hồng", "Xám"],
@@ -410,7 +410,7 @@ async function seedProducts({
           ? Math.max(1000, Math.round(basePrice * (1 - discountPercent / 100)))
           : null;
 
-      const variants = buildVariants({ baseSlug: slug, basePrice });
+      const variants = buildVariants({ basePrice });
       const stock = variants.reduce((s, v) => s + (v.stock || 0), 0);
       const soldFromVariants = variants.reduce((s, v) => s + (v.sold || 0), 0);
       const descImages = pickMany(

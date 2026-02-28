@@ -1,5 +1,4 @@
 const Product = require("../repositories/product.repository");
-const logger = require("../utils/logger");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
 
@@ -21,11 +20,11 @@ class InventoryService {
 
     for (const item of items) {
       const product = productMap.get(item.productId.toString());
-      
+
       if (!product || product.status !== "published") {
         throw new ApiError(
           StatusCodes.NOT_FOUND,
-          `Product unavailable: ${item.productId}`
+          `Product unavailable: ${item.productId}`,
         );
       }
 
@@ -34,20 +33,20 @@ class InventoryService {
       if (item.modelId) {
         // Variant stock check
         const variant = product.variants.find(
-          (v) => v._id.toString() === item.modelId.toString()
+          (v) => v._id.toString() === item.modelId.toString(),
         );
 
         if (!variant) {
           throw new ApiError(
             StatusCodes.NOT_FOUND,
-            `Variation not found for product ${product.name}`
+            `Variation not found for product ${product.name}`,
           );
         }
 
         if (variant.stock < quantity) {
           throw new ApiError(
             StatusCodes.CONFLICT,
-            `Out of stock for ${product.name} - ${variant.name}`
+            `Out of stock for ${product.name} - ${variant.name}`,
           );
         }
       } else {
@@ -55,7 +54,7 @@ class InventoryService {
         if (product.stock < quantity) {
           throw new ApiError(
             StatusCodes.CONFLICT,
-            `Out of stock for ${product.name}`
+            `Out of stock for ${product.name}`,
           );
         }
       }
@@ -103,7 +102,7 @@ class InventoryService {
         if (!result.matchedCount) {
           throw new ApiError(
             StatusCodes.CONFLICT,
-            "Out of stock or variation unavailable"
+            "Out of stock or variation unavailable",
           );
         }
       } else {
@@ -116,7 +115,7 @@ class InventoryService {
         if (!result.matchedCount) {
           throw new ApiError(
             StatusCodes.CONFLICT,
-            "Out of stock or product unavailable"
+            "Out of stock or product unavailable",
           );
         }
       }
@@ -142,12 +141,14 @@ class InventoryService {
           options,
         );
       } else {
-        await Product.restoreStockForBaseProduct(item.productId, quantity, options);
+        await Product.restoreStockForBaseProduct(
+          item.productId,
+          quantity,
+          options,
+        );
       }
     }
   }
 }
 
 module.exports = new InventoryService();
-
-
