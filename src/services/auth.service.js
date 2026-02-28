@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const User = require("../models/user.model");
+const User = require("../repositories/user.repository");
 const comparePassword = require("../utils/comparePassword");
 const hashPassword = require("../utils/hashPasword");
 const { getIO } = require("../socket/index");
@@ -9,7 +9,7 @@ const {
   sendEmailVerificationCode,
   sendPasswordResetCode,
 } = require("./email.service");
-const cacheService = require("./cache.service");
+const redisService = require("./redis.service");
 const logger = require("../utils/logger");
 const tokenService = require("./token.service");
 const parseDurationMs = require("../utils/parseDurationMs");
@@ -62,13 +62,13 @@ class AuthService {
    */
   async register(data) {
     // Check if email already exists
-    const existingUser = await User.findOne({ email: data.email });
+    const existingUser = await User.findByEmail(data.email);
     if (existingUser) {
       throw new ApiError(StatusCodes.CONFLICT, "Email already in use");
     }
 
     // Check if username already exists
-    const existingUsername = await User.findOne({ username: data.username });
+    const existingUsername = await User.findByUsername(data.username);
     if (existingUsername) {
       throw new ApiError(StatusCodes.CONFLICT, "Username already in use");
     }
@@ -78,7 +78,7 @@ class AuthService {
 
 
     // Create new user (without verification code)
-    const newUser = new User({
+    const newUser = User.build({
       username: data.username,
       email: data.email,
       password: hashedPassword,
@@ -130,7 +130,7 @@ class AuthService {
    * @throws {Error} If credentials are invalid or email is not verified
    */
   async login(email, password) {
-    const user = await User.findOne({ email });
+    const user = await User.findByEmail(email);
     if (!user) {
       throw new ApiError(
         StatusCodes.UNAUTHORIZED,
@@ -188,7 +188,7 @@ class AuthService {
    * @throws {Error} If user not found, already verified, or code invalid/expired
    */
   async verifyEmail(email, code) {
-    const user = await User.findOne({ email });
+    const user = await User.findByEmail(email);
     if (!user) {
       throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
@@ -204,7 +204,7 @@ class AuthService {
     user.codeVerifiEmail = undefined;
     user.expiresCodeVerifiEmail = undefined;
     await user.save();
-    await cacheService.del(cacheKey);
+    await redisService.del(cacheKey);
 
     const {
       password,
@@ -223,7 +223,7 @@ class AuthService {
    * @throws {Error} If code is invalid or email already verified
    */
   async verifyEmailByCode(code) {
-    const user = await User.findOne({ codeVerifiEmail: code });
+    const user = await User.findByVerificationEmailCode(code);
     if (!user) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid verification code");
     }
@@ -264,7 +264,7 @@ class AuthService {
    * @throws {Error} If user not found, already verified, or email sending fails
    */
   async sendVerificationCode(email) {
-    const user = await User.findOne({ email });
+    const user = await User.findByEmail(email);
     if (!user) {
       throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
@@ -275,7 +275,7 @@ class AuthService {
 
     const verificationCode = this._generateVerificationCode();
 
-    await cacheService.set(`otp:email:${email}`, verificationCode, 600);
+    await redisService.set(`otp:email:${email}`, verificationCode, 600);
 
     user.codeVerifiEmail = verificationCode;
     user.expiresCodeVerifiEmail = Date.now() + 10 * 60 * 1000;
@@ -308,7 +308,7 @@ class AuthService {
    * @throws {Error} If OTP is invalid or expired
    */
   async ensureValidOtp(cacheKey, code) {
-    const storedCode = await cacheService.get(cacheKey);
+    const storedCode = await redisService.get(cacheKey);
 
     if (!storedCode || storedCode !== code) {
       throw new ApiError(
@@ -335,9 +335,7 @@ class AuthService {
       );
     }
 
-    const user = await User.findById(payload.userId).select(
-      "+refreshTokenHash +refreshTokenExpiresAt"
-    );
+    const user = await User.findByIdWithRefreshFields(payload.userId);
     if (!user) {
       throw new ApiError(StatusCodes.UNAUTHORIZED, "User not found");
     }
@@ -382,10 +380,7 @@ class AuthService {
   async revokeRefreshToken(refreshToken) {
     try {
       const payload = tokenService.verifyRefreshToken(refreshToken);
-      await User.findByIdAndUpdate(payload.userId, {
-        refreshTokenHash: null,
-        refreshTokenExpiresAt: null,
-      });
+      await User.clearRefreshToken(payload.userId);
     } catch (error) {
       // Ignore invalid token on logout
     }
@@ -399,7 +394,7 @@ class AuthService {
    * @throws {Error} If user not found or email sending fails
    */
   async forgotPassword(email) {
-    const user = await User.findOne({ email });
+    const user = await User.findByEmail(email);
     if (!user) {
       throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
@@ -408,7 +403,7 @@ class AuthService {
     const resetCode = this._generateVerificationCode();
 
     // Save to Redis (expire in 1 hour)
-    await cacheService.set(`otp:reset-password:${email}`, resetCode, 3600);
+    await redisService.set(`otp:reset-password:${email}`, resetCode, 3600);
 
     // Send reset code via email
     try {
@@ -433,7 +428,7 @@ class AuthService {
    * @throws {Error} If user not found or code invalid
    */
   async resetPassword(email, code, newPassword) {
-    const user = await User.findOne({ email });
+    const user = await User.findByEmail(email);
     if (!user) {
       throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
@@ -451,7 +446,7 @@ class AuthService {
     await user.save();
 
     // Clear Redis OTP
-    await cacheService.del(cacheKey);
+    await redisService.del(cacheKey);
 
     return { email: user.email };
   }
@@ -491,3 +486,5 @@ class AuthService {
 }
 
 module.exports = new AuthService();
+
+

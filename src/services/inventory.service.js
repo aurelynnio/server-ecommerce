@@ -1,4 +1,4 @@
-const Product = require("../models/product.model");
+const Product = require("../repositories/product.repository");
 const logger = require("../utils/logger");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
@@ -16,7 +16,7 @@ class InventoryService {
    */
   async checkStockAvailability(items) {
     const productIds = items.map((item) => item.productId);
-    const products = await Product.find({ _id: { $in: productIds } });
+    const products = await Product.findByIds(productIds);
     const productMap = new Map(products.map((p) => [p._id.toString(), p]));
 
     for (const item of items) {
@@ -93,22 +93,11 @@ class InventoryService {
     for (const item of aggregatedItems) {
       const quantity = item.quantity;
       if (item.modelId) {
-        const result = await Product.updateOne(
-          {
-            _id: item.productId,
-            status: "published",
-            "variants._id": item.modelId,
-            "variants.stock": { $gte: quantity },
-          },
-          {
-            $inc: {
-              "variants.$.stock": -quantity,
-              "variants.$.sold": quantity,
-              stock: -quantity,
-              soldCount: quantity,
-            },
-          },
-          { session }
+        const result = await Product.decrementStockForVariantSale(
+          item.productId,
+          item.modelId,
+          quantity,
+          session,
         );
 
         if (!result.matchedCount) {
@@ -118,19 +107,10 @@ class InventoryService {
           );
         }
       } else {
-        const result = await Product.updateOne(
-          {
-            _id: item.productId,
-            status: "published",
-            stock: { $gte: quantity },
-          },
-          {
-            $inc: {
-              stock: -quantity,
-              soldCount: quantity,
-            },
-          },
-          { session }
+        const result = await Product.decrementStockForBaseSale(
+          item.productId,
+          quantity,
+          session,
         );
 
         if (!result.matchedCount) {
@@ -155,35 +135,19 @@ class InventoryService {
     for (const item of aggregatedItems) {
       const quantity = item.quantity;
       if (item.modelId) {
-        await Product.updateOne(
-          {
-            _id: item.productId,
-            "variants._id": item.modelId,
-          },
-          {
-            $inc: {
-              "variants.$.stock": quantity,
-              "variants.$.sold": -quantity,
-              stock: quantity,
-              soldCount: -quantity,
-            },
-          },
-          options
+        await Product.restoreStockForVariant(
+          item.productId,
+          item.modelId,
+          quantity,
+          options,
         );
       } else {
-        await Product.updateOne(
-          { _id: item.productId },
-          {
-            $inc: {
-              stock: quantity,
-              soldCount: -quantity,
-            },
-          },
-          options
-        );
+        await Product.restoreStockForBaseProduct(item.productId, quantity, options);
       }
     }
   }
 }
 
 module.exports = new InventoryService();
+
+

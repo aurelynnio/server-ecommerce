@@ -1,5 +1,5 @@
-const Cart = require("../models/cart.model");
-const Product = require("../models/product.model");
+const Cart = require("../repositories/cart.repository");
+const Product = require("../repositories/product.repository");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
 
@@ -14,24 +14,11 @@ class CartService {
    * @returns {Promise<Object>} The populated cart object
    */
   async getCart(userId) {
-    let cart = await Cart.findOne({ userId })
-      .populate({
-        path: "items.productId",
-        select: "name slug images price status tierVariations models shop variants sizes",
-        populate: [
-          { path: "category", select: "name slug" },
-          { path: "shop", select: "name logo" },
-        ],
-      })
-      .populate({
-        path: "items.shopId",
-        select: "name logo",
-      })
-      .lean();
+    let cart = await Cart.findByUserIdWithItemDetails(userId);
 
     // Create new cart if doesn't exist
     if (!cart) {
-      cart = await Cart.create({ userId, items: [], totalAmount: 0 });
+      cart = await Cart.createEmptyCart(userId);
     }
 
     // Populate variation details for each item
@@ -241,9 +228,9 @@ class CartService {
     }
 
     // Find or create cart
-    let cart = await Cart.findOne({ userId });
+    let cart = await Cart.findByUserId(userId);
     if (!cart) {
-      cart = new Cart({ userId, items: [] });
+      cart = Cart.build({ userId, items: [] });
     }
 
     // Check if item exists (same product + variant + size)
@@ -292,7 +279,7 @@ class CartService {
    * @throws {Error} If cart or item not found, or stock is insufficient
    */
   async updateCartItem(userId, itemId, quantity) {
-    const cart = await Cart.findOne({ userId });
+    const cart = await Cart.findByUserId(userId);
     if (!cart) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Cart not found");
     }
@@ -377,7 +364,7 @@ class CartService {
    * @throws {Error} If cart not found
    */
   async removeCartItem(userId, itemId) {
-    const cart = await Cart.findOne({ userId });
+    const cart = await Cart.findByUserId(userId);
     if (!cart) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Cart not found");
     }
@@ -405,7 +392,7 @@ class CartService {
    * @throws {Error} If cart not found
    */
   async clearCart(userId) {
-    const cart = await Cart.findOne({ userId });
+    const cart = await Cart.findByUserId(userId);
     if (!cart) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Cart not found");
     }
@@ -436,7 +423,7 @@ class CartService {
    * @returns {Promise<number>} Total item count
    */
   async getCartItemCount(userId) {
-    const cart = await Cart.findOne({ userId }).lean();
+    const cart = await Cart.findByUserIdLean(userId);
     if (!cart) {
       return 0;
     }
@@ -457,3 +444,5 @@ class CartService {
 }
 
 module.exports = new CartService();
+
+

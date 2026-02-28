@@ -1,6 +1,6 @@
-const Voucher = require("../models/voucher.model");
-const VoucherUsage = require("../models/voucher-usage.model");
-const Shop = require("../models/shop.model");
+const Voucher = require("../repositories/voucher.repository");
+const VoucherUsage = require("../repositories/voucher-usage.repository");
+const Shop = require("../repositories/shop.repository");
 const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
@@ -25,7 +25,7 @@ class VoucherService {
     let scope = "platform";
 
     if (role === "seller") {
-      const shop = await Shop.findOne({ owner: userId });
+      const shop = await Shop.findByOwnerId(userId);
       if (!shop) {
         throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
       }
@@ -35,7 +35,7 @@ class VoucherService {
     }
 
     // Check if code already exists
-    const existingVoucher = await Voucher.findOne({ code: voucherData.code });
+    const existingVoucher = await Voucher.findByCode(voucherData.code);
     if (existingVoucher) {
       throw new ApiError(StatusCodes.CONFLICT, "Voucher code already exists");
     }
@@ -57,9 +57,7 @@ class VoucherService {
    * @throws {Error} If voucher not found
    */
   async getVoucherById(voucherId) {
-    const voucher = await Voucher.findById(voucherId)
-      .populate("shopId", "name logo")
-      .lean();
+    const voucher = await Voucher.findByIdWithShop(voucherId);
 
     if (!voucher) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Voucher not found");
@@ -81,38 +79,11 @@ class VoucherService {
    */
   async getAllVouchers(filters = {}) {
     const { page = 1, limit = 10, scope, isActive, search, shopId } = filters;
-
-    const query = {};
-
-    if (scope) {
-      query.scope = scope;
-    }
-
-    if (typeof isActive === "boolean") {
-      query.isActive = isActive;
-    }
-
-    if (shopId) {
-      query.shopId = shopId;
-    }
-
-    if (search) {
-      query.$or = [
-        { code: { $regex: search, $options: "i" } },
-        { name: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-      ];
-    }
-
-    const total = await Voucher.countDocuments(query);
+    const filterArgs = { scope, isActive, search, shopId };
+    const total = await Voucher.countWithFilters(filterArgs);
     const paginationParams = getPaginationParams(page, limit, total);
 
-    const vouchers = await Voucher.find(query)
-      .populate("shopId", "name logo")
-      .sort({ createdAt: -1 })
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit)
-      .lean();
+    const vouchers = await Voucher.findWithFilters(filterArgs, paginationParams);
 
     return buildPaginationResponse(vouchers, paginationParams);
   }
@@ -137,7 +108,7 @@ class VoucherService {
     // Check authorization
     const isAdmin = roles.includes("admin");
     if (!isAdmin && voucher.scope === "shop") {
-      const shop = await Shop.findOne({ owner: userId });
+      const shop = await Shop.findByOwnerId(userId);
       if (!shop || voucher.shopId.toString() !== shop._id.toString()) {
         throw new ApiError(
           StatusCodes.FORBIDDEN,
@@ -149,10 +120,10 @@ class VoucherService {
 
     // Check if updating code and it already exists
     if (updateData.code && updateData.code !== voucher.code) {
-      const existingVoucher = await Voucher.findOne({
-        code: updateData.code,
-        _id: { $ne: voucherId },
-      });
+      const existingVoucher = await Voucher.findByCodeExcludingId(
+        updateData.code,
+        voucherId,
+      );
       if (existingVoucher) {
         throw new ApiError(StatusCodes.CONFLICT, "Voucher code already exists");
       }
@@ -185,7 +156,7 @@ class VoucherService {
     // Check authorization
     const isAdmin = roles.includes("admin");
     if (!isAdmin && voucher.scope === "shop") {
-      const shop = await Shop.findOne({ owner: userId });
+      const shop = await Shop.findByOwnerId(userId);
       if (!shop || voucher.shopId.toString() !== shop._id.toString()) {
         throw new ApiError(
           StatusCodes.FORBIDDEN,
@@ -208,7 +179,7 @@ class VoucherService {
    * @returns {Promise<Object>} Deletion result
    */
   async permanentDeleteVoucher(voucherId) {
-    const voucher = await Voucher.findByIdAndDelete(voucherId);
+    const voucher = await Voucher.deleteById(voucherId);
 
     if (!voucher) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Voucher not found");
@@ -224,11 +195,7 @@ class VoucherService {
    * @returns {Promise<Array>} List of active vouchers
    */
   async getShopVouchers(shopId) {
-    const vouchers = await Voucher.find({
-      shopId,
-      isActive: true,
-      endDate: { $gte: new Date() },
-    }).lean();
+    const vouchers = await Voucher.findActiveByShop(shopId, new Date());
     return vouchers;
   }
 
@@ -237,11 +204,7 @@ class VoucherService {
    * @returns {Promise<Array>} List of active platform vouchers
    */
   async getPlatformVouchers() {
-    const vouchers = await Voucher.find({
-      scope: "platform",
-      isActive: true,
-      endDate: { $gte: new Date() },
-    }).lean();
+    const vouchers = await Voucher.findActivePlatform(new Date());
     return vouchers;
   }
 
@@ -253,40 +216,25 @@ class VoucherService {
    */
   async getAvailableVouchers(userId, shopId = null) {
     const now = new Date();
-    const baseQuery = {
-      isActive: true,
-      startDate: { $lte: now },
-      endDate: { $gte: now },
-      $or: [
-        { usageLimit: 0 },
-        { $expr: { $lt: ["$usageCount", "$usageLimit"] } },
-      ],
-    };
 
     // Get platform vouchers
-    const platformVouchers = await Voucher.find({
-      ...baseQuery,
-      scope: "platform",
-    }).lean();
+    const platformVouchers = await Voucher.findAvailablePlatform(now);
 
     // Get shop vouchers if shopId provided
     let shopVouchers = [];
     if (shopId) {
-      shopVouchers = await Voucher.find({
-        ...baseQuery,
-        scope: "shop",
-        shopId,
-      }).lean();
+      shopVouchers = await Voucher.findAvailableShop(shopId, now);
     }
 
     // Filter out vouchers user has exceeded usage limit
     const filterByUserUsage = async (vouchers) => {
       if (vouchers.length === 0) return vouchers;
       const voucherIds = vouchers.map((v) => v._id);
-      const usages = await VoucherUsage.aggregate([
-        { $match: { voucherId: { $in: voucherIds }, userId: new (require("mongoose").Types.ObjectId)(userId) } },
-        { $group: { _id: "$voucherId", count: { $sum: 1 } } },
-      ]);
+      const mongoose = require("mongoose");
+      const usages = await VoucherUsage.aggregateUsageByVoucherIdsAndUser(
+        voucherIds,
+        new mongoose.Types.ObjectId(userId),
+      );
       const usageMap = new Map(usages.map((u) => [u._id.toString(), u.count]));
       return vouchers.filter((voucher) => {
         if (voucher.usageLimitPerUser === 0) return true;
@@ -311,7 +259,7 @@ class VoucherService {
    * @throws {Error} If voucher is invalid or cannot be applied
    */
   async applyVoucher(code, userId, orderValue, shopId = null) {
-    const voucher = await Voucher.findOne({ code, isActive: true });
+    const voucher = await Voucher.findActiveByCode(code);
     if (!voucher) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Voucher not found or inactive");
     }
@@ -352,10 +300,7 @@ class VoucherService {
     }
 
     // 5. Check Usage Limit (Per User) via VoucherUsage collection
-    const usedCount = await VoucherUsage.countDocuments({
-      voucherId: voucher._id,
-      userId,
-    });
+    const usedCount = await VoucherUsage.countByVoucherAndUser(voucher._id, userId);
 
     if (
       voucher.usageLimitPerUser > 0 &&
@@ -395,32 +340,15 @@ class VoucherService {
   async getVoucherStatistics() {
     const now = new Date();
 
-    const totalVouchers = await Voucher.countDocuments();
-    const activeVouchers = await Voucher.countDocuments({ isActive: true });
-    const expiredVouchers = await Voucher.countDocuments({
-      endDate: { $lt: now },
-    });
-    const platformVouchers = await Voucher.countDocuments({
-      scope: "platform",
-    });
-    const shopVouchers = await Voucher.countDocuments({ scope: "shop" });
+    const totalVouchers = await Voucher.countAll();
+    const activeVouchers = await Voucher.countActive();
+    const expiredVouchers = await Voucher.countExpired(now);
+    const platformVouchers = await Voucher.countPlatformVouchers();
+    const shopVouchers = await Voucher.countShopVouchers();
 
-    // Most used vouchers
-    const mostUsedVouchers = await Voucher.find()
-      .sort({ usageCount: -1 })
-      .limit(5)
-      .select("code name usageCount type value")
-      .lean();
+    const mostUsedVouchers = await Voucher.findMostUsed(5);
 
-    // Total discount given
-    const discountStats = await Voucher.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalUsage: { $sum: "$usageCount" },
-        },
-      },
-    ]);
+    const discountStats = await Voucher.aggregateTotalUsage();
 
     return {
       totalVouchers,
@@ -435,3 +363,5 @@ class VoucherService {
 }
 
 module.exports = new VoucherService();
+
+

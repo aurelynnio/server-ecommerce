@@ -1,17 +1,20 @@
-const Order = require("../models/order.model");
-const Cart = require("../models/cart.model");
-const Product = require("../models/product.model");
-const User = require("../models/user.model");
+const Order = require("../repositories/order.repository");
+const Cart = require("../repositories/cart.repository");
+const Product = require("../repositories/product.repository");
+const User = require("../repositories/user.repository");
 const { Types } = require("mongoose");
 const mongoose = require("mongoose");
 
 const voucherService = require("./voucher.service");
-const Voucher = require("../models/voucher.model");
-const VoucherUsage = require("../models/voucher-usage.model");
+const Voucher = require("../repositories/voucher.repository");
+const VoucherUsage = require("../repositories/voucher-usage.repository");
 const inventoryService = require("./inventory.service");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
-const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
+const {
+  getPaginationParams,
+  buildPaginationResponse,
+} = require("../utils/pagination");
 const { ORDER_ACTORS, canTransition } = require("../shared/order/orderState");
 
 const MAX_TX_RETRIES = Number(process.env.TXN_MAX_RETRIES) || 3;
@@ -27,6 +30,8 @@ const isRetryableTransactionError = (error) =>
 
 const isUnknownCommitResult = (error) =>
   getErrorLabels(error).includes("UnknownTransactionCommitResult");
+
+const order_queue = "order_queue";
 
 /**
  * Service handling order operations
@@ -65,15 +70,13 @@ class OrderService {
         } = orderData;
 
         // 1. Get Selected Items from Cart
-        const cart = await Cart.findOne({ userId })
-          .populate("items.productId")
-          .session(session);
+        const cart = await Cart.findByUserIdForCheckout(userId, session);
         if (!cart) {
           throw new ApiError(StatusCodes.NOT_FOUND, "Cart is empty");
         }
 
         const itemsToCheckout = cart.items.filter((item) =>
-          cartItemIds.includes(item._id.toString())
+          cartItemIds.includes(item._id.toString()),
         );
 
         if (itemsToCheckout.length === 0) {
@@ -96,7 +99,7 @@ class OrderService {
           if (!shopId) {
             throw new ApiError(
               StatusCodes.UNPROCESSABLE_ENTITY,
-              `Product ${product.name} has no shop`
+              `Product ${product.name} has no shop`,
             );
           }
 
@@ -122,11 +125,9 @@ class OrderService {
 
           // Batch fetch products to optimize performance
           const productIds = items.map((item) => item.productId._id);
-          const products = await Product.find({
-            _id: { $in: productIds },
-          }).session(session);
+          const products = await Product.findByIds(productIds).session(session);
           const productMap = new Map(
-            products.map((p) => [p._id.toString(), p])
+            products.map((p) => [p._id.toString(), p]),
           );
 
           // Verify Price & Build Inventory List
@@ -135,7 +136,7 @@ class OrderService {
             if (!product || product.status !== "published") {
               throw new ApiError(
                 StatusCodes.CONFLICT,
-                `${item.productId.name} unavailable`
+                `${item.productId.name} unavailable`,
               );
             }
 
@@ -144,13 +145,13 @@ class OrderService {
 
             if (item.modelId) {
               const variant = product.variants?.find(
-                (v) => v._id.toString() === item.modelId.toString()
+                (v) => v._id.toString() === item.modelId.toString(),
               );
 
               if (!variant) {
                 throw new ApiError(
                   StatusCodes.NOT_FOUND,
-                  `Variation for ${product.name} no longer exists`
+                  `Variation for ${product.name} no longer exists`,
                 );
               }
 
@@ -191,25 +192,27 @@ class OrderService {
 
           // --- APPLY SHOP VOUCHER ---
           let discountShop = 0;
-          const shopVoucherEntry = shopVouchers.find((v) => v.shopId === shopId);
+          const shopVoucherEntry = shopVouchers.find(
+            (v) => v.shopId === shopId,
+          );
           if (shopVoucherEntry) {
             const voucherResult = await voucherService.applyVoucher(
               shopVoucherEntry.code,
               userId,
               subtotal,
-              shopId
+              shopId,
             );
             discountShop = voucherResult.discountAmount;
 
             // Increment usage count and record in VoucherUsage collection
-            await Voucher.findByIdAndUpdate(
+            await Voucher.updateById(
               voucherResult.voucherId,
               { $inc: { usageCount: 1 } },
-              { session }
+              { session },
             );
             await VoucherUsage.create(
               [{ voucherId: voucherResult.voucherId, userId }],
-              { session }
+              { session },
             );
           }
 
@@ -217,7 +220,7 @@ class OrderService {
           totalPlatformOrderValue += totalAmount; // Platform discount applies on total after shop discount
 
           // 4. Create Order Object (Not save yet)
-          const newOrder = new Order({
+          const newOrder = Order.build({
             orderGroupId,
             userId,
             shopId,
@@ -239,7 +242,7 @@ class OrderService {
           const voucherResult = await voucherService.applyVoucher(
             platformVoucher,
             userId,
-            totalPlatformOrderValue
+            totalPlatformOrderValue,
           );
 
           const totalPlatformDiscount = voucherResult.discountAmount;
@@ -253,7 +256,7 @@ class OrderService {
               // Last order takes the remainder to handle rounding issues
               order.discountPlatform = Math.max(
                 0,
-                totalPlatformDiscount - distributedDiscount
+                totalPlatformDiscount - distributedDiscount,
               );
             } else {
               const ratio = order.totalAmount / totalPlatformOrderValue;
@@ -265,19 +268,19 @@ class OrderService {
             // Recalculate Final Total per Order
             order.totalAmount = Math.max(
               0,
-              order.totalAmount - order.discountPlatform
+              order.totalAmount - order.discountPlatform,
             );
           });
 
           // Increment usage count and record in VoucherUsage collection
-          await Voucher.findByIdAndUpdate(
+          await Voucher.updateById(
             voucherResult.voucherId,
             { $inc: { usageCount: 1 } },
-            { session }
+            { session },
           );
           await VoucherUsage.create(
             [{ voucherId: voucherResult.voucherId, userId }],
-            { session }
+            { session },
           );
         }
 
@@ -290,7 +293,7 @@ class OrderService {
         // 5. Cleanup Cart
         // Filter out checked out items
         cart.items = cart.items.filter(
-          (item) => !cartItemIds.includes(item._id.toString())
+          (item) => !cartItemIds.includes(item._id.toString()),
         );
         cart.totalAmount = this.calculateTotal(cart.items);
         await cart.save({ session });
@@ -313,7 +316,7 @@ class OrderService {
         }
 
         if (isUnknownCommitResult(error)) {
-          const existingOrders = await Order.find({ orderGroupId }).lean();
+          const existingOrders = await Order.findByOrderGroupIdLean(orderGroupId);
           if (existingOrders.length > 0) {
             return {
               message: "Orders created successfully",
@@ -339,7 +342,7 @@ class OrderService {
 
     throw new ApiError(
       StatusCodes.INTERNAL_SERVER_ERROR,
-      "Failed to create order after retries"
+      "Failed to create order after retries",
     );
   }
 
@@ -362,11 +365,7 @@ class OrderService {
    * @returns {Promise<Object>} User's orders
    */
   async getUserOrders(userId, filters = {}) {
-    const orders = await Order.find({ userId })
-      .populate("shopId", "name logo")
-      .populate("products.productId", "name slug")
-      .sort({ createdAt: -1 })
-      .lean();
+    const orders = await Order.findByUserIdWithShopAndProducts(userId);
     return { data: orders }; // Unified response structure
   }
 
@@ -377,10 +376,7 @@ class OrderService {
    * @returns {Promise<Object>} Shop's orders
    */
   async getShopOrders(shopId, filters = {}) {
-    const orders = await Order.find({ shopId })
-      .populate("userId", "username")
-      .sort({ createdAt: -1 })
-      .lean();
+    const orders = await Order.findByShopIdWithUser(shopId);
     return { data: orders };
   }
 
@@ -397,26 +393,15 @@ class OrderService {
   async getOrdersByShop(shopId, filters = {}) {
     const { page = 1, limit = 10, status, paymentStatus } = filters;
 
-    const query = { shopId };
-
-    if (status && status !== "all") {
-      query.status = status;
-    }
-
-    if (paymentStatus && paymentStatus !== "all") {
-      query.paymentStatus = paymentStatus;
-    }
-
-    const total = await Order.countDocuments(query);
+    const filterArgs = { status, paymentStatus };
+    const total = await Order.countByShopWithFilters(shopId, filterArgs);
     const paginationParams = getPaginationParams(page, limit, total);
 
-    const orders = await Order.find(query)
-      .populate("userId", "username email avatar")
-      .populate("products.productId", "name slug images")
-      .sort({ createdAt: -1 })
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit)
-      .lean();
+    const orders = await Order.findByShopWithFilters(
+      shopId,
+      filterArgs,
+      paginationParams,
+    );
 
     return buildPaginationResponse(orders, paginationParams);
   }
@@ -431,19 +416,19 @@ class OrderService {
    * @throws {Error} If invalid status transition
    */
   async updateOrderStatusBySeller(orderId, shopId, newStatus) {
-    const order = await Order.findOne({ _id: orderId, shopId });
+    const order = await Order.findByIdAndShop(orderId, shopId);
 
     if (!order) {
       throw new ApiError(
         StatusCodes.NOT_FOUND,
-        "Order not found or doesn't belong to your shop"
+        "Order not found or doesn't belong to your shop",
       );
     }
 
     if (!canTransition(order.status, newStatus, ORDER_ACTORS.SELLER)) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
-        `Cannot change status from "${order.status}" to "${newStatus}"`
+        `Cannot change status from "${order.status}" to "${newStatus}"`,
       );
     }
 
@@ -472,10 +457,10 @@ class OrderService {
    * @param {Object} order - Order object
    */
   async restoreOrderStock(order) {
-    const inventoryItems = order.products.map(item => ({
-        productId: item.productId,
-        modelId: item.variantId,
-        quantity: item.quantity
+    const inventoryItems = order.products.map((item) => ({
+      productId: item.productId,
+      modelId: item.variantId,
+      quantity: item.quantity,
     }));
 
     await inventoryService.restoreStock(inventoryItems);
@@ -490,16 +475,7 @@ class OrderService {
     const shopObjectId = new Types.ObjectId(shopId);
 
     // 1. Orders count by status
-    const ordersByStatus = await Order.aggregate([
-      { $match: { shopId: shopObjectId } },
-      {
-        $group: {
-          _id: "$status",
-          count: { $sum: 1 },
-          totalAmount: { $sum: "$totalAmount" },
-        },
-      },
-    ]);
+    const ordersByStatus = await Order.aggregateSellerOrdersByStatus(shopObjectId);
 
     const statusStats = {};
     ordersByStatus.forEach((item) => {
@@ -510,94 +486,22 @@ class OrderService {
     });
 
     // 2. Revenue statistics (only paid orders)
-    const revenueStats = await Order.aggregate([
-      {
-        $match: {
-          shopId: shopObjectId,
-          paymentStatus: "paid",
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          totalRevenue: { $sum: "$totalAmount" },
-          totalOrders: { $sum: 1 },
-          avgOrderValue: { $avg: "$totalAmount" },
-        },
-      },
-    ]);
+    const revenueStats = await Order.aggregateSellerRevenueStats(shopObjectId);
 
     // 3. Daily orders for last 30 days
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const dailyOrders = await Order.aggregate([
-      {
-        $match: {
-          shopId: shopObjectId,
-          createdAt: { $gte: thirtyDaysAgo },
-        },
-      },
-      {
-        $group: {
-          _id: {
-            year: { $year: "$createdAt" },
-            month: { $month: "$createdAt" },
-            day: { $dayOfMonth: "$createdAt" },
-          },
-          orders: { $sum: 1 },
-          revenue: {
-            $sum: {
-              $cond: [{ $eq: ["$paymentStatus", "paid"] }, "$totalAmount", 0],
-            },
-          },
-        },
-      },
-      { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 } },
-    ]);
+    const dailyOrders = await Order.aggregateSellerDailyOrders(
+      shopObjectId,
+      thirtyDaysAgo,
+    );
 
     // 4. Top selling products
-    const topProducts = await Order.aggregate([
-      {
-        $match: {
-          shopId: shopObjectId,
-          status: { $ne: "cancelled" },
-        },
-      },
-      { $unwind: "$products" },
-      {
-        $group: {
-          _id: "$products.productId",
-          productName: { $first: "$products.name" },
-          totalQuantity: { $sum: "$products.quantity" },
-          totalRevenue: { $sum: "$products.totalPrice" },
-        },
-      },
-      { $sort: { totalQuantity: -1 } },
-      { $limit: 10 },
-    ]);
+    const topProducts = await Order.aggregateSellerTopProducts(shopObjectId, 10);
 
     // 7. Summary counts - PERFORMANCE FIX: Use single aggregation with $facet
-    const summaryCounts = await Order.aggregate([
-      { $match: { shopId: shopObjectId } },
-      {
-        $facet: {
-          total: [{ $count: "count" }],
-          pending: [
-            { $match: { status: "pending" } },
-            { $count: "count" }
-          ],
-          completed: [
-            { $match: { status: "delivered" } },
-            { $count: "count" }
-          ],
-          cancelled: [
-            { $match: { status: "cancelled" } },
-            { $count: "count" }
-          ]
-        }
-      }
-    ]);
+    const summaryCounts = await Order.aggregateSellerSummaryCounts(shopObjectId);
 
     const counts = summaryCounts[0] || {};
     const totalOrders = counts.total?.[0]?.count || 0;
@@ -636,24 +540,11 @@ class OrderService {
   async getAllOrders(filters = {}) {
     const { shop, status, page = 1, limit = 20 } = filters;
 
-    const query = {};
-    if (shop) {
-      query.shopId = shop;
-    }
-    if (status && status !== "all") {
-      query.status = status;
-    }
-
-    const total = await Order.countDocuments(query);
+    const filterArgs = { shop, status };
+    const total = await Order.countAllWithFilters(filterArgs);
     const paginationParams = getPaginationParams(page, limit, total);
 
-    const orders = await Order.find(query)
-      .populate("userId", "username email")
-      .populate("shopId", "name logo slug")
-      .sort({ createdAt: -1 })
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit)
-      .lean();
+    const orders = await Order.findAllWithFilters(filterArgs, paginationParams);
 
     return buildPaginationResponse(orders, paginationParams);
   }
@@ -667,10 +558,7 @@ class OrderService {
    * @throws {Error} If order not found or unauthorized
    */
   async getOrderById(orderId, userId, isAdmin = false) {
-    const order = await Order.findById(orderId)
-      .populate("shopId", "name logo slug") // Added slug for admin panel
-      .populate("products.productId", "name slug images")
-      .lean();
+    const order = await Order.findByIdWithShopAndProducts(orderId);
 
     if (!order) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Order not found");
@@ -680,7 +568,7 @@ class OrderService {
     if (!isAdmin && order.userId.toString() !== userId.toString()) {
       throw new ApiError(
         StatusCodes.FORBIDDEN,
-        "Unauthorized to view this order"
+        "Unauthorized to view this order",
       );
     }
 
@@ -697,7 +585,13 @@ class OrderService {
    * @returns {Promise<Object>} Updated order
    * @throws {Error} If order not found, unauthorized, or invalid status transition
    */
-  async updateOrderStatus(orderId, status, userId, isAdmin = false, shopId = null) {
+  async updateOrderStatus(
+    orderId,
+    status,
+    userId,
+    isAdmin = false,
+    shopId = null,
+  ) {
     const order = await Order.findById(orderId);
 
     if (!order) {
@@ -710,14 +604,14 @@ class OrderService {
       if (shopId && order.shopId.toString() !== shopId.toString()) {
         throw new ApiError(
           StatusCodes.FORBIDDEN,
-          "Unauthorized to update this order"
+          "Unauthorized to update this order",
         );
       }
       // Regular users cannot update order status
       if (!shopId) {
         throw new ApiError(
           StatusCodes.FORBIDDEN,
-          "Unauthorized to update order status"
+          "Unauthorized to update order status",
         );
       }
     }
@@ -726,7 +620,7 @@ class OrderService {
     if (!canTransition(order.status, status, actor)) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
-        `Cannot transition from ${order.status} to ${status}`
+        `Cannot transition from ${order.status} to ${status}`,
       );
     }
 
@@ -751,15 +645,18 @@ class OrderService {
    * @throws {Error} If order not found, access denied, or cannot be cancelled
    */
   async cancelOrder(orderId, userId) {
-    const order = await Order.findOne({ _id: orderId, userId });
+    const order = await Order.findByIdAndUser(orderId, userId);
     if (!order) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Order not found or access denied");
+      throw new ApiError(
+        StatusCodes.NOT_FOUND,
+        "Order not found or access denied",
+      );
     }
 
     if (!canTransition(order.status, "cancelled", ORDER_ACTORS.USER)) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
-        "Cannot cancel order in this status"
+        "Cannot cancel order in this status",
       );
     }
 
@@ -781,162 +678,59 @@ class OrderService {
    */
   async getOrderStatistics(filters = {}) {
     const { startDate, endDate } = filters;
-    
-    // Build date filter if provided
-    const dateFilter = {};
-    if (startDate || endDate) {
-      dateFilter.createdAt = {};
-      if (startDate) dateFilter.createdAt.$gte = new Date(startDate);
-      if (endDate) dateFilter.createdAt.$lte = new Date(endDate);
-    }
 
     // 1. Total orders count by status
-    const ordersByStatus = await Order.aggregate([
-      { $match: dateFilter },
-      {
-        $group: {
-          _id: "$status",
-          count: { $sum: 1 },
-          totalAmount: { $sum: "$totalAmount" }
-        }
-      }
-    ]);
+    const ordersByStatus = await Order.aggregateAdminOrdersByStatusInRange(
+      startDate,
+      endDate,
+    );
 
     // Convert to object for easier access
     const statusStats = {};
-    ordersByStatus.forEach(item => {
+    ordersByStatus.forEach((item) => {
       statusStats[item._id] = {
         count: item.count,
-        totalAmount: item.totalAmount
+        totalAmount: item.totalAmount,
       };
     });
 
     // 2. Revenue statistics
-    const revenueStats = await Order.aggregate([
-      { 
-        $match: { 
-          ...dateFilter,
-          paymentStatus: "paid" 
-        } 
-      },
-      {
-        $group: {
-          _id: null,
-          totalRevenue: { $sum: "$totalAmount" },
-          totalOrders: { $sum: 1 },
-          avgOrderValue: { $avg: "$totalAmount" }
-        }
-      }
-    ]);
+    const revenueStats = await Order.aggregateAdminRevenueStatsInRange(
+      startDate,
+      endDate,
+    );
 
     // 3. Orders by payment method
-    const ordersByPaymentMethod = await Order.aggregate([
-      { $match: dateFilter },
-      {
-        $group: {
-          _id: "$paymentMethod",
-          count: { $sum: 1 },
-          totalAmount: { $sum: "$totalAmount" }
-        }
-      }
-    ]);
+    const ordersByPaymentMethod = await Order.aggregateAdminOrdersByPaymentMethodInRange(
+      startDate,
+      endDate,
+    );
 
     // 4. Daily orders for last 30 days
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const dailyOrders = await Order.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: thirtyDaysAgo }
-        }
-      },
-      {
-        $group: {
-          _id: {
-            year: { $year: "$createdAt" },
-            month: { $month: "$createdAt" },
-            day: { $dayOfMonth: "$createdAt" }
-          },
-          orders: { $sum: 1 },
-          revenue: {
-            $sum: {
-              $cond: [{ $eq: ["$paymentStatus", "paid"] }, "$totalAmount", 0]
-            }
-          }
-        }
-      },
-      { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 } }
-    ]);
+    const dailyOrders = await Order.aggregateAdminDailyOrders(thirtyDaysAgo);
 
     // 5. Top selling products
-    const topProducts = await Order.aggregate([
-      { $match: { ...dateFilter, status: { $ne: "cancelled" } } },
-      { $unwind: "$products" },
-      {
-        $group: {
-          _id: "$products.productId",
-          productName: { $first: "$products.name" },
-          totalQuantity: { $sum: "$products.quantity" },
-          totalRevenue: { $sum: "$products.totalPrice" }
-        }
-      },
-      { $sort: { totalQuantity: -1 } },
-      { $limit: 10 }
-    ]);
+    const topProducts = await Order.aggregateAdminTopProductsInRange(
+      startDate,
+      endDate,
+      10,
+    );
 
     // 6. Orders by shop (for multi-vendor)
-    const ordersByShop = await Order.aggregate([
-      { $match: dateFilter },
-      {
-        $group: {
-          _id: "$shopId",
-          orderCount: { $sum: 1 },
-          totalRevenue: { $sum: "$totalAmount" }
-        }
-      },
-      { $sort: { totalRevenue: -1 } },
-      { $limit: 10 },
-      {
-        $lookup: {
-          from: "shops",
-          localField: "_id",
-          foreignField: "_id",
-          as: "shop"
-        }
-      },
-      { $unwind: { path: "$shop", preserveNullAndEmptyArrays: true } },
-      {
-        $project: {
-          shopId: "$_id",
-          shopName: "$shop.name",
-          orderCount: 1,
-          totalRevenue: 1
-        }
-      }
-    ]);
+    const ordersByShop = await Order.aggregateAdminOrdersByShopInRange(
+      startDate,
+      endDate,
+      10,
+    );
 
     // 7. Summary counts - PERFORMANCE FIX: Use single aggregation with $facet
-    const adminSummaryCounts = await Order.aggregate([
-      { $match: dateFilter },
-      {
-        $facet: {
-          total: [{ $count: "count" }],
-          pending: [
-            { $match: { status: "pending" } },
-            { $count: "count" }
-          ],
-          completed: [
-            { $match: { status: "delivered" } },
-            { $count: "count" }
-          ],
-          cancelled: [
-            { $match: { status: "cancelled" } },
-            { $count: "count" }
-          ]
-        }
-      }
-    ]);
+    const adminSummaryCounts = await Order.aggregateAdminSummaryCountsInRange(
+      startDate,
+      endDate,
+    );
 
     const adminCounts = adminSummaryCounts[0] || {};
     const totalOrders = adminCounts.total?.[0]?.count || 0;
@@ -951,19 +745,21 @@ class OrderService {
         completedOrders,
         cancelledOrders,
         totalRevenue: revenueStats[0]?.totalRevenue || 0,
-        avgOrderValue: Math.round(revenueStats[0]?.avgOrderValue || 0)
+        avgOrderValue: Math.round(revenueStats[0]?.avgOrderValue || 0),
       },
       ordersByStatus: statusStats,
       ordersByPaymentMethod,
-      dailyOrders: dailyOrders.map(item => ({
-        date: `${item._id.year}-${String(item._id.month).padStart(2, '0')}-${String(item._id.day).padStart(2, '0')}`,
+      dailyOrders: dailyOrders.map((item) => ({
+        date: `${item._id.year}-${String(item._id.month).padStart(2, "0")}-${String(item._id.day).padStart(2, "0")}`,
         orders: item.orders,
-        revenue: item.revenue
+        revenue: item.revenue,
       })),
       topProducts,
-      ordersByShop
+      ordersByShop,
     };
   }
 }
 
 module.exports = new OrderService();
+
+

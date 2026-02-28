@@ -1,4 +1,4 @@
-const Banner = require("../models/banner.model");
+const bannerRepository = require("../repositories/banner.repository");
 const { uploadImage } = require("../configs/cloudinary");
 const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
 
@@ -25,7 +25,7 @@ class BannerService {
       const result = await uploadImage(file.buffer, "banners");
       payload.imageUrl = result.secure_url;
     }
-    return await Banner.create(payload);
+    return await bannerRepository.create(payload);
   }
 
   /**
@@ -39,23 +39,10 @@ class BannerService {
    * @returns {Promise<Object>} Paginated banner results
    */
   async getBanners({ limit = 10, page = 1, filter = {} }) {
-    const { search, ...otherFilters } = filter;
-    const query = { ...otherFilters };
-
-    if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { subtitle: { $regex: search, $options: "i" } },
-      ];
-    }
-
-    const total = await Banner.countDocuments(query);
+    const total = await bannerRepository.countByFilters(filter);
     const paginationParams = getPaginationParams(page, limit, total);
 
-    const banners = await Banner.find(query)
-      .sort({ order: 1, createdAt: -1 })
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit);
+    const banners = await bannerRepository.findByFilters(filter, paginationParams);
 
     return buildPaginationResponse(banners, paginationParams);
   }
@@ -67,7 +54,7 @@ class BannerService {
    * @returns {Promise<Object|null>} Banner object or null if not found
    */
   async getBannerById(id) {
-    return await Banner.findById(id);
+    return await bannerRepository.findById(id);
   }
 
   /**
@@ -82,7 +69,7 @@ class BannerService {
       const result = await uploadImage(file.buffer, "banners");
       payload.imageUrl = result.secure_url;
     }
-    return await Banner.findByIdAndUpdate(id, payload, { new: true });
+    return await bannerRepository.updateById(id, payload);
   }
 
   /**
@@ -91,7 +78,7 @@ class BannerService {
    * @returns {Promise<Object|null>} Delete result or null if not found
    */
   async deleteBanner(id) {
-    const result = await Banner.findByIdAndDelete(id);
+    const result = await bannerRepository.deleteById(id);
     if (!result) return null;
     return { message: "Banner deleted successfully" };
   }

@@ -1,8 +1,7 @@
-const Product = require("../models/product.model");
-const Order = require("../models/order.model");
-const User = require("../models/user.model");
-const Wishlist = require("../models/wishlist.model");
-const cacheService = require("./cache.service");
+const Product = require("../repositories/product.repository");
+const Order = require("../repositories/order.repository");
+const Wishlist = require("../repositories/wishlist.repository");
+const redisService = require("./redis.service");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
 
@@ -20,31 +19,25 @@ class RecommendationService {
    */
   async getPersonalizedRecommendations(userId, limit = 20) {
     const cacheKey = `recommendations:user:${userId}`;
-    const cached = await cacheService.get(cacheKey);
+    const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
     // Get user's purchase history
-    const orders = await Order.find({
-      userId,
-      status: { $ne: "cancelled" },
-    })
-      .select("products.productId")
-      .limit(10)
-      .lean();
+    const orders = await Order.findRecentNonCancelledOrdersByUser(userId, 10);
 
     const purchasedProductIds = orders.flatMap((o) =>
       o.products.map((p) => p.productId.toString())
     );
 
     // Get categories from purchased products
-    const purchasedProducts = await Product.find({
-      _id: { $in: purchasedProductIds },
-    }).select("category");
+    const purchasedProducts = await Product.findByIdsSelectCategory(
+      purchasedProductIds,
+    );
 
     const categoryIds = [...new Set(purchasedProducts.map((p) => p.category?.toString()))];
 
     // Get user's wishlist from Wishlist collection
-    const wishlistEntries = await Wishlist.find({ userId }).select("productId").lean();
+    const wishlistEntries = await Wishlist.findProductIdsByUserIdAll(userId);
     const wishlistIds = wishlistEntries.map((e) => e.productId.toString());
 
     // Exclude already purchased and wishlisted products
@@ -54,16 +47,11 @@ class RecommendationService {
     let recommendations = [];
 
     if (categoryIds.length > 0) {
-      recommendations = await Product.find({
-        _id: { $nin: excludeIds },
-        category: { $in: categoryIds },
-        status: "published",
-      })
-        .select("name slug images price ratingAverage soldCount shop")
-        .populate("shop", "name logo")
-        .sort({ soldCount: -1, ratingAverage: -1 })
-        .limit(limit)
-        .lean();
+      recommendations = await Product.findPersonalizedByCategory(
+        categoryIds,
+        excludeIds,
+        limit,
+      );
     }
 
     // If not enough, fill with popular products
@@ -71,20 +59,15 @@ class RecommendationService {
       const remaining = limit - recommendations.length;
       const existingIds = recommendations.map((p) => p._id.toString());
 
-      const popular = await Product.find({
-        _id: { $nin: [...excludeIds, ...existingIds] },
-        status: "published",
-      })
-        .select("name slug images price ratingAverage soldCount shop")
-        .populate("shop", "name logo")
-        .sort({ soldCount: -1 })
-        .limit(remaining)
-        .lean();
+      const popular = await Product.findPopularExcludingIds(
+        [...excludeIds, ...existingIds],
+        remaining,
+      );
 
       recommendations = [...recommendations, ...popular];
     }
 
-    await cacheService.set(cacheKey, recommendations, 1800); // 30 mins
+    await redisService.set(cacheKey, recommendations, 1800); // 30 mins
     return recommendations;
   }
 
@@ -95,18 +78,12 @@ class RecommendationService {
    */
   async getGuestRecommendations(limit = 20) {
     const cacheKey = "recommendations:guest";
-    const cached = await cacheService.get(cacheKey);
+    const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
-    const products = await Product.find({ status: "published" })
-      .select("name slug images price ratingAverage soldCount shop category")
-      .populate("shop", "name logo")
-      .populate("category", "name slug")
-      .sort({ soldCount: -1, ratingAverage: -1 })
-      .limit(limit)
-      .lean();
+    const products = await Product.findGuestRecommendations(limit);
 
-    await cacheService.set(cacheKey, products, 3600); // 1 hour
+    await redisService.set(cacheKey, products, 3600); // 1 hour
     return products;
   }
 
@@ -118,17 +95,11 @@ class RecommendationService {
    */
   async getFrequentlyBoughtTogether(productId, limit = 5) {
     const cacheKey = `recommendations:fbt:${productId}`;
-    const cached = await cacheService.get(cacheKey);
+    const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
     // Find orders containing this product
-    const orders = await Order.find({
-      "products.productId": productId,
-      status: { $ne: "cancelled" },
-    })
-      .select("products.productId")
-      .limit(100)
-      .lean();
+    const orders = await Order.findOrdersContainingProduct(productId, 100);
 
     // Count co-occurrence of other products
     const productCounts = {};
@@ -147,14 +118,9 @@ class RecommendationService {
       .slice(0, limit)
       .map(([id]) => id);
 
-    const products = await Product.find({
-      _id: { $in: sortedIds },
-      status: "published",
-    })
-      .select("name slug images price")
-      .lean();
+    const products = await Product.findPublishedByIdsBasic(sortedIds);
 
-    await cacheService.set(cacheKey, products, 3600);
+    await redisService.set(cacheKey, products, 3600);
     return products;
   }
 
@@ -175,16 +141,13 @@ class RecommendationService {
     const minPrice = product.price.currentPrice * (1 - priceRange);
     const maxPrice = product.price.currentPrice * (1 + priceRange);
 
-    const similar = await Product.find({
-      _id: { $ne: productId },
-      category: product.category,
-      status: "published",
-      "price.currentPrice": { $gte: minPrice, $lte: maxPrice },
-    })
-      .select("name slug images price ratingAverage soldCount")
-      .sort({ ratingAverage: -1, soldCount: -1 })
-      .limit(limit)
-      .lean();
+    const similar = await Product.findSimilarByCategoryAndPrice(
+      productId,
+      product.category,
+      minPrice,
+      maxPrice,
+      limit,
+    );
 
     return similar;
   }
@@ -197,16 +160,11 @@ class RecommendationService {
    */
   async getRecentlyViewed(userId, limit = 10) {
     const cacheKey = `user:${userId}:recently-viewed`;
-    const viewedIds = await cacheService.get(cacheKey);
+    const viewedIds = await redisService.get(cacheKey);
 
     if (!viewedIds || viewedIds.length === 0) return [];
 
-    const products = await Product.find({
-      _id: { $in: viewedIds.slice(0, limit) },
-      status: "published",
-    })
-      .select("name slug images price")
-      .lean();
+    const products = await Product.findPublishedByIdsForRecent(viewedIds, limit);
 
     return products;
   }
@@ -218,7 +176,7 @@ class RecommendationService {
    */
   async trackProductView(userId, productId) {
     const cacheKey = `user:${userId}:recently-viewed`;
-    let viewedIds = (await cacheService.get(cacheKey)) || [];
+    let viewedIds = (await redisService.get(cacheKey)) || [];
 
     // Remove if exists and add to front
     viewedIds = viewedIds.filter((id) => id !== productId);
@@ -227,7 +185,7 @@ class RecommendationService {
     // Keep only last 50
     viewedIds = viewedIds.slice(0, 50);
 
-    await cacheService.set(cacheKey, viewedIds, 86400 * 7); // 7 days
+    await redisService.set(cacheKey, viewedIds, 86400 * 7); // 7 days
   }
 
   /**
@@ -237,14 +195,7 @@ class RecommendationService {
    * @returns {Promise<Array>} Products in category
    */
   async getCategoryRecommendations(categoryId, limit = 20) {
-    const products = await Product.find({
-      category: categoryId,
-      status: "published",
-    })
-      .select("name slug images price ratingAverage soldCount")
-      .sort({ soldCount: -1, ratingAverage: -1 })
-      .limit(limit)
-      .lean();
+    const products = await Product.findCategoryRecommendations(categoryId, limit);
 
     return products;
   }
@@ -256,21 +207,9 @@ class RecommendationService {
    */
   async getHomepageRecommendations(userId = null) {
     const [popular, newArrivals, topRated] = await Promise.all([
-      Product.find({ status: "published" })
-        .sort({ soldCount: -1 })
-        .limit(10)
-        .select("name slug images price soldCount")
-        .lean(),
-      Product.find({ status: "published", isNewArrival: true })
-        .sort({ createdAt: -1 })
-        .limit(10)
-        .select("name slug images price")
-        .lean(),
-      Product.find({ status: "published", reviewCount: { $gte: 5 } })
-        .sort({ ratingAverage: -1 })
-        .limit(10)
-        .select("name slug images price ratingAverage")
-        .lean(),
+      Product.findHomepagePopular(10),
+      Product.findHomepageNewArrivals(10),
+      Product.findHomepageTopRated(10),
     ]);
 
     let personalized = [];
@@ -288,3 +227,5 @@ class RecommendationService {
 }
 
 module.exports = new RecommendationService();
+
+

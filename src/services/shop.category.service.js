@@ -1,6 +1,6 @@
-const ShopCategory = require("../models/shop.category.model");
-const Shop = require("../models/shop.model");
-const Product = require("../models/product.model");
+const ShopCategory = require("../repositories/shop-category.repository");
+const Shop = require("../repositories/shop.repository");
+const Product = require("../repositories/product.repository");
 const mongoose = require("mongoose");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
@@ -13,13 +13,10 @@ class ShopCategoryService {
    * @returns {Promise<any>}
    */
   async createCategory(userId, categoryData) {
-    const shop = await Shop.findOne({ owner: userId });
+    const shop = await Shop.findByOwnerId(userId);
     if (!shop) throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
 
-    const existing = await ShopCategory.findOne({
-      shopId: shop._id,
-      name: categoryData?.name,
-    });
+    const existing = await ShopCategory.findByShopAndName(shop._id, categoryData?.name);
     if (existing) {
       throw new ApiError(StatusCodes.CONFLICT, "Category name already exists");
     }
@@ -48,39 +45,23 @@ class ShopCategoryService {
    * @returns {Promise<any>}
    */
   async getMyShopCategories(userId) {
-    const shop = await Shop.findOne({ owner: userId });
+    const shop = await Shop.findByOwnerId(userId);
     if (!shop) throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
 
-    const categories = await ShopCategory.find({ shopId: shop._id })
-      .sort({ displayOrder: 1 })
-      .lean();
+    const categories = await ShopCategory.findByShopIdSorted(shop._id);
 
     const categoryIds = categories.map((c) => c._id);
-    const productCounts = await Product.aggregate([
-      {
-        $match: {
-          shop: shop._id,
-          shopCategory: { $in: categoryIds },
-          status: "published",
-        },
-      },
-      {
-        $group: {
-          _id: "$shopCategory",
-          count: { $sum: 1 },
-        },
-      },
-    ]);
+    const productCounts = await Product.aggregatePublishedCountsByShopCategories(
+      shop._id,
+      categoryIds,
+    );
 
     const countMap = {};
     productCounts.forEach((p) => {
       countMap[p._id.toString()] = p.count;
     });
 
-    const totalProducts = await Product.countDocuments({
-      shop: shop._id,
-      status: "published",
-    });
+    const totalProducts = await Product.countPublishedByShop(shop._id);
 
     const categoriesWithCount = categories.map((cat) => ({
       ...cat,
@@ -104,7 +85,7 @@ class ShopCategoryService {
 
     // If no param, try getting from logged in user (Owner viewing their own)
     if (!shopId && userId) {
-      const shop = await Shop.findOne({ owner: userId });
+      const shop = await Shop.findByOwnerId(userId);
       if (shop) shopId = shop._id;
     }
 
@@ -117,27 +98,14 @@ class ShopCategoryService {
       ? new mongoose.Types.ObjectId(shopId) 
       : shopId;
 
-    const categories = await ShopCategory.find({ shopId: shopObjectId, isActive: true })
-      .sort({ displayOrder: 1 })
-      .lean();
+    const categories = await ShopCategory.findActiveByShopIdSorted(shopObjectId);
 
     // Get product counts for each category
     const categoryIds = categories.map((c) => c._id);
-    const productCounts = await Product.aggregate([
-      {
-        $match: {
-          shop: shopObjectId,
-          shopCategory: { $in: categoryIds },
-          status: "published",
-        },
-      },
-      {
-        $group: {
-          _id: "$shopCategory",
-          count: { $sum: 1 },
-        },
-      },
-    ]);
+    const productCounts = await Product.aggregatePublishedCountsByShopCategories(
+      shopObjectId,
+      categoryIds,
+    );
 
     // Create count map
     const countMap = {};
@@ -146,10 +114,7 @@ class ShopCategoryService {
     });
 
     // Get total products for this shop
-    const totalProducts = await Product.countDocuments({
-      shop: shopObjectId,
-      status: "published",
-    });
+    const totalProducts = await Product.countPublishedByShop(shopObjectId);
 
     // Add productCount to each category
     const categoriesWithCount = categories.map((cat) => ({
@@ -171,18 +136,14 @@ class ShopCategoryService {
    * @returns {Promise<any>}
    */
   async updateCategory(userId, categoryId, updates) {
-    const shop = await Shop.findOne({ owner: userId });
+    const shop = await Shop.findByOwnerId(userId);
 
     if (!shop) throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
 
     if (updates?.description === undefined) delete updates.description;
     if (updates?.image === undefined) delete updates.image;
 
-    const updated = await ShopCategory.findOneAndUpdate(
-      { _id: categoryId, shopId: shop._id },
-      updates,
-      { new: true }
-    );
+    const updated = await ShopCategory.updateByIdAndShop(categoryId, shop._id, updates);
     if (!updated) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Category not found");
     }
@@ -198,14 +159,11 @@ class ShopCategoryService {
    * @returns {Promise<any>}
    */
   async deleteCategory(userId, categoryId) {
-    const shop = await Shop.findOne({ owner: userId });
+    const shop = await Shop.findByOwnerId(userId);
     if (!shop) throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
 
 
-    const deleted = await ShopCategory.findOneAndDelete({
-      _id: categoryId,
-      shopId: shop._id,
-    });
+    const deleted = await ShopCategory.deleteByIdAndShop(categoryId, shop._id);
     if (!deleted) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Category not found");
     }
@@ -216,3 +174,5 @@ class ShopCategoryService {
 }
 
 module.exports = new ShopCategoryService();
+
+

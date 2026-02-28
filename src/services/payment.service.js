@@ -5,8 +5,8 @@ const {
   dateFormat,
   getDateInGMT7,
 } = require("vnpay");
-const Payment = require("../models/payment.model");
-const Order = require("../models/order.model");
+const Payment = require("../repositories/payment.repository");
+const Order = require("../repositories/order.repository");
 const { getIO } = require("../socket/index");
 const logger = require("../utils/logger");
 const { StatusCodes } = require("http-status-codes");
@@ -103,7 +103,7 @@ class PaymentService {
     });
 
     // Save payment record
-    const payment = new Payment({
+    const payment = Payment.build({
       orderId: order._id,
       userId: order.userId,
       amount: order.totalAmount,
@@ -139,7 +139,7 @@ class PaymentService {
     const transactionStatus = vnpayParams.vnp_TransactionStatus;
 
     // Find payment record
-    const payment = await Payment.findOne({ transactionId });
+    const payment = await Payment.findByTransactionId(transactionId);
     if (!payment) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Payment not found");
     }
@@ -210,7 +210,7 @@ class PaymentService {
     const amount = parseInt(vnpayParams.vnp_Amount) / 100;
 
     // Find payment record
-    const payment = await Payment.findOne({ transactionId });
+    const payment = await Payment.findByTransactionId(transactionId);
     if (!payment) {
       return {
         RspCode: "01",
@@ -269,9 +269,7 @@ class PaymentService {
    * @returns {Object} Payment record
    */
   async getPaymentByOrderId(orderId) {
-    const payment = await Payment.findOne({ orderId })
-      .populate("orderId")
-      .populate("userId", "email name");
+    const payment = await Payment.findByOrderIdWithOrderAndUser(orderId);
     return payment;
   }
 
@@ -281,11 +279,11 @@ class PaymentService {
    * @returns {Object} Payment record
    */
   async getPaymentByTransactionId(transactionId) {
-    const payment = await Payment.findOne({ transactionId })
-      .populate("orderId")
-      .populate("userId", "email name");
+    const payment = await Payment.findByTransactionIdWithOrderAndUser(transactionId);
     return payment;
   }
 }
 
 module.exports = new PaymentService();
+
+

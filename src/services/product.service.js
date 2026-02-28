@@ -1,10 +1,14 @@
-const Product = require("../models/product.model");
-const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
-const Category = require("../models/category.model");
+const Product = require("../repositories/product.repository");
+const {
+  getPaginationParams,
+  buildPaginationResponse,
+} = require("../utils/pagination");
+const Category = require("../repositories/category.repository");
 const { multiUpload } = require("../configs/cloudinary");
 const { getIO } = require("../socket/index");
-const cacheService = require("./cache.service");
+const redisService = require("./redis.service");
 const logger = require("../utils/logger");
+const { buildHashedCacheKey } = require("../utils/cacheKey");
 const { embedProduct, deleteProductEmbedding } = require("./embedding.service");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
@@ -33,85 +37,36 @@ class ProductService {
       rating,
     } = { ...filters, ...options };
 
-    const cacheKey = `products:all:${JSON.stringify({ filters, options })}`;
-    const cachedData = await cacheService.get(cacheKey);
+    const cacheKey = buildHashedCacheKey("products:all", { filters, options });
+    const cachedData = await redisService.get(cacheKey);
     if (cachedData) return cachedData;
 
-    const query =
-      status === "all" ? { status: { $ne: "deleted" } } : { status };
+    const filterArgs = {
+      status,
+      category,
+      brand,
+      shop: filters.shop,
+      shopCategory: filters.shopCategory,
+      minPrice,
+      maxPrice,
+      tags,
+      search,
+      colors,
+      sizes,
+      rating,
+    };
 
-    if (category) {
-      query.category = category;
-    }
-
-    if (brand) {
-      query.brand = brand;
-    }
-
-    if (filters.shop) {
-      query.shop = filters.shop;
-    }
-
-    if (filters.shopCategory) {
-      query.shopCategory = filters.shopCategory;
-    }
-
-    if (minPrice || maxPrice) {
-      query["price.currentPrice"] = {};
-      if (minPrice) query["price.currentPrice"].$gte = Number(minPrice);
-      if (maxPrice) query["price.currentPrice"].$lte = Number(maxPrice);
-    }
-
-    if (tags) {
-      const tagArray = Array.isArray(tags) ? tags : tags.split(",");
-      query.tags = { $in: tagArray };
-    }
-
-    if (colors) {
-      const colorArray = Array.isArray(colors) ? colors : colors.split(",");
-      const colorRegexArray = colorArray.map((c) => new RegExp(`^${c}$`, "i"));
-      query["variants.color"] = { $in: colorRegexArray };
-    }
-
-    if (sizes) {
-      const sizeArray = Array.isArray(sizes) ? sizes : sizes.split(",");
-      query["variants.size"] = { $in: sizeArray };
-    }
-
-    if (rating) {
-      const ratingArray = Array.isArray(rating)
-        ? rating
-        : rating.split(",").map(Number);
-      const minRating = Math.min(...ratingArray);
-      if (!isNaN(minRating)) {
-        query.averageRating = { $gte: minRating };
-      }
-    }
-
-    if (search) {
-      query.$text = { $search: search };
-    }
-
-    const total = await Product.countDocuments(query);
+    const total = await Product.countWithCatalogFilters(filterArgs);
     const paginationParams = getPaginationParams(page, limit, total);
 
-    let productsQuery = Product.find(query)
-      .populate("category", "name slug")
-      .populate("shopCategory", "name slug");
-
-    if (search) {
-      productsQuery = productsQuery
-        .select({ score: { $meta: "textScore" } })
-        .sort({ score: { $meta: "textScore" } });
-    } else {
-      productsQuery = productsQuery.sort(sort);
-    }
-
-
-    const products = await productsQuery
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit)
-      .lean();
+    const products = await Product.findWithCatalogFilters(
+      filterArgs,
+      {
+        sort,
+        skip: paginationParams.skip,
+        limit: paginationParams.limit,
+      },
+    );
 
     return buildPaginationResponse(products, paginationParams);
   }
@@ -123,20 +78,16 @@ class ProductService {
    */
   async getProductById(id) {
     const cacheKey = `products:id:${id}`;
-    const cachedProduct = await cacheService.get(cacheKey);
+    const cachedProduct = await redisService.get(cacheKey);
     if (cachedProduct) return cachedProduct;
 
-    const product = await Product.findById(id)
-      .populate("category", "name slug")
-      .populate("shop", "name logo")
-      .populate("shopCategory", "name slug");
+    const product = await Product.findByIdWithCategoryShopAndShopCategory(id);
 
     if (!product) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
 
-
-    await cacheService.set(cacheKey, product, 3600); // 1 hour cache
+    await redisService.set(cacheKey, product, 3600); // 1 hour cache
     return product;
   }
 
@@ -146,22 +97,17 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async getProductBySlug(slug) {
-
     const cacheKey = `products:slug:${slug}`;
-    const cachedProduct = await cacheService.get(cacheKey);
+    const cachedProduct = await redisService.get(cacheKey);
     if (cachedProduct) return cachedProduct;
 
-    const product = await Product.findOne({ slug })
-      .populate("category", "name slug")
-      .populate("shop", "name logo")
-      .populate("shopCategory", "name slug");
+    const product = await Product.findBySlugWithCategoryShopAndShopCategory(slug);
 
     if (!product) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
 
-
-    await cacheService.set(cacheKey, product, 3600);
+    await redisService.set(cacheKey, product, 3600);
     return product;
   }
 
@@ -173,7 +119,6 @@ class ProductService {
    * @returns {string}
    */
   generateSku(slug, color, index) {
-
     const slugPart = slug
       ? slug.substring(0, 20).toUpperCase().replace(/-/g, "")
       : "PROD";
@@ -189,16 +134,16 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async ensureShopForUser(userId) {
-    const User = require("../models/user.model");
-    const Shop = require("../models/shop.model");
+    const User = require("../repositories/user.repository");
+    const Shop = require("../repositories/shop.repository");
 
     const user = await User.findById(userId).lean();
     let shopId = user?.shop;
 
     if (!shopId) {
-      const shop = await Shop.findOne({ owner: userId }).lean();
+      const shop = await Shop.findByOwnerIdLean(userId);
       if (shop) {
-        await User.findByIdAndUpdate(userId, { shop: shop._id });
+        await User.updateById(userId, { shop: shop._id });
         shopId = shop._id;
       }
     }
@@ -206,13 +151,12 @@ class ProductService {
     if (!shopId) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
-        "User does not have a shop. Please register a shop first."
+        "User does not have a shop. Please register a shop first.",
       );
     }
 
     return shopId;
   }
-
 
   /**
    * Create product
@@ -222,7 +166,6 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async createProduct(data, files, userId) {
-
     const shopId = await this.ensureShopForUser(userId);
     const productData = { ...data, shop: shopId };
 
@@ -235,7 +178,6 @@ class ProductService {
         locale: "vi",
       });
     }
-
 
     // Clean up and process variants
     if (productData.variants && Array.isArray(productData.variants)) {
@@ -260,14 +202,13 @@ class ProductService {
 
     // Check if slug already exists
     if (data.slug) {
-      const existingProduct = await Product.findOne({ slug: data.slug });
+      const existingProduct = await Product.findBySlug(data.slug);
       if (existingProduct) {
         throw new ApiError(
           StatusCodes.CONFLICT,
-          "Product with this slug already exists"
+          "Product with this slug already exists",
         );
       }
-
     }
 
     // Handle image files
@@ -337,10 +278,10 @@ class ProductService {
       }
     }
 
-    const product = new Product(productData);
+    const product = Product.build(productData);
     await product.save();
 
-    await cacheService.delByPattern("products:*");
+    await redisService.delByPattern("products:*");
 
     const io = getIO();
     if (io) {
@@ -353,11 +294,12 @@ class ProductService {
 
     // Generate embedding for the new product (async, don't wait)
     if (product.status === "published") {
-      const populatedProduct = await Product.findById(product._id)
-        .populate("category", "name")
-        .lean();
+      const populatedProduct = await Product.findByIdWithCategoryNameLean(product._id);
       embedProduct(populatedProduct).catch((err) => {
-        logger.error("[ProductService] Error embedding new product:", err.message);
+        logger.error(
+          "[ProductService] Error embedding new product:",
+          err.message,
+        );
       });
     }
 
@@ -372,22 +314,20 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async updateProduct(id, data, files) {
-
     try {
       const updateData = { ...data };
 
       if (updateData.slug) {
-        const existingProduct = await Product.findOne({
-          slug: updateData.slug,
-          _id: { $ne: id },
-        });
+        const existingProduct = await Product.findBySlugExcludingId(
+          updateData.slug,
+          id,
+        );
         if (existingProduct) {
           throw new ApiError(
             StatusCodes.CONFLICT,
-            "Product with this slug already exists"
+            "Product with this slug already exists",
           );
         }
-
       }
 
       const variantUploadMap = {};
@@ -444,50 +384,49 @@ class ProductService {
         updateData.variants = updateData.variants.map((variant, index) => {
           const variantData = { ...variant };
 
-      if (
-        variantData._id &&
-        typeof variantData._id === "string" &&
-        variantData._id.startsWith("temp-")
-      ) {
-        delete variantData._id;
-      }
+          if (
+            variantData._id &&
+            typeof variantData._id === "string" &&
+            variantData._id.startsWith("temp-")
+          ) {
+            delete variantData._id;
+          }
 
-      const existingImages =
-        existingVariantImagesMap[index] || variantData.images || [];
-      const newImages = variantUploadMap[index] || [];
-      variantData.images = [...existingImages, ...newImages];
-
+          const existingImages =
+            existingVariantImagesMap[index] || variantData.images || [];
+          const newImages = variantUploadMap[index] || [];
+          variantData.images = [...existingImages, ...newImages];
 
           return variantData;
         });
 
-      if (updateData.variants[0]?.images?.length > 0) {
-        updateData.images = updateData.variants[0].images;
+        if (updateData.variants[0]?.images?.length > 0) {
+          updateData.images = updateData.variants[0].images;
+        }
       }
 
-      }
-
-      const product = await Product.findByIdAndUpdate(id, updateData, {
-        new: true,
-        runValidators: true,
-      }).populate("category", "name slug");
+      const product = await Product.updateByIdWithCategory(id, updateData);
 
       if (!product) {
         throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
       }
 
-      await cacheService.delByPattern("products:*");
+      await redisService.delByPattern("products:*");
 
       if (product.status === "published") {
-        const populatedProduct = await Product.findById(product._id)
-          .populate("category", "name")
-          .lean();
+        const populatedProduct = await Product.findByIdWithCategoryNameLean(product._id);
         embedProduct(populatedProduct).catch((err) => {
-          logger.error("[ProductService] Error updating product embedding:", err.message);
+          logger.error(
+            "[ProductService] Error updating product embedding:",
+            err.message,
+          );
         });
       } else {
         deleteProductEmbedding(product._id).catch((err) => {
-          logger.error("[ProductService] Error deleting product embedding:", err.message);
+          logger.error(
+            "[ProductService] Error deleting product embedding:",
+            err.message,
+          );
         });
       }
 
@@ -504,8 +443,7 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async deleteProduct(id) {
-
-    const product = await Product.findByIdAndUpdate(
+    const product = await Product.updateById(
       id,
       { status: "deleted" },
       { new: true },
@@ -515,10 +453,13 @@ class ProductService {
       throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
 
-    await cacheService.delByPattern("products:*");
+    await redisService.delByPattern("products:*");
 
     deleteProductEmbedding(id).catch((err) => {
-      logger.error("[ProductService] Error deleting product embedding:", err.message);
+      logger.error(
+        "[ProductService] Error deleting product embedding:",
+        err.message,
+      );
     });
 
     return product;
@@ -530,15 +471,13 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async permanentDeleteProduct(id) {
-
-    const product = await Product.findByIdAndDelete(id);
+    const product = await Product.deleteById(id);
 
     if (!product) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
 
-
-    await cacheService.delByPattern("products:*");
+    await redisService.delByPattern("products:*");
 
     return product;
   }
@@ -551,7 +490,6 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async addVariant(productId, variantData, files) {
-
     const allowedVariantData = { ...variantData };
 
     if (files && files.length > 0) {
@@ -562,25 +500,17 @@ class ProductService {
       allowedVariantData.images = variantData.images;
     }
 
-    const existingProduct = await Product.findOne({
-      "variants.sku": allowedVariantData.sku,
-    });
+    const existingProduct = await Product.findByVariantSku(allowedVariantData.sku);
 
     if (existingProduct) {
       throw new ApiError(StatusCodes.CONFLICT, "SKU already exists");
     }
 
-
-    const product = await Product.findByIdAndUpdate(
-      productId,
-      { $push: { variants: allowedVariantData } },
-      { new: true, runValidators: true },
-    );
+    const product = await Product.pushVariant(productId, allowedVariantData);
 
     if (!product) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
-
 
     return product;
   }
@@ -593,22 +523,20 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async updateVariant(productId, variantId, variantData) {
-
     const allowedVariantData = {
       ...variantData,
       _id: variantId,
     };
 
-    const product = await Product.findOneAndUpdate(
-      { _id: productId, "variants._id": variantId },
-      { $set: { "variants.$": allowedVariantData } },
-      { new: true, runValidators: true },
+    const product = await Product.replaceVariant(
+      productId,
+      variantId,
+      allowedVariantData,
     );
 
     if (!product) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Product or variant not found");
     }
-
 
     return product;
   }
@@ -620,17 +548,11 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async deleteVariant(productId, variantId) {
-
-    const product = await Product.findByIdAndUpdate(
-      productId,
-      { $pull: { variants: { _id: variantId } } },
-      { new: true },
-    );
+    const product = await Product.pullVariant(productId, variantId);
 
     if (!product) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
-
 
     return product;
   }
@@ -642,24 +564,16 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async getProductsByCategory(categoryId, options = {}) {
-
     const { page = 1, limit = 10, sort = "-createdAt" } = options;
 
-    const query = {
-      category: categoryId,
-      status: "published",
-    };
-
-    const total = await Product.countDocuments(query);
+    const total = await Product.countByCategory(categoryId);
     const paginationParams = getPaginationParams(page, limit, total);
 
-
-    const products = await Product.find(query)
-      .populate("category", "name slug")
-      .sort(sort)
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit)
-      .lean();
+    const products = await Product.findByCategory(categoryId, {
+      sort,
+      skip: paginationParams.skip,
+      limit: paginationParams.limit,
+    });
 
     return buildPaginationResponse(products, paginationParams);
   }
@@ -671,40 +585,28 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async getProductsByCategorySlug(slug, options = {}) {
-
     const { page = 1, limit = 10, sort = "-createdAt" } = options;
 
-    const category = await Category.findOne({ slug, isActive: true });
+    const category = await Category.findBySlugActive(slug);
     if (!category) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Category not found");
     }
 
-    const childCategories = await Category.find({
-      parentCategory: category._id,
-      isActive: true,
-    }).select("_id");
+    const childCategories = await Category.findSubcategoryIds(category._id);
 
     const categoryIds = [
       category._id,
       ...childCategories.map((child) => child._id),
     ];
 
-
-    const query = {
-      category: { $in: categoryIds },
-      status: "published",
-    };
-
-    const total = await Product.countDocuments(query);
+    const total = await Product.countByCategoryIds(categoryIds);
     const paginationParams = getPaginationParams(page, limit, total);
 
-
-    const products = await Product.find(query)
-      .populate("category", "name slug")
-      .sort(sort)
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit)
-      .lean();
+    const products = await Product.findByCategoryIds(categoryIds, {
+      sort,
+      skip: paginationParams.skip,
+      limit: paginationParams.limit,
+    });
 
     return {
       ...buildPaginationResponse(products, paginationParams),
@@ -723,16 +625,10 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async getFeaturedProductsSimple(limit = 10) {
-
-    const products = await Product.find({ status: "published" })
-      .populate("category", "name slug")
-      .sort("-createdAt")
-      .limit(Number(limit))
-      .lean();
+    const products = await Product.findPublishedNewest(limit);
     if (!products) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Products not found");
     }
-
 
     return products;
   }
@@ -743,25 +639,14 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async getFeaturedProducts(query) {
-
     const cacheKey = "products:featured";
-    const cachedProducts = await cacheService.get(cacheKey);
+    const cachedProducts = await redisService.get(cacheKey);
     if (cachedProducts) return cachedProducts;
 
-    const filter = {
-      status: "published",
-      isFeatured: true,
-    };
+    const products = await Product.findFeatured(10);
 
-    const products = await Product.find(filter)
-      .populate("category", "name slug")
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean();
-
-    await cacheService.set(cacheKey, products, 1800);
+    await redisService.set(cacheKey, products, 1800);
     return products;
-
   }
 
   /**
@@ -770,23 +655,13 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async getNewArrivalProducts(query) {
-
     const cacheKey = "products:new-arrivals";
-    const cachedProducts = await cacheService.get(cacheKey);
+    const cachedProducts = await redisService.get(cacheKey);
     if (cachedProducts) return cachedProducts;
 
-    const filter = {
-      status: "published",
-      isNewArrival: true,
-    };
+    const products = await Product.findNewArrival(10);
 
-    const products = await Product.find(filter)
-      .populate("category", "name slug")
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean();
-
-    await cacheService.set(cacheKey, products, 1800);
+    await redisService.set(cacheKey, products, 1800);
     return products;
   }
 
@@ -796,31 +671,14 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async getOnSaleProducts(query) {
-
     const cacheKey = "products:on-sale";
-    const cachedProducts = await cacheService.get(cacheKey);
+    const cachedProducts = await redisService.get(cacheKey);
     if (cachedProducts) return cachedProducts;
 
     const now = new Date();
-    const filter = {
-      status: "published",
-      $or: [
-        { "price.discountPrice": { $ne: null, $gt: 0 } },
-        {
-          "flashSale.isActive": true,
-          "flashSale.startTime": { $lte: now },
-          "flashSale.endTime": { $gt: now },
-        },
-      ],
-    };
+    const products = await Product.findOnSale(now, 10);
 
-    const products = await Product.find(filter)
-      .populate("category", "name slug")
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean();
-
-    await cacheService.set(cacheKey, products, 1800);
+    await redisService.set(cacheKey, products, 1800);
     return products;
   }
 
@@ -832,30 +690,17 @@ class ProductService {
    */
   async searchProducts(keyword, limit = 10) {
     const cacheKey = `products:search:${keyword}:${limit}`;
-    const cachedProducts = await cacheService.get(cacheKey);
+    const cachedProducts = await redisService.get(cacheKey);
     if (cachedProducts) return cachedProducts;
 
-    const query = {
-      status: "published",
-      $or: [
-        { name: { $regex: keyword, $options: "i" } },
-        { description: { $regex: keyword, $options: "i" } },
-        { "category.name": { $regex: keyword, $options: "i" } },
-      ],
-    };
-
-    const products = await Product.find(query)
-      .select("name slug price category variants")
-      .populate("category", "name slug")
-      .limit(Number(limit))
-      .lean();
+    const products = await Product.searchByKeyword(keyword, limit);
 
     const productsWithImages = products.map((product) => ({
       ...product,
       image: product.variants?.[0]?.images?.[0] || null,
     }));
 
-    await cacheService.set(cacheKey, productsWithImages, 300);
+    await redisService.set(cacheKey, productsWithImages, 300);
     return productsWithImages;
   }
 
@@ -865,13 +710,11 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async getRelatedProducts(productId) {
-
     const limit = 10;
     const currentProduct = await Product.findById(productId);
     if (!currentProduct) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
-
 
     const priceBuffer = 0.2;
 
@@ -879,18 +722,10 @@ class ProductService {
     const minPrice = currentPrice * (1 - priceBuffer);
     const maxPrice = currentPrice * (1 + priceBuffer);
 
-    const query = {
-      _id: { $ne: currentProduct._id },
-      category: currentProduct.category,
-      status: "published",
-      "price.currentPrice": { $gte: minPrice, $lte: maxPrice },
-    };
-
-    const products = await Product.find(query)
-      .populate("category", "name slug")
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .lean();
+    const products = await Product.findRelatedByCategoryAndPrice(
+      currentProduct,
+      { minPrice, maxPrice, limit },
+    );
 
     return products;
   }
@@ -904,19 +739,14 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async updateProductBySeller(productId, shopId, data, files) {
-    const existingProduct = await Product.findOne({
-      _id: productId,
-      shop: shopId,
-    });
-
+    const existingProduct = await Product.findByIdAndShop(productId, shopId);
 
     if (!existingProduct) {
       throw new ApiError(
         StatusCodes.NOT_FOUND,
-        "Product not found or you don't have permission to update it"
+        "Product not found or you don't have permission to update it",
       );
     }
-
 
     const updateData = { ...data };
     delete updateData.shop;
@@ -935,24 +765,22 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async deleteProductBySeller(productId, shopId) {
-    const product = await Product.findOneAndUpdate(
-      { _id: productId, shop: shopId },
-      { status: "deleted" },
-      { new: true },
-    );
-
+    const product = await Product.softDeleteByIdAndShop(productId, shopId);
 
     if (!product) {
       throw new ApiError(
         StatusCodes.NOT_FOUND,
-        "Product not found or you don't have permission to delete it"
+        "Product not found or you don't have permission to delete it",
       );
     }
 
-    await cacheService.delByPattern("products:*");
+    await redisService.delByPattern("products:*");
 
     deleteProductEmbedding(productId).catch((err) => {
-      logger.error("[ProductService] Error deleting product embedding:", err.message);
+      logger.error(
+        "[ProductService] Error deleting product embedding:",
+        err.message,
+      );
     });
 
     return product;
@@ -967,9 +795,12 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async addVariantBySeller(productId, shopId, variantData, files) {
-    const product = await Product.findOne({ _id: productId, shop: shopId });
+    const product = await Product.findByIdAndShop(productId, shopId);
     if (!product) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found or access denied");
+      throw new ApiError(
+        StatusCodes.NOT_FOUND,
+        "Product not found or access denied",
+      );
     }
     return this.addVariant(productId, variantData, files);
   }
@@ -983,9 +814,12 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async updateVariantBySeller(productId, shopId, variantId, variantData) {
-    const product = await Product.findOne({ _id: productId, shop: shopId });
+    const product = await Product.findByIdAndShop(productId, shopId);
     if (!product) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found or access denied");
+      throw new ApiError(
+        StatusCodes.NOT_FOUND,
+        "Product not found or access denied",
+      );
     }
     return this.updateVariant(productId, variantId, variantData);
   }
@@ -998,12 +832,17 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async deleteVariantBySeller(productId, shopId, variantId) {
-    const product = await Product.findOne({ _id: productId, shop: shopId });
+    const product = await Product.findByIdAndShop(productId, shopId);
     if (!product) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found or access denied");
+      throw new ApiError(
+        StatusCodes.NOT_FOUND,
+        "Product not found or access denied",
+      );
     }
     return this.deleteVariant(productId, variantId);
   }
 }
 
 module.exports = new ProductService();
+
+

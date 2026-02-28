@@ -1,6 +1,6 @@
-const Order = require("../models/order.model");
-const User = require("../models/user.model");
-const Product = require("../models/product.model");
+const Order = require("../repositories/order.repository");
+const User = require("../repositories/user.repository");
+const Product = require("../repositories/product.repository");
 
 class StatisticsService {
   /**
@@ -13,61 +13,19 @@ class StatisticsService {
     const [countsResult, recentOrdersRaw, topProductsRaw, monthlyStatsRaw] = await Promise.all([
       // Single aggregation for all counts
       Promise.all([
-        Order.aggregate([
-          {
-            $facet: {
-              totalRevenue: [
-                { $match: { paymentStatus: "paid" } },
-                { $group: { _id: null, total: { $sum: "$totalAmount" } } }
-              ],
-              totalOrders: [{ $count: "count" }]
-            }
-          }
-        ]),
-        User.countDocuments({ roles: "user" }),
-        Product.countDocuments({ status: "published" })
+        Order.aggregateRevenueAndOrderCount(),
+        User.countUsersByRole(),
+        Product.countPublishedProducts()
       ]),
 
       // Recent Orders (5)
-      Order.find()
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .populate("userId", "username email avatar")
-        .lean(),
+      Order.findRecentWithUser(5),
 
       // Top Products (By Revenue or Sold Count) - Only products with sales
-      Product.find({ soldCount: { $gt: 0 } })
-        .sort({ soldCount: -1 })
-        .limit(5)
-        .select("name price soldCount variants slug")
-        .lean(),
+      Product.findTopSellingProducts(5),
 
       // Monthly Stats
-      Order.aggregate([
-        {
-          $match: {
-            status: { $ne: "cancelled" },
-            createdAt: {
-              $gte: new Date(new Date().setMonth(new Date().getMonth() - 5)),
-            },
-          },
-        },
-        {
-          $group: {
-            _id: {
-              month: { $month: "$createdAt" },
-              year: { $year: "$createdAt" },
-            },
-            revenue: {
-              $sum: {
-                $cond: [{ $eq: ["$paymentStatus", "paid"] }, "$totalAmount", 0]
-              }
-            },
-            orders: { $sum: 1 },
-          },
-        },
-        { $sort: { "_id.year": 1, "_id.month": 1 } },
-      ])
+      Order.aggregateMonthlyStatsLastMonths(6)
     ]);
 
     // Extract counts from aggregation result
@@ -162,3 +120,5 @@ class StatisticsService {
 }
 
 module.exports = new StatisticsService();
+
+

@@ -1,9 +1,9 @@
-const Shop = require("../models/shop.model");
-const User = require("../models/user.model");
-const Product = require("../models/product.model");
-const Order = require("../models/order.model");
-const Review = require("../models/review.model");
-const ShopFollower = require("../models/shop-follower.model");
+const Shop = require("../repositories/shop.repository");
+const User = require("../repositories/user.repository");
+const Product = require("../repositories/product.repository");
+const Order = require("../repositories/order.repository");
+const Review = require("../repositories/review.repository");
+const ShopFollower = require("../repositories/shop-follower.repository");
 const {
   getPaginationParams,
   buildPaginationResponse,
@@ -24,13 +24,13 @@ class ShopService {
     const { name, ...otherDetails } = shopData;
 
     // Check if user already has a shop
-    const existingShop = await Shop.findOne({ owner: userId });
+    const existingShop = await Shop.findByOwnerId(userId);
     if (existingShop) {
       throw new ApiError(StatusCodes.CONFLICT, "User already owns a shop");
     }
 
     // Check duplicate name
-    const existingName = await Shop.findOne({ name });
+    const existingName = await Shop.findByName(name);
     if (existingName) {
       throw new ApiError(StatusCodes.CONFLICT, "Shop name already taken");
     }
@@ -45,7 +45,7 @@ class ShopService {
     });
 
     // Update User Role to Seller and link shop
-    await User.findByIdAndUpdate(userId, {
+    await User.updateById(userId, {
       roles: "seller",
       shop: newShop._id,
     });
@@ -59,7 +59,7 @@ class ShopService {
    * @returns {Promise<any>}
    */
   async getShopInfo(shopId) {
-    const findShop = await Shop.findById(shopId).lean();
+    const findShop = await Shop.findByIdLean(shopId);
     if (!findShop) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
     }
@@ -72,7 +72,7 @@ class ShopService {
    * @returns {Promise<any>}
    */
   async getMyShop(userId) {
-    const findShop = await Shop.findOne({ owner: userId }).lean();
+    const findShop = await Shop.findByOwnerIdLean(userId);
     if (!findShop) {
       throw new ApiError(
         StatusCodes.NOT_FOUND,
@@ -95,11 +95,7 @@ class ShopService {
     delete updates.rating;
     delete updates.metrics;
 
-    const updatedShop = await Shop.findOneAndUpdate(
-      { owner: userId },
-      updates,
-      { new: true },
-    );
+    const updatedShop = await Shop.updateByOwnerId(userId, updates);
 
     if (!updatedShop) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
@@ -121,24 +117,13 @@ class ShopService {
       sort = "-createdAt",
     } = filters;
 
-    const query = {};
-    if (status) query.status = status;
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-      ];
-    }
-
-    const total = await Shop.countDocuments(query);
+    const total = await Shop.countWithFilters({ status, search });
     const paginationParams = getPaginationParams(page, limit, total);
 
-    const shops = await Shop.find(query)
-      .populate("owner", "username email")
-      .sort(sort)
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit)
-      .lean();
+    const shops = await Shop.findWithFilters(
+      { status, search },
+      { sort, skip: paginationParams.skip, limit: paginationParams.limit },
+    );
 
     return buildPaginationResponse(shops, paginationParams);
   }
@@ -149,24 +134,17 @@ class ShopService {
    * @returns {Promise<Object>} Shop details with products count
    */
   async getShopBySlug(slug) {
-    const shop = await Shop.findOne({ slug, status: "active" })
-      .populate("owner", "username avatar")
-      .lean();
+    const shop = await Shop.findBySlugActive(slug);
 
     if (!shop) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
     }
 
     // Get product count
-    const productCount = await Product.countDocuments({
-      shop: shop._id,
-      status: "published",
-    });
+    const productCount = await Product.countPublishedByShop(shop._id);
 
     // Get follower count from ShopFollower collection
-    const followerCount = await ShopFollower.countDocuments({
-      shopId: shop._id,
-    });
+    const followerCount = await ShopFollower.countByShopId(shop._id);
 
     return {
       ...shop,
@@ -184,18 +162,15 @@ class ShopService {
   async getShopProducts(shopId, options = {}) {
     const { page = 1, limit = 20, sort = "-createdAt", category } = options;
 
-    const query = { shop: shopId, status: "published" };
-    if (category) query.category = category;
-
-    const total = await Product.countDocuments(query);
+    const total = await Product.countPublishedByShop(shopId, category);
     const paginationParams = getPaginationParams(page, limit, total);
 
-    const products = await Product.find(query)
-      .populate("category", "name slug")
-      .sort(sort)
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit)
-      .lean();
+    const products = await Product.findPublishedByShop(shopId, {
+      category,
+      sort,
+      skip: paginationParams.skip,
+      limit: paginationParams.limit,
+    });
 
     return buildPaginationResponse(products, paginationParams);
   }
@@ -206,7 +181,7 @@ class ShopService {
    * @returns {Promise<Object>} Shop statistics
    */
   async getShopStatistics(userId) {
-    const shop = await Shop.findOne({ owner: userId });
+    const shop = await Shop.findByOwnerId(userId);
     if (!shop) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
     }
@@ -220,29 +195,12 @@ class ShopService {
       topProducts,
       recentOrders,
     ] = await Promise.all([
-      Product.countDocuments({ shop: shopId, status: "published" }),
-      Order.countDocuments({ shopId }),
-
-      Order.aggregate([
-        { $match: { shopId } },
-        { $group: { _id: "$status", count: { $sum: 1 } } },
-      ]),
-      Order.aggregate([
-        { $match: { shopId, paymentStatus: "paid" } },
-        { $group: { _id: null, total: { $sum: "$totalAmount" } } },
-      ]),
-      Product.find({ shop: shopId, soldCount: { $gt: 0 } })
-        .sort({ soldCount: -1 })
-        .limit(5)
-        .select("name soldCount price variants slug")
-        .lean(),
-
-      Order.find({ shopId })
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .populate("userId", "username avatar")
-        .select("_id status totalAmount createdAt paymentStatus")
-        .lean(),
+      Product.countPublishedByShop(shopId),
+      Order.countByShopId(shopId),
+      Order.aggregateStatusCountsByShopId(shopId),
+      Order.aggregatePaidRevenueByShopId(shopId),
+      Product.findTopSellingByShop(shopId, 5),
+      Order.findRecentByShopIdWithUser(shopId, 5),
     ]);
     const ordersByStatus = {
       pending: 0,
@@ -269,32 +227,9 @@ class ShopService {
       });
     }
 
-    const monthlyRevenueRaw = await Order.aggregate([
-      {
-        $match: {
-          shopId,
-          status: { $ne: "cancelled" },
-          createdAt: {
-            $gte: new Date(new Date().setMonth(new Date().getMonth() - 5)),
-          },
-        },
-      },
-      {
-        $group: {
-          _id: {
-            month: { $month: "$createdAt" },
-            year: { $year: "$createdAt" },
-          },
-          revenue: {
-            $sum: {
-              $cond: [{ $eq: ["$paymentStatus", "paid"] }, "$totalAmount", 0],
-            },
-          },
-          orders: { $sum: 1 },
-        },
-      },
-      { $sort: { "_id.year": 1, "_id.month": 1 } },
-    ]);
+    const monthlyRevenueRaw = await Order.aggregateMonthlyStatsLastMonths(6, {
+      shopId,
+    });
 
     // Map raw data to lookup object
     const revenueMap = {};
@@ -375,7 +310,7 @@ class ShopService {
     }
 
     // Check if already following
-    const existing = await ShopFollower.findOne({ shopId, userId });
+    const existing = await ShopFollower.findByShopAndUser(shopId, userId);
     if (existing) {
       throw new ApiError(StatusCodes.CONFLICT, "Already following this shop");
     }
@@ -383,9 +318,9 @@ class ShopService {
     await ShopFollower.create({ shopId, userId });
 
     // Increment cached follower count
-    await Shop.findByIdAndUpdate(shopId, { $inc: { followerCount: 1 } });
+    await Shop.updateById(shopId, { $inc: { followerCount: 1 } });
 
-    const followerCount = await ShopFollower.countDocuments({ shopId });
+    const followerCount = await ShopFollower.countByShopId(shopId);
 
     return {
       message: "Shop followed successfully",
@@ -400,10 +335,10 @@ class ShopService {
    * @returns {Promise<Object>} Unfollow result
    */
   async unfollowShop(userId, shopId) {
-    const result = await ShopFollower.deleteOne({ shopId, userId });
+    const result = await ShopFollower.deleteByShopAndUser(shopId, userId);
 
     if (result.deletedCount > 0) {
-      await Shop.findByIdAndUpdate(shopId, { $inc: { followerCount: -1 } });
+      await Shop.updateById(shopId, { $inc: { followerCount: -1 } });
     }
 
     return { message: "Shop unfollowed successfully" };
@@ -415,18 +350,11 @@ class ShopService {
    * @returns {Promise<Array>} Followed shops
    */
   async getFollowedShops(userId) {
-    const followedEntries = await ShopFollower.find({ userId })
-      .select("shopId")
-      .lean();
+    const followedEntries = await ShopFollower.findByUserSelectShopIds(userId);
 
     const shopIds = followedEntries.map((entry) => entry.shopId);
 
-    const shops = await Shop.find({
-      _id: { $in: shopIds },
-      status: "active",
-    })
-      .select("name slug logo rating")
-      .lean();
+    const shops = await Shop.findActiveByIds(shopIds);
 
     return shops;
   }
@@ -443,7 +371,7 @@ class ShopService {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid status");
     }
 
-    const shop = await Shop.findByIdAndUpdate(
+    const shop = await Shop.updateById(
       shopId,
       { status },
       { new: true },
@@ -462,24 +390,10 @@ class ShopService {
    * @returns {Promise<Object>} Shop rating statistics
    */
   async getShopRatings(shopId) {
-    const products = await Product.find({ shop: shopId }).select("_id");
+    const products = await Product.findByShopIdSelectIds(shopId);
     const productIds = products.map((p) => p._id);
 
-    const stats = await Review.aggregate([
-      { $match: { productId: { $in: productIds } } },
-      {
-        $group: {
-          _id: null,
-          averageRating: { $avg: "$rating" },
-          totalReviews: { $sum: 1 },
-          rating5: { $sum: { $cond: [{ $eq: ["$rating", 5] }, 1, 0] } },
-          rating4: { $sum: { $cond: [{ $eq: ["$rating", 4] }, 1, 0] } },
-          rating3: { $sum: { $cond: [{ $eq: ["$rating", 3] }, 1, 0] } },
-          rating2: { $sum: { $cond: [{ $eq: ["$rating", 2] }, 1, 0] } },
-          rating1: { $sum: { $cond: [{ $eq: ["$rating", 1] }, 1, 0] } },
-        },
-      },
-    ]);
+    const stats = await Review.aggregateShopRatingsByProductIds(productIds);
 
     return (
       stats[0] || {
@@ -500,31 +414,12 @@ class ShopService {
    * @returns {Promise<Array>} Categories with product count
    */
   async getShopCategories(shopId) {
-    const categories = await Product.aggregate([
-      { $match: { shop: shopId, status: "published" } },
-      { $group: { _id: "$category", count: { $sum: 1 } } },
-      {
-        $lookup: {
-          from: "categories",
-          localField: "_id",
-          foreignField: "_id",
-          as: "category",
-        },
-      },
-      { $unwind: "$category" },
-      {
-        $project: {
-          _id: "$category._id",
-          name: "$category.name",
-          slug: "$category.slug",
-          productCount: "$count",
-        },
-      },
-      { $sort: { productCount: -1 } },
-    ]);
+    const categories = await Product.aggregateShopCategories(shopId);
 
     return categories;
   }
 }
 
 module.exports = new ShopService();
+
+

@@ -1,7 +1,7 @@
 const { MistralAIEmbeddings } = require("@langchain/mistralai");
 const mongoose = require("mongoose");
-const Product = require("../models/product.model");
-const Category = require("../models/category.model");
+const Product = require("../repositories/product.repository");
+const Category = require("../repositories/category.repository");
 const logger = require("../utils/logger");
 
 // Singleton embedding model
@@ -211,10 +211,7 @@ async function embedAllProducts({ batchSize = 50, force = false } = {}) {
     const collection = getEmbeddingsCollection();
     
     // Get all published products
-    const products = await Product.find({ status: "published" })
-      .populate("category", "name")
-      .select("name slug description brand tags sizes variants price status isFeatured isNewArrival stock soldCount ratingAverage updatedAt")
-      .lean();
+    const products = await Product.findPublishedForEmbedding();
     
     logger.info(`[Embeddings] Starting to embed ${products.length} products...`);
     
@@ -402,31 +399,19 @@ async function searchSimilarProducts(query, { limit = 5, filter = {} } = {}) {
  */
 async function fallbackTextSearch(query, { limit = 5, filter = {} } = {}) {
   try {
-    const searchQuery = {
-      status: "published",
-      $or: [
-        { name: { $regex: query, $options: "i" } },
-        { description: { $regex: query, $options: "i" } },
-        { brand: { $regex: query, $options: "i" } },
-        { tags: { $elemMatch: { $regex: query, $options: "i" } } },
-      ],
-    };
-    
-    // Apply additional filters
-    if (filter.isFeatured !== undefined) {
-      searchQuery.isFeatured = filter.isFeatured;
-    }
+    let categoryId = null;
     if (filter.category) {
-      const cat = await Category.findOne({ name: { $regex: filter.category, $options: "i" } });
-      if (cat) searchQuery.category = cat._id;
+      const cat = await Category.findByNameRegex(filter.category);
+      if (cat) {
+        categoryId = cat._id;
+      }
     }
-    
-    const products = await Product.find(searchQuery)
-      .populate("category", "name")
-      .select("name slug price variants brand category stock isFeatured")
-      .sort({ soldCount: -1 })
-      .limit(limit)
-      .lean();
+
+    const products = await Product.findFallbackTextSearch(query, {
+      isFeatured: filter.isFeatured,
+      categoryId,
+      limit,
+    });
     
     return products.map((p) => ({
       id: p._id,
@@ -460,28 +445,7 @@ async function fallbackTextSearch(query, { limit = 5, filter = {} } = {}) {
  */
 async function getFeaturedProducts({ type = "featured", limit = 5 } = {}) {
   try {
-    const query = { status: "published" };
-    let sort = { soldCount: -1 };
-    
-    if (type === "featured") {
-      query.isFeatured = true;
-    } else if (type === "newArrivals") {
-      query.isNewArrival = true;
-      sort = { createdAt: -1 };
-    } else if (type === "bestsellers") {
-      sort = { soldCount: -1 };
-    } else if (type === "onSale") {
-      // Products with discount
-      query["price.discountPrice"] = { $exists: true, $ne: null };
-      query.$expr = { $lt: ["$price.discountPrice", "$price.currentPrice"] };
-    }
-    
-    const products = await Product.find(query)
-      .populate("category", "name")
-      .select("name slug price variants brand category stock isFeatured isNewArrival soldCount")
-      .sort(sort)
-      .limit(limit)
-      .lean();
+    const products = await Product.findFeaturedForEmbedding(type, limit);
     
     // Fallback: if specific query returns empty, get any published products
     if (products.length === 0 && type !== "bestsellers") {
@@ -587,3 +551,5 @@ module.exports = {
   createVectorSearchIndex,
   fallbackTextSearch,
 };
+
+

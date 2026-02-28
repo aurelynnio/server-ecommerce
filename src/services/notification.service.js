@@ -1,5 +1,5 @@
-const Notification = require("../models/notification.model");
-const User = require("../models/user.model");
+const Notification = require("../repositories/notification.repository");
+const User = require("../repositories/user.repository");
 const mongoose = require("mongoose");
 const logger = require("../utils/logger");
 const { StatusCodes } = require("http-status-codes");
@@ -41,7 +41,7 @@ class NotificationService {
       let processedCount = 0;
       
       // Use cursor to stream users without loading all into memory
-      const cursor = User.find({}).select("_id").cursor();
+      const cursor = User.streamAllUserIds();
       let batch = [];
 
       for await (const user of cursor) {
@@ -61,7 +61,7 @@ class NotificationService {
         });
 
         if (batch.length >= BATCH_SIZE) {
-          await Notification.bulkWrite(batch);
+          await Notification.bulkWriteNotifications(batch);
           
           // Emit socket notifications for this batch
           try {
@@ -84,7 +84,7 @@ class NotificationService {
 
       // Process remaining batch
       if (batch.length > 0) {
-        await Notification.bulkWrite(batch);
+        await Notification.bulkWriteNotifications(batch);
         
         try {
           const io = getIO();
@@ -137,19 +137,15 @@ class NotificationService {
    * @throws {Error} If userId is missing
    */
   async getListNotification(userId, { page = 1, limit = 10 } = {}) {
-    const total = await Notification.countDocuments({ userId });
+    const total = await Notification.countByUserId(userId);
     const paginationParams = getPaginationParams(page, limit, total || 0);
 
-    const notifications = await Notification.find({ userId })
-      .sort({ createdAt: -1 })
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit)
-      .populate("orderId", "orderCode totalAmount status");
-
-    const unreadCount = await Notification.countDocuments({
+    const notifications = await Notification.findByUserIdWithPagination(
       userId,
-      isRead: false,
-    });
+      paginationParams,
+    );
+
+    const unreadCount = await Notification.countUnreadByUserId(userId);
 
     return {
       ...buildPaginationResponse(notifications, paginationParams),
@@ -167,15 +163,7 @@ class NotificationService {
    * @throws {Error} If update fails
    */
   async markReadAll(userId) {
-    const result = await Notification.updateMany(
-      { userId, isRead: false },
-      {
-        $set: {
-          isRead: true,
-          readAt: new Date(),
-        },
-      },
-    );
+    const result = await Notification.markAllReadByUserId(userId);
     // Update real-time count
     try {
       const { getIO } = require("../socket/index");
@@ -191,7 +179,7 @@ class NotificationService {
    * @param {String} userId
    */
   async cleanNotification(userId) {
-    const result = await Notification.deleteMany({ userId });
+    const result = await Notification.deleteAllByUserId(userId);
 
     // Update real-time count
     try {
@@ -208,7 +196,7 @@ class NotificationService {
    * @param {String} userId
    */
   async countUnread(userId) {
-    const count = await Notification.countDocuments({ userId, isRead: false });
+    const count = await Notification.countUnreadByUserId(userId);
     return count || 0;
   }
 
@@ -218,10 +206,7 @@ class NotificationService {
    * @param {String} userId - Owner ID
    */
   async getNotificationById(id, userId) {
-    const notification = await Notification.findOne({
-      _id: id,
-      userId,
-    }).populate("orderId");
+    const notification = await Notification.findByIdAndUserId(id, userId);
     if (!notification) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Notification not found");
     }
@@ -236,11 +221,7 @@ class NotificationService {
    * @param {Object} data
    */
   async updateNotification(id, userId, data) {
-    const notification = await Notification.findOneAndUpdate(
-      { _id: id, userId },
-      data,
-      { new: true },
-    );
+    const notification = await Notification.updateByIdAndUserId(id, userId, data);
     if (!notification) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Notification not found");
     }
@@ -261,3 +242,5 @@ class NotificationService {
 }
 
 module.exports = new NotificationService();
+
+

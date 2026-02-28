@@ -1,10 +1,12 @@
-const Product = require("../models/product.model");
-const cacheService = require("./cache.service");
+const Product = require("../repositories/product.repository");
+const redisService = require("./redis.service");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
 
-const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
-
+const {
+  getPaginationParams,
+  buildPaginationResponse,
+} = require("../utils/pagination");
 
 /**
  * Service handling flash sale operations
@@ -20,29 +22,18 @@ class FlashSaleService {
    */
   async getActiveFlashSale({ page = 1, limit = 20 } = {}) {
     const cacheKey = `flash-sale:active:${page}:${limit}`;
-    const cached = await cacheService.get(cacheKey);
+    const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
     const now = new Date();
 
-    // Get products on flash sale
-    const query = {
-      status: "published",
-      "flashSale.isActive": true,
-      "flashSale.startTime": { $lte: now },
-      "flashSale.endTime": { $gte: now },
-    };
-
-    const total = await Product.countDocuments(query);
+    const total = await Product.countActiveFlashSale(now);
     const paginationParams = getPaginationParams(page, limit, total);
 
-    const products = await Product.find(query)
-      .select("name slug price flashSale soldCount stock shop variants descriptionImages")
-      .populate("shop", "name logo")
-      .sort({ "flashSale.soldCount": -1 })
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit)
-      .lean();
+    const products = await Product.findActiveFlashSaleProducts(
+      now,
+      paginationParams,
+    );
 
     // Calculate remaining time and sold percentage
     const enrichedProducts = products.map((p) => ({
@@ -59,7 +50,7 @@ class FlashSaleService {
         endTime: p.flashSale?.endTime,
         remainingSeconds: Math.max(
           0,
-          Math.floor((new Date(p.flashSale?.endTime) - now) / 1000)
+          Math.floor((new Date(p.flashSale?.endTime) - now) / 1000),
         ),
       },
     }));
@@ -72,7 +63,7 @@ class FlashSaleService {
       },
     };
 
-    await cacheService.set(cacheKey, result, 60); // 1 min cache
+    await redisService.set(cacheKey, result, 60); // 1 min cache
     return result;
   }
 
@@ -151,16 +142,11 @@ class FlashSaleService {
     const slotEnd = new Date(slotStart);
     slotEnd.setHours(slotEnd.getHours() + 2);
 
-    const products = await Product.find({
-      status: "published",
-      "flashSale.isActive": true,
-      "flashSale.startTime": { $lte: slotEnd },
-      "flashSale.endTime": { $gte: slotStart },
-    })
-      .select("name slug images price flashSale")
-      .populate("shop", "name")
-      .limit(50)
-      .lean();
+    const products = await Product.findFlashSaleProductsBySlot(
+      slotStart,
+      slotEnd,
+      50,
+    );
 
     return {
       timeSlot,
@@ -177,15 +163,10 @@ class FlashSaleService {
    * @returns {Promise<Object>} Updated product
    */
   async addToFlashSale(productId, flashSaleData) {
-    const { salePrice, discountPercent, stock, startTime, endTime } = flashSaleData;
+    const { salePrice, discountPercent, stock, startTime, endTime } =
+      flashSaleData;
 
-    const product = await Product.findById(productId);
-    if (!product) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
-    }
-
-
-    product.flashSale = {
+    const product = await Product.setFlashSaleByProductId(productId, {
       isActive: true,
       salePrice,
       discountPercent,
@@ -193,10 +174,13 @@ class FlashSaleService {
       soldCount: 0,
       startTime: new Date(startTime),
       endTime: new Date(endTime),
-    };
+    });
 
-    await product.save();
-    await cacheService.delByPattern("flash-sale:*");
+    if (!product) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+    }
+
+    await redisService.delByPattern("flash-sale:*");
 
     return product;
   }
@@ -207,18 +191,13 @@ class FlashSaleService {
    * @returns {Promise<Object>} Updated product
    */
   async removeFromFlashSale(productId) {
-    const product = await Product.findByIdAndUpdate(
-      productId,
-      { $unset: { flashSale: 1 } },
-      { new: true }
-    );
+    const product = await Product.removeFlashSaleByProductId(productId);
 
     if (!product) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
 
-
-    await cacheService.delByPattern("flash-sale:*");
+    await redisService.delByPattern("flash-sale:*");
     return product;
   }
 
@@ -230,20 +209,9 @@ class FlashSaleService {
     const now = new Date();
 
     const [activeCount, totalSold, topProducts] = await Promise.all([
-      Product.countDocuments({
-        "flashSale.isActive": true,
-        "flashSale.startTime": { $lte: now },
-        "flashSale.endTime": { $gte: now },
-      }),
-      Product.aggregate([
-        { $match: { "flashSale.isActive": true } },
-        { $group: { _id: null, total: { $sum: "$flashSale.soldCount" } } },
-      ]),
-      Product.find({ "flashSale.isActive": true })
-        .sort({ "flashSale.soldCount": -1 })
-        .limit(10)
-        .select("name flashSale.soldCount flashSale.salePrice")
-        .lean(),
+      Product.countActiveFlashSale(now),
+      Product.aggregateTotalFlashSaleSold(),
+      Product.findTopFlashSaleProducts(10),
     ]);
 
     return {

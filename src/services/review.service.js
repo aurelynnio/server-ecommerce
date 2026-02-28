@@ -1,12 +1,12 @@
-const Review = require("../models/review.model");
-const Product = require("../models/product.model");
-const Order = require("../models/order.model");
-const Shop = require("../models/shop.model");
+const Review = require("../repositories/review.repository");
+const Product = require("../repositories/product.repository");
+const Order = require("../repositories/order.repository");
+const Shop = require("../repositories/shop.repository");
 const {
   getPaginationParams,
   buildPaginationResponse,
 } = require("../utils/pagination");
-const cacheService = require("./cache.service");
+const redisService = require("./redis.service");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
 
@@ -36,11 +36,10 @@ class ReviewService {
     }
 
     // Check if user has purchased this product
-    const hasPurchased = await Order.exists({
+    const hasPurchased = await Order.existsDeliveredOrderForProductByUser(
       userId,
-      "products.productId": productId,
-      status: "delivered",
-    });
+      productId,
+    );
 
     if (!hasPurchased) {
       throw new ApiError(
@@ -50,10 +49,7 @@ class ReviewService {
     }
 
     // Check if user already reviewed this product
-    const existingReview = await Review.findOne({
-      user: userId,
-      productId,
-    });
+    const existingReview = await Review.findByUserAndProduct(userId, productId);
 
     if (existingReview) {
       throw new ApiError(
@@ -65,7 +61,7 @@ class ReviewService {
     // Create review
     const review = await Review.create({
       user: userId,
-      productId,
+      product: productId,
       rating,
       comment,
     });
@@ -99,13 +95,6 @@ class ReviewService {
       throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
     }
 
-    // Build query
-    const query = { product: productId };
-
-    if (rating) {
-      query.rating = rating;
-    }
-
     // Determine sort order
     let sortOption = {};
     switch (sort) {
@@ -126,34 +115,28 @@ class ReviewService {
     }
 
     // Count total items first
-    const total = await Review.countDocuments(query);
+    const total = await Review.countByProductWithFilters(productId, { rating });
 
     // Get pagination params with total count
     const paginationParams = getPaginationParams(page, limit, total);
 
     // Execute query
-    const reviews = await Review.find(query)
-      .populate("user", "username email")
-      .sort(sortOption)
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit);
+    const reviews = await Review.findByProductWithFilters(productId, {
+      rating,
+      sort: sortOption,
+      skip: paginationParams.skip,
+      limit: paginationParams.limit,
+    });
 
     // PERFORMANCE FIX: Cache rating distribution for 5 minutes
     const distributionCacheKey = `reviews:distribution:${productId}`;
-    let distribution = await cacheService.get(distributionCacheKey);
+    let distribution = await redisService.get(distributionCacheKey);
 
     if (!distribution) {
       // Calculate rating distribution
-      const ratingDistribution = await Review.aggregate([
-        { $match: { product: productExists._id } },
-        {
-          $group: {
-            _id: "$rating",
-            count: { $sum: 1 },
-          },
-        },
-        { $sort: { _id: -1 } },
-      ]);
+      const ratingDistribution = await Review.aggregateRatingDistributionByProduct(
+        productExists._id,
+      );
 
       distribution = {};
       for (let i = 1; i <= 5; i++) {
@@ -164,7 +147,7 @@ class ReviewService {
       });
 
       // Cache for 5 minutes
-      await cacheService.set(distributionCacheKey, distribution, 300);
+      await redisService.set(distributionCacheKey, distribution, 300);
     }
 
     return {
@@ -183,31 +166,22 @@ class ReviewService {
   async getAllReviews(filters = {}) {
     const { page = 1, limit = 10, rating, sort = "newest", search } = filters;
 
-    const query = {};
-
-    if (rating) {
-      query.rating = rating;
-    }
-
-    if (search) {
-      // Simple search by comment content
-      query.comment = { $regex: search, $options: "i" };
-    }
-
     let sortOption = { createdAt: -1 };
     if (sort === "oldest") sortOption = { createdAt: 1 };
     if (sort === "highest") sortOption = { rating: -1 };
     if (sort === "lowest") sortOption = { rating: 1 };
 
-    const total = await Review.countDocuments(query);
+    const total = await Review.countWithFilters({ rating, search });
     const paginationParams = getPaginationParams(page, limit, total);
 
-    const reviews = await Review.find(query)
-      .populate("user", "username email avatar")
-      .populate("product", "name slug images")
-      .sort(sortOption)
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit);
+    const reviews = await Review.findWithFilters(
+      { rating, search },
+      {
+        sort: sortOption,
+        skip: paginationParams.skip,
+        limit: paginationParams.limit,
+      },
+    );
 
     return buildPaginationResponse(reviews, paginationParams);
   }
@@ -224,17 +198,16 @@ class ReviewService {
     const { page = 1, limit = 10 } = filters;
 
     // Count total items first
-    const total = await Review.countDocuments({ user: userId });
+    const total = await Review.countByUserId(userId);
 
     // Get pagination params with total count
     const paginationParams = getPaginationParams(page, limit, total);
 
     // Execute query
-    const reviews = await Review.find({ user: userId })
-      .populate("product", "name slug images")
-      .sort({ createdAt: -1 })
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit);
+    const reviews = await Review.findByUserIdWithPagination(
+      userId,
+      paginationParams,
+    );
 
     return buildPaginationResponse(reviews, paginationParams);
   }
@@ -246,9 +219,7 @@ class ReviewService {
    * @throws {Error} If review not found
    */
   async getReviewById(reviewId) {
-    const review = await Review.findById(reviewId)
-      .populate("user", "username email")
-      .populate("product", "name slug images");
+    const review = await Review.findByIdWithUserAndProduct(reviewId);
 
     if (!review) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Review not found");
@@ -327,7 +298,7 @@ class ReviewService {
 
     const productId = review.product;
 
-    await review.deleteOne();
+    await Review.deleteById(reviewId);
 
     // Update product average rating
     await this.updateProductRating(productId);
@@ -341,16 +312,7 @@ class ReviewService {
    * @returns {Promise<{ averageRating: number, totalReviews: number }>}
    */
   async updateProductRating(productId) {
-    const stats = await Review.aggregate([
-      { $match: { product: productId } },
-      {
-        $group: {
-          _id: null,
-          averageRating: { $avg: "$rating" },
-          totalReviews: { $sum: 1 },
-        },
-      },
-    ]);
+    const stats = await Review.aggregateProductRatingStats(productId);
 
     const product = await Product.findById(productId);
     if (product) {
@@ -381,11 +343,10 @@ class ReviewService {
     }
 
     // Check if user has purchased and received this product
-    const hasPurchased = await Order.exists({
+    const hasPurchased = await Order.existsDeliveredOrderForProductByUser(
       userId,
-      "products.productId": productId,
-      status: "delivered",
-    });
+      productId,
+    );
 
     if (!hasPurchased) {
       return {
@@ -395,10 +356,7 @@ class ReviewService {
     }
 
     // Check if user already reviewed
-    const existingReview = await Review.findOne({
-      user: userId,
-      product: productId,
-    });
+    const existingReview = await Review.findByUserAndProduct(userId, productId);
 
     if (existingReview) {
       return {
@@ -424,43 +382,27 @@ class ReviewService {
    */
   async getShopReviews(userId, filters = {}) {
     // 1. Find the shop owned by this user
-    const shop = await Shop.findOne({ owner: userId });
+    const shop = await Shop.findByOwnerId(userId);
     if (!shop) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found for this user");
     }
 
     // 2. Find all products belonging to this shop
-    const products = await Product.find({ shop: shop._id }).select("_id");
+    const products = await Product.findByShopIdSelectIds(shop._id);
     const productIds = products.map((p) => p._id);
 
     // 3. Query reviews for these products
     const { page = 1, limit = 10, rating, replyStatus, search } = filters;
 
-    const query = { product: { $in: productIds } };
-
-    if (rating) {
-      query.rating = rating;
-    }
-
-    if (replyStatus === "replied") {
-      query.reply = { $ne: "" };
-    } else if (replyStatus === "unreplied") {
-      query.reply = "";
-    }
-
-    if (search) {
-      query.comment = { $regex: search, $options: "i" };
-    }
-
-    const total = await Review.countDocuments(query);
+    const filterArgs = { rating, replyStatus, search };
+    const total = await Review.countByProductIdsWithFilters(productIds, filterArgs);
     const paginationParams = getPaginationParams(page, limit, total);
 
-    const reviews = await Review.find(query)
-      .populate("user", "username email avatar")
-      .populate("product", "name slug images")
-      .sort({ createdAt: -1 })
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit);
+    const reviews = await Review.findByProductIdsWithFilters(
+      productIds,
+      filterArgs,
+      paginationParams,
+    );
 
     return buildPaginationResponse(reviews, paginationParams);
   }
@@ -478,13 +420,13 @@ class ReviewService {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Reply content is required");
     }
 
-    const review = await Review.findById(reviewId).populate("product");
+    const review = await Review.findByIdWithProduct(reviewId);
     if (!review) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Review not found");
     }
 
     // Check if user owns the shop that owns the product
-    const shop = await Shop.findOne({ owner: userId });
+    const shop = await Shop.findByOwnerId(userId);
     if (!shop) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
     }
@@ -513,40 +455,17 @@ class ReviewService {
    * @returns {Promise<Object>} Review statistics summary
    */
   async getReviewStatistics() {
-    const totalReviews = await Review.countDocuments();
+    const totalReviews = await Review.countAll();
 
-    const ratingDistribution = await Review.aggregate([
-      {
-        $group: {
-          _id: "$rating",
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: -1 } },
-    ]);
+    const ratingDistribution = await Review.aggregateOverallRatingDistribution();
 
-    const averageRating = await Review.aggregate([
-      {
-        $group: {
-          _id: null,
-          average: { $avg: "$rating" },
-        },
-      },
-    ]);
+    const averageRating = await Review.aggregateOverallAverageRating();
 
     // Top rated products
-    const topRatedProducts = await Product.find({ totalReviews: { $gt: 0 } })
-      .sort({ averageRating: -1, totalReviews: -1 })
-      .limit(5)
-      .select("name slug averageRating totalReviews images");
+    const topRatedProducts = await Product.findTopRatedProducts(5);
 
     // Most reviewed products
-    const mostReviewedProducts = await Product.find({
-      totalReviews: { $gt: 0 },
-    })
-      .sort({ totalReviews: -1 })
-      .limit(5)
-      .select("name slug averageRating totalReviews images");
+    const mostReviewedProducts = await Product.findMostReviewedProducts(5);
 
     return {
       totalReviews,
@@ -562,3 +481,5 @@ class ReviewService {
 }
 
 module.exports = new ReviewService();
+
+

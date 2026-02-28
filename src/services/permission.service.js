@@ -1,5 +1,5 @@
-const User = require("../models/user.model");
-const PermissionAudit = require("../models/permission-audit.model");
+const User = require("../repositories/user.repository");
+const PermissionAudit = require("../repositories/permission-audit.repository");
 const {
   ROLE_PERMISSIONS,
   getAllPermissionsList,
@@ -182,7 +182,7 @@ class PermissionService {
       );
     }
 
-    const user = await User.findByIdAndUpdate(
+    const user = await User.updateById(
       userId,
       { permissions },
       { new: true },
@@ -212,7 +212,6 @@ class PermissionService {
         adminId,
         targetUserId,
         permission,
-        timestamp: new Date(),
       });
     } catch (error) {
       logger.error("Failed to log permission audit:", { error: error.message });
@@ -233,7 +232,6 @@ class PermissionService {
         adminId,
         targetUserId,
         permission: JSON.stringify(permissions),
-        timestamp: new Date(),
       });
     } catch (error) {
       logger.error("Failed to log bulk permission update:", {
@@ -248,7 +246,7 @@ class PermissionService {
    * @returns {Promise<any>}
    */
   async getUserPermissionsSummary(userId) {
-    const user = await User.findById(userId).select("-password");
+    const user = await User.findByIdWithoutPassword(userId);
     if (!user) {
       throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
@@ -275,22 +273,19 @@ class PermissionService {
    * @returns {Promise<any>}
    */
   async getAuditLogs({ page = 1, limit = 20, userId, action }) {
-    const query = {};
-    if (userId) query.targetUserId = userId;
-    if (action) query.action = action;
-
-    const total = await PermissionAudit.countDocuments(query);
+    const filterArgs = { userId, action };
+    const total = await PermissionAudit.countWithFilters(filterArgs);
     const paginationParams = getPaginationParams(page, limit, total);
 
-    const logs = await PermissionAudit.find(query)
-      .sort({ timestamp: -1 })
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit)
-      .populate("adminId", "username email")
-      .populate("targetUserId", "username email");
+    const logs = await PermissionAudit.findWithFilters(
+      filterArgs,
+      paginationParams,
+    );
 
     return buildPaginationResponse(logs, paginationParams);
   }
 }
 
 module.exports = new PermissionService();
+
+

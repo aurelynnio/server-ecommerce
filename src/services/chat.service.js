@@ -1,5 +1,5 @@
-const { Conversation, Message } = require("../models/conversation.model");
-const Shop = require("../models/shop.model");
+const { Conversation, Message } = require("../repositories/conversation.repository");
+const Shop = require("../repositories/shop.repository");
 const { getIO } = require("../socket/index");
 const { StatusCodes } = require("http-status-codes");
 const { ApiError } = require("../middlewares/errorHandler.middleware");
@@ -21,16 +21,17 @@ class ChatService {
     const sellerId = shop.owner;
 
     // Check existing conversation
-    let conversation = await Conversation.findOne({
-      members: { $all: [userId, sellerId] },
+    let conversation = await Conversation.findByMembersAndShop(
+      userId,
+      sellerId,
       shopId,
-    });
+    );
 
     if (!conversation) {
-      conversation = await Conversation.create({
+      conversation = await Conversation.createConversation({
         members: [userId, sellerId],
         shopId,
-        context: { productId },
+        productId,
       });
     }
 
@@ -65,7 +66,7 @@ class ChatService {
     });
 
     // Update last message
-    await Conversation.findByIdAndUpdate(conversationId, {
+    await Conversation.updateById(conversationId, {
       lastMessage: {
         content,
         senderId,
@@ -88,10 +89,7 @@ class ChatService {
    * @returns {Promise<any>}
    */
   async getMyConversations(userId) {
-    const conversations = await Conversation.find({ members: userId })
-      .populate("shopId", "name logo")
-      .populate("members", "username avatar") // Be careful exposing sensitive info
-      .sort({ updatedAt: -1 });
+    const conversations = await Conversation.findByMemberWithDetails(userId);
     return conversations;
   }
 
@@ -105,14 +103,13 @@ class ChatService {
    * @returns {Promise<Object>} Messages with pagination
    */
   async getMessages(conversationId, { page = 1, limit = 50 } = {}) {
-    const total = await Message.countDocuments({ conversationId });
+    const total = await Message.countByConversationId(conversationId);
     const paginationParams = getPaginationParams(page, limit, total);
 
-    const messages = await Message.find({ conversationId })
-      .sort({ createdAt: -1 })
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit)
-      .lean();
+    const messages = await Message.findByConversationWithPagination(
+      conversationId,
+      paginationParams,
+    );
 
     const reversedMessages = messages.reverse();
 
@@ -145,13 +142,9 @@ class ChatService {
 
 
     // Update all messages where senderId != userId to isRead: true
-    const result = await Message.updateMany(
-      {
-        conversationId,
-        senderId: { $ne: userId },
-        isRead: false,
-      },
-      { $set: { isRead: true } }
+    const result = await Message.markUnreadAsReadByConversationAndReceiver(
+      conversationId,
+      userId,
     );
 
     return { updatedCount: result.modifiedCount };
@@ -159,3 +152,5 @@ class ChatService {
 }
 
 module.exports = new ChatService();
+
+

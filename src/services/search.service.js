@@ -1,9 +1,11 @@
-const Product = require("../models/product.model");
-const Category = require("../models/category.model");
-const Shop = require("../models/shop.model");
-const cacheService = require("./cache.service");
-const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
-
+const Product = require("../repositories/product.repository");
+const Category = require("../repositories/category.repository");
+const Shop = require("../repositories/shop.repository");
+const redisService = require("./redis.service");
+const {
+  getPaginationParams,
+  buildPaginationResponse,
+} = require("../utils/pagination");
 
 /**
  * Service handling advanced search operations
@@ -24,19 +26,13 @@ class SearchService {
 
     // PERFORMANCE FIX: Re-enable cache
     const cacheKey = `search:suggestions:${keyword.toLowerCase()}`;
-    const cached = await cacheService.get(cacheKey);
+    const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
     const regex = new RegExp(keyword, "i");
 
     // Search products - Note: images are in variants[].images, not root level
-    const products = await Product.find({
-      status: "published",
-      $or: [{ name: regex }, { tags: regex }],
-    })
-      .select("name slug price variants")
-      .limit(limit)
-      .lean();
+    const products = await Product.findPublishedAutocomplete(regex, limit);
 
     // Map products to include first variant image for display in 'images' array
     const productsWithImages = products.map((product) => {
@@ -51,26 +47,14 @@ class SearchService {
     });
 
     // Search categories
-    const categories = await Category.find({
-      isActive: true,
-      name: regex,
-    })
-      .select("name slug images")
-      .limit(5)
-      .lean();
+    const categories = await Category.findActiveByNameRegex(regex, 5);
 
     // Search shops
-    const shops = await Shop.find({
-      status: "active",
-      name: regex,
-    })
-      .select("name slug logo")
-      .limit(5)
-      .lean();
+    const shops = await Shop.findActiveByNameRegex(regex, 5);
 
     const result = { products: productsWithImages, categories, shops };
     // PERFORMANCE FIX: Cache for 5 minutes
-    await cacheService.set(cacheKey, result, 300);
+    await redisService.set(cacheKey, result, 300);
 
     return result;
   }
@@ -82,22 +66,18 @@ class SearchService {
    */
   async getTrendingSearches(limit = 10) {
     const cacheKey = "search:trending";
-    const cached = await cacheService.get(cacheKey);
+    const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
     // Get top selling products as trending
-    const trendingProducts = await Product.find({ status: "published" })
-      .sort({ soldCount: -1 })
-      .select("name")
-      .limit(limit)
-      .lean();
+    const trendingProducts = await Product.findTrendingProducts(limit);
 
     const trending = trendingProducts.map((p) => ({
       keyword: p.name,
       type: "product",
     }));
 
-    await cacheService.set(cacheKey, trending, 3600); // 1 hour cache
+    await redisService.set(cacheKey, trending, 3600); // 1 hour cache
     return trending;
   }
 
@@ -108,17 +88,13 @@ class SearchService {
    */
   async getHotKeywords(limit = 20) {
     const cacheKey = "search:hot-keywords";
-    const cached = await cacheService.get(cacheKey);
+    const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
     // Combine trending products and categories
     const [products, categories] = await Promise.all([
-      Product.find({ status: "published" })
-        .sort({ soldCount: -1, ratingAverage: -1 })
-        .select("name tags")
-        .limit(limit)
-        .lean(),
-      Category.find({ isActive: true }).select("name").limit(10).lean(),
+      Product.findHotKeywordProducts(limit),
+      Category.findActiveNames(10),
     ]);
 
     const keywords = [
@@ -129,7 +105,7 @@ class SearchService {
     // Remove duplicates and limit
     const uniqueKeywords = [...new Set(keywords)].slice(0, limit);
 
-    await cacheService.set(cacheKey, uniqueKeywords, 3600);
+    await redisService.set(cacheKey, uniqueKeywords, 3600);
     return uniqueKeywords;
   }
 
@@ -150,82 +126,38 @@ class SearchService {
       limit = 20,
     } = params;
 
-    const query = { status: "published" };
-
-    // Text search
-    if (keyword) {
-      query.$text = { $search: keyword };
-    }
+    let categoryIds = [];
 
     // Category filter
     if (category) {
-      const cat = await Category.findOne({ slug: category });
+      const cat = await Category.findBySlug(category);
       if (cat) {
-        // Include subcategories
-        const subcats = await Category.find({ parentCategory: cat._id }).select(
-          "_id"
-        );
-        const categoryIds = [cat._id, ...subcats.map((s) => s._id)];
-        query.category = { $in: categoryIds };
+        const subcats = await Category.findSubcategoryIds(cat._id);
+        categoryIds = [cat._id, ...subcats.map((s) => s._id)];
       }
     }
 
-    // Price filter
-    if (minPrice || maxPrice) {
-      query["price.currentPrice"] = {};
-      if (minPrice) query["price.currentPrice"].$gte = Number(minPrice);
-      if (maxPrice) query["price.currentPrice"].$lte = Number(maxPrice);
-    }
+    const searchParams = {
+      keyword,
+      categoryIds,
+      minPrice,
+      maxPrice,
+      rating,
+    };
 
-    // Rating filter
-    if (rating) {
-      query.ratingAverage = { $gte: Number(rating) };
-    }
-
-    // Sorting
-    let sort = {};
-    switch (sortBy) {
-      case "price_asc":
-        sort = { "price.currentPrice": 1 };
-        break;
-      case "price_desc":
-        sort = { "price.currentPrice": -1 };
-        break;
-      case "newest":
-        sort = { createdAt: -1 };
-        break;
-      case "bestselling":
-        sort = { soldCount: -1 };
-        break;
-      case "rating":
-        sort = { ratingAverage: -1 };
-        break;
-      default:
-        if (keyword) {
-          sort = { score: { $meta: "textScore" } };
-        } else {
-          sort = { createdAt: -1 };
-        }
-    }
-
-    const total = await Product.countDocuments(query);
+    const total = await Product.countByAdvancedSearchParams(searchParams);
     const paginationParams = getPaginationParams(page, limit, total);
 
-    let productsQuery = Product.find(query)
-      .populate("category", "name slug")
-      .populate("shop", "name logo");
+    const products = await Product.findByAdvancedSearchParams(
+      searchParams,
+      {
+        sortBy,
+        skip: paginationParams.skip,
+        limit: paginationParams.limit,
+      },
+    );
 
-    if (keyword) {
-      productsQuery = productsQuery.select({ score: { $meta: "textScore" } });
-    }
-
-    const products = await productsQuery
-      .sort(sort)
-      .skip(paginationParams.skip)
-      .limit(paginationParams.limit)
-      .lean();
-
-    const facets = await this.getSearchFacets(query);
+    const facets = await this.getSearchFacets(searchParams);
 
     return {
       ...buildPaginationResponse(products, paginationParams),
@@ -235,63 +167,17 @@ class SearchService {
 
   /**
    * Get search facets for filtering
-   * @param {Object} baseQuery - Base search query
+   * @param {Object} searchParams - Base search params
    * @returns {Promise<Object>} Facets data
    */
-  async getSearchFacets(baseQuery) {
-    const [priceRanges, categories, ratings] = await Promise.all([
-      // Price ranges
-      Product.aggregate([
-        { $match: baseQuery },
-        {
-          $bucket: {
-            groupBy: "$price.currentPrice",
-            boundaries: [0, 100000, 500000, 1000000, 5000000, Infinity],
-            default: "Other",
-            output: { count: { $sum: 1 } },
-          },
-        },
-      ]),
-      // Categories
-      Product.aggregate([
-        { $match: baseQuery },
-        { $group: { _id: "$category", count: { $sum: 1 } } },
-        {
-          $lookup: {
-            from: "categories",
-            localField: "_id",
-            foreignField: "_id",
-            as: "category",
-          },
-        },
-        { $unwind: "$category" },
-        {
-          $project: {
-            _id: "$category._id",
-            name: "$category.name",
-            slug: "$category.slug",
-            count: 1,
-          },
-        },
-        { $sort: { count: -1 } },
-        { $limit: 10 },
-      ]),
-      // Ratings
-      Product.aggregate([
-        { $match: baseQuery },
-        {
-          $bucket: {
-            groupBy: "$ratingAverage",
-            boundaries: [0, 3, 4, 4.5, 5],
-            default: "unrated",
-            output: { count: { $sum: 1 } },
-          },
-        },
-      ]),
-    ]);
+  async getSearchFacets(searchParams) {
+    const [priceRanges, categories, ratings] =
+      await Product.getSearchFacetsByParams(searchParams);
 
     return { priceRanges, categories, ratings };
   }
 }
 
 module.exports = new SearchService();
+
+
