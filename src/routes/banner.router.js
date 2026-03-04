@@ -1,23 +1,19 @@
+const express = require('express');
 
-const express = require("express");
+const BannerController = require('../controllers/banner.controller');
 
-const BannerController = require("../controllers/banner.controller");
+const upload = require('../configs/upload');
+const { validateImageSignature } = require('../middlewares/uploadSignature.middleware');
 
-const upload = require("../configs/upload");
-const { validateImageSignature } = require("../middlewares/uploadSignature.middleware");
+const validate = require('../middlewares/validate.middleware');
 
-const validate = require("../middlewares/validate.middleware");
-
-const {
-  verifyAccessToken,
-  requireRole,
-} = require("../middlewares/auth.middleware");
+const { verifyAccessToken, requireRole } = require('../middlewares/auth.middleware');
 
 const {
   createBannerValidator,
   updateBannerValidator,
   bannerIdParamValidator,
-} = require("../validations/banner.validator");
+} = require('../validations/banner.validator');
 
 const router = express.Router();
 
@@ -28,17 +24,13 @@ const router = express.Router();
  * @desc    Get active banners
  * @access  Public
  */
-router.get("/", BannerController.getBanners);
+router.get('/', BannerController.getBanners);
 
 /**
  * @desc    Get banner by ID
  * @access  Public
  */
-router.get(
-  "/:id",
-  validate({ params: bannerIdParamValidator }),
-  BannerController.getBannerById
-);
+router.get('/:id', validate({ params: bannerIdParamValidator }), BannerController.getBannerById);
 
 /**
  * Admin Routes (Protected)
@@ -48,13 +40,13 @@ router.get(
  * @access  Private (Admin only)
  */
 router.post(
-  "/",
+  '/',
   verifyAccessToken,
-  requireRole("admin"),
-  upload.single("image"),
+  requireRole('admin'),
+  upload.single('image'),
   validateImageSignature,
   validate({ body: createBannerValidator }),
-  BannerController.createBanner
+  BannerController.createBanner,
 );
 
 /**
@@ -62,10 +54,10 @@ router.post(
  * @access  Private (Admin only)
  */
 router.get(
-  "/admin/all",
+  '/admin/all',
   verifyAccessToken,
-  requireRole("admin"),
-  BannerController.getAllBannersAdmin
+  requireRole('admin'),
+  BannerController.getAllBannersAdmin,
 );
 
 /**
@@ -73,13 +65,13 @@ router.get(
  * @access  Private (Admin only)
  */
 router.put(
-  "/:id",
+  '/:id',
   verifyAccessToken,
-  requireRole("admin"),
-  upload.single("image"),
+  requireRole('admin'),
+  upload.single('image'),
   validateImageSignature,
   validate({ params: bannerIdParamValidator, body: updateBannerValidator }),
-  BannerController.updateBanner
+  BannerController.updateBanner,
 );
 
 /**
@@ -87,11 +79,11 @@ router.put(
  * @access  Private (Admin only)
  */
 router.delete(
-  "/:id",
+  '/:id',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({ params: bannerIdParamValidator }),
-  BannerController.deleteBanner
+  BannerController.deleteBanner,
 );
 
 module.exports = router;

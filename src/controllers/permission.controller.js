@@ -1,13 +1,13 @@
-const { StatusCodes } = require("http-status-codes");
-const catchAsync = require("../configs/catchAsync");
-const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
-const permissionService = require("../services/permission.service");
+const { StatusCodes } = require('http-status-codes');
+const catchAsync = require('../configs/catchAsync');
+const { sendSuccess, sendFail } = require('../shared/res/formatResponse');
+const permissionService = require('../services/permission.service');
 const {
   ROLE_PERMISSIONS,
   getAllPermissionsList,
   getPermissionsByResource,
   isValidPermission,
-} = require("../configs/permission");
+} = require('../configs/permission');
 
 const getAdminId = (user) => user._id || user.userId;
 
@@ -38,7 +38,7 @@ const PermissionController = {
         grouped: groupedPermissions,
         total: permissions.length,
       },
-      "Permissions retrieved successfully",
+      'Permissions retrieved successfully',
     );
   }),
 
@@ -46,7 +46,7 @@ const PermissionController = {
     return sendSuccess(
       res,
       { rolePermissions: ROLE_PERMISSIONS },
-      "Role permissions retrieved successfully",
+      'Role permissions retrieved successfully',
     );
   }),
 
@@ -60,7 +60,7 @@ const PermissionController = {
         role: req.user.roles || req.user.role,
         userSpecificPermissions: req.user.permissions || [],
       },
-      "Your permissions retrieved successfully",
+      'Your permissions retrieved successfully',
     );
   }),
 
@@ -68,7 +68,7 @@ const PermissionController = {
     const { userId } = req.params;
     const result = await permissionService.getUserPermissionsSummary(userId);
 
-    return sendSuccess(res, result, "User permissions retrieved successfully");
+    return sendSuccess(res, result, 'User permissions retrieved successfully');
   }),
 
   updateUserPermissions: catchAsync(async (req, res) => {
@@ -76,21 +76,16 @@ const PermissionController = {
     const { permissions } = req.body;
 
     if (!Array.isArray(permissions)) {
-      return sendFail(
-        res,
-        "Permissions must be an array",
-        StatusCodes.BAD_REQUEST,
-      );
+      return sendFail(res, 'Permissions must be an array', StatusCodes.BAD_REQUEST);
     }
 
     const invalidPerms = permissions.filter(
-      (permission) =>
-        !isValidPermission(permission) && !permission.startsWith("-"),
+      (permission) => !isValidPermission(permission) && !permission.startsWith('-'),
     );
     if (invalidPerms.length > 0) {
       return sendFail(
         res,
-        `Invalid permissions: ${invalidPerms.join(", ")}`,
+        `Invalid permissions: ${invalidPerms.join(', ')}`,
         StatusCodes.BAD_REQUEST,
       );
     }
@@ -104,7 +99,7 @@ const PermissionController = {
     return sendSuccess(
       res,
       { user: mapUserResponse(user) },
-      "User permissions updated successfully",
+      'User permissions updated successfully',
     );
   }),
 
@@ -113,20 +108,12 @@ const PermissionController = {
     const { permission } = req.body;
 
     if (!permission) {
-      return sendFail(res, "Permission is required", StatusCodes.BAD_REQUEST);
+      return sendFail(res, 'Permission is required', StatusCodes.BAD_REQUEST);
     }
 
-    const user = await permissionService.grantPermission(
-      userId,
-      permission,
-      getAdminId(req.user),
-    );
+    const user = await permissionService.grantPermission(userId, permission, getAdminId(req.user));
 
-    return sendSuccess(
-      res,
-      { user: mapUserResponse(user) },
-      "Permission granted successfully",
-    );
+    return sendSuccess(res, { user: mapUserResponse(user) }, 'Permission granted successfully');
   }),
 
   revokePermission: catchAsync(async (req, res) => {
@@ -134,27 +121,17 @@ const PermissionController = {
     const { permission } = req.body;
 
     if (!permission) {
-      return sendFail(res, "Permission is required", StatusCodes.BAD_REQUEST);
+      return sendFail(res, 'Permission is required', StatusCodes.BAD_REQUEST);
     }
 
-    const user = await permissionService.revokePermission(
-      userId,
-      permission,
-      getAdminId(req.user),
-    );
+    const user = await permissionService.revokePermission(userId, permission, getAdminId(req.user));
 
-    return sendSuccess(
-      res,
-      { user: mapUserResponse(user) },
-      "Permission revoked successfully",
-    );
+    return sendSuccess(res, { user: mapUserResponse(user) }, 'Permission revoked successfully');
   }),
 
   getAuditLogs: catchAsync(async (req, res) => {
-    const result = await permissionService.getAuditLogs(
-      parsePagination(req.query),
-    );
-    return sendSuccess(res, result, "Audit logs retrieved successfully");
+    const result = await permissionService.getAuditLogs(parsePagination(req.query));
+    return sendSuccess(res, result, 'Audit logs retrieved successfully');
   }),
 };
 

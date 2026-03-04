@@ -1,17 +1,11 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const shopController = require("../controllers/shop.controller");
-const {
-  verifyAccessToken,
-  requireRole,
-} = require("../middlewares/auth.middleware");
-const validate = require("../middlewares/validate.middleware");
-const {
-  createShopValidator,
-  updateShopValidator,
-} = require("../validations/shop.validator");
-const upload = require("../configs/upload");
-const { validateImageSignature } = require("../middlewares/uploadSignature.middleware");
+const shopController = require('../controllers/shop.controller');
+const { verifyAccessToken, requireRole } = require('../middlewares/auth.middleware');
+const validate = require('../middlewares/validate.middleware');
+const { createShopValidator, updateShopValidator } = require('../validations/shop.validator');
+const upload = require('../configs/upload');
+const { validateImageSignature } = require('../middlewares/uploadSignature.middleware');
 
 const normalizeSingleFile = (req, res, next) => {
   if (req.file) return next();
@@ -28,27 +22,22 @@ const normalizeSingleFile = (req, res, next) => {
  * @desc    Get all public shops (active only)
  * @access  Public
  */
-router.get("/", shopController.getPublicShops);
+router.get('/', shopController.getPublicShops);
 
 /**
  * @desc    Get all shops with pagination (Admin)
  * @access  Private (Admin)
  */
-router.get(
-  "/admin/all",
-  verifyAccessToken,
-  requireRole(["admin"]),
-  shopController.getAllShops,
-);
+router.get('/admin/all', verifyAccessToken, requireRole(['admin']), shopController.getAllShops);
 
 /**
  * @desc    Update shop status (Admin)
  * @access  Private (Admin)
  */
 router.put(
-  "/admin/:shopId/status",
+  '/admin/:shopId/status',
   verifyAccessToken,
-  requireRole(["admin"]),
+  requireRole(['admin']),
   shopController.updateShopStatus,
 );
 
@@ -57,7 +46,7 @@ router.put(
  * @access  Private
  */
 router.post(
-  "/register",
+  '/register',
   verifyAccessToken,
   validate(createShopValidator),
   shopController.createShop,
@@ -68,9 +57,12 @@ router.post(
  * @access  Private
  */
 router.post(
-  "/upload-register-image",
+  '/upload-register-image',
   verifyAccessToken,
-  upload.fields([{ name: "image", maxCount: 1 }, { name: "file", maxCount: 1 }]),
+  upload.fields([
+    { name: 'image', maxCount: 1 },
+    { name: 'file', maxCount: 1 },
+  ]),
   normalizeSingleFile,
   validateImageSignature,
   shopController.uploadImage,
@@ -81,9 +73,9 @@ router.post(
  * @access  Private (Seller/Admin)
  */
 router.get(
-  "/statistics",
+  '/statistics',
   verifyAccessToken,
-  requireRole("seller", "admin"),
+  requireRole('seller', 'admin'),
   shopController.getShopStatistics,
 );
 
@@ -91,32 +83,22 @@ router.get(
  * @desc    Get current user's shop information
  * @access  Private (Seller/Admin)
  */
-router.get(
-  "/me",
-  verifyAccessToken,
-  requireRole("seller", "admin"),
-  shopController.getMyShop,
-);
+router.get('/me', verifyAccessToken, requireRole('seller', 'admin'), shopController.getMyShop);
 
 /**
  * @desc    Get current user's shop information (Alias for /me)
  * @access  Private (Seller/Admin)
  */
-router.get(
-  "/my",
-  verifyAccessToken,
-  requireRole("seller", "admin"),
-  shopController.getMyShop,
-);
+router.get('/my', verifyAccessToken, requireRole('seller', 'admin'), shopController.getMyShop);
 
 /**
  * @desc    Update current user's shop information
  * @access  Private (Seller/Admin)
  */
 router.put(
-  "/",
+  '/',
   verifyAccessToken,
-  requireRole("seller", "admin"),
+  requireRole('seller', 'admin'),
   validate(updateShopValidator),
   shopController.updateShop,
 );
@@ -126,9 +108,9 @@ router.put(
  * @access  Private (Seller/Admin)
  */
 router.put(
-  "/my",
+  '/my',
   verifyAccessToken,
-  requireRole("seller", "admin"),
+  requireRole('seller', 'admin'),
   validate(updateShopValidator),
   shopController.updateShop,
 );
@@ -138,10 +120,13 @@ router.put(
  * @access  Private (Seller/Admin)
  */
 router.post(
-  "/upload-image",
+  '/upload-image',
   verifyAccessToken,
-  requireRole("seller", "admin"),
-  upload.fields([{ name: "image", maxCount: 1 }, { name: "file", maxCount: 1 }]),
+  requireRole('seller', 'admin'),
+  upload.fields([
+    { name: 'image', maxCount: 1 },
+    { name: 'file', maxCount: 1 },
+  ]),
   normalizeSingleFile,
   validateImageSignature,
   shopController.uploadImage,
@@ -152,9 +137,12 @@ router.post(
  * @access  Private (Seller/Admin)
  */
 router.post(
-  "/upload-logo",
+  '/upload-logo',
   verifyAccessToken,
-  upload.fields([{ name: "image", maxCount: 1 }, { name: "file", maxCount: 1 }]),
+  upload.fields([
+    { name: 'image', maxCount: 1 },
+    { name: 'file', maxCount: 1 },
+  ]),
   normalizeSingleFile,
   validateImageSignature,
   shopController.uploadLogo,
@@ -165,9 +153,12 @@ router.post(
  * @access  Private (Seller/Admin)
  */
 router.post(
-  "/upload-banner",
+  '/upload-banner',
   verifyAccessToken,
-  upload.fields([{ name: "image", maxCount: 1 }, { name: "file", maxCount: 1 }]),
+  upload.fields([
+    { name: 'image', maxCount: 1 },
+    { name: 'file', maxCount: 1 },
+  ]),
   normalizeSingleFile,
   validateImageSignature,
   shopController.uploadBanner,
@@ -177,12 +168,12 @@ router.post(
  * @desc    Get shop information by slug
  * @access  Public
  */
-router.get("/slug/:slug", shopController.getShopBySlug);
+router.get('/slug/:slug', shopController.getShopBySlug);
 
 /**
  * @desc    Get shop information by ID
  * @access  Public
  */
-router.get("/:shopId", shopController.getShopInfo);
+router.get('/:shopId', shopController.getShopInfo);
 
 module.exports = router;

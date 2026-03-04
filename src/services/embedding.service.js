@@ -1,8 +1,8 @@
-const { MistralAIEmbeddings } = require("@langchain/mistralai");
-const mongoose = require("mongoose");
-const Product = require("../repositories/product.repository");
-const Category = require("../repositories/category.repository");
-const logger = require("../utils/logger");
+const { MistralAIEmbeddings } = require('@langchain/mistralai');
+const mongoose = require('mongoose');
+const Product = require('../repositories/product.repository');
+const Category = require('../repositories/category.repository');
+const logger = require('../utils/logger');
 
 // Singleton embedding model
 let embeddingModel = null;
@@ -20,7 +20,7 @@ function getEmbeddingModel() {
   if (!embeddingModel) {
     embeddingModel = new MistralAIEmbeddings({
       apiKey: process.env.MISTRAL_API_KEY,
-      model: "mistral-embed", // Mistral's embedding model
+      model: 'mistral-embed', // Mistral's embedding model
     });
   }
   return embeddingModel;
@@ -32,7 +32,7 @@ function getEmbeddingModel() {
  */
 function getEmbeddingsCollection() {
   const client = mongoose.connection.getClient();
-  return client.db().collection("product_embeddings");
+  return client.db().collection('product_embeddings');
 }
 
 /**
@@ -43,7 +43,7 @@ function getEmbeddingsCollection() {
  */
 function createProductTextContent(product) {
   const parts = [];
-  
+
   // Product name is most important
   /**
    * If
@@ -53,7 +53,7 @@ function createProductTextContent(product) {
   if (product.name) {
     parts.push(`Tên sản phẩm: ${product.name}`);
   }
-  
+
   /**
    * If
    * @param {any} product.brand
@@ -62,7 +62,7 @@ function createProductTextContent(product) {
   if (product.brand) {
     parts.push(`Thương hiệu: ${product.brand}`);
   }
-  
+
   /**
    * If
    * @param {any} product.category?.name
@@ -71,36 +71,36 @@ function createProductTextContent(product) {
   if (product.category?.name) {
     parts.push(`Danh mục: ${product.category.name}`);
   }
-  
+
   /**
    * If
    * @param {any} product.tags && product.tags.length > 0
    * @returns {any}
    */
   if (product.tags && product.tags.length > 0) {
-    parts.push(`Tags: ${product.tags.join(", ")}`);
+    parts.push(`Tags: ${product.tags.join(', ')}`);
   }
-  
+
   /**
    * If
    * @param {any} product.sizes && product.sizes.length > 0
    * @returns {any}
    */
   if (product.sizes && product.sizes.length > 0) {
-    parts.push(`Kích cỡ: ${product.sizes.join(", ")}`);
+    parts.push(`Kích cỡ: ${product.sizes.join(', ')}`);
   }
-  
+
   // Colors from variants
-  const colors = [...new Set(product.variants?.map(v => v.color).filter(Boolean))];
+  const colors = [...new Set(product.variants?.map((v) => v.color).filter(Boolean))];
   /**
    * If
    * @param {any} colors.length > 0
    * @returns {any}
    */
   if (colors.length > 0) {
-    parts.push(`Màu sắc: ${colors.join(", ")}`);
+    parts.push(`Màu sắc: ${colors.join(', ')}`);
   }
-  
+
   // Price range
   const price = product.price?.discountPrice || product.price?.currentPrice;
   /**
@@ -109,9 +109,9 @@ function createProductTextContent(product) {
    * @returns {any}
    */
   if (price) {
-    parts.push(`Giá: ${price.toLocaleString("vi-VN")}đ`);
+    parts.push(`Giá: ${price.toLocaleString('vi-VN')}đ`);
   }
-  
+
   /**
    * If
    * @param {any} product.description
@@ -121,8 +121,8 @@ function createProductTextContent(product) {
     const truncatedDesc = product.description.substring(0, 500);
     parts.push(`Mô tả: ${truncatedDesc}`);
   }
-  
-  return parts.join(". ");
+
+  return parts.join('. ');
 }
 
 /**
@@ -140,7 +140,9 @@ function createProductMetadata(product) {
     categoryId: product.category?._id?.toString() || null,
     price: product.price?.discountPrice || product.price?.currentPrice,
     originalPrice: product.price?.currentPrice,
-    hasDiscount: !!(product.price?.discountPrice && product.price.discountPrice < product.price.currentPrice),
+    hasDiscount: !!(
+      product.price?.discountPrice && product.price.discountPrice < product.price.currentPrice
+    ),
     status: product.status,
     isFeatured: product.isFeatured || false,
     isNewArrival: product.isNewArrival || false,
@@ -163,13 +165,13 @@ async function embedProduct(product) {
   try {
     const embeddings = getEmbeddingModel();
     const collection = getEmbeddingsCollection();
-    
+
     const textContent = createProductTextContent(product);
     const metadata = createProductMetadata(product);
-    
+
     // Generate embedding vector
     const [vector] = await embeddings.embedDocuments([textContent]);
-    
+
     // Upsert into MongoDB
     await collection.updateOne(
       { productId: product._id.toString() },
@@ -182,12 +184,12 @@ async function embedProduct(product) {
           updatedAt: new Date(),
         },
       },
-      { upsert: true }
+      { upsert: true },
     );
-    
+
     return true;
   } catch (error) {
-    logger.error("[Embeddings] Error embedding product:", {
+    logger.error('[Embeddings] Error embedding product:', {
       productId: product._id,
       error: error.message,
     });
@@ -205,96 +207,99 @@ async function embedProduct(product) {
  */
 async function embedAllProducts({ batchSize = 50, force = false } = {}) {
   const stats = { success: 0, failed: 0, skipped: 0 };
-  
+
   try {
     const embeddings = getEmbeddingModel();
     const collection = getEmbeddingsCollection();
-    
+
     // Get all published products
     const products = await Product.findPublishedForEmbedding();
-    
+
     logger.info(`[Embeddings] Starting to embed ${products.length} products...`);
-    
+
     // Get existing embeddings map for quick lookup
     const existingMap = new Map();
     if (!force) {
-      const existing = await collection.find({}, { projection: { productId: 1, "metadata.updatedAt": 1 } }).toArray();
-      existing.forEach(e => {
+      const existing = await collection
+        .find({}, { projection: { productId: 1, 'metadata.updatedAt': 1 } })
+        .toArray();
+      existing.forEach((e) => {
         existingMap.set(e.productId, new Date(e.metadata?.updatedAt || 0).getTime());
       });
     }
-    
+
     // Optimized: Run batches in parallel chunks
     const CONCURRENCY = 2; // Reduced to 2 to match Rate Limit
     const allBatches = [];
-    
+
     // 1. Prepare all batches
     for (let i = 0; i < products.length; i += batchSize) {
       allBatches.push(products.slice(i, i + batchSize));
     }
-    
+
     // 2. Process chunks of batches
     for (let i = 0; i < allBatches.length; i += CONCURRENCY) {
       const currentChunk = allBatches.slice(i, i + CONCURRENCY);
-      
-      await Promise.all(currentChunk.map(async (batch) => {
-        const docsToEmbed = [];
-        const productsToEmbed = [];
-        
-        for (const product of batch) {
-          const key = product._id.toString();
-          const productTime = new Date(product.updatedAt || 0).getTime();
-          
-          if (!force && existingMap.has(key) && existingMap.get(key) >= productTime) {
-            stats.skipped++;
-            continue;
-          }
-          
-          const textContent = createProductTextContent(product);
-          docsToEmbed.push(textContent);
-          productsToEmbed.push({ product, textContent });
-        }
-        
-        if (docsToEmbed.length > 0) {
-          try {
-            const vectors = await embeddings.embedDocuments(docsToEmbed);
-            
-            const bulkOps = productsToEmbed.map((item, idx) => ({
-              updateOne: {
-                filter: { productId: item.product._id.toString() },
-                update: {
-                  $set: {
-                    productId: item.product._id.toString(),
-                    embedding: vectors[idx],
-                    text: item.textContent,
-                    metadata: createProductMetadata(item.product),
-                    updatedAt: new Date(),
-                  },
-                },
-                upsert: true,
-              },
-            }));
-            
-            if (bulkOps.length > 0) {
-              const result = await collection.bulkWrite(bulkOps);
-              stats.success += result.upsertedCount + result.modifiedCount;
+
+      await Promise.all(
+        currentChunk.map(async (batch) => {
+          const docsToEmbed = [];
+          const productsToEmbed = [];
+
+          for (const product of batch) {
+            const key = product._id.toString();
+            const productTime = new Date(product.updatedAt || 0).getTime();
+
+            if (!force && existingMap.has(key) && existingMap.get(key) >= productTime) {
+              stats.skipped++;
+              continue;
             }
-          } catch (error) {
-            logger.error(`[Embeddings] Batch failed:`, error.message);
-            stats.failed += docsToEmbed.length;
+
+            const textContent = createProductTextContent(product);
+            docsToEmbed.push(textContent);
+            productsToEmbed.push({ product, textContent });
           }
-        }
-      }));
-      
+
+          if (docsToEmbed.length > 0) {
+            try {
+              const vectors = await embeddings.embedDocuments(docsToEmbed);
+
+              const bulkOps = productsToEmbed.map((item, idx) => ({
+                updateOne: {
+                  filter: { productId: item.product._id.toString() },
+                  update: {
+                    $set: {
+                      productId: item.product._id.toString(),
+                      embedding: vectors[idx],
+                      text: item.textContent,
+                      metadata: createProductMetadata(item.product),
+                      updatedAt: new Date(),
+                    },
+                  },
+                  upsert: true,
+                },
+              }));
+
+              if (bulkOps.length > 0) {
+                const result = await collection.bulkWrite(bulkOps);
+                stats.success += result.upsertedCount + result.modifiedCount;
+              }
+            } catch (error) {
+              logger.error(`[Embeddings] Batch failed:`, error.message);
+              stats.failed += docsToEmbed.length;
+            }
+          }
+        }),
+      );
+
       const processedCount = Math.min((i + CONCURRENCY) * batchSize, products.length);
       logger.info(`[Embeddings] Processed ${processedCount}/${products.length} products`);
     }
-    
-    logger.info("[Embeddings] Embedding complete:", stats);
+
+    logger.info('[Embeddings] Embedding complete:', stats);
     return stats;
-    
   } catch (error) {
-    logger.error("[Embeddings] Error in embedAllProducts:", error.message);
+    logger.error('[Embeddings] Error in embedAllProducts:', error.message);
     throw error;
   }
 }
@@ -310,7 +315,7 @@ async function deleteProductEmbedding(productId) {
     await collection.deleteOne({ productId: productId.toString() });
     return true;
   } catch (error) {
-    logger.error("[Embeddings] Error deleting embedding:", {
+    logger.error('[Embeddings] Error deleting embedding:', {
       productId,
       error: error.message,
     });
@@ -330,22 +335,22 @@ async function searchSimilarProducts(query, { limit = 5, filter = {} } = {}) {
   try {
     const embeddings = getEmbeddingModel();
     const collection = getEmbeddingsCollection();
-    
+
     // Generate embedding for the query
     const [queryVector] = await embeddings.embedDocuments([query]);
-    
+
     // Build the aggregation pipeline for vector search
     // Note: This requires MongoDB Atlas Vector Search index to be created
     const pipeline = [
       {
         $vectorSearch: {
-          index: "product_vector_index", // Name of the Atlas Vector Search index
-          path: "embedding",
+          index: 'product_vector_index', // Name of the Atlas Vector Search index
+          path: 'embedding',
           queryVector: queryVector,
           numCandidates: limit * 10, // Consider more candidates for better results
           limit: limit,
           filter: {
-            "metadata.status": "published",
+            'metadata.status': 'published',
             ...filter,
           },
         },
@@ -356,13 +361,13 @@ async function searchSimilarProducts(query, { limit = 5, filter = {} } = {}) {
           productId: 1,
           text: 1,
           metadata: 1,
-          score: { $meta: "vectorSearchScore" },
+          score: { $meta: 'vectorSearchScore' },
         },
       },
     ];
-    
+
     const results = await collection.aggregate(pipeline).toArray();
-    
+
     // Format results for chatbot consumption
     return results.map((r) => ({
       id: r.metadata.productId,
@@ -380,13 +385,12 @@ async function searchSimilarProducts(query, { limit = 5, filter = {} } = {}) {
       isFeatured: r.metadata.isFeatured,
       score: r.score,
     }));
-    
   } catch (error) {
-    logger.error("[Embeddings] Vector search error:", error.message);
-    
+    logger.error('[Embeddings] Vector search error:', error.message);
+
     // Fallback to text search if vector search fails
     // This handles the case where Atlas Vector Search is not configured
-    logger.info("[Embeddings] Falling back to text search...");
+    logger.info('[Embeddings] Falling back to text search...');
     return await fallbackTextSearch(query, { limit, filter });
   }
 }
@@ -412,7 +416,7 @@ async function fallbackTextSearch(query, { limit = 5, filter = {} } = {}) {
       categoryId,
       limit,
     });
-    
+
     return products.map((p) => ({
       id: p._id,
       name: p.name,
@@ -429,9 +433,8 @@ async function fallbackTextSearch(query, { limit = 5, filter = {} } = {}) {
       isFeatured: p.isFeatured,
       score: 1, // No score for text search
     }));
-    
   } catch (error) {
-    logger.error("[Embeddings] Fallback text search error:", error.message);
+    logger.error('[Embeddings] Fallback text search error:', error.message);
     return [];
   }
 }
@@ -443,16 +446,16 @@ async function fallbackTextSearch(query, { limit = 5, filter = {} } = {}) {
  * @param {number} options.limit
  * @returns {Promise<Array>}
  */
-async function getFeaturedProducts({ type = "featured", limit = 5 } = {}) {
+async function getFeaturedProducts({ type = 'featured', limit = 5 } = {}) {
   try {
     const products = await Product.findFeaturedForEmbedding(type, limit);
-    
+
     // Fallback: if specific query returns empty, get any published products
-    if (products.length === 0 && type !== "bestsellers") {
+    if (products.length === 0 && type !== 'bestsellers') {
       logger.info(`[Embeddings] No ${type} products found, falling back to bestsellers`);
-      return getFeaturedProducts({ type: "bestsellers", limit });
+      return getFeaturedProducts({ type: 'bestsellers', limit });
     }
-    
+
     return products.map((p) => ({
       id: p._id,
       name: p.name,
@@ -468,9 +471,8 @@ async function getFeaturedProducts({ type = "featured", limit = 5 } = {}) {
       stock: p.stock,
       isFeatured: p.isFeatured,
     }));
-    
   } catch (error) {
-    logger.error("[Embeddings] getFeaturedProducts error:", error.message);
+    logger.error('[Embeddings] getFeaturedProducts error:', error.message);
     return [];
   }
 }
@@ -484,49 +486,48 @@ async function createVectorSearchIndex() {
   try {
     const client = mongoose.connection.getClient();
     const db = client.db();
-    
+
     // Check if index exists
-    const indexes = await db.collection("product_embeddings").listSearchIndexes().toArray();
-    const existingIndex = indexes.find(idx => idx.name === "product_vector_index");
-    
+    const indexes = await db.collection('product_embeddings').listSearchIndexes().toArray();
+    const existingIndex = indexes.find((idx) => idx.name === 'product_vector_index');
+
     if (existingIndex) {
-      logger.info("[Embeddings] Vector search index already exists");
+      logger.info('[Embeddings] Vector search index already exists');
       return true;
     }
-    
+
     // Create the vector search index
     // Note: This requires MongoDB Atlas M10+ or serverless
-    await db.collection("product_embeddings").createSearchIndex({
-      name: "product_vector_index",
+    await db.collection('product_embeddings').createSearchIndex({
+      name: 'product_vector_index',
       definition: {
         mappings: {
           dynamic: true,
           fields: {
             embedding: {
-              type: "knnVector",
+              type: 'knnVector',
               dimensions: 1024, // Mistral embed dimensions
-              similarity: "cosine",
+              similarity: 'cosine',
             },
-            "metadata.status": {
-              type: "string",
+            'metadata.status': {
+              type: 'string',
             },
-            "metadata.isFeatured": {
-              type: "boolean",
+            'metadata.isFeatured': {
+              type: 'boolean',
             },
-            "metadata.category": {
-              type: "string",
+            'metadata.category': {
+              type: 'string',
             },
           },
         },
       },
     });
-    
-    logger.info("[Embeddings] Vector search index created successfully");
+
+    logger.info('[Embeddings] Vector search index created successfully');
     return true;
-    
   } catch (error) {
-    logger.error("[Embeddings] Error creating vector search index:", error.message);
-    logger.info("[Embeddings] You may need to create the index manually via Atlas UI");
+    logger.error('[Embeddings] Error creating vector search index:', error.message);
+    logger.info('[Embeddings] You may need to create the index manually via Atlas UI');
     logger.info(`
     Index configuration for Atlas UI:
     - Collection: product_embeddings
@@ -551,5 +552,3 @@ module.exports = {
   createVectorSearchIndex,
   fallbackTextSearch,
 };
-
-

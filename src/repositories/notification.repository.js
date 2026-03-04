@@ -1,5 +1,5 @@
-const Notification = require("../models/notification.model");
-const BaseRepository = require("./base.repository");
+const Notification = require('../models/notification.model');
+const BaseRepository = require('./base.repository');
 
 class NotificationRepository extends BaseRepository {
   constructor() {
@@ -15,7 +15,7 @@ class NotificationRepository extends BaseRepository {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("orderId", "orderCode totalAmount status");
+      .populate('orderId', 'orderCode totalAmount status');
   }
 
   countByUserId(userId) {
@@ -43,7 +43,7 @@ class NotificationRepository extends BaseRepository {
   }
 
   findByIdAndUserId(id, userId) {
-    return this.findOneByFilter({ _id: id, userId }).populate("orderId");
+    return this.findOneByFilter({ _id: id, userId }).populate('orderId');
   }
 
   updateByIdAndUserId(id, userId, update) {

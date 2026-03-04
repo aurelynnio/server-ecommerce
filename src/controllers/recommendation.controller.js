@@ -1,6 +1,6 @@
-const catchAsync = require("../configs/catchAsync");
-const recommendationService = require("../services/recommendation.service");
-const { sendSuccess } = require("../shared/res/formatResponse");
+const catchAsync = require('../configs/catchAsync');
+const recommendationService = require('../services/recommendation.service');
+const { sendSuccess } = require('../shared/res/formatResponse');
 
 const RecommendationController = {
   /**
@@ -17,15 +17,13 @@ const RecommendationController = {
     if (userId) {
       recommendations = await recommendationService.getPersonalizedRecommendations(
         userId,
-        parseInt(limit) || 20
+        parseInt(limit) || 20,
       );
     } else {
-      recommendations = await recommendationService.getGuestRecommendations(
-        parseInt(limit) || 20
-      );
+      recommendations = await recommendationService.getGuestRecommendations(parseInt(limit) || 20);
     }
 
-    return sendSuccess(res, recommendations, "Recommendations retrieved");
+    return sendSuccess(res, recommendations, 'Recommendations retrieved');
   }),
 
   /**
@@ -40,10 +38,10 @@ const RecommendationController = {
 
     const products = await recommendationService.getFrequentlyBoughtTogether(
       productId,
-      parseInt(limit) || 5
+      parseInt(limit) || 5,
     );
 
-    return sendSuccess(res, products, "FBT products retrieved");
+    return sendSuccess(res, products, 'FBT products retrieved');
   }),
 
   /**
@@ -58,10 +56,10 @@ const RecommendationController = {
 
     const products = await recommendationService.getSimilarProducts(
       productId,
-      parseInt(limit) || 10
+      parseInt(limit) || 10,
     );
 
-    return sendSuccess(res, products, "Similar products retrieved");
+    return sendSuccess(res, products, 'Similar products retrieved');
   }),
 
   /**
@@ -75,15 +73,12 @@ const RecommendationController = {
     const { limit } = req.query;
 
     if (!userId) {
-      return sendSuccess(res, [], "No recently viewed products");
+      return sendSuccess(res, [], 'No recently viewed products');
     }
 
-    const products = await recommendationService.getRecentlyViewed(
-      userId,
-      parseInt(limit) || 10
-    );
+    const products = await recommendationService.getRecentlyViewed(userId, parseInt(limit) || 10);
 
-    return sendSuccess(res, products, "Recently viewed products retrieved");
+    return sendSuccess(res, products, 'Recently viewed products retrieved');
   }),
 
   /**
@@ -100,7 +95,7 @@ const RecommendationController = {
       await recommendationService.trackProductView(userId, productId);
     }
 
-    return sendSuccess(res, null, "View tracked");
+    return sendSuccess(res, null, 'View tracked');
   }),
 
   /**
@@ -115,10 +110,10 @@ const RecommendationController = {
 
     const products = await recommendationService.getCategoryRecommendations(
       categoryId,
-      parseInt(limit) || 20
+      parseInt(limit) || 20,
     );
 
-    return sendSuccess(res, products, "Category recommendations retrieved");
+    return sendSuccess(res, products, 'Category recommendations retrieved');
   }),
 
   /**
@@ -132,7 +127,7 @@ const RecommendationController = {
 
     const recommendations = await recommendationService.getHomepageRecommendations(userId);
 
-    return sendSuccess(res, recommendations, "Homepage recommendations retrieved");
+    return sendSuccess(res, recommendations, 'Homepage recommendations retrieved');
   }),
 };
 

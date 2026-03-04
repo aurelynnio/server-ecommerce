@@ -1,4 +1,4 @@
-const bcrypt = require("bcrypt");
+const bcrypt = require('bcrypt');
 
 /**
  * Compare a plain text password with a hashed password
@@ -11,4 +11,3 @@ const comparePassword = async (password, hashedPassword) => {
 };
 
 module.exports = comparePassword;
-

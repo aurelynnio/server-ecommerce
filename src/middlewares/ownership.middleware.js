@@ -1,9 +1,9 @@
-const { StatusCodes } = require("http-status-codes");
-const { ApiError } = require("./errorHandler.middleware");
-const Shop = require("../models/shop.model");
-const Product = require("../models/product.model");
-const Order = require("../models/order.model");
-const logger = require("../utils/logger");
+const { StatusCodes } = require('http-status-codes');
+const { ApiError } = require('./errorHandler.middleware');
+const Shop = require('../models/shop.model');
+const Product = require('../models/product.model');
+const Order = require('../models/order.model');
+const logger = require('../utils/logger');
 
 /**
  * Verify that the authenticated user owns a shop
@@ -14,7 +14,7 @@ const verifyShopOwnership = async (req, res, next) => {
     const userId = req.user?.userId || req.user?._id;
 
     if (!userId) {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, "Authentication required");
+      throw new ApiError(StatusCodes.UNAUTHORIZED, 'Authentication required');
     }
 
     const shop = await Shop.findOne({ owner: userId });
@@ -26,17 +26,17 @@ const verifyShopOwnership = async (req, res, next) => {
       );
     }
 
-    if (shop.status === "banned") {
+    if (shop.status === 'banned') {
       throw new ApiError(
         StatusCodes.FORBIDDEN,
-        "Your shop has been banned. Please contact support.",
+        'Your shop has been banned. Please contact support.',
       );
     }
 
     req.shop = shop;
     next();
   } catch (error) {
-    logger.error("verifyShopOwnership error:", { error });
+    logger.error('verifyShopOwnership error:', { error });
     next(error);
   }
 };
@@ -51,20 +51,20 @@ const verifyProductOwnership = async (req, res, next) => {
     const productId = req.params.id || req.params.productId;
 
     if (!productId) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, "Product ID is required");
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Product ID is required');
     }
 
     if (!req.shop) {
       throw new ApiError(
         StatusCodes.INTERNAL_SERVER_ERROR,
-        "Shop verification required. Use verifyShopOwnership middleware first.",
+        'Shop verification required. Use verifyShopOwnership middleware first.',
       );
     }
 
     const product = await Product.findById(productId);
 
     if (!product) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
     }
 
     if (product.shop.toString() !== req.shop._id.toString()) {
@@ -77,7 +77,7 @@ const verifyProductOwnership = async (req, res, next) => {
     req.product = product;
     next();
   } catch (error) {
-    logger.error("verifyProductOwnership error:", { error });
+    logger.error('verifyProductOwnership error:', { error });
     next(error);
   }
 };
@@ -92,33 +92,30 @@ const verifyOrderOwnership = async (req, res, next) => {
     const orderId = req.params.orderId || req.params.id;
 
     if (!orderId) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, "Order ID is required");
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Order ID is required');
     }
 
     if (!req.shop) {
       throw new ApiError(
         StatusCodes.INTERNAL_SERVER_ERROR,
-        "Shop verification required. Use verifyShopOwnership middleware first.",
+        'Shop verification required. Use verifyShopOwnership middleware first.',
       );
     }
 
     const order = await Order.findById(orderId);
 
     if (!order) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Order not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found');
     }
 
     if (order.shopId.toString() !== req.shop._id.toString()) {
-      throw new ApiError(
-        StatusCodes.FORBIDDEN,
-        "This order doesn't belong to your shop.",
-      );
+      throw new ApiError(StatusCodes.FORBIDDEN, "This order doesn't belong to your shop.");
     }
 
     req.order = order;
     next();
   } catch (error) {
-    logger.error("verifyOrderOwnership error:", { error });
+    logger.error('verifyOrderOwnership error:', { error });
     next(error);
   }
 };

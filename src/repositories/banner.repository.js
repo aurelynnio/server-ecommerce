@@ -1,4 +1,4 @@
-const Banner = require("../models/banner.model");
+const Banner = require('../models/banner.model');
 
 class BannerRepository {
   create(payload) {
@@ -10,10 +10,7 @@ class BannerRepository {
   }
 
   findWithPagination(query, { skip, limit }) {
-    return Banner.find(query)
-      .sort({ order: 1, createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    return Banner.find(query).sort({ order: 1, createdAt: -1 }).skip(skip).limit(limit);
   }
 
   findById(id) {
@@ -33,8 +30,8 @@ class BannerRepository {
 
     if (search) {
       query.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { subtitle: { $regex: search, $options: "i" } },
+        { title: { $regex: search, $options: 'i' } },
+        { subtitle: { $regex: search, $options: 'i' } },
       ];
     }
 
@@ -49,10 +46,7 @@ class BannerRepository {
   findByFilters(filter = {}, { skip, limit }) {
     const query = this._buildFilterQuery(filter);
 
-    return Banner.find(query)
-      .sort({ order: 1, createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    return Banner.find(query).sort({ order: 1, createdAt: -1 }).skip(skip).limit(limit);
   }
 }
 

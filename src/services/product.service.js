@@ -1,17 +1,14 @@
-const Product = require("../repositories/product.repository");
-const {
-  getPaginationParams,
-  buildPaginationResponse,
-} = require("../utils/pagination");
-const Category = require("../repositories/category.repository");
-const { multiUpload } = require("../configs/cloudinary");
-const { getIO } = require("../socket/index");
-const redisService = require("./redis.service");
-const logger = require("../utils/logger");
-const { buildHashedCacheKey } = require("../utils/cacheKey");
-const { embedProduct, deleteProductEmbedding } = require("./embedding.service");
-const { StatusCodes } = require("http-status-codes");
-const { ApiError } = require("../middlewares/errorHandler.middleware");
+const Product = require('../repositories/product.repository');
+const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
+const Category = require('../repositories/category.repository');
+const { multiUpload } = require('../configs/cloudinary');
+const { getIO } = require('../socket/index');
+const redisService = require('./redis.service');
+const logger = require('../utils/logger');
+const { buildHashedCacheKey } = require('../utils/cacheKey');
+const { embedProduct, deleteProductEmbedding } = require('./embedding.service');
+const { StatusCodes } = require('http-status-codes');
+const { ApiError } = require('../middlewares/errorHandler.middleware');
 
 class ProductService {
   /**
@@ -24,20 +21,20 @@ class ProductService {
     const {
       page = 1,
       limit = 10,
-      sort = "-createdAt",
+      sort = '-createdAt',
       category,
       brand,
       minPrice,
       maxPrice,
       tags,
       search,
-      status = "published",
+      status = 'published',
       colors,
       sizes,
       rating,
     } = { ...filters, ...options };
 
-    const cacheKey = buildHashedCacheKey("products:all", { filters, options });
+    const cacheKey = buildHashedCacheKey('products:all', { filters, options });
     const cachedData = await redisService.get(cacheKey);
     if (cachedData) return cachedData;
 
@@ -59,14 +56,11 @@ class ProductService {
     const total = await Product.countWithCatalogFilters(filterArgs);
     const paginationParams = getPaginationParams(page, limit, total);
 
-    const products = await Product.findWithCatalogFilters(
-      filterArgs,
-      {
-        sort,
-        skip: paginationParams.skip,
-        limit: paginationParams.limit,
-      },
-    );
+    const products = await Product.findWithCatalogFilters(filterArgs, {
+      sort,
+      skip: paginationParams.skip,
+      limit: paginationParams.limit,
+    });
 
     return buildPaginationResponse(products, paginationParams);
   }
@@ -84,7 +78,7 @@ class ProductService {
     const product = await Product.findByIdWithCategoryShopAndShopCategory(id);
 
     if (!product) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
     }
 
     await redisService.set(cacheKey, product, 3600); // 1 hour cache
@@ -104,7 +98,7 @@ class ProductService {
     const product = await Product.findBySlugWithCategoryShopAndShopCategory(slug);
 
     if (!product) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
     }
 
     await redisService.set(cacheKey, product, 3600);
@@ -119,13 +113,9 @@ class ProductService {
    * @returns {string}
    */
   generateSku(slug, color, index) {
-    const slugPart = slug
-      ? slug.substring(0, 20).toUpperCase().replace(/-/g, "")
-      : "PROD";
-    const colorPart = color
-      ? color.substring(0, 10).toUpperCase().replace(/\s+/g, "")
-      : "DEFAULT";
-    return `${slugPart}-${colorPart}-${String(index + 1).padStart(3, "0")}`;
+    const slugPart = slug ? slug.substring(0, 20).toUpperCase().replace(/-/g, '') : 'PROD';
+    const colorPart = color ? color.substring(0, 10).toUpperCase().replace(/\s+/g, '') : 'DEFAULT';
+    return `${slugPart}-${colorPart}-${String(index + 1).padStart(3, '0')}`;
   }
 
   /**
@@ -134,8 +124,8 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async ensureShopForUser(userId) {
-    const User = require("../repositories/user.repository");
-    const Shop = require("../repositories/shop.repository");
+    const User = require('../repositories/user.repository');
+    const Shop = require('../repositories/shop.repository');
 
     const user = await User.findById(userId).lean();
     let shopId = user?.shop;
@@ -151,7 +141,7 @@ class ProductService {
     if (!shopId) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
-        "User does not have a shop. Please register a shop first.",
+        'User does not have a shop. Please register a shop first.',
       );
     }
 
@@ -171,11 +161,11 @@ class ProductService {
 
     // Generate slug if not provided
     if (!productData.slug && productData.name) {
-      const slugify = require("slugify");
+      const slugify = require('slugify');
       productData.slug = slugify(productData.name, {
         lower: true,
         strict: true,
-        locale: "vi",
+        locale: 'vi',
       });
     }
 
@@ -185,7 +175,7 @@ class ProductService {
         const { _id, attributes, ...rest } = variant;
 
         // Extract color from old attributes structure if present
-        const color = variant.color || attributes?.color || "";
+        const color = variant.color || attributes?.color || '';
 
         // Auto-generate SKU
         const sku = this.generateSku(productData.slug, color, index);
@@ -204,17 +194,14 @@ class ProductService {
     if (data.slug) {
       const existingProduct = await Product.findBySlug(data.slug);
       if (existingProduct) {
-        throw new ApiError(
-          StatusCodes.CONFLICT,
-          "Product with this slug already exists",
-        );
+        throw new ApiError(StatusCodes.CONFLICT, 'Product with this slug already exists');
       }
     }
 
     // Handle image files
     if (files && files.length > 0) {
       logger.info(
-        "[ProductService] Processing files:",
+        '[ProductService] Processing files:',
         files.map((f) => ({ fieldname: f.fieldname, size: f.size })),
       );
 
@@ -225,7 +212,7 @@ class ProductService {
 
       const uploadResults = await multiUpload(
         filesToUpload.map((f) => f.buffer),
-        "products",
+        'products',
       );
 
       const uploads = uploadResults.map((result, index) => ({
@@ -234,10 +221,10 @@ class ProductService {
       }));
 
       logger.info(
-        "[ProductService] Upload results:",
+        '[ProductService] Upload results:',
         uploads.map((u) => ({
           fieldname: u.fieldname,
-          url: u.secure_url?.substring(0, 50) + "...",
+          url: u.secure_url?.substring(0, 50) + '...',
         })),
       );
 
@@ -246,8 +233,8 @@ class ProductService {
       if (productData.variants && Array.isArray(productData.variants)) {
         const variantImageMap = {};
         uploads.forEach((upload) => {
-          if (upload.fieldname.startsWith("variantImages_")) {
-            const variantIndex = parseInt(upload.fieldname.split("_")[1]);
+          if (upload.fieldname.startsWith('variantImages_')) {
+            const variantIndex = parseInt(upload.fieldname.split('_')[1]);
             if (!variantImageMap[variantIndex]) {
               variantImageMap[variantIndex] = [];
             }
@@ -255,7 +242,7 @@ class ProductService {
           }
         });
 
-        logger.info("[ProductService] Variant image map:", variantImageMap);
+        logger.info('[ProductService] Variant image map:', variantImageMap);
 
         // Assign images to variants
         productData.variants = productData.variants.map((variant, idx) => ({
@@ -264,15 +251,13 @@ class ProductService {
         }));
 
         logger.info(
-          "[ProductService] Variants after image assignment:",
+          '[ProductService] Variants after image assignment:',
           productData.variants.map((v) => ({ name: v.name, images: v.images })),
         );
       }
 
       // 2. Description Images
-      const descImages = uploads.filter(
-        (u) => u.fieldname === "descriptionImages",
-      );
+      const descImages = uploads.filter((u) => u.fieldname === 'descriptionImages');
       if (descImages.length > 0) {
         productData.descriptionImages = descImages.map((u) => u.secure_url);
       }
@@ -281,11 +266,11 @@ class ProductService {
     const product = Product.build(productData);
     await product.save();
 
-    await redisService.delByPattern("products:*");
+    await redisService.delByPattern('products:*');
 
     const io = getIO();
     if (io) {
-      io.emit("new_product", {
+      io.emit('new_product', {
         name: product.name,
         _id: product._id,
         shop: shopId,
@@ -293,13 +278,10 @@ class ProductService {
     }
 
     // Generate embedding for the new product (async, don't wait)
-    if (product.status === "published") {
+    if (product.status === 'published') {
       const populatedProduct = await Product.findByIdWithCategoryNameLean(product._id);
       embedProduct(populatedProduct).catch((err) => {
-        logger.error(
-          "[ProductService] Error embedding new product:",
-          err.message,
-        );
+        logger.error('[ProductService] Error embedding new product:', err.message);
       });
     }
 
@@ -318,15 +300,9 @@ class ProductService {
       const updateData = { ...data };
 
       if (updateData.slug) {
-        const existingProduct = await Product.findBySlugExcludingId(
-          updateData.slug,
-          id,
-        );
+        const existingProduct = await Product.findBySlugExcludingId(updateData.slug, id);
         if (existingProduct) {
-          throw new ApiError(
-            StatusCodes.CONFLICT,
-            "Product with this slug already exists",
-          );
+          throw new ApiError(StatusCodes.CONFLICT, 'Product with this slug already exists');
         }
       }
 
@@ -335,34 +311,27 @@ class ProductService {
 
       if (files && files.length > 0) {
         const buffers = files.map((file) => file.buffer);
-        const uploads = await multiUpload(buffers, "products");
+        const uploads = await multiUpload(buffers, 'products');
 
         files.forEach((file, idx) => {
-          if (file.fieldname.startsWith("variantImages_")) {
-            const variantIndex = parseInt(file.fieldname.split("_")[1]);
-            if (!variantUploadMap[variantIndex])
-              variantUploadMap[variantIndex] = [];
+          if (file.fieldname.startsWith('variantImages_')) {
+            const variantIndex = parseInt(file.fieldname.split('_')[1]);
+            if (!variantUploadMap[variantIndex]) variantUploadMap[variantIndex] = [];
             variantUploadMap[variantIndex].push(uploads[idx].secure_url);
-          } else if (file.fieldname === "descriptionImages") {
+          } else if (file.fieldname === 'descriptionImages') {
             newDescriptionImages.push(uploads[idx].secure_url);
           }
         });
       }
 
       // Handle description images update
-      if (
-        updateData.existingDescriptionImages !== undefined ||
-        newDescriptionImages.length > 0
-      ) {
+      if (updateData.existingDescriptionImages !== undefined || newDescriptionImages.length > 0) {
         const existingImages = updateData.existingDescriptionImages
           ? Array.isArray(updateData.existingDescriptionImages)
             ? updateData.existingDescriptionImages
             : JSON.parse(updateData.existingDescriptionImages)
           : [];
-        updateData.descriptionImages = [
-          ...existingImages,
-          ...newDescriptionImages,
-        ];
+        updateData.descriptionImages = [...existingImages, ...newDescriptionImages];
         delete updateData.existingDescriptionImages;
       }
 
@@ -372,7 +341,7 @@ class ProductService {
         const existingVariantImagesMap = {};
         if (updateData.existingVariantImages) {
           const mapping =
-            typeof updateData.existingVariantImages === "string"
+            typeof updateData.existingVariantImages === 'string'
               ? JSON.parse(updateData.existingVariantImages)
               : updateData.existingVariantImages;
           mapping.forEach((item) => {
@@ -386,14 +355,13 @@ class ProductService {
 
           if (
             variantData._id &&
-            typeof variantData._id === "string" &&
-            variantData._id.startsWith("temp-")
+            typeof variantData._id === 'string' &&
+            variantData._id.startsWith('temp-')
           ) {
             delete variantData._id;
           }
 
-          const existingImages =
-            existingVariantImagesMap[index] || variantData.images || [];
+          const existingImages = existingVariantImagesMap[index] || variantData.images || [];
           const newImages = variantUploadMap[index] || [];
           variantData.images = [...existingImages, ...newImages];
 
@@ -408,31 +376,25 @@ class ProductService {
       const product = await Product.updateByIdWithCategory(id, updateData);
 
       if (!product) {
-        throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+        throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
       }
 
-      await redisService.delByPattern("products:*");
+      await redisService.delByPattern('products:*');
 
-      if (product.status === "published") {
+      if (product.status === 'published') {
         const populatedProduct = await Product.findByIdWithCategoryNameLean(product._id);
         embedProduct(populatedProduct).catch((err) => {
-          logger.error(
-            "[ProductService] Error updating product embedding:",
-            err.message,
-          );
+          logger.error('[ProductService] Error updating product embedding:', err.message);
         });
       } else {
         deleteProductEmbedding(product._id).catch((err) => {
-          logger.error(
-            "[ProductService] Error deleting product embedding:",
-            err.message,
-          );
+          logger.error('[ProductService] Error deleting product embedding:', err.message);
         });
       }
 
       return product;
     } catch (error) {
-      logger.error("Error in updateProduct service:", error);
+      logger.error('Error in updateProduct service:', error);
       throw error;
     }
   }
@@ -443,23 +405,16 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async deleteProduct(id) {
-    const product = await Product.updateById(
-      id,
-      { status: "deleted" },
-      { new: true },
-    );
+    const product = await Product.updateById(id, { status: 'deleted' }, { new: true });
 
     if (!product) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
     }
 
-    await redisService.delByPattern("products:*");
+    await redisService.delByPattern('products:*');
 
     deleteProductEmbedding(id).catch((err) => {
-      logger.error(
-        "[ProductService] Error deleting product embedding:",
-        err.message,
-      );
+      logger.error('[ProductService] Error deleting product embedding:', err.message);
     });
 
     return product;
@@ -474,10 +429,10 @@ class ProductService {
     const product = await Product.deleteById(id);
 
     if (!product) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
     }
 
-    await redisService.delByPattern("products:*");
+    await redisService.delByPattern('products:*');
 
     return product;
   }
@@ -494,7 +449,7 @@ class ProductService {
 
     if (files && files.length > 0) {
       const buffers = files.map((file) => file.buffer);
-      const uploads = await multiUpload(buffers, "products");
+      const uploads = await multiUpload(buffers, 'products');
       allowedVariantData.images = uploads.map((upload) => upload.secure_url);
     } else if (variantData.images) {
       allowedVariantData.images = variantData.images;
@@ -503,13 +458,13 @@ class ProductService {
     const existingProduct = await Product.findByVariantSku(allowedVariantData.sku);
 
     if (existingProduct) {
-      throw new ApiError(StatusCodes.CONFLICT, "SKU already exists");
+      throw new ApiError(StatusCodes.CONFLICT, 'SKU already exists');
     }
 
     const product = await Product.pushVariant(productId, allowedVariantData);
 
     if (!product) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
     }
 
     return product;
@@ -528,14 +483,10 @@ class ProductService {
       _id: variantId,
     };
 
-    const product = await Product.replaceVariant(
-      productId,
-      variantId,
-      allowedVariantData,
-    );
+    const product = await Product.replaceVariant(productId, variantId, allowedVariantData);
 
     if (!product) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product or variant not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product or variant not found');
     }
 
     return product;
@@ -551,7 +502,7 @@ class ProductService {
     const product = await Product.pullVariant(productId, variantId);
 
     if (!product) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
     }
 
     return product;
@@ -564,7 +515,7 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async getProductsByCategory(categoryId, options = {}) {
-    const { page = 1, limit = 10, sort = "-createdAt" } = options;
+    const { page = 1, limit = 10, sort = '-createdAt' } = options;
 
     const total = await Product.countByCategory(categoryId);
     const paginationParams = getPaginationParams(page, limit, total);
@@ -585,19 +536,16 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async getProductsByCategorySlug(slug, options = {}) {
-    const { page = 1, limit = 10, sort = "-createdAt" } = options;
+    const { page = 1, limit = 10, sort = '-createdAt' } = options;
 
     const category = await Category.findBySlugActive(slug);
     if (!category) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Category not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Category not found');
     }
 
     const childCategories = await Category.findSubcategoryIds(category._id);
 
-    const categoryIds = [
-      category._id,
-      ...childCategories.map((child) => child._id),
-    ];
+    const categoryIds = [category._id, ...childCategories.map((child) => child._id)];
 
     const total = await Product.countByCategoryIds(categoryIds);
     const paginationParams = getPaginationParams(page, limit, total);
@@ -627,7 +575,7 @@ class ProductService {
   async getFeaturedProductsSimple(limit = 10) {
     const products = await Product.findPublishedNewest(limit);
     if (!products) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Products not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Products not found');
     }
 
     return products;
@@ -639,7 +587,7 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async getFeaturedProducts(_query) {
-    const cacheKey = "products:featured";
+    const cacheKey = 'products:featured';
     const cachedProducts = await redisService.get(cacheKey);
     if (cachedProducts) return cachedProducts;
 
@@ -655,7 +603,7 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async getNewArrivalProducts(_query) {
-    const cacheKey = "products:new-arrivals";
+    const cacheKey = 'products:new-arrivals';
     const cachedProducts = await redisService.get(cacheKey);
     if (cachedProducts) return cachedProducts;
 
@@ -671,7 +619,7 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async getOnSaleProducts(_query) {
-    const cacheKey = "products:on-sale";
+    const cacheKey = 'products:on-sale';
     const cachedProducts = await redisService.get(cacheKey);
     if (cachedProducts) return cachedProducts;
 
@@ -713,7 +661,7 @@ class ProductService {
     const limit = 10;
     const currentProduct = await Product.findById(productId);
     if (!currentProduct) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
     }
 
     const priceBuffer = 0.2;
@@ -722,10 +670,11 @@ class ProductService {
     const minPrice = currentPrice * (1 - priceBuffer);
     const maxPrice = currentPrice * (1 + priceBuffer);
 
-    const products = await Product.findRelatedByCategoryAndPrice(
-      currentProduct,
-      { minPrice, maxPrice, limit },
-    );
+    const products = await Product.findRelatedByCategoryAndPrice(currentProduct, {
+      minPrice,
+      maxPrice,
+      limit,
+    });
 
     return products;
   }
@@ -774,13 +723,10 @@ class ProductService {
       );
     }
 
-    await redisService.delByPattern("products:*");
+    await redisService.delByPattern('products:*');
 
     deleteProductEmbedding(productId).catch((err) => {
-      logger.error(
-        "[ProductService] Error deleting product embedding:",
-        err.message,
-      );
+      logger.error('[ProductService] Error deleting product embedding:', err.message);
     });
 
     return product;
@@ -797,10 +743,7 @@ class ProductService {
   async addVariantBySeller(productId, shopId, variantData, files) {
     const product = await Product.findByIdAndShop(productId, shopId);
     if (!product) {
-      throw new ApiError(
-        StatusCodes.NOT_FOUND,
-        "Product not found or access denied",
-      );
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found or access denied');
     }
     return this.addVariant(productId, variantData, files);
   }
@@ -816,10 +759,7 @@ class ProductService {
   async updateVariantBySeller(productId, shopId, variantId, variantData) {
     const product = await Product.findByIdAndShop(productId, shopId);
     if (!product) {
-      throw new ApiError(
-        StatusCodes.NOT_FOUND,
-        "Product not found or access denied",
-      );
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found or access denied');
     }
     return this.updateVariant(productId, variantId, variantData);
   }
@@ -834,15 +774,10 @@ class ProductService {
   async deleteVariantBySeller(productId, shopId, variantId) {
     const product = await Product.findByIdAndShop(productId, shopId);
     if (!product) {
-      throw new ApiError(
-        StatusCodes.NOT_FOUND,
-        "Product not found or access denied",
-      );
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found or access denied');
     }
     return this.deleteVariant(productId, variantId);
   }
 }
 
 module.exports = new ProductService();
-
-

@@ -1,9 +1,9 @@
-const catchAsync = require("../configs/catchAsync");
-const { uploadImage } = require("../configs/cloudinary");
-const userService = require("../services/user.service");
-const { sendFail, sendSuccess } = require("../shared/res/formatResponse");
-const { StatusCodes } = require("http-status-codes");
-const { ApiError } = require("../middlewares/errorHandler.middleware");
+const catchAsync = require('../configs/catchAsync');
+const { uploadImage } = require('../configs/cloudinary');
+const userService = require('../services/user.service');
+const { sendFail, sendSuccess } = require('../shared/res/formatResponse');
+const { StatusCodes } = require('http-status-codes');
+const { ApiError } = require('../middlewares/errorHandler.middleware');
 
 const UserController = {
   /**
@@ -14,12 +14,7 @@ const UserController = {
    */
   createUser: catchAsync(async (req, res) => {
     const user = await userService.createUser(req.body);
-    return sendSuccess(
-      res,
-      user,
-      "User created successfully",
-      StatusCodes.CREATED
-    );
+    return sendSuccess(res, user, 'User created successfully', StatusCodes.CREATED);
   }),
 
   /**
@@ -32,15 +27,11 @@ const UserController = {
     const { id, ...updateData } = req.body;
 
     if (!updateData || Object.keys(updateData).length === 0) {
-      return sendFail(
-        res,
-        "No data provided for update",
-        StatusCodes.BAD_REQUEST
-      );
+      return sendFail(res, 'No data provided for update', StatusCodes.BAD_REQUEST);
     }
 
     const user = await userService.updateUserById(id, updateData);
-    return sendSuccess(res, user, "User updated successfully", StatusCodes.OK);
+    return sendSuccess(res, user, 'User updated successfully', StatusCodes.OK);
   }),
 
   /**
@@ -54,25 +45,16 @@ const UserController = {
     const userId = req.user.userId;
 
     if (!file) {
-      return sendFail(res, "No file uploaded", StatusCodes.BAD_REQUEST);
+      return sendFail(res, 'No file uploaded', StatusCodes.BAD_REQUEST);
     }
 
-    const result = await uploadImage(file.buffer, "avatar");
+    const result = await uploadImage(file.buffer, 'avatar');
     if (!result) {
-      return sendFail(
-        res,
-        "Image upload failed",
-        StatusCodes.INTERNAL_SERVER_ERROR
-      );
+      return sendFail(res, 'Image upload failed', StatusCodes.INTERNAL_SERVER_ERROR);
     }
 
     const user = await userService.uploadAvatar(userId, result.secure_url);
-    return sendSuccess(
-      res,
-      user,
-      "Avatar uploaded successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, user, 'Avatar uploaded successfully', StatusCodes.OK);
   }),
 
   /**
@@ -84,12 +66,7 @@ const UserController = {
   getProfile: catchAsync(async (req, res) => {
     const userId = req.user.userId;
     const user = await userService.getUserProfile(userId);
-    return sendSuccess(
-      res,
-      user,
-      "Profile retrieved successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, user, 'Profile retrieved successfully', StatusCodes.OK);
   }),
 
   /**
@@ -101,12 +78,7 @@ const UserController = {
   updateProfile: catchAsync(async (req, res) => {
     const userId = req.user.userId;
     const user = await userService.updateProfile(userId, req.body);
-    return sendSuccess(
-      res,
-      user,
-      "Profile updated successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, user, 'Profile updated successfully', StatusCodes.OK);
   }),
 
   /**
@@ -118,12 +90,7 @@ const UserController = {
   addAddress: catchAsync(async (req, res) => {
     const userId = req.user.userId;
     const user = await userService.addAddress(userId, req.body);
-    return sendSuccess(
-      res,
-      user,
-      "Address added successfully",
-      StatusCodes.CREATED
-    );
+    return sendSuccess(res, user, 'Address added successfully', StatusCodes.CREATED);
   }),
 
   /**
@@ -134,17 +101,8 @@ const UserController = {
    */
   updateAddress: catchAsync(async (req, res) => {
     const userId = req.user.userId;
-    const user = await userService.updateAddress(
-      userId,
-      req.params.addressId,
-      req.body
-    );
-    return sendSuccess(
-      res,
-      user,
-      "Address updated successfully",
-      StatusCodes.OK
-    );
+    const user = await userService.updateAddress(userId, req.params.addressId, req.body);
+    return sendSuccess(res, user, 'Address updated successfully', StatusCodes.OK);
   }),
 
   /**
@@ -157,14 +115,9 @@ const UserController = {
     const userId = req.user.userId;
     const user = await userService.deleteAddress(userId, req.params.addressId);
     if (!user) {
-      throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, "Delete address failed");
+      throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Delete address failed');
     }
-    return sendSuccess(
-      res,
-      user,
-      "Address deleted successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, user, 'Address deleted successfully', StatusCodes.OK);
   }),
 
   /**
@@ -176,12 +129,7 @@ const UserController = {
   getAddresses: catchAsync(async (req, res) => {
     const userId = req.user.userId;
     const addresses = await userService.getAddresses(userId);
-    return sendSuccess(
-      res,
-      addresses,
-      "Addresses retrieved successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, addresses, 'Addresses retrieved successfully', StatusCodes.OK);
   }),
 
   /**
@@ -192,16 +140,8 @@ const UserController = {
    */
   setDefaultAddress: catchAsync(async (req, res) => {
     const userId = req.user.userId;
-    const addresses = await userService.setDefaultAddress(
-      userId,
-      req.params.addressId
-    );
-    return sendSuccess(
-      res,
-      addresses,
-      "Default address set successfully",
-      StatusCodes.OK
-    );
+    const addresses = await userService.setDefaultAddress(userId, req.params.addressId);
+    return sendSuccess(res, addresses, 'Default address set successfully', StatusCodes.OK);
   }),
 
   /**
@@ -215,7 +155,7 @@ const UserController = {
     const result = await userService.changePassword(
       userId,
       req.body.oldPassword,
-      req.body.newPassword
+      req.body.newPassword,
     );
     return sendSuccess(res, result, result.message, StatusCodes.OK);
   }),
@@ -228,12 +168,7 @@ const UserController = {
    */
   getAllUsers: catchAsync(async (req, res) => {
     const result = await userService.getAllUsers(req.query);
-    return sendSuccess(
-      res,
-      result,
-      "Users retrieved successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, result, 'Users retrieved successfully', StatusCodes.OK);
   }),
 
   /**
@@ -244,12 +179,7 @@ const UserController = {
    */
   getUserById: catchAsync(async (req, res) => {
     const user = await userService.getUserById(req.params.id);
-    return sendSuccess(
-      res,
-      user,
-      "User retrieved successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, user, 'User retrieved successfully', StatusCodes.OK);
   }),
 
   /**
@@ -262,15 +192,11 @@ const UserController = {
     const bodyValue = req.body;
 
     if (!bodyValue || Object.keys(bodyValue).length === 0) {
-      return sendFail(
-        res,
-        "No data provided for update",
-        StatusCodes.BAD_REQUEST
-      );
+      return sendFail(res, 'No data provided for update', StatusCodes.BAD_REQUEST);
     }
 
     const user = await userService.updateUserById(req.params.id, bodyValue);
-    return sendSuccess(res, user, "User updated successfully", StatusCodes.OK);
+    return sendSuccess(res, user, 'User updated successfully', StatusCodes.OK);
   }),
 
   /**
@@ -281,12 +207,7 @@ const UserController = {
    */
   updateUserRole: catchAsync(async (req, res) => {
     const user = await userService.updateUserRole(req.params.id, req.body.roles);
-    return sendSuccess(
-      res,
-      user,
-      "User role updated successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, user, 'User role updated successfully', StatusCodes.OK);
   }),
 
   /**
@@ -296,16 +217,8 @@ const UserController = {
    * @returns {Promise<any>}
    */
   updateUserPermissions: catchAsync(async (req, res) => {
-    const user = await userService.updateUserPermissions(
-      req.params.id,
-      req.body.permissions
-    );
-    return sendSuccess(
-      res,
-      user,
-      "User permissions updated successfully",
-      StatusCodes.OK
-    );
+    const user = await userService.updateUserPermissions(req.params.id, req.body.permissions);
+    return sendSuccess(res, user, 'User permissions updated successfully', StatusCodes.OK);
   }),
 
   /**

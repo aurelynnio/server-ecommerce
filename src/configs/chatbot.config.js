@@ -60,21 +60,20 @@ Anh/chị muốn xem thêm thông tin sản phẩm nào ạ?"
 // Định nghĩa các tools cho AI
 const toolDefinitions = [
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "search_products",
-      description:
-        "Tìm kiếm sản phẩm theo từ khóa, danh mục, giá. Dùng khi khách hỏi về sản phẩm.",
+      name: 'search_products',
+      description: 'Tìm kiếm sản phẩm theo từ khóa, danh mục, giá. Dùng khi khách hỏi về sản phẩm.',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          keyword: { type: "string", description: "Từ khóa tìm kiếm" },
-          category: { type: "string", description: "Tên danh mục" },
-          minPrice: { type: "number", description: "Giá tối thiểu" },
-          maxPrice: { type: "number", description: "Giá tối đa" },
+          keyword: { type: 'string', description: 'Từ khóa tìm kiếm' },
+          category: { type: 'string', description: 'Tên danh mục' },
+          minPrice: { type: 'number', description: 'Giá tối thiểu' },
+          maxPrice: { type: 'number', description: 'Giá tối đa' },
           limit: {
-            type: "number",
-            description: "Số lượng kết quả",
+            type: 'number',
+            description: 'Số lượng kết quả',
             default: 5,
           },
         },
@@ -82,285 +81,279 @@ const toolDefinitions = [
     },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "search_products_advanced",
+      name: 'search_products_advanced',
       description:
-        "Tìm kiếm sản phẩm nâng cao theo nhiều bộ lọc: từ khóa, danh mục, thương hiệu, khoảng giá, màu, size, tồn kho, giảm giá, sắp xếp.",
+        'Tìm kiếm sản phẩm nâng cao theo nhiều bộ lọc: từ khóa, danh mục, thương hiệu, khoảng giá, màu, size, tồn kho, giảm giá, sắp xếp.',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          keyword: { type: "string", description: "Từ khóa tìm kiếm" },
-          category: { type: "string", description: "Tên/slug danh mục" },
-          brand: { type: "string", description: "Thương hiệu sản phẩm" },
-          minPrice: { type: "number", description: "Giá tối thiểu" },
-          maxPrice: { type: "number", description: "Giá tối đa" },
+          keyword: { type: 'string', description: 'Từ khóa tìm kiếm' },
+          category: { type: 'string', description: 'Tên/slug danh mục' },
+          brand: { type: 'string', description: 'Thương hiệu sản phẩm' },
+          minPrice: { type: 'number', description: 'Giá tối thiểu' },
+          maxPrice: { type: 'number', description: 'Giá tối đa' },
           colors: {
-            type: "array",
-            items: { type: "string" },
-            description: "Danh sách màu cần lọc",
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Danh sách màu cần lọc',
           },
           sizes: {
-            type: "array",
-            items: { type: "string" },
-            description: "Danh sách size cần lọc",
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Danh sách size cần lọc',
           },
           tags: {
-            type: "array",
-            items: { type: "string" },
-            description: "Danh sách tag cần lọc",
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Danh sách tag cần lọc',
           },
           inStockOnly: {
-            type: "boolean",
-            description: "Chỉ lấy sản phẩm còn hàng",
+            type: 'boolean',
+            description: 'Chỉ lấy sản phẩm còn hàng',
           },
           onlyDiscounted: {
-            type: "boolean",
-            description: "Chỉ lấy sản phẩm đang giảm giá",
+            type: 'boolean',
+            description: 'Chỉ lấy sản phẩm đang giảm giá',
           },
           sortBy: {
-            type: "string",
-            enum: ["bestselling", "newest", "price_asc", "price_desc", "rating"],
-            description: "Kiểu sắp xếp kết quả",
+            type: 'string',
+            enum: ['bestselling', 'newest', 'price_asc', 'price_desc', 'rating'],
+            description: 'Kiểu sắp xếp kết quả',
           },
-          limit: { type: "number", default: 5 },
+          limit: { type: 'number', default: 5 },
         },
       },
     },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "search_products_by_brand",
+      name: 'search_products_by_brand',
       description:
-        "Tìm kiếm nhanh sản phẩm theo thương hiệu, có thể kết hợp từ khóa và khoảng giá.",
+        'Tìm kiếm nhanh sản phẩm theo thương hiệu, có thể kết hợp từ khóa và khoảng giá.',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          brand: { type: "string", description: "Tên thương hiệu" },
-          keyword: { type: "string", description: "Từ khóa bổ sung" },
-          minPrice: { type: "number", description: "Giá tối thiểu" },
-          maxPrice: { type: "number", description: "Giá tối đa" },
+          brand: { type: 'string', description: 'Tên thương hiệu' },
+          keyword: { type: 'string', description: 'Từ khóa bổ sung' },
+          minPrice: { type: 'number', description: 'Giá tối thiểu' },
+          maxPrice: { type: 'number', description: 'Giá tối đa' },
           sortBy: {
-            type: "string",
-            enum: ["bestselling", "newest", "price_asc", "price_desc", "rating"],
-            description: "Kiểu sắp xếp kết quả",
+            type: 'string',
+            enum: ['bestselling', 'newest', 'price_asc', 'price_desc', 'rating'],
+            description: 'Kiểu sắp xếp kết quả',
           },
-          limit: { type: "number", default: 5 },
+          limit: { type: 'number', default: 5 },
         },
-        required: ["brand"],
+        required: ['brand'],
       },
     },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "search_products_by_price_range",
-      description:
-        "Tìm sản phẩm theo ngân sách/khoảng giá, có thể kết hợp từ khóa và danh mục.",
+      name: 'search_products_by_price_range',
+      description: 'Tìm sản phẩm theo ngân sách/khoảng giá, có thể kết hợp từ khóa và danh mục.',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          minPrice: { type: "number", description: "Giá tối thiểu" },
-          maxPrice: { type: "number", description: "Giá tối đa" },
-          keyword: { type: "string", description: "Từ khóa bổ sung" },
-          category: { type: "string", description: "Tên/slug danh mục" },
+          minPrice: { type: 'number', description: 'Giá tối thiểu' },
+          maxPrice: { type: 'number', description: 'Giá tối đa' },
+          keyword: { type: 'string', description: 'Từ khóa bổ sung' },
+          category: { type: 'string', description: 'Tên/slug danh mục' },
           sortBy: {
-            type: "string",
-            enum: ["bestselling", "newest", "price_asc", "price_desc", "rating"],
-            description: "Kiểu sắp xếp kết quả",
+            type: 'string',
+            enum: ['bestselling', 'newest', 'price_asc', 'price_desc', 'rating'],
+            description: 'Kiểu sắp xếp kết quả',
           },
-          limit: { type: "number", default: 5 },
+          limit: { type: 'number', default: 5 },
         },
       },
     },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "get_discounted_products",
+      name: 'get_discounted_products',
       description:
-        "Lấy danh sách sản phẩm đang giảm giá, có thể lọc theo danh mục/từ khóa và mức giảm tối thiểu.",
+        'Lấy danh sách sản phẩm đang giảm giá, có thể lọc theo danh mục/từ khóa và mức giảm tối thiểu.',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          keyword: { type: "string", description: "Từ khóa sản phẩm" },
-          category: { type: "string", description: "Tên/slug danh mục" },
+          keyword: { type: 'string', description: 'Từ khóa sản phẩm' },
+          category: { type: 'string', description: 'Tên/slug danh mục' },
           minDiscountPercent: {
-            type: "number",
-            description: "Phần trăm giảm tối thiểu",
+            type: 'number',
+            description: 'Phần trăm giảm tối thiểu',
             default: 5,
           },
           inStockOnly: {
-            type: "boolean",
-            description: "Chỉ lấy sản phẩm còn hàng",
+            type: 'boolean',
+            description: 'Chỉ lấy sản phẩm còn hàng',
             default: true,
           },
-          limit: { type: "number", default: 5 },
+          limit: { type: 'number', default: 5 },
         },
       },
     },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "get_bestseller_products",
-      description:
-        "Lấy danh sách sản phẩm bán chạy theo danh mục hoặc thương hiệu.",
+      name: 'get_bestseller_products',
+      description: 'Lấy danh sách sản phẩm bán chạy theo danh mục hoặc thương hiệu.',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          category: { type: "string", description: "Tên/slug danh mục" },
-          brand: { type: "string", description: "Thương hiệu sản phẩm" },
-          limit: { type: "number", default: 5 },
+          category: { type: 'string', description: 'Tên/slug danh mục' },
+          brand: { type: 'string', description: 'Thương hiệu sản phẩm' },
+          limit: { type: 'number', default: 5 },
         },
       },
     },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "get_new_arrival_products",
-      description:
-        "Lấy danh sách sản phẩm mới nhất theo danh mục hoặc thương hiệu.",
+      name: 'get_new_arrival_products',
+      description: 'Lấy danh sách sản phẩm mới nhất theo danh mục hoặc thương hiệu.',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          category: { type: "string", description: "Tên/slug danh mục" },
-          brand: { type: "string", description: "Thương hiệu sản phẩm" },
-          limit: { type: "number", default: 5 },
+          category: { type: 'string', description: 'Tên/slug danh mục' },
+          brand: { type: 'string', description: 'Thương hiệu sản phẩm' },
+          limit: { type: 'number', default: 5 },
         },
       },
     },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "get_related_products",
+      name: 'get_related_products',
       description:
-        "Lấy danh sách sản phẩm liên quan dựa trên sản phẩm gốc (cùng danh mục/thương hiệu).",
+        'Lấy danh sách sản phẩm liên quan dựa trên sản phẩm gốc (cùng danh mục/thương hiệu).',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          productId: { type: "string", description: "ID hoặc slug sản phẩm gốc" },
-          limit: { type: "number", default: 5 },
+          productId: { type: 'string', description: 'ID hoặc slug sản phẩm gốc' },
+          limit: { type: 'number', default: 5 },
         },
-        required: ["productId"],
+        required: ['productId'],
       },
     },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "get_search_filter_options",
+      name: 'get_search_filter_options',
       description:
-        "Lấy danh sách bộ lọc khả dụng (brand, category, màu, size, khoảng giá) từ tập sản phẩm phù hợp.",
+        'Lấy danh sách bộ lọc khả dụng (brand, category, màu, size, khoảng giá) từ tập sản phẩm phù hợp.',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          keyword: { type: "string", description: "Từ khóa tìm kiếm" },
-          category: { type: "string", description: "Tên/slug danh mục" },
-          brand: { type: "string", description: "Thương hiệu sản phẩm" },
-          minPrice: { type: "number", description: "Giá tối thiểu" },
-          maxPrice: { type: "number", description: "Giá tối đa" },
+          keyword: { type: 'string', description: 'Từ khóa tìm kiếm' },
+          category: { type: 'string', description: 'Tên/slug danh mục' },
+          brand: { type: 'string', description: 'Thương hiệu sản phẩm' },
+          minPrice: { type: 'number', description: 'Giá tối thiểu' },
+          maxPrice: { type: 'number', description: 'Giá tối đa' },
         },
       },
     },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "get_product_details",
+      name: 'get_product_details',
       description:
-        "Lấy chi tiết sản phẩm theo ID hoặc slug. Dùng khi khách muốn biết thêm về sản phẩm cụ thể.",
+        'Lấy chi tiết sản phẩm theo ID hoặc slug. Dùng khi khách muốn biết thêm về sản phẩm cụ thể.',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          productId: { type: "string", description: "ID hoặc slug sản phẩm" },
+          productId: { type: 'string', description: 'ID hoặc slug sản phẩm' },
         },
-        required: ["productId"],
+        required: ['productId'],
       },
     },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "get_categories",
+      name: 'get_categories',
       description:
-        "Lấy danh sách các danh mục sản phẩm. Dùng khi khách muốn xem có những loại sản phẩm gì.",
-      parameters: { type: "object", properties: {} },
+        'Lấy danh sách các danh mục sản phẩm. Dùng khi khách muốn xem có những loại sản phẩm gì.',
+      parameters: { type: 'object', properties: {} },
     },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "get_featured_products",
+      name: 'get_featured_products',
       description:
-        "Lấy sản phẩm nổi bật, bán chạy. Dùng khi khách chưa biết mua gì hoặc muốn gợi ý.",
+        'Lấy sản phẩm nổi bật, bán chạy. Dùng khi khách chưa biết mua gì hoặc muốn gợi ý.',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
           type: {
-            type: "string",
-            enum: ["featured", "newArrivals", "onSale"],
-            description:
-              "Loại sản phẩm: featured (nổi bật), newArrivals (mới), onSale (giảm giá)",
+            type: 'string',
+            enum: ['featured', 'newArrivals', 'onSale'],
+            description: 'Loại sản phẩm: featured (nổi bật), newArrivals (mới), onSale (giảm giá)',
           },
-          limit: { type: "number", default: 5 },
+          limit: { type: 'number', default: 5 },
         },
       },
     },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "check_product_availability",
-      description:
-        "Kiểm tra tồn kho sản phẩm theo size/màu. Dùng khi khách hỏi còn hàng không.",
+      name: 'check_product_availability',
+      description: 'Kiểm tra tồn kho sản phẩm theo size/màu. Dùng khi khách hỏi còn hàng không.',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          productId: { type: "string", description: "ID hoặc slug sản phẩm" },
-          size: { type: "string", description: "Size cần kiểm tra" },
-          color: { type: "string", description: "Màu cần kiểm tra" },
+          productId: { type: 'string', description: 'ID hoặc slug sản phẩm' },
+          size: { type: 'string', description: 'Size cần kiểm tra' },
+          color: { type: 'string', description: 'Màu cần kiểm tra' },
         },
-        required: ["productId"],
+        required: ['productId'],
       },
     },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "generate_checkout_link",
+      name: 'generate_checkout_link',
       description:
-        "Tạo link checkout cho sản phẩm. LUÔN DÙNG khi khách muốn mua hoặc đã quyết định.",
+        'Tạo link checkout cho sản phẩm. LUÔN DÙNG khi khách muốn mua hoặc đã quyết định.',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          productId: { type: "string", description: "ID hoặc slug sản phẩm" },
-          variantId: { type: "string", description: "ID variant (size/màu)" },
-          quantity: { type: "number", default: 1 },
+          productId: { type: 'string', description: 'ID hoặc slug sản phẩm' },
+          variantId: { type: 'string', description: 'ID variant (size/màu)' },
+          quantity: { type: 'number', default: 1 },
         },
-        required: ["productId"],
+        required: ['productId'],
       },
     },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "compare_products",
-      description:
-        "So sánh 2-3 sản phẩm. Dùng khi khách phân vân giữa các lựa chọn.",
+      name: 'compare_products',
+      description: 'So sánh 2-3 sản phẩm. Dùng khi khách phân vân giữa các lựa chọn.',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
           productIds: {
-            type: "array",
-            items: { type: "string" },
-            description: "Danh sách ID sản phẩm cần so sánh",
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Danh sách ID sản phẩm cần so sánh',
           },
         },
-        required: ["productIds"],
+        required: ['productIds'],
       },
     },
   },

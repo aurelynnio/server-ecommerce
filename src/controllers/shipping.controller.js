@@ -1,7 +1,7 @@
-const shippingService = require("../services/shipping.service");
-const catchAsync = require("../configs/catchAsync");
-const { sendSuccess } = require("../shared/res/formatResponse");
-const { StatusCodes } = require("http-status-codes");
+const shippingService = require('../services/shipping.service');
+const catchAsync = require('../configs/catchAsync');
+const { sendSuccess } = require('../shared/res/formatResponse');
+const { StatusCodes } = require('http-status-codes');
 
 const ShippingController = {
   /**
@@ -11,16 +11,8 @@ const ShippingController = {
    * @returns {Promise<any>}
    */
   createTemplate: catchAsync(async (req, res) => {
-    const newTemplate = await shippingService.createTemplate(
-      req.user.userId,
-      req.body
-    );
-    return sendSuccess(
-      res,
-      newTemplate,
-      "Shipping template created",
-      StatusCodes.CREATED
-    );
+    const newTemplate = await shippingService.createTemplate(req.user.userId, req.body);
+    return sendSuccess(res, newTemplate, 'Shipping template created', StatusCodes.CREATED);
   }),
 
   /**
@@ -31,7 +23,7 @@ const ShippingController = {
    */
   getMyTemplates: catchAsync(async (req, res) => {
     const templates = await shippingService.getMyTemplates(req.user.userId);
-    return sendSuccess(res, templates, "Get templates success", StatusCodes.OK);
+    return sendSuccess(res, templates, 'Get templates success', StatusCodes.OK);
   }),
 
   /**
@@ -44,9 +36,9 @@ const ShippingController = {
     const updated = await shippingService.updateTemplate(
       req.user.userId,
       req.params.templateId,
-      req.body
+      req.body,
     );
-    return sendSuccess(res, updated, "Template updated", StatusCodes.OK);
+    return sendSuccess(res, updated, 'Template updated', StatusCodes.OK);
   }),
 
   /**
@@ -56,11 +48,8 @@ const ShippingController = {
    * @returns {Promise<any>}
    */
   deleteTemplate: catchAsync(async (req, res) => {
-    const deleted = await shippingService.deleteTemplate(
-      req.user.userId,
-      req.params.templateId
-    );
-    return sendSuccess(res, deleted, "Template deleted", StatusCodes.OK);
+    const deleted = await shippingService.deleteTemplate(req.user.userId, req.params.templateId);
+    return sendSuccess(res, deleted, 'Template deleted', StatusCodes.OK);
   }),
 };
 

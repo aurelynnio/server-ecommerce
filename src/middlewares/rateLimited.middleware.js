@@ -1,8 +1,8 @@
-const { rateLimit } = require("express-rate-limit");
-const { RedisStore } = require("rate-limit-redis");
-const redis = require("../configs/redis.config");
-const { StatusCodes } = require("http-status-codes");
-const { sendFail } = require("../shared/res/formatResponse");
+const { rateLimit } = require('express-rate-limit');
+const { RedisStore } = require('rate-limit-redis');
+const redis = require('../configs/redis.config');
+const { StatusCodes } = require('http-status-codes');
+const { sendFail } = require('../shared/res/formatResponse');
 
 /**
  * Create custom Rate Limiter
@@ -11,8 +11,8 @@ const { sendFail } = require("../shared/res/formatResponse");
 const createLimiter = ({
   minutes = 15,
   max = 100,
-  message = "Too many requests, please try again later.",
-  prefix = "rl",
+  message = 'Too many requests, please try again later.',
+  prefix = 'rl',
 } = {}) => {
   return rateLimit({
     windowMs: minutes * 60 * 1000,
@@ -36,31 +36,31 @@ const createLimiter = ({
 const globalLimiter = createLimiter({
   minutes: 15,
   max: 1000,
-  prefix: "global",
+  prefix: 'global',
 });
 
 // 2. Strict limiter for Auth (Login/Register/Forgot Pass) - Prevent Spam/Brute Force
 const authLimiter = createLimiter({
   minutes: 15,
   max: 10,
-  message: "Too many login attempts. Please try again after 15 minutes.",
-  prefix: "auth",
+  message: 'Too many login attempts. Please try again after 15 minutes.',
+  prefix: 'auth',
 });
 
 // 3. Limiter for other sensitive APIs (e.g., OTP, Payment)
 const sensitiveLimiter = createLimiter({
   minutes: 1,
   max: 5,
-  message: "Too many requests. Please slow down.",
-  prefix: "sensitive",
+  message: 'Too many requests. Please slow down.',
+  prefix: 'sensitive',
 });
 
 // 4. Limiter for Chatbot - Prevent spam
 const chatbotLimiter = createLimiter({
   minutes: 1,
   max: 30,
-  message: "Bạn đang gửi tin nhắn quá nhanh. Vui lòng chờ một chút.",
-  prefix: "chatbot",
+  message: 'Bạn đang gửi tin nhắn quá nhanh. Vui lòng chờ một chút.',
+  prefix: 'chatbot',
 });
 
 module.exports = {

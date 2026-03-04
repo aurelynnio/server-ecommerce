@@ -1,19 +1,15 @@
-const crypto = require("crypto");
-const User = require("../repositories/user.repository");
-const comparePassword = require("../utils/comparePassword");
-const hashPassword = require("../utils/hashPasword");
-const { getIO } = require("../socket/index");
-const { StatusCodes } = require("http-status-codes");
-const { ApiError } = require("../middlewares/errorHandler.middleware");
-const {
-  sendEmailVerificationCode,
-  sendPasswordResetCode,
-} = require("./email.service");
-const redisService = require("./redis.service");
-const logger = require("../utils/logger");
-const tokenService = require("./token.service");
-const parseDurationMs = require("../utils/parseDurationMs");
-
+const crypto = require('crypto');
+const User = require('../repositories/user.repository');
+const comparePassword = require('../utils/comparePassword');
+const hashPassword = require('../utils/hashPasword');
+const { getIO } = require('../socket/index');
+const { StatusCodes } = require('http-status-codes');
+const { ApiError } = require('../middlewares/errorHandler.middleware');
+const { sendEmailVerificationCode, sendPasswordResetCode } = require('./email.service');
+const redisService = require('./redis.service');
+const logger = require('../utils/logger');
+const tokenService = require('./token.service');
+const parseDurationMs = require('../utils/parseDurationMs');
 
 /**
  * Service handling authentication logic
@@ -35,7 +31,7 @@ class AuthService {
    * @returns {string}
    */
   _hashToken(token) {
-    return crypto.createHash("sha256").update(token).digest("hex");
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 
   /**
@@ -43,10 +39,7 @@ class AuthService {
    * @returns {Date}
    */
   _getRefreshTokenExpiresAt() {
-    const ttlMs = parseDurationMs(
-      process.env.JWT_REFRESH_EXPIRES_IN,
-      16 * 24 * 60 * 60 * 1000
-    );
+    const ttlMs = parseDurationMs(process.env.JWT_REFRESH_EXPIRES_IN, 16 * 24 * 60 * 60 * 1000);
     return new Date(Date.now() + ttlMs);
   }
 
@@ -64,18 +57,17 @@ class AuthService {
     // Check if email already exists
     const existingUser = await User.findByEmail(data.email);
     if (existingUser) {
-      throw new ApiError(StatusCodes.CONFLICT, "Email already in use");
+      throw new ApiError(StatusCodes.CONFLICT, 'Email already in use');
     }
 
     // Check if username already exists
     const existingUsername = await User.findByUsername(data.username);
     if (existingUsername) {
-      throw new ApiError(StatusCodes.CONFLICT, "Username already in use");
+      throw new ApiError(StatusCodes.CONFLICT, 'Username already in use');
     }
 
     // Hash password
     const hashedPassword = await hashPassword(data.password);
-
 
     // Create new user (without verification code)
     const newUser = User.build({
@@ -83,7 +75,7 @@ class AuthService {
       email: data.email,
       password: hashedPassword,
       isVerifiedEmail: false,
-      provider: data.provider || "local",
+      provider: data.provider || 'local',
     });
 
     await newUser.save();
@@ -92,24 +84,22 @@ class AuthService {
     try {
       const io = getIO();
       if (io) {
-        io.emit("new_user", {
+        io.emit('new_user', {
           username: newUser.username,
           _id: newUser._id,
         });
       }
     } catch (_error) {
-      logger.warn("[AuthService] Socket not initialized, skipping emit");
+      logger.warn('[AuthService] Socket not initialized, skipping emit');
     }
 
     // Send verification email
     try {
-      logger.info(
-        `[AuthService] Attempting to send verification email to ${data.email}`,
-      );
+      logger.info(`[AuthService] Attempting to send verification email to ${data.email}`);
       await this.sendVerificationCode(data.email);
       logger.info(`[AuthService] Verification email sent successfully`);
     } catch (error) {
-      logger.error("[AuthService] Failed to send verification email:", error);
+      logger.error('[AuthService] Failed to send verification email:', error);
       // Do not block registration if email fails, user can resend later
     }
 
@@ -132,25 +122,16 @@ class AuthService {
   async login(email, password) {
     const user = await User.findByEmail(email);
     if (!user) {
-      throw new ApiError(
-        StatusCodes.UNAUTHORIZED,
-        "Invalid email or password"
-      );
+      throw new ApiError(StatusCodes.UNAUTHORIZED, 'Invalid email or password');
     }
 
     const isMatch = await comparePassword(password, user.password);
     if (!isMatch) {
-      throw new ApiError(
-        StatusCodes.UNAUTHORIZED,
-        "Invalid email or password"
-      );
+      throw new ApiError(StatusCodes.UNAUTHORIZED, 'Invalid email or password');
     }
 
     if (!user.isVerifiedEmail) {
-      throw new ApiError(
-        StatusCodes.FORBIDDEN,
-        "Please verify your email before logging in"
-      );
+      throw new ApiError(StatusCodes.FORBIDDEN, 'Please verify your email before logging in');
     }
 
     const permissions = tokenService.getPermissionsForUser(user);
@@ -179,7 +160,6 @@ class AuthService {
     };
   }
 
-
   /**
    * Verify email using a code tied to the email address
    * @param {string} email - User email
@@ -190,11 +170,11 @@ class AuthService {
   async verifyEmail(email, code) {
     const user = await User.findByEmail(email);
     if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
     }
 
     if (user.isVerifiedEmail) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, "Email already verified");
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Email already verified');
     }
 
     const cacheKey = `otp:email:${email}`;
@@ -215,7 +195,6 @@ class AuthService {
     return { user: userWithoutPassword };
   }
 
-
   /**
    * Verify email using code only (no email required)
    * @param {string} code - Verification code
@@ -225,21 +204,15 @@ class AuthService {
   async verifyEmailByCode(code) {
     const user = await User.findByVerificationEmailCode(code);
     if (!user) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid verification code");
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid verification code');
     }
 
     if (user.isVerifiedEmail) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, "Email already verified");
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Email already verified');
     }
 
-    if (
-      user.expiresCodeVerifiEmail &&
-      user.expiresCodeVerifiEmail < new Date()
-    ) {
-      throw new ApiError(
-        StatusCodes.BAD_REQUEST,
-        "Verification code has expired"
-      );
+    if (user.expiresCodeVerifiEmail && user.expiresCodeVerifiEmail < new Date()) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Verification code has expired');
     }
 
     user.isVerifiedEmail = true;
@@ -256,7 +229,6 @@ class AuthService {
     return { user: userWithoutPassword };
   }
 
-
   /**
    * Send verification code to email (new or resend)
    * @param {string} email - User email
@@ -266,11 +238,11 @@ class AuthService {
   async sendVerificationCode(email) {
     const user = await User.findByEmail(email);
     if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
     }
 
     if (user.isVerifiedEmail) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, "Email already verified");
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Email already verified');
     }
 
     const verificationCode = this._generateVerificationCode();
@@ -289,14 +261,14 @@ class AuthService {
       await user.save();
       throw new ApiError(
         StatusCodes.INTERNAL_SERVER_ERROR,
-        "Failed to send verification email. Please try again."
+        'Failed to send verification email. Please try again.',
       );
     }
 
     return {
       email,
-      message: "Verification code sent successfully",
-      expiresIn: "10 minutes",
+      message: 'Verification code sent successfully',
+      expiresIn: '10 minutes',
     };
   }
 
@@ -311,10 +283,7 @@ class AuthService {
     const storedCode = await redisService.get(cacheKey);
 
     if (!storedCode || storedCode !== code) {
-      throw new ApiError(
-        StatusCodes.BAD_REQUEST,
-        "Invalid or expired verification code"
-      );
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid or expired verification code');
     }
   }
 
@@ -329,33 +298,21 @@ class AuthService {
     try {
       payload = tokenService.verifyRefreshToken(refreshToken);
     } catch (_error) {
-      throw new ApiError(
-        StatusCodes.UNAUTHORIZED,
-        "Invalid or expired refresh token"
-      );
+      throw new ApiError(StatusCodes.UNAUTHORIZED, 'Invalid or expired refresh token');
     }
 
     const user = await User.findByIdWithRefreshFields(payload.userId);
     if (!user) {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not found");
+      throw new ApiError(StatusCodes.UNAUTHORIZED, 'User not found');
     }
 
     const tokenHash = this._hashToken(refreshToken);
     if (user.refreshTokenHash && user.refreshTokenHash !== tokenHash) {
-      throw new ApiError(
-        StatusCodes.UNAUTHORIZED,
-        "Invalid or revoked refresh token"
-      );
+      throw new ApiError(StatusCodes.UNAUTHORIZED, 'Invalid or revoked refresh token');
     }
 
-    if (
-      user.refreshTokenExpiresAt &&
-      user.refreshTokenExpiresAt < new Date()
-    ) {
-      throw new ApiError(
-        StatusCodes.UNAUTHORIZED,
-        "Refresh token has expired"
-      );
+    if (user.refreshTokenExpiresAt && user.refreshTokenExpiresAt < new Date()) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, 'Refresh token has expired');
     }
 
     const permissions = tokenService.getPermissionsForUser(user);
@@ -386,7 +343,6 @@ class AuthService {
     }
   }
 
-
   /**
    * Send password reset code to email
    * @param {string} email - User email
@@ -396,7 +352,7 @@ class AuthService {
   async forgotPassword(email) {
     const user = await User.findByEmail(email);
     if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
     }
 
     // Generate password reset code
@@ -409,10 +365,10 @@ class AuthService {
     try {
       await sendPasswordResetCode(email, resetCode);
     } catch (error) {
-      logger.error("Failed to send password reset email:", error);
+      logger.error('Failed to send password reset email:', error);
       throw new ApiError(
         StatusCodes.INTERNAL_SERVER_ERROR,
-        "Failed to send password reset email. Please try again."
+        'Failed to send password reset email. Please try again.',
       );
     }
 
@@ -430,16 +386,14 @@ class AuthService {
   async resetPassword(email, code, newPassword) {
     const user = await User.findByEmail(email);
     if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
     }
 
     const cacheKey = `otp:reset-password:${email}`;
     await this.ensureValidOtp(cacheKey, code);
 
-
     // Hash new password
     const hashedPassword = await hashPassword(newPassword);
-
 
     // Update password and clear reset code
     user.password = hashedPassword;
@@ -462,17 +416,14 @@ class AuthService {
   async changePassword(userId, currentPassword, newPassword) {
     const user = await User.findById(userId);
     if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
     }
 
     // Verify current password
     const isMatch = await comparePassword(currentPassword, user.password);
 
     if (!isMatch) {
-      throw new ApiError(
-        StatusCodes.BAD_REQUEST,
-        "Current password is incorrect"
-      );
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Current password is incorrect');
     }
 
     // Hash and update new password
@@ -486,5 +437,3 @@ class AuthService {
 }
 
 module.exports = new AuthService();
-
-

@@ -1,7 +1,7 @@
-const voucherService = require("../services/voucher.service");
-const catchAsync = require("../configs/catchAsync");
-const { sendSuccess } = require("../shared/res/formatResponse");
-const { StatusCodes } = require("http-status-codes");
+const voucherService = require('../services/voucher.service');
+const catchAsync = require('../configs/catchAsync');
+const { sendSuccess } = require('../shared/res/formatResponse');
+const { StatusCodes } = require('http-status-codes');
 
 const VoucherController = {
   /**
@@ -13,10 +13,10 @@ const VoucherController = {
   createVoucher: catchAsync(async (req, res) => {
     const newVoucher = await voucherService.createVoucher(
       req.user.userId,
-      req.user.role ? [req.user.role] : ["user"],
-      req.body
+      req.user.role ? [req.user.role] : ['user'],
+      req.body,
     );
-    return sendSuccess(res, newVoucher, "Voucher created", StatusCodes.CREATED);
+    return sendSuccess(res, newVoucher, 'Voucher created', StatusCodes.CREATED);
   }),
 
   /**
@@ -27,7 +27,7 @@ const VoucherController = {
    */
   getVoucherById: catchAsync(async (req, res) => {
     const voucher = await voucherService.getVoucherById(req.params.id);
-    return sendSuccess(res, voucher, "Voucher retrieved", StatusCodes.OK);
+    return sendSuccess(res, voucher, 'Voucher retrieved', StatusCodes.OK);
   }),
 
   /**
@@ -38,7 +38,7 @@ const VoucherController = {
    */
   getAllVouchers: catchAsync(async (req, res) => {
     const result = await voucherService.getAllVouchers(req.query);
-    return sendSuccess(res, result, "Vouchers retrieved", StatusCodes.OK);
+    return sendSuccess(res, result, 'Vouchers retrieved', StatusCodes.OK);
   }),
 
   /**
@@ -52,9 +52,9 @@ const VoucherController = {
       req.params.id,
       req.body,
       req.user.userId,
-      req.user.role ? [req.user.role] : ["user"]
+      req.user.role ? [req.user.role] : ['user'],
     );
-    return sendSuccess(res, voucher, "Voucher updated", StatusCodes.OK);
+    return sendSuccess(res, voucher, 'Voucher updated', StatusCodes.OK);
   }),
 
   /**
@@ -67,9 +67,9 @@ const VoucherController = {
     const result = await voucherService.deleteVoucher(
       req.params.id,
       req.user.userId,
-      req.user.role ? [req.user.role] : ["user"]
+      req.user.role ? [req.user.role] : ['user'],
     );
-    return sendSuccess(res, result, "Voucher deleted", StatusCodes.OK);
+    return sendSuccess(res, result, 'Voucher deleted', StatusCodes.OK);
   }),
 
   /**
@@ -80,7 +80,7 @@ const VoucherController = {
    */
   permanentDeleteVoucher: catchAsync(async (req, res) => {
     const result = await voucherService.permanentDeleteVoucher(req.params.id);
-    return sendSuccess(res, result, "Voucher permanently deleted", StatusCodes.OK);
+    return sendSuccess(res, result, 'Voucher permanently deleted', StatusCodes.OK);
   }),
 
   /**
@@ -91,7 +91,7 @@ const VoucherController = {
    */
   getShopVouchers: catchAsync(async (req, res) => {
     const vouchers = await voucherService.getShopVouchers(req.params.shopId);
-    return sendSuccess(res, vouchers, "Shop vouchers retrieved", StatusCodes.OK);
+    return sendSuccess(res, vouchers, 'Shop vouchers retrieved', StatusCodes.OK);
   }),
 
   /**
@@ -102,7 +102,7 @@ const VoucherController = {
    */
   getPlatformVouchers: catchAsync(async (req, res) => {
     const vouchers = await voucherService.getPlatformVouchers();
-    return sendSuccess(res, vouchers, "Platform vouchers retrieved", StatusCodes.OK);
+    return sendSuccess(res, vouchers, 'Platform vouchers retrieved', StatusCodes.OK);
   }),
 
   /**
@@ -113,11 +113,8 @@ const VoucherController = {
    */
   getAvailableVouchers: catchAsync(async (req, res) => {
     const { shopId } = req.query;
-    const vouchers = await voucherService.getAvailableVouchers(
-      req.user.userId,
-      shopId
-    );
-    return sendSuccess(res, vouchers, "Available vouchers retrieved", StatusCodes.OK);
+    const vouchers = await voucherService.getAvailableVouchers(req.user.userId, shopId);
+    return sendSuccess(res, vouchers, 'Available vouchers retrieved', StatusCodes.OK);
   }),
 
   /**
@@ -128,13 +125,8 @@ const VoucherController = {
    */
   applyVoucher: catchAsync(async (req, res) => {
     const { code, orderValue, shopId } = req.body;
-    const result = await voucherService.applyVoucher(
-      code,
-      req.user.userId,
-      orderValue,
-      shopId
-    );
-    return sendSuccess(res, result, "Voucher applied", StatusCodes.OK);
+    const result = await voucherService.applyVoucher(code, req.user.userId, orderValue, shopId);
+    return sendSuccess(res, result, 'Voucher applied', StatusCodes.OK);
   }),
 
   /**
@@ -145,7 +137,7 @@ const VoucherController = {
    */
   getVoucherStatistics: catchAsync(async (req, res) => {
     const stats = await voucherService.getVoucherStatistics();
-    return sendSuccess(res, stats, "Voucher statistics retrieved", StatusCodes.OK);
+    return sendSuccess(res, stats, 'Voucher statistics retrieved', StatusCodes.OK);
   }),
 };
 

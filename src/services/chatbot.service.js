@@ -1,31 +1,28 @@
-const { ChatMistralAI } = require("@langchain/mistralai");
-const { MongoDBChatMessageHistory } = require("@langchain/mongodb");
-const {
-  ChatPromptTemplate,
-  MessagesPlaceholder,
-} = require("@langchain/core/prompts");
-const { RunnableWithMessageHistory } = require("@langchain/core/runnables");
-const { StringOutputParser } = require("@langchain/core/output_parsers");
-const mongoose = require("mongoose");
+const { ChatMistralAI } = require('@langchain/mistralai');
+const { MongoDBChatMessageHistory } = require('@langchain/mongodb');
+const { ChatPromptTemplate, MessagesPlaceholder } = require('@langchain/core/prompts');
+const { RunnableWithMessageHistory } = require('@langchain/core/runnables');
+const { StringOutputParser } = require('@langchain/core/output_parsers');
+const mongoose = require('mongoose');
 
-const { searchSimilarProducts, getFeaturedProducts } = require("./embedding.service");
-const { toolHandlers } = require("../utils/chatbot.tools");
-const { SYSTEM_PROMPT } = require("../configs/chatbot.config");
-const logger = require("../utils/logger");
+const { searchSimilarProducts, getFeaturedProducts } = require('./embedding.service');
+const { toolHandlers } = require('../utils/chatbot.tools');
+const { SYSTEM_PROMPT } = require('../configs/chatbot.config');
+const logger = require('../utils/logger');
 
 class ChatbotService {
   constructor() {
     this.model = new ChatMistralAI({
-      model: "mistral-large-latest",
+      model: 'mistral-large-latest',
       apiKey: process.env.MISTRAL_API_KEY,
       temperature: 0.3,
       streaming: true,
     });
 
     this.prompt = ChatPromptTemplate.fromMessages([
-      ["system", SYSTEM_PROMPT],
-      new MessagesPlaceholder("chat_history"),
-      ["human", "{input}"],
+      ['system', SYSTEM_PROMPT],
+      new MessagesPlaceholder('chat_history'),
+      ['human', '{input}'],
     ]);
 
     this.chain = this.prompt.pipe(this.model).pipe(new StringOutputParser());
@@ -38,7 +35,7 @@ class ChatbotService {
    */
   getMessageHistory(sessionId) {
     const client = mongoose.connection.getClient();
-    const collection = client.db().collection("chatbot_messages");
+    const collection = client.db().collection('chatbot_messages');
 
     return new MongoDBChatMessageHistory({
       collection,
@@ -55,15 +52,15 @@ class ChatbotService {
    */
   async chatStream(sessionId, userMessage, onToken) {
     try {
-      logger.info("[Chatbot] Starting RAG stream chat with sessionId:", sessionId);
-      logger.info("[Chatbot] User message:", userMessage);
+      logger.info('[Chatbot] Starting RAG stream chat with sessionId:', sessionId);
+      logger.info('[Chatbot] User message:', userMessage);
 
       // Use RAG to retrieve relevant products
       const products = await this.retrieveProducts(userMessage);
 
       logger.info(
-        "[Chatbot] RAG retrieved:",
-        products.length > 0 ? `Found ${products.length} products` : "No products found"
+        '[Chatbot] RAG retrieved:',
+        products.length > 0 ? `Found ${products.length} products` : 'No products found',
       );
 
       // Build context from retrieved products
@@ -73,15 +70,15 @@ class ChatbotService {
       const chainWithHistory = new RunnableWithMessageHistory({
         runnable: this.chain,
         getMessageHistory: (sessionId) => this.getMessageHistory(sessionId),
-        inputMessagesKey: "input",
-        historyMessagesKey: "chat_history",
+        inputMessagesKey: 'input',
+        historyMessagesKey: 'chat_history',
       });
 
       // Stream response
-      let fullResponse = "";
+      let fullResponse = '';
       const stream = await chainWithHistory.stream(
         { input: contextMessage },
-        { configurable: { sessionId } }
+        { configurable: { sessionId } },
       );
 
       for await (const chunk of stream) {
@@ -91,7 +88,7 @@ class ChatbotService {
         }
       }
 
-      logger.info("[Chatbot] Stream completed");
+      logger.info('[Chatbot] Stream completed');
 
       // Validate response before returning
       const validatedResponse = this.validateResponse(fullResponse, products);
@@ -102,11 +99,10 @@ class ChatbotService {
         sessionId,
       };
     } catch (error) {
-      logger.error("[Chatbot] Stream error:", error.message);
+      logger.error('[Chatbot] Stream error:', error.message);
       return {
         success: false,
-        message:
-          "Xin lỗi, hệ thống đang bận. Anh/chị vui lòng thử lại sau nhé!",
+        message: 'Xin lỗi, hệ thống đang bận. Anh/chị vui lòng thử lại sau nhé!',
         error: error.message,
         sessionId,
       };
@@ -118,15 +114,15 @@ class ChatbotService {
    */
   async chat(sessionId, userMessage) {
     try {
-      logger.info("[Chatbot] Starting RAG chat with sessionId:", sessionId);
-      logger.info("[Chatbot] User message:", userMessage);
+      logger.info('[Chatbot] Starting RAG chat with sessionId:', sessionId);
+      logger.info('[Chatbot] User message:', userMessage);
 
       // Use RAG to retrieve relevant products
       const products = await this.retrieveProducts(userMessage);
-      
+
       logger.info(
-        "[Chatbot] RAG retrieved:",
-        products.length > 0 ? `Found ${products.length} products` : "No products found"
+        '[Chatbot] RAG retrieved:',
+        products.length > 0 ? `Found ${products.length} products` : 'No products found',
       );
 
       const contextMessage = this.buildContextMessage(userMessage, products);
@@ -134,16 +130,16 @@ class ChatbotService {
       const chainWithHistory = new RunnableWithMessageHistory({
         runnable: this.chain,
         getMessageHistory: (sessionId) => this.getMessageHistory(sessionId),
-        inputMessagesKey: "input",
-        historyMessagesKey: "chat_history",
+        inputMessagesKey: 'input',
+        historyMessagesKey: 'chat_history',
       });
 
       const result = await chainWithHistory.invoke(
         { input: contextMessage },
-        { configurable: { sessionId } }
+        { configurable: { sessionId } },
       );
 
-      logger.info("[Chatbot] Response generated successfully");
+      logger.info('[Chatbot] Response generated successfully');
 
       // Validate response before returning
       const validatedResponse = this.validateResponse(result, products);
@@ -154,32 +150,31 @@ class ChatbotService {
         sessionId,
       };
     } catch (error) {
-      logger.error("[Chatbot] Error:", error.message);
+      logger.error('[Chatbot] Error:', error.message);
       return {
         success: false,
-        message:
-          "Xin lỗi, hệ thống đang bận. Anh/chị vui lòng thử lại sau nhé!",
+        message: 'Xin lỗi, hệ thống đang bận. Anh/chị vui lòng thử lại sau nhé!',
         error: error.message,
         sessionId,
       };
     }
   }
 
-  parseMoneyValue(rawValue, unit = "") {
+  parseMoneyValue(rawValue, unit = '') {
     if (rawValue === undefined || rawValue === null) return null;
 
     const normalized = String(rawValue)
       .trim()
-      .replace(/\.(?=\d{3}(\D|$))/g, "")
-      .replace(",", ".");
+      .replace(/\.(?=\d{3}(\D|$))/g, '')
+      .replace(',', '.');
     const numeric = Number(normalized);
     if (!Number.isFinite(numeric)) return null;
 
     const normalizedUnit = unit.toLowerCase();
-    if (["k", "nghìn", "ngan"].includes(normalizedUnit)) {
+    if (['k', 'nghìn', 'ngan'].includes(normalizedUnit)) {
       return Math.round(numeric * 1000);
     }
-    if (["tr", "triệu", "m"].includes(normalizedUnit)) {
+    if (['tr', 'triệu', 'm'].includes(normalizedUnit)) {
       return Math.round(numeric * 1000000);
     }
     return Math.round(numeric);
@@ -206,12 +201,8 @@ class ChatbotService {
     );
 
     return {
-      minPrice: aboveMatch
-        ? this.parseMoneyValue(aboveMatch[1], aboveMatch[2])
-        : null,
-      maxPrice: underMatch
-        ? this.parseMoneyValue(underMatch[1], underMatch[2])
-        : null,
+      minPrice: aboveMatch ? this.parseMoneyValue(aboveMatch[1], aboveMatch[2]) : null,
+      maxPrice: underMatch ? this.parseMoneyValue(underMatch[1], underMatch[2]) : null,
     };
   }
 
@@ -220,17 +211,16 @@ class ChatbotService {
     const priceRange = this.extractPriceRange(message);
 
     const cleanValue = (value) =>
-      value ? value.trim().replace(/[?.!,]+$/g, "").trim() : null;
+      value
+        ? value
+            .trim()
+            .replace(/[?.!,]+$/g, '')
+            .trim()
+        : null;
 
-    const brandMatch = message.match(
-      /(?:thương hiệu|hãng|brand)\s+([a-zA-ZÀ-ỹ0-9\s-]{2,40})/i,
-    );
-    const categoryMatch = message.match(
-      /(?:danh mục|loại|category)\s+([a-zA-ZÀ-ỹ0-9\s-]{2,40})/i,
-    );
-    const colorMatch = message.match(
-      /(?:màu|color)\s+([a-zA-ZÀ-ỹ0-9\s-]{2,30})/i,
-    );
+    const brandMatch = message.match(/(?:thương hiệu|hãng|brand)\s+([a-zA-ZÀ-ỹ0-9\s-]{2,40})/i);
+    const categoryMatch = message.match(/(?:danh mục|loại|category)\s+([a-zA-ZÀ-ỹ0-9\s-]{2,40})/i);
+    const colorMatch = message.match(/(?:màu|color)\s+([a-zA-ZÀ-ỹ0-9\s-]{2,30})/i);
     const sizeMatch = message.match(/(?:size|kích cỡ|cỡ)\s*([a-zA-Z0-9]{1,8})/i);
 
     const limitMatch =
@@ -238,14 +228,14 @@ class ChatbotService {
       message.match(/(\d{1,2})\s*(?:sản phẩm|sp|món)/i);
 
     const sortBy = /(rẻ nhất|giá thấp|thấp đến cao)/i.test(lowerMessage)
-      ? "price_asc"
+      ? 'price_asc'
       : /(đắt nhất|giá cao|cao đến thấp)/i.test(lowerMessage)
-        ? "price_desc"
+        ? 'price_desc'
         : /(mới nhất|vừa về|newest|new arrival)/i.test(lowerMessage)
-          ? "newest"
+          ? 'newest'
           : /(đánh giá cao|top rated|5 sao)/i.test(lowerMessage)
-            ? "rating"
-            : "bestselling";
+            ? 'rating'
+            : 'bestselling';
 
     const limit = limitMatch ? Math.min(Math.max(Number(limitMatch[1]), 1), 20) : 5;
 
@@ -258,9 +248,7 @@ class ChatbotService {
       maxPrice: priceRange.maxPrice,
       hasPriceFilter: priceRange.minPrice !== null || priceRange.maxPrice !== null,
       inStockOnly: /(còn hàng|sẵn hàng|available|in stock)/i.test(lowerMessage),
-      onlyDiscounted: /(giảm giá|sale|khuyến mãi|discount|ưu đãi)/i.test(
-        lowerMessage,
-      ),
+      onlyDiscounted: /(giảm giá|sale|khuyến mãi|discount|ưu đãi)/i.test(lowerMessage),
       sortBy,
       limit,
     };
@@ -279,26 +267,38 @@ class ChatbotService {
     const lowerMessage = message.toLowerCase();
     const signals = this.extractSearchSignals(message);
 
-    const greetingKeywords = ["xin chào", "hello", "hi", "chào", "hey"];
-    const categoryKeywords = ["danh mục", "loại", "category", "thể loại", "phân loại"];
-    const featuredKeywords = ["hot", "nổi bật", "nỗi bật", "gợi ý", "recommend", "best", "top", "phổ biến"];
-    const saleKeywords = ["giảm giá", "sale", "khuyến mãi", "discount", "ưu đãi"];
-    const bestsellerKeywords = ["bán chạy", "best seller", "best-seller", "phổ biến"];
-    const newKeywords = ["mới", "new", "vừa về", "mới nhất", "latest"];
+    const greetingKeywords = ['xin chào', 'hello', 'hi', 'chào', 'hey'];
+    const categoryKeywords = ['danh mục', 'loại', 'category', 'thể loại', 'phân loại'];
+    const featuredKeywords = [
+      'hot',
+      'nổi bật',
+      'nỗi bật',
+      'gợi ý',
+      'recommend',
+      'best',
+      'top',
+      'phổ biến',
+    ];
+    const saleKeywords = ['giảm giá', 'sale', 'khuyến mãi', 'discount', 'ưu đãi'];
+    const bestsellerKeywords = ['bán chạy', 'best seller', 'best-seller', 'phổ biến'];
+    const newKeywords = ['mới', 'new', 'vừa về', 'mới nhất', 'latest'];
 
     try {
       if (greetingKeywords.some((keyword) => lowerMessage.includes(keyword))) {
-        logger.info("[Chatbot] Detected: greeting - fetching featured products");
-        return await getFeaturedProducts({ type: "featured", limit: 3 });
+        logger.info('[Chatbot] Detected: greeting - fetching featured products');
+        return await getFeaturedProducts({ type: 'featured', limit: 3 });
       }
 
       if (categoryKeywords.some((keyword) => lowerMessage.includes(keyword))) {
-        logger.info("[Chatbot] Detected: categories request");
+        logger.info('[Chatbot] Detected: categories request');
         return this.normalizeProductList(await toolHandlers.get_categories());
       }
 
-      if (signals.onlyDiscounted || saleKeywords.some((keyword) => lowerMessage.includes(keyword))) {
-        logger.info("[Chatbot] Detected: discounted products");
+      if (
+        signals.onlyDiscounted ||
+        saleKeywords.some((keyword) => lowerMessage.includes(keyword))
+      ) {
+        logger.info('[Chatbot] Detected: discounted products');
         const discounted = this.normalizeProductList(
           await toolHandlers.get_discounted_products({
             keyword: signals.brand || signals.category ? undefined : message,
@@ -313,7 +313,7 @@ class ChatbotService {
       }
 
       if (bestsellerKeywords.some((keyword) => lowerMessage.includes(keyword))) {
-        logger.info("[Chatbot] Detected: bestseller products");
+        logger.info('[Chatbot] Detected: bestseller products');
         const bestsellers = this.normalizeProductList(
           await toolHandlers.get_bestseller_products({
             category: signals.category,
@@ -325,7 +325,7 @@ class ChatbotService {
       }
 
       if (newKeywords.some((keyword) => lowerMessage.includes(keyword))) {
-        logger.info("[Chatbot] Detected: new arrival products");
+        logger.info('[Chatbot] Detected: new arrival products');
         const newArrivals = this.normalizeProductList(
           await toolHandlers.get_new_arrival_products({
             category: signals.category,
@@ -343,13 +343,14 @@ class ChatbotService {
         signals.colors.length > 0 ||
         signals.sizes.length > 0 ||
         signals.inStockOnly ||
-        signals.sortBy !== "bestselling";
+        signals.sortBy !== 'bestselling';
 
       if (hasAdvancedFilters) {
-        logger.info("[Chatbot] Using advanced product search tools");
+        logger.info('[Chatbot] Using advanced product search tools');
         const advancedResults = this.normalizeProductList(
           await toolHandlers.search_products_advanced({
-            keyword: signals.brand || signals.category || signals.hasPriceFilter ? undefined : message,
+            keyword:
+              signals.brand || signals.category || signals.hasPriceFilter ? undefined : message,
             category: signals.category,
             brand: signals.brand,
             minPrice: signals.minPrice,
@@ -366,31 +367,31 @@ class ChatbotService {
       }
 
       if (featuredKeywords.some((keyword) => lowerMessage.includes(keyword))) {
-        logger.info("[Chatbot] Detected: featured products");
-        return await getFeaturedProducts({ type: "featured", limit: 5 });
+        logger.info('[Chatbot] Detected: featured products');
+        return await getFeaturedProducts({ type: 'featured', limit: 5 });
       }
 
       if (message.length > 2) {
-        logger.info("[Chatbot] Using semantic search for:", message);
+        logger.info('[Chatbot] Using semantic search for:', message);
         const results = await searchSimilarProducts(message, { limit: signals.limit });
         if (results.length > 0) return results;
 
-        logger.info("[Chatbot] No semantic results, fallback to bestsellers");
+        logger.info('[Chatbot] No semantic results, fallback to bestsellers');
         const fallback = this.normalizeProductList(
           await toolHandlers.get_bestseller_products({ limit: 5 }),
         );
         if (fallback.length > 0) return fallback;
       }
 
-      logger.info("[Chatbot] Default: showing featured products");
-      return await getFeaturedProducts({ type: "featured", limit: 3 });
+      logger.info('[Chatbot] Default: showing featured products');
+      return await getFeaturedProducts({ type: 'featured', limit: 3 });
     } catch (error) {
-      logger.error("[Chatbot] Error retrieving products:", error.message);
+      logger.error('[Chatbot] Error retrieving products:', error.message);
       const fallback = this.normalizeProductList(
         await toolHandlers.get_bestseller_products({ limit: 5 }),
       );
       if (fallback.length > 0) return fallback;
-      return await getFeaturedProducts({ type: "featured", limit: 3 });
+      return await getFeaturedProducts({ type: 'featured', limit: 3 });
     }
   }
 
@@ -415,7 +416,7 @@ ${formattedData}
 - Nếu khách hỏi về sản phẩm không có trong danh sách → nói "Em chưa tìm thấy sản phẩm phù hợp, anh/chị có thể mô tả thêm không ạ?"`;
     }
 
-    logger.info("[Chatbot] No products found, using default message");
+    logger.info('[Chatbot] No products found, using default message');
     return `[KHÁCH HỎI]: ${userMessage}
 
 [THÔNG BÁO]: Không tìm thấy sản phẩm phù hợp trong hệ thống.
@@ -433,7 +434,7 @@ ${formattedData}
    */
   formatProducts(products) {
     if (!Array.isArray(products) || products.length === 0) {
-      return "Không có sản phẩm.";
+      return 'Không có sản phẩm.';
     }
 
     return products
@@ -442,16 +443,16 @@ ${formattedData}
           // Product format
           const discount =
             item.originalPrice && item.originalPrice > item.price
-              ? ` (gốc ${item.originalPrice.toLocaleString("vi-VN")}đ, giảm ${Math.round((1 - item.price / item.originalPrice) * 100)}%)`
-              : "";
-          const similarity = item.score ? ` [Độ phù hợp: ${(item.score * 100).toFixed(0)}%]` : "";
-          
+              ? ` (gốc ${item.originalPrice.toLocaleString('vi-VN')}đ, giảm ${Math.round((1 - item.price / item.originalPrice) * 100)}%)`
+              : '';
+          const similarity = item.score ? ` [Độ phù hợp: ${(item.score * 100).toFixed(0)}%]` : '';
+
           return `[SẢN PHẨM ${index + 1}]${similarity}
 Tên: ${item.name}
-Giá: ${item.price?.toLocaleString("vi-VN")}đ${discount}
-Thương hiệu: ${item.brand || "N/A"}
-Danh mục: ${item.category || "N/A"}
-Còn hàng: ${item.stock > 0 ? "Có" : "Hết hàng"}
+Giá: ${item.price?.toLocaleString('vi-VN')}đ${discount}
+Thương hiệu: ${item.brand || 'N/A'}
+Danh mục: ${item.category || 'N/A'}
+Còn hàng: ${item.stock > 0 ? 'Có' : 'Hết hàng'}
 Link xem: ${item.productUrl}
 Link mua: ${item.checkoutUrl}`;
         } else if (item.name && item.slug && item.url) {
@@ -460,7 +461,7 @@ Link mua: ${item.checkoutUrl}`;
         }
         return JSON.stringify(item);
       })
-      .join("\n\n");
+      .join('\n\n');
   }
 
   /**
@@ -476,14 +477,16 @@ Link mua: ${item.checkoutUrl}`;
       // Check if response contains price patterns (potential hallucination)
       const pricePattern = /\d{2,3}[.,]?\d{3}[.,]?\d{0,3}\s*đ/g;
       const hasPrices = pricePattern.test(response);
-      
+
       if (hasPrices) {
-        logger.warn("[Chatbot] Potential hallucination detected - prices in response but no products in context");
+        logger.warn(
+          '[Chatbot] Potential hallucination detected - prices in response but no products in context',
+        );
         // Return a safe response
-        return "Em xin lỗi, hiện tại em chưa tìm thấy sản phẩm phù hợp với yêu cầu của anh/chị. Anh/chị có thể cho em biết cụ thể hơn muốn tìm loại sản phẩm gì không ạ? Ví dụ: áo, quần, giày, túi xách...";
+        return 'Em xin lỗi, hiện tại em chưa tìm thấy sản phẩm phù hợp với yêu cầu của anh/chị. Anh/chị có thể cho em biết cụ thể hơn muốn tìm loại sản phẩm gì không ạ? Ví dụ: áo, quần, giày, túi xách...';
       }
     }
-    
+
     // For now, return the response as-is
     // More sophisticated validation can be added here
     return response;

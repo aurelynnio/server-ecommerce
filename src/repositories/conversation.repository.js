@@ -1,5 +1,5 @@
-const { Conversation, Message } = require("../models/conversation.model");
-const BaseRepository = require("./base.repository");
+const { Conversation, Message } = require('../models/conversation.model');
+const BaseRepository = require('./base.repository');
 
 class ConversationRepository extends BaseRepository {
   constructor() {
@@ -23,8 +23,8 @@ class ConversationRepository extends BaseRepository {
 
   findByMemberWithDetails(userId) {
     return this.findManyByFilter({ members: userId })
-      .populate("shopId", "name logo")
-      .populate("members", "username avatar")
+      .populate('shopId', 'name logo')
+      .populate('members', 'username avatar')
       .sort({ updatedAt: -1 });
   }
 }

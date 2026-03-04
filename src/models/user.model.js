@@ -1,4 +1,4 @@
-const { Schema, model } = require("mongoose");
+const { Schema, model } = require('mongoose');
 
 const addressSchema = new Schema({
   fullName: { type: String, required: true },
@@ -28,12 +28,12 @@ const userSchema = new Schema(
     },
     roles: {
       type: String,
-      enum: ["user", "admin", "seller"],
-      default: "user",
+      enum: ['user', 'admin', 'seller'],
+      default: 'user',
     },
     shop: {
       type: Schema.Types.ObjectId,
-      ref: "Shop",
+      ref: 'Shop',
       default: null,
     },
     permissions: {
@@ -69,8 +69,8 @@ const userSchema = new Schema(
     },
     provider: {
       type: String,
-      enum: ["local", "google"],
-      default: "local",
+      enum: ['local', 'google'],
+      default: 'local',
     },
     refreshTokenHash: {
       type: String,
@@ -85,7 +85,7 @@ const userSchema = new Schema(
   },
   {
     timestamps: true,
-    collection: "users",
+    collection: 'users',
   },
 );
 
@@ -93,4 +93,4 @@ const userSchema = new Schema(
 userSchema.index({ roles: 1 });
 userSchema.index({ isVerifiedEmail: 1 });
 
-module.exports = model("User", userSchema);
+module.exports = model('User', userSchema);

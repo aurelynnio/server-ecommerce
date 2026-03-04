@@ -4,7 +4,7 @@
  * to prevent injection attacks (XSS, NoSQL injection)
  */
 
-const joi = require("joi");
+const joi = require('joi');
 
 /**
  * Escape HTML special characters to prevent XSS attacks
@@ -12,13 +12,13 @@ const joi = require("joi");
  * @returns {string} - Escaped string
  */
 const escapeHtml = (str) => {
-  if (typeof str !== "string") return str;
+  if (typeof str !== 'string') return str;
   return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#x27;");
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
 };
 
 /**
@@ -27,9 +27,9 @@ const escapeHtml = (str) => {
  * @returns {string} - Sanitized string
  */
 const sanitizeMongoOperators = (str) => {
-  if (typeof str !== "string") return str;
+  if (typeof str !== 'string') return str;
   // Remove $ at start of string or after . (MongoDB operators)
-  return str.replace(/\$|\./g, "");
+  return str.replace(/\$|\./g, '');
 };
 
 /**
@@ -38,11 +38,11 @@ const sanitizeMongoOperators = (str) => {
  */
 const sanitizedString = () => {
   return joi.string().custom((value, _helpers) => {
-    if (typeof value !== "string") return value;
+    if (typeof value !== 'string') return value;
     // Trim whitespace
     const sanitized = value.trim();
     return sanitized;
-  }, "sanitize");
+  }, 'sanitize');
 };
 
 /**
@@ -51,12 +51,12 @@ const sanitizedString = () => {
  */
 const escapedString = () => {
   return joi.string().custom((value, _helpers) => {
-    if (typeof value !== "string") return value;
+    if (typeof value !== 'string') return value;
     // Trim and escape HTML
     let sanitized = value.trim();
     sanitized = escapeHtml(sanitized);
     return sanitized;
-  }, "escape");
+  }, 'escape');
 };
 
 /**
@@ -65,12 +65,12 @@ const escapedString = () => {
  */
 const searchString = () => {
   return joi.string().custom((value, _helpers) => {
-    if (typeof value !== "string") return value;
+    if (typeof value !== 'string') return value;
     // Trim and remove MongoDB operators
     let sanitized = value.trim();
     sanitized = sanitizeMongoOperators(sanitized);
     return sanitized;
-  }, "searchSanitize");
+  }, 'searchSanitize');
 };
 
 /**
@@ -82,7 +82,7 @@ const objectId = () => {
     .string()
     .pattern(/^[0-9a-fA-F]{24}$/)
     .messages({
-      "string.pattern.base": "Invalid ObjectId format",
+      'string.pattern.base': 'Invalid ObjectId format',
     });
 };
 
@@ -93,13 +93,13 @@ const objectId = () => {
  */
 const sanitizeObject = (obj) => {
   if (obj === null || obj === undefined) return obj;
-  if (typeof obj === "string") return obj.trim();
+  if (typeof obj === 'string') return obj.trim();
   if (Array.isArray(obj)) return obj.map(sanitizeObject);
-  if (typeof obj === "object") {
+  if (typeof obj === 'object') {
     const sanitized = {};
     for (const [key, value] of Object.entries(obj)) {
       // Skip keys starting with $ (MongoDB operators)
-      if (key.startsWith("$")) continue;
+      if (key.startsWith('$')) continue;
       sanitized[key] = sanitizeObject(value);
     }
     return sanitized;

@@ -1,6 +1,6 @@
-const catchAsync = require("../configs/catchAsync");
-const searchService = require("../services/search.service");
-const { sendSuccess } = require("../shared/res/formatResponse");
+const catchAsync = require('../configs/catchAsync');
+const searchService = require('../services/search.service');
+const { sendSuccess } = require('../shared/res/formatResponse');
 
 const SearchController = {
   /**
@@ -12,12 +12,9 @@ const SearchController = {
   getSuggestions: catchAsync(async (req, res) => {
     const { q, limit } = req.query;
 
-    const suggestions = await searchService.getSuggestions(
-      q,
-      parseInt(limit) || 10,
-    );
+    const suggestions = await searchService.getSuggestions(q, parseInt(limit) || 10);
 
-    return sendSuccess(res, suggestions, "Suggestions retrieved");
+    return sendSuccess(res, suggestions, 'Suggestions retrieved');
   }),
 
   /**
@@ -29,11 +26,9 @@ const SearchController = {
   getTrending: catchAsync(async (req, res) => {
     const { limit } = req.query;
 
-    const trending = await searchService.getTrendingSearches(
-      parseInt(limit) || 10,
-    );
+    const trending = await searchService.getTrendingSearches(parseInt(limit) || 10);
 
-    return sendSuccess(res, trending, "Trending searches retrieved");
+    return sendSuccess(res, trending, 'Trending searches retrieved');
   }),
 
   /**
@@ -47,7 +42,7 @@ const SearchController = {
 
     const keywords = await searchService.getHotKeywords(parseInt(limit) || 20);
 
-    return sendSuccess(res, keywords, "Hot keywords retrieved");
+    return sendSuccess(res, keywords, 'Hot keywords retrieved');
   }),
 
   /**
@@ -57,16 +52,7 @@ const SearchController = {
    * @returns {Promise<any>}
    */
   advancedSearch: catchAsync(async (req, res) => {
-    const {
-      q: keyword,
-      category,
-      minPrice,
-      maxPrice,
-      rating,
-      sort,
-      page,
-      limit,
-    } = req.query;
+    const { q: keyword, category, minPrice, maxPrice, rating, sort, page, limit } = req.query;
 
     const results = await searchService.advancedSearch({
       keyword,
@@ -79,7 +65,7 @@ const SearchController = {
       limit: parseInt(limit) || 20,
     });
 
-    return sendSuccess(res, results, "Search completed");
+    return sendSuccess(res, results, 'Search completed');
   }),
 };
 

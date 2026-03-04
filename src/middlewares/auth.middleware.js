@@ -1,7 +1,7 @@
-const { StatusCodes } = require("http-status-codes");
-const { sendFail } = require("../shared/res/formatResponse");
-const User = require("../models/user.model");
-const tokenService = require("../services/token.service");
+const { StatusCodes } = require('http-status-codes');
+const { sendFail } = require('../shared/res/formatResponse');
+const User = require('../models/user.model');
+const tokenService = require('../services/token.service');
 
 /**
  * Verify JWT access token from cookie or Authorization header
@@ -15,18 +15,14 @@ const verifyAccessToken = (req, res, next) => {
     // If not in cookie, check Authorization header
     if (!token && req.headers.authorization) {
       const authHeader = req.headers.authorization;
-      if (authHeader.startsWith("Bearer ")) {
+      if (authHeader.startsWith('Bearer ')) {
         token = authHeader.substring(7); // Remove "Bearer " prefix
       }
     }
 
     // No token found
     if (!token) {
-      return sendFail(
-        res,
-        "Access token is required. Please login.",
-        StatusCodes.UNAUTHORIZED,
-      );
+      return sendFail(res, 'Access token is required. Please login.', StatusCodes.UNAUTHORIZED);
     }
 
     // Verify token
@@ -45,23 +41,19 @@ const verifyAccessToken = (req, res, next) => {
 
     next();
   } catch (error) {
-    if (error.name === "TokenExpiredError") {
+    if (error.name === 'TokenExpiredError') {
       return sendFail(
         res,
-        "Access token has expired. Please refresh your token.",
+        'Access token has expired. Please refresh your token.',
         StatusCodes.UNAUTHORIZED,
       );
     }
 
-    if (error.name === "JsonWebTokenError") {
-      return sendFail(
-        res,
-        "Invalid access token. Please login again.",
-        StatusCodes.UNAUTHORIZED,
-      );
+    if (error.name === 'JsonWebTokenError') {
+      return sendFail(res, 'Invalid access token. Please login again.', StatusCodes.UNAUTHORIZED);
     }
 
-    return sendFail(res, "Authentication failed", StatusCodes.UNAUTHORIZED);
+    return sendFail(res, 'Authentication failed', StatusCodes.UNAUTHORIZED);
   }
 };
 
@@ -75,7 +67,7 @@ const optionalAuth = async (req, res, next) => {
 
     if (!token && req.headers.authorization) {
       const authHeader = req.headers.authorization;
-      if (authHeader.startsWith("Bearer ")) {
+      if (authHeader.startsWith('Bearer ')) {
         token = authHeader.substring(7);
       }
     }
@@ -87,7 +79,7 @@ const optionalAuth = async (req, res, next) => {
 
     const decoded = tokenService.verifyAccessToken(token);
 
-    const user = await User.findById(decoded.userId).select("-password");
+    const user = await User.findById(decoded.userId).select('-password');
     req.user = user || null;
     next();
   } catch (_error) {
@@ -108,24 +100,16 @@ const requireRole = (...allowedRoles) => {
     try {
       // Check if user is authenticated first
       if (!req.user) {
-        return sendFail(
-          res,
-          "Authentication required",
-          StatusCodes.UNAUTHORIZED,
-        );
+        return sendFail(res, 'Authentication required', StatusCodes.UNAUTHORIZED);
       }
 
       // Support both 'role' and 'roles' field (string or array)
       let userRoles = [];
       if (req.user.role) {
-        userRoles = Array.isArray(req.user.role)
-          ? req.user.role
-          : [req.user.role];
+        userRoles = Array.isArray(req.user.role) ? req.user.role : [req.user.role];
       }
       if (req.user.roles) {
-        const roles = Array.isArray(req.user.roles)
-          ? req.user.roles
-          : [req.user.roles];
+        const roles = Array.isArray(req.user.roles) ? req.user.roles : [req.user.roles];
         userRoles = [...userRoles, ...roles];
       }
 
@@ -136,19 +120,15 @@ const requireRole = (...allowedRoles) => {
       }
 
       // If checking for seller role and user has a shop, treat them as seller
-      if (flatRoles.includes("seller") && !userRoles.includes("seller")) {
+      if (flatRoles.includes('seller') && !userRoles.includes('seller')) {
         try {
-          const Shop = require("../models/shop.model");
+          const Shop = require('../models/shop.model');
           const shop = await Shop.findOne({ owner: req.user.userId });
           if (shop) {
-            userRoles.push("seller");
+            userRoles.push('seller');
           }
         } catch (_err) {
-          return sendFail(
-            res,
-            "Error verifying seller role",
-            StatusCodes.INTERNAL_SERVER_ERROR,
-          );
+          return sendFail(res, 'Error verifying seller role', StatusCodes.INTERNAL_SERVER_ERROR);
         }
       }
 
@@ -158,18 +138,14 @@ const requireRole = (...allowedRoles) => {
       if (!hasRole) {
         return sendFail(
           res,
-          `Access denied. Required role: ${flatRoles.join(" or ")}`,
+          `Access denied. Required role: ${flatRoles.join(' or ')}`,
           StatusCodes.FORBIDDEN,
         );
       }
 
       next();
     } catch (_error) {
-      return sendFail(
-        res,
-        "Authorization check failed",
-        StatusCodes.INTERNAL_SERVER_ERROR,
-      );
+      return sendFail(res, 'Authorization check failed', StatusCodes.INTERNAL_SERVER_ERROR);
     }
   };
 };

@@ -1,10 +1,10 @@
-const { Schema, model, Types } = require("mongoose");
+const { Schema, model, Types } = require('mongoose');
 
 const shopSchema = new Schema(
   {
     owner: {
       type: Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
       unique: true, // 1 User = 1 Shop for now
     },
@@ -19,9 +19,9 @@ const shopSchema = new Schema(
       unique: true,
       lowercase: true,
     },
-    logo: { type: String, default: "" },
-    banner: { type: String, default: "" },
-    description: { type: String, default: "" },
+    logo: { type: String, default: '' },
+    banner: { type: String, default: '' },
+    description: { type: String, default: '' },
 
     // Address for returns/pickup
     pickupAddress: {
@@ -35,8 +35,8 @@ const shopSchema = new Schema(
 
     status: {
       type: String,
-      enum: ["active", "inactive", "banned"],
-      default: "active",
+      enum: ['active', 'inactive', 'banned'],
+      default: 'active',
     },
 
     // Reputation Metrics
@@ -57,11 +57,11 @@ const shopSchema = new Schema(
   },
   {
     timestamps: true,
-    collection: "shops",
-  }
+    collection: 'shops',
+  },
 );
 
 // Indexes
-shopSchema.index({ name: "text" });
+shopSchema.index({ name: 'text' });
 
-module.exports = model("Shop", shopSchema);
+module.exports = model('Shop', shopSchema);

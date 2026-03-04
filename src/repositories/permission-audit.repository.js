@@ -1,5 +1,5 @@
-const PermissionAudit = require("../models/permission-audit.model");
-const BaseRepository = require("./base.repository");
+const PermissionAudit = require('../models/permission-audit.model');
+const BaseRepository = require('./base.repository');
 
 class PermissionAuditRepository extends BaseRepository {
   constructor() {
@@ -27,10 +27,7 @@ class PermissionAuditRepository extends BaseRepository {
     return this.countByFilter(query);
   }
 
-  findWithFilters(
-    { userId, action } = {},
-    { skip = 0, limit = 20 } = {},
-  ) {
+  findWithFilters({ userId, action } = {}, { skip = 0, limit = 20 } = {}) {
     const query = {};
     if (userId) {
       query.targetUserId = userId;
@@ -43,8 +40,8 @@ class PermissionAuditRepository extends BaseRepository {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("adminId", "username email")
-      .populate("targetUserId", "username email");
+      .populate('adminId', 'username email')
+      .populate('targetUserId', 'username email');
   }
 }
 

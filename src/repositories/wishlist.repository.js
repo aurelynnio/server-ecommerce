@@ -1,5 +1,5 @@
-const Wishlist = require("../models/wishlist.model");
-const BaseRepository = require("./base.repository");
+const Wishlist = require('../models/wishlist.model');
+const BaseRepository = require('./base.repository');
 
 class WishlistRepository extends BaseRepository {
   constructor() {
@@ -15,7 +15,7 @@ class WishlistRepository extends BaseRepository {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .select("productId")
+      .select('productId')
       .lean();
   }
 
@@ -36,12 +36,12 @@ class WishlistRepository extends BaseRepository {
       userId,
       productId: { $in: productIds },
     })
-      .select("productId")
+      .select('productId')
       .lean();
   }
 
   findProductIdsByUserIdAll(userId) {
-    return this.findManyByFilter({ userId }).select("productId").lean();
+    return this.findManyByFilter({ userId }).select('productId').lean();
   }
 }
 

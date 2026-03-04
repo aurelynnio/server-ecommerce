@@ -1,6 +1,6 @@
-const Joi = require("joi");
-const { objectId } = require("./common.validator");
-const { sanitizedString } = require("./sanitize");
+const Joi = require('joi');
+const { objectId } = require('./common.validator');
+const { sanitizedString } = require('./sanitize');
 
 const addressSchema = Joi.object({
   fullName: sanitizedString().required(),
@@ -16,13 +16,13 @@ const addressSchema = Joi.object({
 const createShopValidator = Joi.object({
   name: sanitizedString().min(3).max(150).required(),
   pickupAddress: addressSchema.required(),
-  description: sanitizedString().allow(""),
-  logo: Joi.string().allow(""),
-  banner: Joi.string().allow(""),
+  description: sanitizedString().allow(''),
+  logo: Joi.string().allow(''),
+  banner: Joi.string().allow(''),
 });
 
 const updateShopValidator = createShopValidator
-  .fork(["name", "pickupAddress"], (schema) => schema.optional())
+  .fork(['name', 'pickupAddress'], (schema) => schema.optional())
   .keys({
     isActive: Joi.boolean(),
   });

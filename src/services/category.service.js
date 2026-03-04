@@ -1,12 +1,10 @@
-const Category = require("../repositories/category.repository");
-const Product = require("../repositories/product.repository");
-const slugify = require("slugify");
-const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
-const redisService = require("./redis.service");
-const { StatusCodes } = require("http-status-codes");
-const { ApiError } = require("../middlewares/errorHandler.middleware");
-
-
+const Category = require('../repositories/category.repository');
+const Product = require('../repositories/product.repository');
+const slugify = require('slugify');
+const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
+const redisService = require('./redis.service');
+const { StatusCodes } = require('http-status-codes');
+const { ApiError } = require('../middlewares/errorHandler.middleware');
 
 /**
  * Service handling category operations
@@ -30,7 +28,7 @@ class CategoryService {
       categoryData.slug = slugify(categoryData.name, {
         lower: true,
         strict: true,
-        locale: "vi",
+        locale: 'vi',
       });
     }
 
@@ -39,22 +37,19 @@ class CategoryService {
 
     if (existingCategory) {
       // Add random suffix if slug exists
-      categoryData.slug = `${categoryData.slug}-${Math.random()
-        .toString(36)
-        .substr(2, 6)}`;
+      categoryData.slug = `${categoryData.slug}-${Math.random().toString(36).substr(2, 6)}`;
     }
 
     // Validate parent category if provided
     if (categoryData.parentCategory) {
       const parentExists = await Category.findById(categoryData.parentCategory);
       if (!parentExists) {
-        throw new ApiError(StatusCodes.NOT_FOUND, "Parent category not found");
-
+        throw new ApiError(StatusCodes.NOT_FOUND, 'Parent category not found');
       }
     }
 
     const category = await Category.create(categoryData);
-    await redisService.delByPattern("categories:*");
+    await redisService.delByPattern('categories:*');
     return category;
   }
 
@@ -77,10 +72,7 @@ class CategoryService {
     // Get pagination params with total count
     const paginationParams = getPaginationParams(page, limit, total);
 
-    const categoriesWithData = await Category.aggregateWithDetails(
-      filterArgs,
-      paginationParams,
-    );
+    const categoriesWithData = await Category.aggregateWithDetails(filterArgs, paginationParams);
 
     return buildPaginationResponse(categoriesWithData, paginationParams);
   }
@@ -95,9 +87,8 @@ class CategoryService {
     const category = await Category.findByIdWithParent(categoryId);
 
     if (!category) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Category not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Category not found');
     }
-
 
     return category;
   }
@@ -112,9 +103,8 @@ class CategoryService {
     const category = await Category.findBySlugWithParent(slug);
 
     if (!category) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Category not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Category not found');
     }
-
 
     return category;
   }
@@ -129,9 +119,8 @@ class CategoryService {
     const category = await Category.findById(categoryId);
 
     if (!category) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Category not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Category not found');
     }
-
 
     // Get subcategories
     const subcategories = await Category.findActiveSubcategories(categoryId);
@@ -156,29 +145,24 @@ class CategoryService {
     const category = await Category.findById(categoryId);
 
     if (!category) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Category not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Category not found');
     }
-
 
     // If updating name and no slug provided, regenerate slug
     if (updateData.name && !updateData.slug) {
       updateData.slug = slugify(updateData.name, {
         lower: true,
         strict: true,
-        locale: "vi",
+        locale: 'vi',
       });
     }
 
     // Check slug uniqueness if updating slug
     if (updateData.slug && updateData.slug !== category.slug) {
-      const existingCategory = await Category.findBySlugExcludingId(
-        updateData.slug,
-        categoryId,
-      );
+      const existingCategory = await Category.findBySlugExcludingId(updateData.slug, categoryId);
 
       if (existingCategory) {
-        throw new ApiError(StatusCodes.CONFLICT, "Slug already exists");
-
+        throw new ApiError(StatusCodes.CONFLICT, 'Slug already exists');
       }
     }
 
@@ -187,26 +171,17 @@ class CategoryService {
       // Check if parent category exists
       const parentExists = await Category.findById(updateData.parentCategory);
       if (!parentExists) {
-        throw new ApiError(StatusCodes.NOT_FOUND, "Parent category not found");
-
+        throw new ApiError(StatusCodes.NOT_FOUND, 'Parent category not found');
       }
 
       // Prevent setting self as parent
       if (updateData.parentCategory === categoryId) {
-        throw new ApiError(
-          StatusCodes.BAD_REQUEST,
-          "Category cannot be its own parent"
-        );
-
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Category cannot be its own parent');
       }
 
       // Prevent circular reference (parent's parent is this category)
       if (parentExists.parentCategory?.toString() === categoryId) {
-        throw new ApiError(
-          StatusCodes.BAD_REQUEST,
-          "Circular parent-child relationship detected"
-        );
-
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Circular parent-child relationship detected');
       }
     }
 
@@ -214,7 +189,7 @@ class CategoryService {
     Object.assign(category, updateData);
     await category.save();
 
-    await redisService.delByPattern("categories:*");
+    await redisService.delByPattern('categories:*');
 
     return category;
   }
@@ -229,9 +204,8 @@ class CategoryService {
     const category = await Category.findById(categoryId);
 
     if (!category) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Category not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Category not found');
     }
-
 
     // Check if category has subcategories
     const hasSubcategories = await Category.existsSubcategories(categoryId);
@@ -239,7 +213,7 @@ class CategoryService {
     if (hasSubcategories) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
-        "Cannot delete category with subcategories. Please delete or reassign subcategories first."
+        'Cannot delete category with subcategories. Please delete or reassign subcategories first.',
       );
     }
 
@@ -249,14 +223,14 @@ class CategoryService {
     if (hasProducts) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
-        "Cannot delete category with products. Please reassign or delete products first."
+        'Cannot delete category with products. Please reassign or delete products first.',
       );
     }
     await Category.deleteById(categoryId);
 
-    await redisService.delByPattern("categories:*");
+    await redisService.delByPattern('categories:*');
 
-    return { message: "Category deleted successfully" };
+    return { message: 'Category deleted successfully' };
   }
 
   /**
@@ -264,7 +238,7 @@ class CategoryService {
    * @returns {Promise<Array>} Tree structure of categories with nested subcategories
    */
   async getCategoryTree() {
-    const cacheKey = "categories:tree";
+    const cacheKey = 'categories:tree';
     const cachedTree = await redisService.get(cacheKey);
     if (cachedTree) return cachedTree;
 
@@ -276,10 +250,7 @@ class CategoryService {
     // Build tree structure
     const buildTree = (parentId) => {
       return allSubcategories
-        .filter(
-          (cat) =>
-            cat.parentCategory && cat.parentCategory.toString() === parentId
-        )
+        .filter((cat) => cat.parentCategory && cat.parentCategory.toString() === parentId)
         .map((cat) => {
           const children = buildTree(cat._id.toString());
           const result = { ...cat };
@@ -352,5 +323,3 @@ class CategoryService {
 }
 
 module.exports = new CategoryService();
-
-

@@ -11,8 +11,7 @@ const LOG_LEVELS = {
   DEBUG: 3,
 };
 
-const currentLevel =
-  process.env.NODE_ENV === "production" ? LOG_LEVELS.INFO : LOG_LEVELS.DEBUG;
+const currentLevel = process.env.NODE_ENV === 'production' ? LOG_LEVELS.INFO : LOG_LEVELS.DEBUG;
 
 const normalizeError = (err) => {
   if (!(err instanceof Error)) return err;
@@ -22,7 +21,7 @@ const normalizeError = (err) => {
 const normalizeMeta = (meta) => {
   if (!meta) return {};
   if (meta instanceof Error) return normalizeError(meta);
-  if (typeof meta !== "object") return { meta };
+  if (typeof meta !== 'object') return { meta };
 
   const out = {};
   for (const [k, v] of Object.entries(meta)) {
@@ -42,9 +41,7 @@ const formatMessage = (level, message, meta = {}) => {
   const timestamp = new Date().toISOString();
   const normalizedMeta = normalizeMeta(meta);
   const metaStr =
-    Object.keys(normalizedMeta).length > 0
-      ? ` ${JSON.stringify(normalizedMeta)}`
-      : "";
+    Object.keys(normalizedMeta).length > 0 ? ` ${JSON.stringify(normalizedMeta)}` : '';
   return `[${timestamp}] [${level}] ${message}${metaStr}`;
 };
 
@@ -59,7 +56,7 @@ const logger = {
    */
   error: (message, meta = {}) => {
     if (currentLevel >= LOG_LEVELS.ERROR) {
-      console.error(formatMessage("ERROR", message, meta));
+      console.error(formatMessage('ERROR', message, meta));
     }
   },
 
@@ -70,7 +67,7 @@ const logger = {
    */
   warn: (message, meta = {}) => {
     if (currentLevel >= LOG_LEVELS.WARN) {
-      console.warn(formatMessage("WARN", message, meta));
+      console.warn(formatMessage('WARN', message, meta));
     }
   },
 
@@ -81,7 +78,7 @@ const logger = {
    */
   info: (message, meta = {}) => {
     if (currentLevel >= LOG_LEVELS.INFO) {
-      console.info(formatMessage("INFO", message, meta));
+      console.info(formatMessage('INFO', message, meta));
     }
   },
 
@@ -92,7 +89,7 @@ const logger = {
    */
   debug: (message, meta = {}) => {
     if (currentLevel >= LOG_LEVELS.DEBUG) {
-      console.log(formatMessage("DEBUG", message, meta));
+      console.log(formatMessage('DEBUG', message, meta));
     }
   },
 
@@ -101,7 +98,7 @@ const logger = {
    * @param {Object} req - Express request object
    * @param {string} message - Optional message
    */
-  request: (req, message = "Incoming request") => {
+  request: (req, message = 'Incoming request') => {
     if (currentLevel >= LOG_LEVELS.DEBUG) {
       logger.debug(message, {
         method: req.method,

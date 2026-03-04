@@ -5,7 +5,7 @@
  *
  * We re-implement the pure logic (no Mongoose dependency needed).
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from 'vitest';
 
 /* ===========================
  * Re-implementations of virtual getters
@@ -14,18 +14,15 @@ import { describe, it, expect } from "vitest";
 function getOnSale(product) {
   if (product.flashSale?.isActive) {
     const now = new Date();
-    return (
-      product.flashSale.startTime <= now && product.flashSale.endTime > now
-    );
+    return product.flashSale.startTime <= now && product.flashSale.endTime > now;
   }
   return (
-    product.price?.discountPrice != null &&
-    product.price.discountPrice < product.price.currentPrice
+    product.price?.discountPrice != null && product.price.discountPrice < product.price.currentPrice
   );
 }
 
 function getIsActive(product) {
-  return product.status === "published";
+  return product.status === 'published';
 }
 
 function getEffectivePrice(product) {
@@ -51,8 +48,8 @@ function aggregateVariants(variants) {
  * TESTS
  * =========================== */
 
-describe("Product Model – onSale virtual", () => {
-  it("should return true when flashSale is active and within time range", () => {
+describe('Product Model – onSale virtual', () => {
+  it('should return true when flashSale is active and within time range', () => {
     const product = {
       flashSale: {
         isActive: true,
@@ -64,7 +61,7 @@ describe("Product Model – onSale virtual", () => {
     expect(getOnSale(product)).toBe(true);
   });
 
-  it("should return false when flashSale is active but expired", () => {
+  it('should return false when flashSale is active but expired', () => {
     const product = {
       flashSale: {
         isActive: true,
@@ -76,7 +73,7 @@ describe("Product Model – onSale virtual", () => {
     expect(getOnSale(product)).toBe(false);
   });
 
-  it("should return false when flashSale is active but not yet started", () => {
+  it('should return false when flashSale is active but not yet started', () => {
     const product = {
       flashSale: {
         isActive: true,
@@ -88,7 +85,7 @@ describe("Product Model – onSale virtual", () => {
     expect(getOnSale(product)).toBe(false);
   });
 
-  it("should return true when discountPrice < currentPrice (no flash sale)", () => {
+  it('should return true when discountPrice < currentPrice (no flash sale)', () => {
     const product = {
       flashSale: null,
       price: { currentPrice: 100000, discountPrice: 80000 },
@@ -96,7 +93,7 @@ describe("Product Model – onSale virtual", () => {
     expect(getOnSale(product)).toBe(true);
   });
 
-  it("should return false when discountPrice >= currentPrice", () => {
+  it('should return false when discountPrice >= currentPrice', () => {
     const product = {
       flashSale: null,
       price: { currentPrice: 100000, discountPrice: 100000 },
@@ -104,7 +101,7 @@ describe("Product Model – onSale virtual", () => {
     expect(getOnSale(product)).toBe(false);
   });
 
-  it("should return false when no discountPrice and no flashSale", () => {
+  it('should return false when no discountPrice and no flashSale', () => {
     const product = {
       flashSale: null,
       price: { currentPrice: 100000, discountPrice: null },
@@ -112,7 +109,7 @@ describe("Product Model – onSale virtual", () => {
     expect(getOnSale(product)).toBe(false);
   });
 
-  it("should return false when flashSale.isActive is false", () => {
+  it('should return false when flashSale.isActive is false', () => {
     const product = {
       flashSale: {
         isActive: false,
@@ -125,26 +122,26 @@ describe("Product Model – onSale virtual", () => {
   });
 });
 
-describe("Product Model – isActive virtual", () => {
+describe('Product Model – isActive virtual', () => {
   it('should return true for status "published"', () => {
-    expect(getIsActive({ status: "published" })).toBe(true);
+    expect(getIsActive({ status: 'published' })).toBe(true);
   });
 
   it('should return false for status "draft"', () => {
-    expect(getIsActive({ status: "draft" })).toBe(false);
+    expect(getIsActive({ status: 'draft' })).toBe(false);
   });
 
   it('should return false for status "suspended"', () => {
-    expect(getIsActive({ status: "suspended" })).toBe(false);
+    expect(getIsActive({ status: 'suspended' })).toBe(false);
   });
 
   it('should return false for status "deleted"', () => {
-    expect(getIsActive({ status: "deleted" })).toBe(false);
+    expect(getIsActive({ status: 'deleted' })).toBe(false);
   });
 });
 
-describe("Product Model – effectivePrice virtual", () => {
-  it("should return flashSale price when active and in time range", () => {
+describe('Product Model – effectivePrice virtual', () => {
+  it('should return flashSale price when active and in time range', () => {
     const product = {
       flashSale: {
         isActive: true,
@@ -157,7 +154,7 @@ describe("Product Model – effectivePrice virtual", () => {
     expect(getEffectivePrice(product)).toBe(50000);
   });
 
-  it("should return discountPrice when flashSale expired", () => {
+  it('should return discountPrice when flashSale expired', () => {
     const product = {
       flashSale: {
         isActive: true,
@@ -170,7 +167,7 @@ describe("Product Model – effectivePrice virtual", () => {
     expect(getEffectivePrice(product)).toBe(80000);
   });
 
-  it("should return discountPrice when no flashSale", () => {
+  it('should return discountPrice when no flashSale', () => {
     const product = {
       flashSale: null,
       price: { currentPrice: 100000, discountPrice: 75000 },
@@ -178,7 +175,7 @@ describe("Product Model – effectivePrice virtual", () => {
     expect(getEffectivePrice(product)).toBe(75000);
   });
 
-  it("should return currentPrice when no discountPrice and no flashSale", () => {
+  it('should return currentPrice when no discountPrice and no flashSale', () => {
     const product = {
       flashSale: null,
       price: { currentPrice: 100000, discountPrice: null },
@@ -186,7 +183,7 @@ describe("Product Model – effectivePrice virtual", () => {
     expect(getEffectivePrice(product)).toBe(100000);
   });
 
-  it("should return currentPrice when flashSale.isActive is false", () => {
+  it('should return currentPrice when flashSale.isActive is false', () => {
     const product = {
       flashSale: { isActive: false, salePrice: 50000 },
       price: { currentPrice: 100000 },
@@ -195,8 +192,8 @@ describe("Product Model – effectivePrice virtual", () => {
   });
 });
 
-describe("Product Model – Variant Aggregation (pre-save hook)", () => {
-  it("should sum stock across all variants", () => {
+describe('Product Model – Variant Aggregation (pre-save hook)', () => {
+  it('should sum stock across all variants', () => {
     const variants = [
       { stock: 10, sold: 5 },
       { stock: 20, sold: 3 },
@@ -207,7 +204,7 @@ describe("Product Model – Variant Aggregation (pre-save hook)", () => {
     expect(soldCount).toBe(10);
   });
 
-  it("should handle variants with zero stock", () => {
+  it('should handle variants with zero stock', () => {
     const variants = [
       { stock: 0, sold: 0 },
       { stock: 0, sold: 0 },
@@ -217,56 +214,56 @@ describe("Product Model – Variant Aggregation (pre-save hook)", () => {
     expect(soldCount).toBe(0);
   });
 
-  it("should handle single variant", () => {
+  it('should handle single variant', () => {
     const variants = [{ stock: 100, sold: 50 }];
     const { stock, soldCount } = aggregateVariants(variants);
     expect(stock).toBe(100);
     expect(soldCount).toBe(50);
   });
 
-  it("should handle missing stock/sold values (default to 0)", () => {
+  it('should handle missing stock/sold values (default to 0)', () => {
     const variants = [{ stock: undefined, sold: undefined }, { stock: 10 }];
     const { stock, soldCount } = aggregateVariants(variants);
     expect(stock).toBe(10);
     expect(soldCount).toBe(0);
   });
 
-  it("should handle empty variants array", () => {
+  it('should handle empty variants array', () => {
     const { stock, soldCount } = aggregateVariants([]);
     expect(stock).toBe(0);
     expect(soldCount).toBe(0);
   });
 });
 
-describe("Product Model – Slug Generation (pre-validate hook)", () => {
-  it("should generate slug from name via slugify rules", () => {
+describe('Product Model – Slug Generation (pre-validate hook)', () => {
+  it('should generate slug from name via slugify rules', () => {
     // Re-implement: slugify(name, { lower: true, strict: true, locale: "vi" })
-    const slugify = require("slugify");
-    const slug = slugify("Áo Thun Nam Cotton", {
+    const slugify = require('slugify');
+    const slug = slugify('Áo Thun Nam Cotton', {
       lower: true,
       strict: true,
-      locale: "vi",
+      locale: 'vi',
     });
-    expect(slug).toBe("ao-thun-nam-cotton");
+    expect(slug).toBe('ao-thun-nam-cotton');
   });
 
-  it("should handle special characters", () => {
-    const slugify = require("slugify");
-    const slug = slugify("Điện thoại iPhone 15 Pro Max", {
+  it('should handle special characters', () => {
+    const slugify = require('slugify');
+    const slug = slugify('Điện thoại iPhone 15 Pro Max', {
       lower: true,
       strict: true,
-      locale: "vi",
+      locale: 'vi',
     });
     expect(slug).toMatch(/^[a-z0-9-]+$/);
-    expect(slug).toContain("dien-thoai");
+    expect(slug).toContain('dien-thoai');
   });
 
-  it("should lowercase the slug", () => {
-    const slugify = require("slugify");
-    const slug = slugify("UPPERCASE NAME", {
+  it('should lowercase the slug', () => {
+    const slugify = require('slugify');
+    const slug = slugify('UPPERCASE NAME', {
       lower: true,
       strict: true,
     });
-    expect(slug).toBe("uppercase-name");
+    expect(slug).toBe('uppercase-name');
   });
 });

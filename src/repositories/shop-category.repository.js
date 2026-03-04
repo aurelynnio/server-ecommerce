@@ -1,5 +1,5 @@
-const ShopCategory = require("../models/shop.category.model");
-const BaseRepository = require("./base.repository");
+const ShopCategory = require('../models/shop.category.model');
+const BaseRepository = require('./base.repository');
 
 class ShopCategoryRepository extends BaseRepository {
   constructor() {
@@ -7,15 +7,11 @@ class ShopCategoryRepository extends BaseRepository {
   }
 
   findByShopIdSorted(shopId) {
-    return this.findManyByFilter({ shopId })
-      .sort({ displayOrder: 1 })
-      .lean();
+    return this.findManyByFilter({ shopId }).sort({ displayOrder: 1 }).lean();
   }
 
   findActiveByShopIdSorted(shopId) {
-    return this.findManyByFilter({ shopId, isActive: true })
-      .sort({ displayOrder: 1 })
-      .lean();
+    return this.findManyByFilter({ shopId, isActive: true }).sort({ displayOrder: 1 }).lean();
   }
 
   findByShopAndName(shopId, name) {
@@ -23,11 +19,7 @@ class ShopCategoryRepository extends BaseRepository {
   }
 
   updateByIdAndShop(categoryId, shopId, updates) {
-    return this.findOneAndUpdateByFilter(
-      { _id: categoryId, shopId },
-      updates,
-      { new: true },
-    );
+    return this.findOneAndUpdateByFilter({ _id: categoryId, shopId }, updates, { new: true });
   }
 
   deleteByIdAndShop(categoryId, shopId) {

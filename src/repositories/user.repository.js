@@ -1,5 +1,5 @@
-const User = require("../models/user.model");
-const BaseRepository = require("./base.repository");
+const User = require('../models/user.model');
+const BaseRepository = require('./base.repository');
 
 class UserRepository extends BaseRepository {
   constructor() {
@@ -19,7 +19,7 @@ class UserRepository extends BaseRepository {
   }
 
   findByIdWithRefreshFields(userId) {
-    return this.findById(userId).select("+refreshTokenHash +refreshTokenExpiresAt");
+    return this.findById(userId).select('+refreshTokenHash +refreshTokenExpiresAt');
   }
 
   clearRefreshToken(userId) {
@@ -30,11 +30,11 @@ class UserRepository extends BaseRepository {
   }
 
   streamAllUserIds() {
-    return this.findManyByFilter({}).select("_id").cursor();
+    return this.findManyByFilter({}).select('_id').cursor();
   }
 
   countUsersByRole() {
-    return this.countByFilter({ roles: "user" });
+    return this.countByFilter({ roles: 'user' });
   }
 
   findByOwnerShop(shopId) {
@@ -42,11 +42,11 @@ class UserRepository extends BaseRepository {
   }
 
   findByIdWithoutPassword(userId) {
-    return this.findById(userId).select("-password");
+    return this.findById(userId).select('-password');
   }
 
   findByIdWithAddresses(userId) {
-    return this.findById(userId).select("addresses");
+    return this.findById(userId).select('addresses');
   }
 
   findByUsernameExcludingId(username, userId) {
@@ -63,54 +63,51 @@ class UserRepository extends BaseRepository {
     });
   }
 
-  countWithFilters({ search = "", role, isVerifiedEmail } = {}) {
+  countWithFilters({ search = '', role, isVerifiedEmail } = {}) {
     const filter = {};
-    const normalizedSearch = String(search || "").trim();
+    const normalizedSearch = String(search || '').trim();
 
     if (normalizedSearch) {
-      const escapedSearch = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const escapedSearch = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       filter.$or = [
-        { username: { $regex: escapedSearch, $options: "i" } },
-        { email: { $regex: escapedSearch, $options: "i" } },
+        { username: { $regex: escapedSearch, $options: 'i' } },
+        { email: { $regex: escapedSearch, $options: 'i' } },
       ];
     }
 
-    if (role && role !== "") {
+    if (role && role !== '') {
       filter.roles = role;
     }
 
-    if (isVerifiedEmail !== undefined && isVerifiedEmail !== "") {
+    if (isVerifiedEmail !== undefined && isVerifiedEmail !== '') {
       filter.isVerifiedEmail = isVerifiedEmail;
     }
 
     return this.countByFilter(filter);
   }
 
-  findWithFilters(
-    { search = "", role, isVerifiedEmail } = {},
-    { skip = 0, limit = 10 } = {},
-  ) {
+  findWithFilters({ search = '', role, isVerifiedEmail } = {}, { skip = 0, limit = 10 } = {}) {
     const filter = {};
-    const normalizedSearch = String(search || "").trim();
+    const normalizedSearch = String(search || '').trim();
 
     if (normalizedSearch) {
-      const escapedSearch = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const escapedSearch = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       filter.$or = [
-        { username: { $regex: escapedSearch, $options: "i" } },
-        { email: { $regex: escapedSearch, $options: "i" } },
+        { username: { $regex: escapedSearch, $options: 'i' } },
+        { email: { $regex: escapedSearch, $options: 'i' } },
       ];
     }
 
-    if (role && role !== "") {
+    if (role && role !== '') {
       filter.roles = role;
     }
 
-    if (isVerifiedEmail !== undefined && isVerifiedEmail !== "") {
+    if (isVerifiedEmail !== undefined && isVerifiedEmail !== '') {
       filter.isVerifiedEmail = isVerifiedEmail;
     }
 
     return this.findManyByFilter(filter)
-      .select("-password")
+      .select('-password')
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 });

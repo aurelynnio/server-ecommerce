@@ -1,10 +1,8 @@
-const wishlistRepository = require("../repositories/wishlist.repository");
-const productRepository = require("../repositories/product.repository");
-const { StatusCodes } = require("http-status-codes");
-const { ApiError } = require("../middlewares/errorHandler.middleware");
-const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
-
-
+const wishlistRepository = require('../repositories/wishlist.repository');
+const productRepository = require('../repositories/product.repository');
+const { StatusCodes } = require('http-status-codes');
+const { ApiError } = require('../middlewares/errorHandler.middleware');
+const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 
 /**
  * Service handling wishlist/favorites operations
@@ -53,16 +51,16 @@ class WishlistService {
     // Verify product exists
     const product = await productRepository.findById(productId);
     if (!product) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
     }
-    if (product.status !== "published") {
-      throw new ApiError(StatusCodes.CONFLICT, "Product is not available");
+    if (product.status !== 'published') {
+      throw new ApiError(StatusCodes.CONFLICT, 'Product is not available');
     }
 
     // Check if already in wishlist
     const existing = await wishlistRepository.findByUserIdAndProductId(userId, productId);
     if (existing) {
-      throw new ApiError(StatusCodes.CONFLICT, "Product already in wishlist");
+      throw new ApiError(StatusCodes.CONFLICT, 'Product already in wishlist');
     }
 
     await wishlistRepository.create({ userId, productId });
@@ -70,7 +68,7 @@ class WishlistService {
     const wishlistCount = await wishlistRepository.countByUserId(userId);
 
     return {
-      message: "Product added to wishlist",
+      message: 'Product added to wishlist',
       productId,
       wishlistCount,
     };
@@ -88,7 +86,7 @@ class WishlistService {
     const wishlistCount = await wishlistRepository.countByUserId(userId);
 
     return {
-      message: "Product removed from wishlist",
+      message: 'Product removed from wishlist',
       productId,
       wishlistCount,
     };
@@ -112,7 +110,7 @@ class WishlistService {
    */
   async clearWishlist(userId) {
     await wishlistRepository.deleteManyByUserId(userId);
-    return { message: "Wishlist cleared successfully" };
+    return { message: 'Wishlist cleared successfully' };
   }
 
   /**

@@ -1,7 +1,7 @@
-const catchAsync = require("../configs/catchAsync");
-const cartService = require("../services/cart.service");
-const { StatusCodes } = require("http-status-codes");
-const { sendSuccess } = require("../shared/res/formatResponse");
+const catchAsync = require('../configs/catchAsync');
+const cartService = require('../services/cart.service');
+const { StatusCodes } = require('http-status-codes');
+const { sendSuccess } = require('../shared/res/formatResponse');
 
 const CartController = {
   /**
@@ -14,12 +14,7 @@ const CartController = {
     const userId = req.user.userId;
     const cart = await cartService.getCart(userId);
 
-    return sendSuccess(
-      res,
-      cart,
-      "Cart retrieved successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, cart, 'Cart retrieved successfully', StatusCodes.OK);
   }),
 
   /**
@@ -32,12 +27,7 @@ const CartController = {
     const userId = req.user.userId;
     const cart = await cartService.addToCart(userId, req.body);
 
-    return sendSuccess(
-      res,
-      cart,
-      "Item added to cart successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, cart, 'Item added to cart successfully', StatusCodes.OK);
   }),
 
   /**
@@ -48,18 +38,9 @@ const CartController = {
    */
   updateCartItem: catchAsync(async (req, res) => {
     const userId = req.user.userId;
-    const cart = await cartService.updateCartItem(
-      userId,
-      req.params.itemId,
-      req.body.quantity
-    );
+    const cart = await cartService.updateCartItem(userId, req.params.itemId, req.body.quantity);
 
-    return sendSuccess(
-      res,
-      cart,
-      "Cart item updated successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, cart, 'Cart item updated successfully', StatusCodes.OK);
   }),
 
   /**
@@ -74,12 +55,7 @@ const CartController = {
 
     const cart = await cartService.removeCartItem(userId, itemId);
 
-    return sendSuccess(
-      res,
-      cart,
-      "Item removed from cart successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, cart, 'Item removed from cart successfully', StatusCodes.OK);
   }),
 
   /**
@@ -92,7 +68,7 @@ const CartController = {
     const userId = req.user.userId;
     const cart = await cartService.clearCart(userId);
 
-    return sendSuccess(res, cart, "Cart cleared successfully", StatusCodes.OK);
+    return sendSuccess(res, cart, 'Cart cleared successfully', StatusCodes.OK);
   }),
 
   /**
@@ -105,12 +81,7 @@ const CartController = {
     const userId = req.user.userId;
     const count = await cartService.getCartItemCount(userId);
 
-    return sendSuccess(
-      res,
-      { count },
-      "Cart item count retrieved successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, { count }, 'Cart item count retrieved successfully', StatusCodes.OK);
   }),
 };
 

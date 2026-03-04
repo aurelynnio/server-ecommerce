@@ -1,16 +1,10 @@
-const {
-  VNPay,
-  ProductCode,
-  VnpLocale,
-  dateFormat,
-  getDateInGMT7,
-} = require("vnpay");
-const Payment = require("../repositories/payment.repository");
-const Order = require("../repositories/order.repository");
-const { getIO } = require("../socket/index");
-const logger = require("../utils/logger");
-const { StatusCodes } = require("http-status-codes");
-const { ApiError } = require("../middlewares/errorHandler.middleware");
+const { VNPay, ProductCode, VnpLocale, dateFormat, getDateInGMT7 } = require('vnpay');
+const Payment = require('../repositories/payment.repository');
+const Order = require('../repositories/order.repository');
+const { getIO } = require('../socket/index');
+const logger = require('../utils/logger');
+const { StatusCodes } = require('http-status-codes');
+const { ApiError } = require('../middlewares/errorHandler.middleware');
 
 /**
  * PERFORMANCE FIX: Singleton VNPay instance - reuse across requests
@@ -31,9 +25,9 @@ const getVNPayInstance = () => {
     vnpayInstance = new VNPay({
       tmnCode: process.env.VNP_TMNCODE,
       secureSecret: process.env.VNP_HASHSECRET,
-      vnpayHost: "https://sandbox.vnpayment.vn",
-      testMode: process.env.NODE_ENV !== "production",
-      hashAlgorithm: "SHA512",
+      vnpayHost: 'https://sandbox.vnpayment.vn',
+      testMode: process.env.NODE_ENV !== 'production',
+      hashAlgorithm: 'SHA512',
     });
   }
   return vnpayInstance;
@@ -56,24 +50,20 @@ class PaymentService {
     // Get order details
     const order = await Order.findById(orderId);
     if (!order) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Order not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found');
     }
 
     if (order.userId.toString() !== userId.toString()) {
-      throw new ApiError(StatusCodes.FORBIDDEN, "Unauthorized access to order");
+      throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized access to order');
     }
 
-    if (order.paymentMethod !== "vnpay") {
-      throw new ApiError(
-        StatusCodes.BAD_REQUEST,
-        "Order payment method is not VNPay"
-      );
+    if (order.paymentMethod !== 'vnpay') {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Order payment method is not VNPay');
     }
 
-    if (order.paymentStatus === "paid") {
-      throw new ApiError(StatusCodes.CONFLICT, "Order has already been paid");
+    if (order.paymentStatus === 'paid') {
+      throw new ApiError(StatusCodes.CONFLICT, 'Order has already been paid');
     }
-
 
     // PERFORMANCE FIX: Use singleton VNPay instance
     const vnpay = getVNPayInstance();
@@ -94,9 +84,7 @@ class PaymentService {
       vnp_OrderType: ProductCode.Other,
       vnp_ReturnUrl:
         process.env.VNP_RETURN_URL ||
-        `${
-          process.env.SERVER_URL || "http://localhost:5000"
-        }/api/payment/vnpay-return`,
+        `${process.env.SERVER_URL || 'http://localhost:5000'}/api/payment/vnpay-return`,
       vnp_Locale: VnpLocale.VN,
       vnp_CreateDate: dateFormat(createDate),
       vnp_ExpireDate: dateFormat(expireDate),
@@ -107,8 +95,8 @@ class PaymentService {
       orderId: order._id,
       userId: order.userId,
       amount: order.totalAmount,
-      paymentMethod: "vnpay",
-      status: "pending",
+      paymentMethod: 'vnpay',
+      status: 'pending',
       transactionId: transactionId,
       paymentUrl: paymentUrl,
     });
@@ -131,7 +119,7 @@ class PaymentService {
     // Verify signature
     const isValid = vnpay.verifyReturnUrl(vnpayParams);
     if (!isValid) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid signature");
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid signature');
     }
 
     const transactionId = vnpayParams.vnp_TxnRef;
@@ -141,41 +129,40 @@ class PaymentService {
     // Find payment record
     const payment = await Payment.findByTransactionId(transactionId);
     if (!payment) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Payment not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Payment not found');
     }
 
     // Find order
     const order = await Order.findById(payment.orderId);
     if (!order) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Order not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found');
     }
 
-
     // Check if payment is successful
-    const isSuccess = responseCode === "00" && transactionStatus === "00";
+    const isSuccess = responseCode === '00' && transactionStatus === '00';
 
     // Update payment status
-    payment.status = isSuccess ? "completed" : "failed";
+    payment.status = isSuccess ? 'completed' : 'failed';
     payment.vnpayData = vnpayParams;
     payment.paymentDate = new Date();
     await payment.save();
 
     // Update order payment status if successful
     if (isSuccess) {
-      order.paymentStatus = "paid";
-      order.status = "confirmed";
+      order.paymentStatus = 'paid';
+      order.status = 'confirmed';
       await order.save();
 
       // Emit socket event to update dashboard
       try {
         const io = getIO();
-        io.emit("new_order", {
+        io.emit('new_order', {
           orderId: order._id,
           totalAmount: order.totalAmount,
           createdAt: order.createdAt,
         });
       } catch (error) {
-        logger.error("Socket emit error:", { error: error.message });
+        logger.error('Socket emit error:', { error: error.message });
       }
     }
 
@@ -183,7 +170,7 @@ class PaymentService {
       success: isSuccess,
       payment,
       order,
-      message: isSuccess ? "Payment successful" : "Payment failed",
+      message: isSuccess ? 'Payment successful' : 'Payment failed',
     };
   }
 
@@ -200,8 +187,8 @@ class PaymentService {
     const isValid = vnpay.verifyIpnCall(vnpayParams);
     if (!isValid) {
       return {
-        RspCode: "97",
-        Message: "Invalid signature",
+        RspCode: '97',
+        Message: 'Invalid signature',
       };
     }
 
@@ -213,24 +200,24 @@ class PaymentService {
     const payment = await Payment.findByTransactionId(transactionId);
     if (!payment) {
       return {
-        RspCode: "01",
-        Message: "Order not found",
+        RspCode: '01',
+        Message: 'Order not found',
       };
     }
 
     // Check amount
     if (payment.amount !== amount) {
       return {
-        RspCode: "04",
-        Message: "Invalid amount",
+        RspCode: '04',
+        Message: 'Invalid amount',
       };
     }
 
     // Check if already processed
-    if (payment.status === "completed") {
+    if (payment.status === 'completed') {
       return {
-        RspCode: "02",
-        Message: "Order already confirmed",
+        RspCode: '02',
+        Message: 'Order already confirmed',
       };
     }
 
@@ -238,28 +225,28 @@ class PaymentService {
     const order = await Order.findById(payment.orderId);
     if (!order) {
       return {
-        RspCode: "01",
-        Message: "Order not found",
+        RspCode: '01',
+        Message: 'Order not found',
       };
     }
 
     // Process payment
-    const isSuccess = responseCode === "00";
+    const isSuccess = responseCode === '00';
 
-    payment.status = isSuccess ? "completed" : "failed";
+    payment.status = isSuccess ? 'completed' : 'failed';
     payment.vnpayData = vnpayParams;
     payment.paymentDate = new Date();
     await payment.save();
 
     if (isSuccess) {
-      order.paymentStatus = "paid";
-      order.status = "confirmed";
+      order.paymentStatus = 'paid';
+      order.status = 'confirmed';
       await order.save();
     }
 
     return {
-      RspCode: "00",
-      Message: "Confirm success",
+      RspCode: '00',
+      Message: 'Confirm success',
     };
   }
 
@@ -285,5 +272,3 @@ class PaymentService {
 }
 
 module.exports = new PaymentService();
-
-

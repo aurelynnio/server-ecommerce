@@ -3,14 +3,11 @@ import * as fc from 'fast-check';
 
 // Import permission configs and services
 const permissionConfig = await import('../../src/configs/permission.js');
-const permissionServiceInstance = (await import('../../src/services/permission.service.js')).default;
+const permissionServiceInstance = (await import('../../src/services/permission.service.js'))
+  .default;
 const permissionMiddleware = await import('../../src/middlewares/permission.middleware.js');
 
-const {
-  ROLE_PERMISSIONS,
-  getAllPermissionsList,
-  isValidPermission,
-} = permissionConfig;
+const { ROLE_PERMISSIONS, getAllPermissionsList, isValidPermission } = permissionConfig;
 
 // Service methods from instance
 const getUserPermissions = (user) => permissionServiceInstance.getUserPermissions(user);
@@ -18,11 +15,7 @@ const hasPermission = (user, perm) => permissionServiceInstance.hasPermission(us
 const hasAnyPermission = (user, perms) => permissionServiceInstance.hasAnyPermission(user, perms);
 const hasAllPermissions = (user, perms) => permissionServiceInstance.hasAllPermissions(user, perms);
 
-const {
-  requirePermission,
-  requireAdminAccess,
-  requireSellerAccess,
-} = permissionMiddleware;
+const { requirePermission, requireAdminAccess, requireSellerAccess } = permissionMiddleware;
 
 // Permission strings for testing
 const PERM_PRODUCTS_CREATE = 'product:create';
@@ -195,9 +188,9 @@ describe('Permission System - Integration Tests', () => {
           }),
           (permissions) => {
             return hasAllPermissions(adminUser, permissions) === true;
-          }
+          },
         ),
-        { numRuns: 50 }
+        { numRuns: 50 },
       );
     });
 
@@ -216,9 +209,9 @@ describe('Permission System - Integration Tests', () => {
           }),
           (permissions) => {
             return hasAnyPermission(adminUser, permissions) === true;
-          }
+          },
         ),
-        { numRuns: 50 }
+        { numRuns: 50 },
       );
     });
   });
@@ -300,9 +293,9 @@ describe('Permission System - Integration Tests', () => {
           fc.string().filter((s) => !s.includes(':') && s !== '*'),
           (randomString) => {
             return isValidPermission(randomString) === false;
-          }
+          },
         ),
-        { numRuns: 50 }
+        { numRuns: 50 },
       );
     });
   });

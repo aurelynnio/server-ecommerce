@@ -1,5 +1,5 @@
-const Review = require("../models/review.model");
-const BaseRepository = require("./base.repository");
+const Review = require('../models/review.model');
+const BaseRepository = require('./base.repository');
 
 class ReviewRepository extends BaseRepository {
   constructor() {
@@ -12,13 +12,13 @@ class ReviewRepository extends BaseRepository {
       {
         $group: {
           _id: null,
-          averageRating: { $avg: "$rating" },
+          averageRating: { $avg: '$rating' },
           totalReviews: { $sum: 1 },
-          rating5: { $sum: { $cond: [{ $eq: ["$rating", 5] }, 1, 0] } },
-          rating4: { $sum: { $cond: [{ $eq: ["$rating", 4] }, 1, 0] } },
-          rating3: { $sum: { $cond: [{ $eq: ["$rating", 3] }, 1, 0] } },
-          rating2: { $sum: { $cond: [{ $eq: ["$rating", 2] }, 1, 0] } },
-          rating1: { $sum: { $cond: [{ $eq: ["$rating", 1] }, 1, 0] } },
+          rating5: { $sum: { $cond: [{ $eq: ['$rating', 5] }, 1, 0] } },
+          rating4: { $sum: { $cond: [{ $eq: ['$rating', 4] }, 1, 0] } },
+          rating3: { $sum: { $cond: [{ $eq: ['$rating', 3] }, 1, 0] } },
+          rating2: { $sum: { $cond: [{ $eq: ['$rating', 2] }, 1, 0] } },
+          rating1: { $sum: { $cond: [{ $eq: ['$rating', 1] }, 1, 0] } },
         },
       },
     ]);
@@ -49,7 +49,7 @@ class ReviewRepository extends BaseRepository {
     }
 
     return this.findManyByFilter(query)
-      .populate("user", "username email")
+      .populate('user', 'username email')
       .sort(sort)
       .skip(skip)
       .limit(limit);
@@ -60,7 +60,7 @@ class ReviewRepository extends BaseRepository {
       { $match: { product: productId } },
       {
         $group: {
-          _id: "$rating",
+          _id: '$rating',
           count: { $sum: 1 },
         },
       },
@@ -74,7 +74,7 @@ class ReviewRepository extends BaseRepository {
       query.rating = rating;
     }
     if (search) {
-      query.comment = { $regex: search, $options: "i" };
+      query.comment = { $regex: search, $options: 'i' };
     }
     return this.countByFilter(query);
   }
@@ -88,12 +88,12 @@ class ReviewRepository extends BaseRepository {
       query.rating = rating;
     }
     if (search) {
-      query.comment = { $regex: search, $options: "i" };
+      query.comment = { $regex: search, $options: 'i' };
     }
 
     return this.findManyByFilter(query)
-      .populate("user", "username email avatar")
-      .populate("product", "name slug images")
+      .populate('user', 'username email avatar')
+      .populate('product', 'name slug images')
       .sort(sort)
       .skip(skip)
       .limit(limit);
@@ -105,7 +105,7 @@ class ReviewRepository extends BaseRepository {
 
   findByUserIdWithPagination(userId, { skip = 0, limit = 10 } = {}) {
     return this.findManyByFilter({ user: userId })
-      .populate("product", "name slug images")
+      .populate('product', 'name slug images')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -113,12 +113,12 @@ class ReviewRepository extends BaseRepository {
 
   findByIdWithUserAndProduct(reviewId) {
     return this.findById(reviewId)
-      .populate("user", "username email")
-      .populate("product", "name slug images");
+      .populate('user', 'username email')
+      .populate('product', 'name slug images');
   }
 
   findByIdWithProduct(reviewId) {
-    return this.findById(reviewId).populate("product");
+    return this.findById(reviewId).populate('product');
   }
 
   aggregateProductRatingStats(productId) {
@@ -127,7 +127,7 @@ class ReviewRepository extends BaseRepository {
       {
         $group: {
           _id: null,
-          averageRating: { $avg: "$rating" },
+          averageRating: { $avg: '$rating' },
           totalReviews: { $sum: 1 },
         },
       },
@@ -139,13 +139,13 @@ class ReviewRepository extends BaseRepository {
     if (rating) {
       query.rating = rating;
     }
-    if (replyStatus === "replied") {
-      query.reply = { $ne: "" };
-    } else if (replyStatus === "unreplied") {
-      query.reply = "";
+    if (replyStatus === 'replied') {
+      query.reply = { $ne: '' };
+    } else if (replyStatus === 'unreplied') {
+      query.reply = '';
     }
     if (search) {
-      query.comment = { $regex: search, $options: "i" };
+      query.comment = { $regex: search, $options: 'i' };
     }
 
     return this.countByFilter(query);
@@ -160,18 +160,18 @@ class ReviewRepository extends BaseRepository {
     if (rating) {
       query.rating = rating;
     }
-    if (replyStatus === "replied") {
-      query.reply = { $ne: "" };
-    } else if (replyStatus === "unreplied") {
-      query.reply = "";
+    if (replyStatus === 'replied') {
+      query.reply = { $ne: '' };
+    } else if (replyStatus === 'unreplied') {
+      query.reply = '';
     }
     if (search) {
-      query.comment = { $regex: search, $options: "i" };
+      query.comment = { $regex: search, $options: 'i' };
     }
 
     return this.findManyByFilter(query)
-      .populate("user", "username email avatar")
-      .populate("product", "name slug images")
+      .populate('user', 'username email avatar')
+      .populate('product', 'name slug images')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -181,7 +181,7 @@ class ReviewRepository extends BaseRepository {
     return this.aggregateByPipeline([
       {
         $group: {
-          _id: "$rating",
+          _id: '$rating',
           count: { $sum: 1 },
         },
       },
@@ -194,7 +194,7 @@ class ReviewRepository extends BaseRepository {
       {
         $group: {
           _id: null,
-          average: { $avg: "$rating" },
+          average: { $avg: '$rating' },
         },
       },
     ]);

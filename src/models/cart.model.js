@@ -1,25 +1,25 @@
-const { Schema, model, Types } = require("mongoose");
+const { Schema, model, Types } = require('mongoose');
 
 const priceSchema = new Schema(
   {
     currentPrice: { type: Number, required: true },
     discountPrice: { type: Number, default: null },
-    currency: { type: String, default: "VND" },
+    currency: { type: String, default: 'VND' },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const itemSchema = new Schema(
   {
     productId: {
       type: Types.ObjectId,
-      ref: "Product",
+      ref: 'Product',
       required: true,
     },
     shopId: {
       // Denormalized for easier grouping
       type: Types.ObjectId,
-      ref: "Shop",
+      ref: 'Shop',
       required: false, // Changed to false for backward compatibility
     },
     modelId: {
@@ -49,14 +49,14 @@ const itemSchema = new Schema(
       required: false,
     },
   },
-  { _id: true } // Enable _id for cart items
+  { _id: true }, // Enable _id for cart items
 );
 
 const cartSchema = new Schema(
   {
     userId: {
       type: Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
       unique: true,
     },
@@ -66,8 +66,8 @@ const cartSchema = new Schema(
   },
   {
     timestamps: true,
-    collection: "carts",
-  }
+    collection: 'carts',
+  },
 );
 
-module.exports = model("Cart", cartSchema);
+module.exports = model('Cart', cartSchema);

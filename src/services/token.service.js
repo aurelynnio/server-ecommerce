@@ -1,5 +1,5 @@
-const jwt = require("jsonwebtoken");
-const permissionService = require("./permission.service");
+const jwt = require('jsonwebtoken');
+const permissionService = require('./permission.service');
 
 /**
  * Service handling JWT token generation
@@ -97,6 +97,5 @@ class TokenService {
     };
   }
 }
-
 
 module.exports = new TokenService();

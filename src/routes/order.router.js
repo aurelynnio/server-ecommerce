@@ -1,42 +1,34 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const orderController = require("../controllers/order.controller");
-const {
-  verifyAccessToken,
-  requireRole,
-} = require("../middlewares/auth.middleware");
+const orderController = require('../controllers/order.controller');
+const { verifyAccessToken, requireRole } = require('../middlewares/auth.middleware');
 const {
   verifyShopOwnership,
   verifyOrderOwnership,
-} = require("../middlewares/ownership.middleware");
-const validate = require("../middlewares/validate.middleware");
+} = require('../middlewares/ownership.middleware');
+const validate = require('../middlewares/validate.middleware');
 const {
   createOrderValidator,
   updateOrderStatusValidator,
   orderIdParamValidator,
   getOrdersQueryValidator,
-} = require("../validations/order.validator");
+} = require('../validations/order.validator');
 
 /**
  * @desc    Create a new order from cart items
  * @access  Private
  */
-router.post(
-  "/",
-  verifyAccessToken,
-  validate(createOrderValidator),
-  orderController.createOrder
-);
+router.post('/', verifyAccessToken, validate(createOrderValidator), orderController.createOrder);
 
 /**
  * @desc    Get current user's orders with pagination
  * @access  Private
  */
 router.get(
-  "/",
+  '/',
   verifyAccessToken,
   validate({ query: getOrdersQueryValidator }),
-  orderController.getUserOrders
+  orderController.getUserOrders,
 );
 
 /**
@@ -44,10 +36,10 @@ router.get(
  * @access  Private
  */
 router.get(
-  "/:orderId",
+  '/:orderId',
   verifyAccessToken,
   validate({ params: orderIdParamValidator }),
-  orderController.getOrderById
+  orderController.getOrderById,
 );
 
 /**
@@ -55,10 +47,10 @@ router.get(
  * @access  Private
  */
 router.delete(
-  "/:orderId/cancel",
+  '/:orderId/cancel',
   verifyAccessToken,
   validate({ params: orderIdParamValidator }),
-  orderController.cancelOrder
+  orderController.cancelOrder,
 );
 
 /**
@@ -66,11 +58,11 @@ router.delete(
  * @access  Private (Admin)
  */
 router.get(
-  "/all/list",
+  '/all/list',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({ query: getOrdersQueryValidator }),
-  orderController.getAllOrders
+  orderController.getAllOrders,
 );
 
 /**
@@ -78,12 +70,12 @@ router.get(
  * @access  Private (Seller)
  */
 router.get(
-  "/seller/list",
+  '/seller/list',
   verifyAccessToken,
-  requireRole("seller", "admin"),
+  requireRole('seller', 'admin'),
   verifyShopOwnership,
   validate({ query: getOrdersQueryValidator }),
-  orderController.getSellerOrders
+  orderController.getSellerOrders,
 );
 
 /**
@@ -91,11 +83,11 @@ router.get(
  * @access  Private (Seller)
  */
 router.get(
-  "/seller/statistics",
+  '/seller/statistics',
   verifyAccessToken,
-  requireRole("seller", "admin"),
+  requireRole('seller', 'admin'),
   verifyShopOwnership,
-  orderController.getSellerOrderStatistics
+  orderController.getSellerOrderStatistics,
 );
 
 /**
@@ -103,16 +95,16 @@ router.get(
  * @access  Private (Seller)
  */
 router.put(
-  "/seller/:orderId/status",
+  '/seller/:orderId/status',
   verifyAccessToken,
-  requireRole("seller", "admin"),
+  requireRole('seller', 'admin'),
   verifyShopOwnership,
   verifyOrderOwnership,
   validate({
     params: orderIdParamValidator,
     body: updateOrderStatusValidator,
   }),
-  orderController.updateOrderStatusBySeller
+  orderController.updateOrderStatusBySeller,
 );
 
 /**
@@ -120,10 +112,10 @@ router.put(
  * @access  Private (Admin)
  */
 router.get(
-  "/statistics/overview",
+  '/statistics/overview',
   verifyAccessToken,
-  requireRole("admin"),
-  orderController.getOrderStatistics
+  requireRole('admin'),
+  orderController.getOrderStatistics,
 );
 
 module.exports = router;

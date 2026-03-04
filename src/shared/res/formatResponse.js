@@ -1,4 +1,4 @@
-const successResponse = (data, message, code, status = "success") => {
+const successResponse = (data, message, code, status = 'success') => {
   return {
     status: status,
     message: message,
@@ -7,7 +7,7 @@ const successResponse = (data, message, code, status = "success") => {
   };
 };
 
-const failResponse = (message, code, status = "fail") => {
+const failResponse = (message, code, status = 'fail') => {
   return {
     status: status,
     message: message,

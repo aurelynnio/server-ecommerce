@@ -1,19 +1,18 @@
-
-const express = require("express");
+const express = require('express');
 
 const router = express.Router();
 
-const cartController = require("../controllers/cart.controller");
+const cartController = require('../controllers/cart.controller');
 
-const { verifyAccessToken } = require("../middlewares/auth.middleware");
+const { verifyAccessToken } = require('../middlewares/auth.middleware');
 
-const validate = require("../middlewares/validate.middleware");
+const validate = require('../middlewares/validate.middleware');
 
 const {
   addToCartValidator,
   updateCartItemValidator,
   cartItemIdValidator,
-} = require("../validations/cart.validator");
+} = require('../validations/cart.validator');
 // All cart routes require authentication
 
 router.use(verifyAccessToken);
@@ -22,20 +21,20 @@ router.use(verifyAccessToken);
  * @desc    Get user's cart
  * @access  Private (Authenticated users)
  */
-router.get("/", cartController.getCart);
+router.get('/', cartController.getCart);
 
 /**
  * @desc    Get cart item count
  * @access  Private (Authenticated users)
  */
-router.get("/count", cartController.getCartItemCount);
+router.get('/count', cartController.getCartItemCount);
 
 /**
  * @desc    Add item to cart
  * @access  Private (Authenticated users)
  * @body    { productId, variantId?, quantity }
  */
-router.post("/", validate(addToCartValidator), cartController.addToCart);
+router.post('/', validate(addToCartValidator), cartController.addToCart);
 
 /**
  * @desc    Update cart item quantity
@@ -43,25 +42,21 @@ router.post("/", validate(addToCartValidator), cartController.addToCart);
  * @body    { quantity }
  */
 router.put(
-  "/:itemId",
+  '/:itemId',
   validate({ params: cartItemIdValidator, body: updateCartItemValidator }),
-  cartController.updateCartItem
+  cartController.updateCartItem,
 );
 
 /**
  * @desc    Remove item from cart
  * @access  Private (Authenticated users)
  */
-router.delete(
-  "/:itemId",
-  validate({ params: cartItemIdValidator }),
-  cartController.removeCartItem
-);
+router.delete('/:itemId', validate({ params: cartItemIdValidator }), cartController.removeCartItem);
 
 /**
  * @desc    Clear cart
  * @access  Private (Authenticated users)
  */
-router.delete("/", cartController.clearCart);
+router.delete('/', cartController.clearCart);
 
 module.exports = router;

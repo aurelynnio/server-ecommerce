@@ -3,9 +3,9 @@
  * Standardizes all error responses across the application
  */
 
-const { StatusCodes } = require("http-status-codes");
-const logger = require("../utils/logger");
-const { sendJson } = require("../shared/res/formatResponse");
+const { StatusCodes } = require('http-status-codes');
+const logger = require('../utils/logger');
+const { sendJson } = require('../shared/res/formatResponse');
 
 /**
  * Custom API Error class for consistent error handling
@@ -15,7 +15,7 @@ class ApiError extends Error {
     super(message);
     this.statusCode = statusCode;
     this.isOperational = isOperational;
-    this.status = `${statusCode}`.startsWith("4") ? "fail" : "error";
+    this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
     Error.captureStackTrace(this, this.constructor);
   }
 }
@@ -58,40 +58,40 @@ const getStatusCode = (err) => {
  */
 const getErrorMessage = (err) => {
   // Validation errors (Joi, Mongoose)
-  if (err.name === "ValidationError") {
+  if (err.name === 'ValidationError') {
     if (err.details) {
       // Joi validation error
-      return err.details.map((d) => d.message).join(", ");
+      return err.details.map((d) => d.message).join(', ');
     }
     // Mongoose validation error
     return Object.values(err.errors || {})
       .map((e) => e.message)
-      .join(", ");
+      .join(', ');
   }
 
   // MongoDB CastError (invalid ObjectId)
-  if (err.name === "CastError") {
+  if (err.name === 'CastError') {
     return `Invalid ${err.path}: ${err.value}`;
   }
 
   // MongoDB duplicate key error
   if (err.code === 11000) {
     const field = Object.keys(err.keyValue || {})[0];
-    return `${field || "Field"} already exists`;
+    return `${field || 'Field'} already exists`;
   }
 
   // JWT errors
-  if (err.name === "JsonWebTokenError") {
-    return "Invalid token. Please log in again.";
+  if (err.name === 'JsonWebTokenError') {
+    return 'Invalid token. Please log in again.';
   }
-  if (err.name === "TokenExpiredError") {
-    return "Token expired. Please log in again.";
+  if (err.name === 'TokenExpiredError') {
+    return 'Token expired. Please log in again.';
   }
 
   // Multer file upload errors
-  if (err.name === "MulterError") {
-    if (err.code === "LIMIT_FILE_SIZE") return "File too large";
-    if (err.code === "LIMIT_UNEXPECTED_FILE") return "Unexpected file field";
+  if (err.name === 'MulterError') {
+    if (err.code === 'LIMIT_FILE_SIZE') return 'File too large';
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') return 'Unexpected file field';
     return err.message;
   }
 
@@ -101,11 +101,11 @@ const getErrorMessage = (err) => {
   }
 
   // Hide internal error details in production
-  if (process.env.NODE_ENV === "production") {
-    return "Something went wrong. Please try again later.";
+  if (process.env.NODE_ENV === 'production') {
+    return 'Something went wrong. Please try again later.';
   }
 
-  return err.message || "Internal server error";
+  return err.message || 'Internal server error';
 };
 
 /**
@@ -118,19 +118,19 @@ const getErrorMessage = (err) => {
 const errorHandler = (err, req, res, _next) => {
   const statusCode = getStatusCode(err);
   const message = getErrorMessage(err);
-  const status = `${statusCode}`.startsWith("4") ? "fail" : "error";
+  const status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
 
   // Log error (skip in test environment to keep CI output clean)
-  if (process.env.NODE_ENV !== "test") {
-    if (process.env.NODE_ENV !== "production") {
-      logger.error("Request error", {
+  if (process.env.NODE_ENV !== 'test') {
+    if (process.env.NODE_ENV !== 'production') {
+      logger.error('Request error', {
         name: err.name,
         message: err.message,
         statusCode,
         stack: err.stack,
       });
     } else {
-      logger.error("Request error", {
+      logger.error('Request error', {
         name: err.name,
         message: err.message,
         statusCode,
@@ -145,7 +145,7 @@ const errorHandler = (err, req, res, _next) => {
       status,
       message,
       code: statusCode,
-      ...(process.env.NODE_ENV !== "production" && {
+      ...(process.env.NODE_ENV !== 'production' && {
         stack: err.stack,
         error: err.name,
       }),
@@ -158,10 +158,7 @@ const errorHandler = (err, req, res, _next) => {
  * Handle 404 Not Found errors
  */
 const notFoundHandler = (req, res, next) => {
-  const err = new ApiError(
-    StatusCodes.NOT_FOUND,
-    `Route ${req.originalUrl} not found`,
-  );
+  const err = new ApiError(StatusCodes.NOT_FOUND, `Route ${req.originalUrl} not found`);
   next(err);
 };
 

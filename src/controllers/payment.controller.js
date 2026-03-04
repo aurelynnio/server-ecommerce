@@ -1,15 +1,15 @@
-const catchAsync = require("../configs/catchAsync");
-const PaymentService = require("../services/payment.service");
-const { StatusCodes } = require("http-status-codes");
-const { sendSuccess, sendFail, sendJson } = require("../shared/res/formatResponse");
+const catchAsync = require('../configs/catchAsync');
+const PaymentService = require('../services/payment.service');
+const { StatusCodes } = require('http-status-codes');
+const { sendSuccess, sendFail, sendJson } = require('../shared/res/formatResponse');
 
-const getClientUrl = () => process.env.FRONTEND_URL || "http://localhost:3000";
+const getClientUrl = () => process.env.FRONTEND_URL || 'http://localhost:3000';
 
 const buildPaymentResultUrl = ({ status, orderId, transactionId }) => {
   const clientUrl = getClientUrl();
   const query = new URLSearchParams({
-    orderId: String(orderId || ""),
-    transactionId: String(transactionId || ""),
+    orderId: String(orderId || ''),
+    transactionId: String(transactionId || ''),
   });
 
   return `${clientUrl}/payment/${status}?${query.toString()}`;
@@ -17,7 +17,7 @@ const buildPaymentResultUrl = ({ status, orderId, transactionId }) => {
 
 const buildPaymentErrorUrl = (message) => {
   const clientUrl = getClientUrl();
-  const query = new URLSearchParams({ message: message || "Payment failed" });
+  const query = new URLSearchParams({ message: message || 'Payment failed' });
   return `${clientUrl}/payment/error?${query.toString()}`;
 };
 
@@ -33,16 +33,12 @@ const PaymentController = {
     const userId = req.user.userId;
 
     const ipAddress =
-      req.headers["x-forwarded-for"] ||
+      req.headers['x-forwarded-for'] ||
       req.connection.remoteAddress ||
       req.socket.remoteAddress ||
       req.ip;
 
-    const payment = await PaymentService.createPaymentUrl(
-      orderId,
-      userId,
-      ipAddress,
-    );
+    const payment = await PaymentService.createPaymentUrl(orderId, userId, ipAddress);
 
     return sendSuccess(
       res,
@@ -51,7 +47,7 @@ const PaymentController = {
         transactionId: payment.transactionId,
         amount: payment.amount,
       },
-      "Payment URL created successfully",
+      'Payment URL created successfully',
       StatusCodes.OK,
     );
   }),
@@ -68,7 +64,7 @@ const PaymentController = {
     try {
       const result = await PaymentService.verifyReturnUrl(vnpayParams);
 
-      const status = result.success ? "success" : "failed";
+      const status = result.success ? 'success' : 'failed';
       const redirectUrl = buildPaymentResultUrl({
         status,
         orderId: result.order?._id,
@@ -108,17 +104,14 @@ const PaymentController = {
     const payment = await PaymentService.getPaymentByOrderId(orderId);
 
     if (!payment) {
-      return sendFail(res, "Payment not found", StatusCodes.NOT_FOUND);
+      return sendFail(res, 'Payment not found', StatusCodes.NOT_FOUND);
     }
 
-    if (
-      payment.userId._id.toString() !== userId.toString() &&
-      !req.user.isAdmin
-    ) {
-      return sendFail(res, "Unauthorized access", StatusCodes.FORBIDDEN);
+    if (payment.userId._id.toString() !== userId.toString() && !req.user.isAdmin) {
+      return sendFail(res, 'Unauthorized access', StatusCodes.FORBIDDEN);
     }
 
-    return sendSuccess(res, payment, "Get payment details successfully");
+    return sendSuccess(res, payment, 'Get payment details successfully');
   }),
 };
 

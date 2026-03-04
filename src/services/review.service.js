@@ -1,14 +1,11 @@
-const Review = require("../repositories/review.repository");
-const Product = require("../repositories/product.repository");
-const Order = require("../repositories/order.repository");
-const Shop = require("../repositories/shop.repository");
-const {
-  getPaginationParams,
-  buildPaginationResponse,
-} = require("../utils/pagination");
-const redisService = require("./redis.service");
-const { StatusCodes } = require("http-status-codes");
-const { ApiError } = require("../middlewares/errorHandler.middleware");
+const Review = require('../repositories/review.repository');
+const Product = require('../repositories/product.repository');
+const Order = require('../repositories/order.repository');
+const Shop = require('../repositories/shop.repository');
+const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
+const redisService = require('./redis.service');
+const { StatusCodes } = require('http-status-codes');
+const { ApiError } = require('../middlewares/errorHandler.middleware');
 
 /**
  * Service handling product reviews
@@ -32,19 +29,16 @@ class ReviewService {
     // Check if product exists
     const productExists = await Product.findById(productId);
     if (!productExists) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
     }
 
     // Check if user has purchased this product
-    const hasPurchased = await Order.existsDeliveredOrderForProductByUser(
-      userId,
-      productId,
-    );
+    const hasPurchased = await Order.existsDeliveredOrderForProductByUser(userId, productId);
 
     if (!hasPurchased) {
       throw new ApiError(
         StatusCodes.FORBIDDEN,
-        "You can only review products you have purchased and received",
+        'You can only review products you have purchased and received',
       );
     }
 
@@ -52,10 +46,7 @@ class ReviewService {
     const existingReview = await Review.findByUserAndProduct(userId, productId);
 
     if (existingReview) {
-      throw new ApiError(
-        StatusCodes.CONFLICT,
-        "You have already reviewed this product",
-      );
+      throw new ApiError(StatusCodes.CONFLICT, 'You have already reviewed this product');
     }
 
     // Create review
@@ -70,7 +61,7 @@ class ReviewService {
     await this.updateProductRating(productId);
 
     // Populate user info
-    await review.populate("user", "username email");
+    await review.populate('user', 'username email');
 
     return review;
   }
@@ -87,27 +78,27 @@ class ReviewService {
    * @throws {Error} If product not found
    */
   async getProductReviews(productId, filters = {}) {
-    const { page = 1, limit = 10, rating, sort = "newest" } = filters;
+    const { page = 1, limit = 10, rating, sort = 'newest' } = filters;
 
     // Check if product exists
     const productExists = await Product.findById(productId);
     if (!productExists) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
     }
 
     // Determine sort order
     let sortOption = {};
     switch (sort) {
-      case "newest":
+      case 'newest':
         sortOption = { createdAt: -1 };
         break;
-      case "oldest":
+      case 'oldest':
         sortOption = { createdAt: 1 };
         break;
-      case "highest":
+      case 'highest':
         sortOption = { rating: -1, createdAt: -1 };
         break;
-      case "lowest":
+      case 'lowest':
         sortOption = { rating: 1, createdAt: -1 };
         break;
       default:
@@ -164,12 +155,12 @@ class ReviewService {
    * Get all reviews with filters (Admin)
    */
   async getAllReviews(filters = {}) {
-    const { page = 1, limit = 10, rating, sort = "newest", search } = filters;
+    const { page = 1, limit = 10, rating, sort = 'newest', search } = filters;
 
     let sortOption = { createdAt: -1 };
-    if (sort === "oldest") sortOption = { createdAt: 1 };
-    if (sort === "highest") sortOption = { rating: -1 };
-    if (sort === "lowest") sortOption = { rating: 1 };
+    if (sort === 'oldest') sortOption = { createdAt: 1 };
+    if (sort === 'highest') sortOption = { rating: -1 };
+    if (sort === 'lowest') sortOption = { rating: 1 };
 
     const total = await Review.countWithFilters({ rating, search });
     const paginationParams = getPaginationParams(page, limit, total);
@@ -204,10 +195,7 @@ class ReviewService {
     const paginationParams = getPaginationParams(page, limit, total);
 
     // Execute query
-    const reviews = await Review.findByUserIdWithPagination(
-      userId,
-      paginationParams,
-    );
+    const reviews = await Review.findByUserIdWithPagination(userId, paginationParams);
 
     return buildPaginationResponse(reviews, paginationParams);
   }
@@ -222,7 +210,7 @@ class ReviewService {
     const review = await Review.findByIdWithUserAndProduct(reviewId);
 
     if (!review) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Review not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Review not found');
     }
 
     return review;
@@ -242,15 +230,12 @@ class ReviewService {
     const review = await Review.findById(reviewId);
 
     if (!review) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Review not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Review not found');
     }
 
     // Check if user owns this review
     if (review.user.toString() !== userId) {
-      throw new ApiError(
-        StatusCodes.FORBIDDEN,
-        "Unauthorized to update this review",
-      );
+      throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized to update this review');
     }
 
     // Update review
@@ -268,7 +253,7 @@ class ReviewService {
       await this.updateProductRating(review.product);
     }
 
-    await review.populate("user", "username email");
+    await review.populate('user', 'username email');
 
     return review;
   }
@@ -285,15 +270,12 @@ class ReviewService {
     const review = await Review.findById(reviewId);
 
     if (!review) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Review not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Review not found');
     }
 
     // Check permission: user can only delete their own reviews unless admin
     if (!isAdmin && review.user.toString() !== userId) {
-      throw new ApiError(
-        StatusCodes.FORBIDDEN,
-        "Unauthorized to delete this review",
-      );
+      throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized to delete this review');
     }
 
     const productId = review.product;
@@ -303,7 +285,7 @@ class ReviewService {
     // Update product average rating
     await this.updateProductRating(productId);
 
-    return { message: "Review deleted successfully" };
+    return { message: 'Review deleted successfully' };
   }
 
   /**
@@ -339,19 +321,16 @@ class ReviewService {
     // Check if product exists
     const productExists = await Product.findById(productId);
     if (!productExists) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
     }
 
     // Check if user has purchased and received this product
-    const hasPurchased = await Order.existsDeliveredOrderForProductByUser(
-      userId,
-      productId,
-    );
+    const hasPurchased = await Order.existsDeliveredOrderForProductByUser(userId, productId);
 
     if (!hasPurchased) {
       return {
         canReview: false,
-        reason: "You must purchase and receive this product first",
+        reason: 'You must purchase and receive this product first',
       };
     }
 
@@ -361,7 +340,7 @@ class ReviewService {
     if (existingReview) {
       return {
         canReview: false,
-        reason: "You have already reviewed this product",
+        reason: 'You have already reviewed this product',
         existingReview,
       };
     }
@@ -384,7 +363,7 @@ class ReviewService {
     // 1. Find the shop owned by this user
     const shop = await Shop.findByOwnerId(userId);
     if (!shop) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found for this user");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Shop not found for this user');
     }
 
     // 2. Find all products belonging to this shop
@@ -417,18 +396,18 @@ class ReviewService {
    */
   async replyReview(userId, reviewId, content) {
     if (!content || !content.trim()) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, "Reply content is required");
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Reply content is required');
     }
 
     const review = await Review.findByIdWithProduct(reviewId);
     if (!review) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Review not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Review not found');
     }
 
     // Check if user owns the shop that owns the product
     const shop = await Shop.findByOwnerId(userId);
     if (!shop) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Shop not found');
     }
 
     // Verify product belongs to shop (assuming product has shop field populated or id)
@@ -438,7 +417,7 @@ class ReviewService {
     if (productShopId !== shop._id.toString()) {
       throw new ApiError(
         StatusCodes.FORBIDDEN,
-        "Unauthorized: Product does not belong to your shop",
+        'Unauthorized: Product does not belong to your shop',
       );
     }
 
@@ -469,10 +448,7 @@ class ReviewService {
 
     return {
       totalReviews,
-      averageRating:
-        averageRating.length > 0
-          ? Math.round(averageRating[0].average * 10) / 10
-          : 0,
+      averageRating: averageRating.length > 0 ? Math.round(averageRating[0].average * 10) / 10 : 0,
       ratingDistribution,
       topRatedProducts,
       mostReviewedProducts,
@@ -481,5 +457,3 @@ class ReviewService {
 }
 
 module.exports = new ReviewService();
-
-

@@ -1,5 +1,5 @@
-const Voucher = require("../models/voucher.model");
-const BaseRepository = require("./base.repository");
+const Voucher = require('../models/voucher.model');
+const BaseRepository = require('./base.repository');
 
 class VoucherRepository extends BaseRepository {
   constructor() {
@@ -22,7 +22,7 @@ class VoucherRepository extends BaseRepository {
     if (scope) {
       query.scope = scope;
     }
-    if (typeof isActive === "boolean") {
+    if (typeof isActive === 'boolean') {
       query.isActive = isActive;
     }
     if (shopId) {
@@ -30,24 +30,21 @@ class VoucherRepository extends BaseRepository {
     }
     if (search) {
       query.$or = [
-        { code: { $regex: search, $options: "i" } },
-        { name: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
+        { code: { $regex: search, $options: 'i' } },
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
       ];
     }
 
     return this.countByFilter(query);
   }
 
-  findWithFilters(
-    { scope, isActive, search, shopId } = {},
-    { skip = 0, limit = 10 } = {},
-  ) {
+  findWithFilters({ scope, isActive, search, shopId } = {}, { skip = 0, limit = 10 } = {}) {
     const query = {};
     if (scope) {
       query.scope = scope;
     }
-    if (typeof isActive === "boolean") {
+    if (typeof isActive === 'boolean') {
       query.isActive = isActive;
     }
     if (shopId) {
@@ -55,14 +52,14 @@ class VoucherRepository extends BaseRepository {
     }
     if (search) {
       query.$or = [
-        { code: { $regex: search, $options: "i" } },
-        { name: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
+        { code: { $regex: search, $options: 'i' } },
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
       ];
     }
 
     return this.findManyByFilter(query)
-      .populate("shopId", "name logo")
+      .populate('shopId', 'name logo')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -70,9 +67,7 @@ class VoucherRepository extends BaseRepository {
   }
 
   findByIdWithShop(voucherId) {
-    return this.findById(voucherId)
-      .populate("shopId", "name logo")
-      .lean();
+    return this.findById(voucherId).populate('shopId', 'name logo').lean();
   }
 
   findActiveByShop(shopId, now = new Date()) {
@@ -85,7 +80,7 @@ class VoucherRepository extends BaseRepository {
 
   findActivePlatform(now = new Date()) {
     return this.findManyByFilter({
-      scope: "platform",
+      scope: 'platform',
       isActive: true,
       endDate: { $gte: now },
     }).lean();
@@ -96,11 +91,8 @@ class VoucherRepository extends BaseRepository {
       isActive: true,
       startDate: { $lte: now },
       endDate: { $gte: now },
-      scope: "platform",
-      $or: [
-        { usageLimit: 0 },
-        { $expr: { $lt: ["$usageCount", "$usageLimit"] } },
-      ],
+      scope: 'platform',
+      $or: [{ usageLimit: 0 }, { $expr: { $lt: ['$usageCount', '$usageLimit'] } }],
     }).lean();
   }
 
@@ -109,12 +101,9 @@ class VoucherRepository extends BaseRepository {
       isActive: true,
       startDate: { $lte: now },
       endDate: { $gte: now },
-      scope: "shop",
+      scope: 'shop',
       shopId,
-      $or: [
-        { usageLimit: 0 },
-        { $expr: { $lt: ["$usageCount", "$usageLimit"] } },
-      ],
+      $or: [{ usageLimit: 0 }, { $expr: { $lt: ['$usageCount', '$usageLimit'] } }],
     }).lean();
   }
 
@@ -127,18 +116,18 @@ class VoucherRepository extends BaseRepository {
   }
 
   countPlatformVouchers() {
-    return this.countByFilter({ scope: "platform" });
+    return this.countByFilter({ scope: 'platform' });
   }
 
   countShopVouchers() {
-    return this.countByFilter({ scope: "shop" });
+    return this.countByFilter({ scope: 'shop' });
   }
 
   findMostUsed(limit = 5) {
     return this.findManyByFilter()
       .sort({ usageCount: -1 })
       .limit(limit)
-      .select("code name usageCount type value")
+      .select('code name usageCount type value')
       .lean();
   }
 
@@ -147,7 +136,7 @@ class VoucherRepository extends BaseRepository {
       {
         $group: {
           _id: null,
-          totalUsage: { $sum: "$usageCount" },
+          totalUsage: { $sum: '$usageCount' },
         },
       },
     ]);

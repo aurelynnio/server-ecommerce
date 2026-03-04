@@ -1,6 +1,6 @@
-const settingsRepository = require("../repositories/settings.repository");
-const { StatusCodes } = require("http-status-codes");
-const { ApiError } = require("../middlewares/errorHandler.middleware");
+const settingsRepository = require('../repositories/settings.repository');
+const { StatusCodes } = require('http-status-codes');
+const { ApiError } = require('../middlewares/errorHandler.middleware');
 
 class SettingsService {
   /**
@@ -67,9 +67,9 @@ class SettingsService {
    * @returns {Promise<Object>} Section data
    */
   async getSection(section) {
-    const validSections = ["store", "notifications", "display", "business"];
+    const validSections = ['store', 'notifications', 'display', 'business'];
     if (!validSections.includes(section)) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid settings section");
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid settings section');
     }
 
     const settings = await this.getSettings();
@@ -84,9 +84,9 @@ class SettingsService {
    * @returns {Promise<Object>} Updated settings
    */
   async updateSection(section, data, userId) {
-    const validSections = ["store", "notifications", "display", "business"];
+    const validSections = ['store', 'notifications', 'display', 'business'];
     if (!validSections.includes(section)) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid settings section");
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid settings section');
     }
 
     const updateData = {};

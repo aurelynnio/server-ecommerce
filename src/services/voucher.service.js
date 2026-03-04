@@ -1,10 +1,9 @@
-const Voucher = require("../repositories/voucher.repository");
-const VoucherUsage = require("../repositories/voucher-usage.repository");
-const Shop = require("../repositories/shop.repository");
-const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
-const { StatusCodes } = require("http-status-codes");
-const { ApiError } = require("../middlewares/errorHandler.middleware");
-
+const Voucher = require('../repositories/voucher.repository');
+const VoucherUsage = require('../repositories/voucher-usage.repository');
+const Shop = require('../repositories/shop.repository');
+const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
+const { StatusCodes } = require('http-status-codes');
+const { ApiError } = require('../middlewares/errorHandler.middleware');
 
 /**
  * Service handling voucher/coupon operations
@@ -19,27 +18,26 @@ class VoucherService {
    * @returns {Promise<Object>} Created voucher
    */
   async createVoucher(userId, roles, voucherData) {
-    const role = roles.includes("admin") ? "admin" : "seller";
+    const role = roles.includes('admin') ? 'admin' : 'seller';
 
     let shopId = null;
-    let scope = "platform";
+    let scope = 'platform';
 
-    if (role === "seller") {
+    if (role === 'seller') {
       const shop = await Shop.findByOwnerId(userId);
       if (!shop) {
-        throw new ApiError(StatusCodes.NOT_FOUND, "Shop not found");
+        throw new ApiError(StatusCodes.NOT_FOUND, 'Shop not found');
       }
 
       shopId = shop._id;
-      scope = "shop";
+      scope = 'shop';
     }
 
     // Check if code already exists
     const existingVoucher = await Voucher.findByCode(voucherData.code);
     if (existingVoucher) {
-      throw new ApiError(StatusCodes.CONFLICT, "Voucher code already exists");
+      throw new ApiError(StatusCodes.CONFLICT, 'Voucher code already exists');
     }
-
 
     const newVoucher = await Voucher.create({
       ...voucherData,
@@ -60,9 +58,8 @@ class VoucherService {
     const voucher = await Voucher.findByIdWithShop(voucherId);
 
     if (!voucher) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Voucher not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Voucher not found');
     }
-
 
     return voucher;
   }
@@ -101,33 +98,24 @@ class VoucherService {
     const voucher = await Voucher.findById(voucherId);
 
     if (!voucher) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Voucher not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Voucher not found');
     }
 
-
     // Check authorization
-    const isAdmin = roles.includes("admin");
-    if (!isAdmin && voucher.scope === "shop") {
+    const isAdmin = roles.includes('admin');
+    if (!isAdmin && voucher.scope === 'shop') {
       const shop = await Shop.findByOwnerId(userId);
       if (!shop || voucher.shopId.toString() !== shop._id.toString()) {
-        throw new ApiError(
-          StatusCodes.FORBIDDEN,
-          "Unauthorized to update this voucher"
-        );
+        throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized to update this voucher');
       }
-
     }
 
     // Check if updating code and it already exists
     if (updateData.code && updateData.code !== voucher.code) {
-      const existingVoucher = await Voucher.findByCodeExcludingId(
-        updateData.code,
-        voucherId,
-      );
+      const existingVoucher = await Voucher.findByCodeExcludingId(updateData.code, voucherId);
       if (existingVoucher) {
-        throw new ApiError(StatusCodes.CONFLICT, "Voucher code already exists");
+        throw new ApiError(StatusCodes.CONFLICT, 'Voucher code already exists');
       }
-
     }
 
     // Update voucher
@@ -149,28 +137,23 @@ class VoucherService {
     const voucher = await Voucher.findById(voucherId);
 
     if (!voucher) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Voucher not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Voucher not found');
     }
 
-
     // Check authorization
-    const isAdmin = roles.includes("admin");
-    if (!isAdmin && voucher.scope === "shop") {
+    const isAdmin = roles.includes('admin');
+    if (!isAdmin && voucher.scope === 'shop') {
       const shop = await Shop.findByOwnerId(userId);
       if (!shop || voucher.shopId.toString() !== shop._id.toString()) {
-        throw new ApiError(
-          StatusCodes.FORBIDDEN,
-          "Unauthorized to delete this voucher"
-        );
+        throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized to delete this voucher');
       }
-
     }
 
     // Soft delete
     voucher.isActive = false;
     await voucher.save();
 
-    return { message: "Voucher deleted successfully", voucher };
+    return { message: 'Voucher deleted successfully', voucher };
   }
 
   /**
@@ -182,11 +165,10 @@ class VoucherService {
     const voucher = await Voucher.deleteById(voucherId);
 
     if (!voucher) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Voucher not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Voucher not found');
     }
 
-
-    return { message: "Voucher permanently deleted" };
+    return { message: 'Voucher permanently deleted' };
   }
 
   /**
@@ -230,7 +212,7 @@ class VoucherService {
     const filterByUserUsage = async (vouchers) => {
       if (vouchers.length === 0) return vouchers;
       const voucherIds = vouchers.map((v) => v._id);
-      const mongoose = require("mongoose");
+      const mongoose = require('mongoose');
       const usages = await VoucherUsage.aggregateUsageByVoucherIdsAndUser(
         voucherIds,
         new mongoose.Types.ObjectId(userId),
@@ -261,28 +243,22 @@ class VoucherService {
   async applyVoucher(code, userId, orderValue, shopId = null) {
     const voucher = await Voucher.findActiveByCode(code);
     if (!voucher) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Voucher not found or inactive");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Voucher not found or inactive');
     }
 
     // 1. Check Date
     const now = new Date();
     if (now < voucher.startDate || now > voucher.endDate) {
-      throw new ApiError(
-        StatusCodes.BAD_REQUEST,
-        "Voucher is expired or not yet valid"
-      );
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Voucher is expired or not yet valid');
     }
 
     // 2. Check Scope
-    if (voucher.scope === "shop") {
+    if (voucher.scope === 'shop') {
       if (!shopId) {
-        throw new ApiError(StatusCodes.BAD_REQUEST, "This is a shop voucher");
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'This is a shop voucher');
       }
       if (voucher.shopId.toString() !== shopId.toString()) {
-        throw new ApiError(
-          StatusCodes.BAD_REQUEST,
-          "Voucher does not apply to this shop"
-        );
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Voucher does not apply to this shop');
       }
     }
 
@@ -290,34 +266,27 @@ class VoucherService {
     if (orderValue < voucher.minOrderValue) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
-        `Order value must be at least ${voucher.minOrderValue}`
+        `Order value must be at least ${voucher.minOrderValue}`,
       );
     }
 
     // 4. Check Usage Limit (Global)
     if (voucher.usageLimit > 0 && voucher.usageCount >= voucher.usageLimit) {
-      throw new ApiError(StatusCodes.CONFLICT, "Voucher usage limit reached");
+      throw new ApiError(StatusCodes.CONFLICT, 'Voucher usage limit reached');
     }
 
     // 5. Check Usage Limit (Per User) via VoucherUsage collection
     const usedCount = await VoucherUsage.countByVoucherAndUser(voucher._id, userId);
 
-    if (
-      voucher.usageLimitPerUser > 0 &&
-      usedCount >= voucher.usageLimitPerUser
-    ) {
-      throw new ApiError(
-        StatusCodes.CONFLICT,
-        "You have reached the usage limit for this voucher"
-      );
+    if (voucher.usageLimitPerUser > 0 && usedCount >= voucher.usageLimitPerUser) {
+      throw new ApiError(StatusCodes.CONFLICT, 'You have reached the usage limit for this voucher');
     }
-
 
     // 6. Calculate Discount
     let discountAmount = 0;
-    if (voucher.type === "fixed_amount") {
+    if (voucher.type === 'fixed_amount') {
       discountAmount = voucher.value;
-    } else if (voucher.type === "percentage") {
+    } else if (voucher.type === 'percentage') {
       discountAmount = (orderValue * voucher.value) / 100;
       if (voucher.maxValue > 0) {
         discountAmount = Math.min(discountAmount, voucher.maxValue);
@@ -363,5 +332,3 @@ class VoucherService {
 }
 
 module.exports = new VoucherService();
-
-

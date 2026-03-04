@@ -1,21 +1,18 @@
-const Joi = require("joi");
-const { objectId, pagination } = require("./common.validator");
-const { sanitizedString, searchString } = require("./sanitize");
+const Joi = require('joi');
+const { objectId, pagination } = require('./common.validator');
+const { sanitizedString, searchString } = require('./sanitize');
 
 const priceSchema = Joi.object({
   currentPrice: Joi.number().min(0).required(),
-  discountPrice: Joi.number()
-    .min(0)
-    .less(Joi.ref("currentPrice"))
-    .allow(null, 0),
-  currency: Joi.string().default("VND"),
+  discountPrice: Joi.number().min(0).less(Joi.ref('currentPrice')).allow(null, 0),
+  currency: Joi.string().default('VND'),
 });
 
 const variantSchema = Joi.object({
   _id: Joi.string().optional(),
   name: Joi.string().required(),
-  sku: Joi.string().allow(""),
-  color: Joi.string().allow(""),
+  sku: Joi.string().allow(''),
+  color: Joi.string().allow(''),
   price: Joi.number().min(0).required(),
   stock: Joi.number().integer().min(0).required(),
   images: Joi.array().items(Joi.string()),
@@ -30,8 +27,8 @@ const createProductValidator = Joi.object({
   name: sanitizedString().min(3).max(200).required(),
   description: sanitizedString().min(10).required(),
   category: objectId.required(),
-  shopCategory: objectId.allow("", null),
-  brand: Joi.string().allow(""),
+  shopCategory: objectId.allow('', null),
+  brand: Joi.string().allow(''),
   price: priceSchema.required(),
   stock: Joi.number().integer().min(0).default(0),
   variants: Joi.array().items(variantSchema),
@@ -43,15 +40,11 @@ const createProductValidator = Joi.object({
     length: Joi.number().min(0),
   }),
   images: Joi.array().items(Joi.string()),
-  status: Joi.string()
-    .valid("draft", "published", "suspended")
-    .default("published"),
+  status: Joi.string().valid('draft', 'published', 'suspended').default('published'),
 });
 
 const updateProductValidator = createProductValidator
-  .fork(["name", "description", "category", "price"], (schema) =>
-    schema.optional(),
-  )
+  .fork(['name', 'description', 'category', 'price'], (schema) => schema.optional())
   .keys({
     id: objectId.optional(),
     existingDescriptionImages: Joi.array().items(Joi.string()),
@@ -69,7 +62,7 @@ const getProductsQueryValidator = Joi.object({
   brand: Joi.string(),
   minPrice: Joi.number().min(0),
   maxPrice: Joi.number().min(0),
-  status: Joi.string().valid("draft", "published", "suspended", "all"),
+  status: Joi.string().valid('draft', 'published', 'suspended', 'all'),
 });
 
 const addVariantValidator = variantSchema.keys({
@@ -78,9 +71,7 @@ const addVariantValidator = variantSchema.keys({
 });
 
 const updateVariantValidator = variantSchema
-  .fork(Object.keys(variantSchema.describe().keys), (schema) =>
-    schema.optional(),
-  )
+  .fork(Object.keys(variantSchema.describe().keys), (schema) => schema.optional())
   .keys({
     _id: Joi.forbidden(),
   });

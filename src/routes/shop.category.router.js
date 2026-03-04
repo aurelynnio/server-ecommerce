@@ -1,21 +1,17 @@
-
-const express = require("express");
+const express = require('express');
 
 const router = express.Router();
 
-const shopCategoryController = require("../controllers/shop.category.controller");
+const shopCategoryController = require('../controllers/shop.category.controller');
 
-const {
-  verifyAccessToken,
-  requireRole,
-} = require("../middlewares/auth.middleware");
+const { verifyAccessToken, requireRole } = require('../middlewares/auth.middleware');
 
-const validate = require("../middlewares/validate.middleware");
+const validate = require('../middlewares/validate.middleware');
 
 const {
   createShopCategoryValidator,
   updateShopCategoryValidator,
-} = require("../validations/shop.category.validator");
+} = require('../validations/shop.category.validator');
 
 /**
  * Protected Routes (Seller only) - Define specific routes FIRST
@@ -25,10 +21,10 @@ const {
  * @access  Private (Seller only)
  */
 router.get(
-  "/my",
+  '/my',
   verifyAccessToken,
-  requireRole("seller"),
-  shopCategoryController.getMyShopCategories
+  requireRole('seller'),
+  shopCategoryController.getMyShopCategories,
 );
 
 /**
@@ -37,11 +33,11 @@ router.get(
  * @body    { name, description?, parentCategory?, order? }
  */
 router.post(
-  "/",
+  '/',
   verifyAccessToken,
-  requireRole("seller"),
+  requireRole('seller'),
   validate(createShopCategoryValidator),
-  shopCategoryController.createCategory
+  shopCategoryController.createCategory,
 );
 
 /**
@@ -51,11 +47,11 @@ router.post(
  * @body    { name?, description?, parentCategory?, order?, isActive? }
  */
 router.put(
-  "/:categoryId",
+  '/:categoryId',
   verifyAccessToken,
-  requireRole("seller"),
+  requireRole('seller'),
   validate(updateShopCategoryValidator),
-  shopCategoryController.updateCategory
+  shopCategoryController.updateCategory,
 );
 
 /**
@@ -64,10 +60,10 @@ router.put(
  * @param   categoryId - Category ID to delete
  */
 router.delete(
-  "/:categoryId",
+  '/:categoryId',
   verifyAccessToken,
-  requireRole("seller"),
-  shopCategoryController.deleteCategory
+  requireRole('seller'),
+  shopCategoryController.deleteCategory,
 );
 
 /**
@@ -78,6 +74,6 @@ router.delete(
  * @access  Public
  * @param   shopId - Shop ID
  */
-router.get("/:shopId", shopCategoryController.getShopCategories);
+router.get('/:shopId', shopCategoryController.getShopCategories);
 
 module.exports = router;

@@ -1,14 +1,14 @@
-const { Schema, model, Types } = require("mongoose");
-const slugify = require("slugify");
+const { Schema, model, Types } = require('mongoose');
+const slugify = require('slugify');
 
 // Price Schema (simplified for embedding)
 const priceSchema = new Schema(
   {
     currentPrice: { type: Number, required: true },
     discountPrice: { type: Number, default: null },
-    currency: { type: String, default: "VND" },
+    currency: { type: String, default: 'VND' },
   },
-  { _id: false }
+  { _id: false },
 );
 
 // Variant Schema - Simplified: only color differentiation
@@ -16,24 +16,24 @@ const priceSchema = new Schema(
 // Example: { name: "Xanh", color: "Xanh", price: 100000, stock: 10, images: ["url1", "url2"] }
 const variantSchema = new Schema(
   {
-    name: { type: String, required: true },           // Display name (usually same as color)
-    sku: { type: String, sparse: true },              // Auto-generated: {slug}-{color}-{index}
-    color: { type: String },                          // Color value (e.g., "Đỏ", "Xanh", "Đen")
+    name: { type: String, required: true }, // Display name (usually same as color)
+    sku: { type: String, sparse: true }, // Auto-generated: {slug}-{color}-{index}
+    color: { type: String }, // Color value (e.g., "Đỏ", "Xanh", "Đen")
     price: { type: Number, required: true, min: 0 },
     stock: { type: Number, required: true, min: 0, default: 0 },
     sold: { type: Number, default: 0 },
-    images: { type: [String], default: [] },          // Variant-specific images
+    images: { type: [String], default: [] }, // Variant-specific images
   },
-  { _id: true }
+  { _id: true },
 );
 
 // Product Attribute for specifications
 const attributeSchema = new Schema(
   {
-    name: { type: String, required: true },  // e.g. "Material", "Weight"
+    name: { type: String, required: true }, // e.g. "Material", "Weight"
     value: { type: String, required: true }, // e.g. "Cotton", "500g"
   },
-  { _id: false }
+  { _id: false },
 );
 
 const productSchema = new Schema(
@@ -43,23 +43,23 @@ const productSchema = new Schema(
     description: { type: String, required: true, maxlength: 10000 },
 
     // Core Relations
-    shop: { type: Types.ObjectId, ref: "Shop", required: true, index: true },
-    category: { type: Types.ObjectId, ref: "Category", index: true },
-    shopCategory: { type: Types.ObjectId, ref: "ShopCategory" },
+    shop: { type: Types.ObjectId, ref: 'Shop', required: true, index: true },
+    category: { type: Types.ObjectId, ref: 'Category', index: true },
+    shopCategory: { type: Types.ObjectId, ref: 'ShopCategory' },
 
     // Metadata
     brand: { type: String, maxlength: 100 },
     tags: { type: [String], default: [], index: true },
-    
+
     // Sizes - Product level (applies to all variants)
     // Example: ["S", "M", "L", "XL"] or ["36", "37", "38", "39", "40"]
     sizes: { type: [String], default: [] },
-    
+
     // Media - Description images only (variant images are in variants[].images)
-    descriptionImages: { 
-      type: [String], 
+    descriptionImages: {
+      type: [String],
       default: [],
-      validate: [arr => arr.length <= 20, 'Maximum 20 description images allowed']
+      validate: [(arr) => arr.length <= 20, 'Maximum 20 description images allowed'],
     },
     video: { type: String },
 
@@ -72,11 +72,11 @@ const productSchema = new Schema(
     // Variants - Color variants only (size is at product level)
     variants: {
       type: [variantSchema],
-      validate: [arr => arr.length <= 100, 'Maximum 100 variants allowed']
+      validate: [(arr) => arr.length <= 100, 'Maximum 100 variants allowed'],
     },
 
     // Shipping
-    shippingTemplate: { type: Types.ObjectId, ref: "ShippingTemplate" },
+    shippingTemplate: { type: Types.ObjectId, ref: 'ShippingTemplate' },
     weight: { type: Number, default: 0, min: 0 }, // grams
     dimensions: {
       height: { type: Number, min: 0 }, // cm
@@ -87,7 +87,7 @@ const productSchema = new Schema(
     // Attributes/Specifications
     attributes: {
       type: [attributeSchema],
-      validate: [arr => arr.length <= 30, 'Maximum 30 attributes allowed']
+      validate: [(arr) => arr.length <= 30, 'Maximum 30 attributes allowed'],
     },
 
     // Reviews - Cached counters (actual reviews in Review collection)
@@ -113,25 +113,25 @@ const productSchema = new Schema(
     // Status - Single source of truth (replaces isActive + onSale)
     status: {
       type: String,
-      enum: ["draft", "published", "suspended", "deleted"],
-      default: "published",
+      enum: ['draft', 'published', 'suspended', 'deleted'],
+      default: 'published',
       index: true,
     },
   },
-  { 
-    timestamps: true, 
-    collection: "products",
+  {
+    timestamps: true,
+    collection: 'products',
     // Optimize for reads
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 // ==================== VIRTUALS ====================
 // Computed fields - not stored, calculated on read
 
 // Check if product is on sale (derived from price or flashSale)
-productSchema.virtual("onSale").get(function () {
+productSchema.virtual('onSale').get(function () {
   if (this.flashSale?.isActive) {
     const now = new Date();
     return this.flashSale.startTime <= now && this.flashSale.endTime > now;
@@ -140,12 +140,12 @@ productSchema.virtual("onSale").get(function () {
 });
 
 // Check if product is active (derived from status)
-productSchema.virtual("isActive").get(function () {
-  return this.status === "published";
+productSchema.virtual('isActive').get(function () {
+  return this.status === 'published';
 });
 
 // Get effective price (considering flash sale)
-productSchema.virtual("effectivePrice").get(function () {
+productSchema.virtual('effectivePrice').get(function () {
   if (this.flashSale?.isActive) {
     const now = new Date();
     if (this.flashSale.startTime <= now && this.flashSale.endTime > now) {
@@ -163,31 +163,31 @@ productSchema.index({ shop: 1, shopCategory: 1, status: 1 }); // Optimized for s
 productSchema.index({ shopCategory: 1, status: 1 });
 productSchema.index({ status: 1, isFeatured: -1, createdAt: -1 });
 productSchema.index({ status: 1, soldCount: -1 });
-productSchema.index({ status: 1, "price.currentPrice": 1 });
-productSchema.index({ "flashSale.isActive": 1, "flashSale.endTime": 1 });
+productSchema.index({ status: 1, 'price.currentPrice': 1 });
+productSchema.index({ 'flashSale.isActive': 1, 'flashSale.endTime': 1 });
 
 // Text search index
 productSchema.index(
-  { name: "text", description: "text", brand: "text", tags: "text" },
-  { weights: { name: 10, brand: 5, tags: 3, description: 1 } }
+  { name: 'text', description: 'text', brand: 'text', tags: 'text' },
+  { weights: { name: 10, brand: 5, tags: 3, description: 1 } },
 );
 
 // ==================== HOOKS ====================
 // Slug generation
-productSchema.pre("validate", function (next) {
+productSchema.pre('validate', function (next) {
   if (this.name && !this.slug) {
     this.slug = slugify(this.name, {
       lower: true,
       strict: true,
-      locale: "vi",
+      locale: 'vi',
     });
   }
   next();
 });
 
 // Ensure unique slug
-productSchema.pre("save", async function (next) {
-  if (this.isNew || this.isModified("slug")) {
+productSchema.pre('save', async function (next) {
+  if (this.isNew || this.isModified('slug')) {
     const existingProduct = await this.constructor.findOne({
       slug: this.slug,
       _id: { $ne: this._id },
@@ -202,7 +202,7 @@ productSchema.pre("save", async function (next) {
 });
 
 // Sync stock/soldCount from variants before save
-productSchema.pre("save", function (next) {
+productSchema.pre('save', function (next) {
   if (this.variants && this.variants.length > 0) {
     this.stock = this.variants.reduce((sum, v) => sum + (v.stock || 0), 0);
     this.soldCount = this.variants.reduce((sum, v) => sum + (v.sold || 0), 0);
@@ -214,11 +214,11 @@ productSchema.pre("save", function (next) {
 // Efficient queries for common use cases
 
 productSchema.statics.findPublished = function (filter = {}) {
-  return this.find({ ...filter, status: "published" });
+  return this.find({ ...filter, status: 'published' });
 };
 
 productSchema.statics.findByShop = function (shopId, options = {}) {
-  const { status = "published", page = 1, limit = 20 } = options;
+  const { status = 'published', page = 1, limit = 20 } = options;
   return this.find({ shop: shopId, status })
     .skip((page - 1) * limit)
     .limit(limit)
@@ -228,10 +228,10 @@ productSchema.statics.findByShop = function (shopId, options = {}) {
 productSchema.statics.findFlashSale = function (limit = 20) {
   const now = new Date();
   return this.find({
-    status: "published",
-    "flashSale.isActive": true,
-    "flashSale.startTime": { $lte: now },
-    "flashSale.endTime": { $gt: now },
+    status: 'published',
+    'flashSale.isActive': true,
+    'flashSale.startTime': { $lte: now },
+    'flashSale.endTime': { $gt: now },
   })
     .limit(limit)
     .lean();
@@ -239,13 +239,13 @@ productSchema.statics.findFlashSale = function (limit = 20) {
 
 // Update review stats (call from Review service after review CRUD)
 productSchema.statics.updateReviewStats = async function (productId) {
-  const Review = require("./review.model");
+  const Review = require('./review.model');
   const stats = await Review.aggregate([
     { $match: { product: new Types.ObjectId(productId) } },
     {
       $group: {
         _id: null,
-        avgRating: { $avg: "$rating" },
+        avgRating: { $avg: '$rating' },
         count: { $sum: 1 },
       },
     },
@@ -258,4 +258,4 @@ productSchema.statics.updateReviewStats = async function (productId) {
   });
 };
 
-module.exports = model("Product", productSchema);
+module.exports = model('Product', productSchema);

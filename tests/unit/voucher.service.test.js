@@ -1,8 +1,8 @@
 /**
  * Unit Tests: Voucher Service Logic
- * 
+ *
  * Tests validation and business logic for voucher operations
- * 
+ *
  * Validates Requirements: 9.2, 9.3
  */
 
@@ -10,7 +10,6 @@ import { describe, it, expect } from 'vitest';
 
 // Test pure business logic without mocking the entire service
 describe('VoucherService Logic', () => {
-  
   describe('Discount Calculation', () => {
     // Helper function that mirrors the service logic
     const calculateDiscount = (voucher, orderValue) => {
@@ -30,9 +29,9 @@ describe('VoucherService Logic', () => {
       const voucher = {
         discountType: 'percentage',
         discountValue: 10,
-        maxDiscount: 50000
+        maxDiscount: 50000,
       };
-      
+
       expect(calculateDiscount(voucher, 200000)).toBe(20000); // 10% of 200000
       expect(calculateDiscount(voucher, 100000)).toBe(10000); // 10% of 100000
     });
@@ -41,9 +40,9 @@ describe('VoucherService Logic', () => {
       const voucher = {
         discountType: 'percentage',
         discountValue: 10,
-        maxDiscount: 50000
+        maxDiscount: 50000,
       };
-      
+
       // 10% of 1000000 = 100000, but capped at 50000
       expect(calculateDiscount(voucher, 1000000)).toBe(50000);
     });
@@ -51,9 +50,9 @@ describe('VoucherService Logic', () => {
     it('should calculate fixed discount correctly', () => {
       const voucher = {
         discountType: 'fixed',
-        discountValue: 30000
+        discountValue: 30000,
       };
-      
+
       expect(calculateDiscount(voucher, 200000)).toBe(30000);
       expect(calculateDiscount(voucher, 100000)).toBe(30000);
     });
@@ -61,9 +60,9 @@ describe('VoucherService Logic', () => {
     it('should not exceed order value for fixed discount', () => {
       const voucher = {
         discountType: 'fixed',
-        discountValue: 50000
+        discountValue: 50000,
       };
-      
+
       // Order value is less than discount
       expect(calculateDiscount(voucher, 30000)).toBe(30000);
     });
@@ -112,14 +111,14 @@ describe('VoucherService Logic', () => {
 
       return {
         valid: errors.length === 0,
-        errors
+        errors,
       };
     };
 
     it('should reject inactive voucher', () => {
       const voucher = { isActive: false };
       const result = validateVoucher(voucher, 'user123', 200000);
-      
+
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Voucher is not active');
     });
@@ -127,10 +126,10 @@ describe('VoucherService Logic', () => {
     it('should reject expired voucher', () => {
       const voucher = {
         isActive: true,
-        endDate: new Date(Date.now() - 86400000) // Yesterday
+        endDate: new Date(Date.now() - 86400000), // Yesterday
       };
       const result = validateVoucher(voucher, 'user123', 200000);
-      
+
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Voucher has expired');
     });
@@ -138,10 +137,10 @@ describe('VoucherService Logic', () => {
     it('should reject voucher not yet started', () => {
       const voucher = {
         isActive: true,
-        startDate: new Date(Date.now() + 86400000) // Tomorrow
+        startDate: new Date(Date.now() + 86400000), // Tomorrow
       };
       const result = validateVoucher(voucher, 'user123', 200000);
-      
+
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Voucher is not yet active');
     });
@@ -150,10 +149,10 @@ describe('VoucherService Logic', () => {
       const voucher = {
         isActive: true,
         usageLimit: 100,
-        usageCount: 100
+        usageCount: 100,
       };
       const result = validateVoucher(voucher, 'user123', 200000);
-      
+
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Voucher usage limit reached');
     });
@@ -161,10 +160,10 @@ describe('VoucherService Logic', () => {
     it('should reject when user already used voucher', () => {
       const voucher = {
         isActive: true,
-        usedBy: ['user123', 'user456']
+        usedBy: ['user123', 'user456'],
       };
       const result = validateVoucher(voucher, 'user123', 200000);
-      
+
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('You have already used this voucher');
     });
@@ -172,22 +171,22 @@ describe('VoucherService Logic', () => {
     it('should reject when order value below minimum', () => {
       const voucher = {
         isActive: true,
-        minOrderValue: 100000
+        minOrderValue: 100000,
       };
       const result = validateVoucher(voucher, 'user123', 50000);
-      
+
       expect(result.valid).toBe(false);
-      expect(result.errors.some(e => e.includes('Order value must be at least'))).toBe(true);
+      expect(result.errors.some((e) => e.includes('Order value must be at least'))).toBe(true);
     });
 
     it('should reject shop voucher for wrong shop', () => {
       const voucher = {
         isActive: true,
         scope: 'shop',
-        shopId: 'shop123'
+        shopId: 'shop123',
       };
       const result = validateVoucher(voucher, 'user123', 200000, 'differentShop');
-      
+
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Voucher is not valid for this shop');
     });
@@ -201,10 +200,10 @@ describe('VoucherService Logic', () => {
         usageCount: 50,
         usedBy: ['otherUser'],
         minOrderValue: 100000,
-        scope: 'platform'
+        scope: 'platform',
       };
       const result = validateVoucher(voucher, 'user123', 200000);
-      
+
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
@@ -213,10 +212,10 @@ describe('VoucherService Logic', () => {
       const voucher = {
         isActive: true,
         scope: 'shop',
-        shopId: 'shop123'
+        shopId: 'shop123',
       };
       const result = validateVoucher(voucher, 'user123', 200000, 'shop123');
-      
+
       expect(result.valid).toBe(true);
     });
   });
@@ -260,13 +259,13 @@ describe('VoucherService Logic', () => {
         hasNextPage: currentPage < totalPages,
         hasPrevPage: currentPage > 1,
         nextPage: currentPage < totalPages ? currentPage + 1 : null,
-        prevPage: currentPage > 1 ? currentPage - 1 : null
+        prevPage: currentPage > 1 ? currentPage - 1 : null,
       };
     };
 
     it('should calculate pagination correctly', () => {
       const result = getPaginationParams(1, 10, 100);
-      
+
       expect(result.currentPage).toBe(1);
       expect(result.pageSize).toBe(10);
       expect(result.totalPages).toBe(10);
@@ -278,7 +277,7 @@ describe('VoucherService Logic', () => {
 
     it('should handle middle page', () => {
       const result = getPaginationParams(5, 10, 100);
-      
+
       expect(result.currentPage).toBe(5);
       expect(result.skip).toBe(40);
       expect(result.hasNextPage).toBe(true);
@@ -289,7 +288,7 @@ describe('VoucherService Logic', () => {
 
     it('should handle last page', () => {
       const result = getPaginationParams(10, 10, 100);
-      
+
       expect(result.hasNextPage).toBe(false);
       expect(result.hasPrevPage).toBe(true);
       expect(result.nextPage).toBe(null);
@@ -297,13 +296,13 @@ describe('VoucherService Logic', () => {
 
     it('should cap page size at 100', () => {
       const result = getPaginationParams(1, 200, 1000);
-      
+
       expect(result.pageSize).toBe(100);
     });
 
     it('should default to page 1 for invalid input', () => {
       const result = getPaginationParams(-1, 10, 100);
-      
+
       expect(result.currentPage).toBe(1);
     });
   });
@@ -311,15 +310,15 @@ describe('VoucherService Logic', () => {
   describe('Voucher Statistics Calculation', () => {
     const calculateStats = (vouchers) => {
       const total = vouchers.length;
-      const active = vouchers.filter(v => v.isActive).length;
-      const expired = vouchers.filter(v => new Date(v.endDate) < new Date()).length;
+      const active = vouchers.filter((v) => v.isActive).length;
+      const expired = vouchers.filter((v) => new Date(v.endDate) < new Date()).length;
       const totalUsage = vouchers.reduce((sum, v) => sum + (v.usageCount || 0), 0);
-      
+
       return {
         totalVouchers: total,
         activeVouchers: active,
         expiredVouchers: expired,
-        totalUsage
+        totalUsage,
       };
     };
 
@@ -328,7 +327,7 @@ describe('VoucherService Logic', () => {
         { isActive: true, endDate: new Date(Date.now() + 86400000), usageCount: 10 },
         { isActive: true, endDate: new Date(Date.now() + 86400000), usageCount: 20 },
         { isActive: false, endDate: new Date(Date.now() - 86400000), usageCount: 50 },
-        { isActive: false, endDate: new Date(Date.now() - 86400000), usageCount: 30 }
+        { isActive: false, endDate: new Date(Date.now() - 86400000), usageCount: 30 },
       ];
 
       const stats = calculateStats(vouchers);

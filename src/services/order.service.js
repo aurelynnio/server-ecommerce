@@ -1,34 +1,31 @@
-const Order = require("../repositories/order.repository");
-const Cart = require("../repositories/cart.repository");
-const Product = require("../repositories/product.repository");
-const { Types } = require("mongoose");
-const mongoose = require("mongoose");
-
-const voucherService = require("./voucher.service");
-const Voucher = require("../repositories/voucher.repository");
-const VoucherUsage = require("../repositories/voucher-usage.repository");
-const inventoryService = require("./inventory.service");
-const { StatusCodes } = require("http-status-codes");
-const { ApiError } = require("../middlewares/errorHandler.middleware");
-const {
-  getPaginationParams,
-  buildPaginationResponse,
-} = require("../utils/pagination");
-const { ORDER_ACTORS, canTransition } = require("../shared/order/orderState");
+const Order = require('../repositories/order.repository');
+const Cart = require('../repositories/cart.repository');
+const Product = require('../repositories/product.repository');
+const { Types } = require('mongoose');
+const mongoose = require('mongoose');
+const voucherService = require('./voucher.service');
+const Voucher = require('../repositories/voucher.repository');
+const VoucherUsage = require('../repositories/voucher-usage.repository');
+const inventoryService = require('./inventory.service');
+const { StatusCodes } = require('http-status-codes');
+const { ApiError } = require('../middlewares/errorHandler.middleware');
+const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
+const { ORDER_ACTORS, canTransition } = require('../shared/order/orderState');
 
 const MAX_TX_RETRIES = Number(process.env.TXN_MAX_RETRIES) || 3;
 const TX_RETRY_DELAY_MS = Number(process.env.TXN_RETRY_DELAY_MS) || 50;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const getErrorLabels = (error) =>
-  error?.errorLabels || error?.result?.errorLabels || [];
+const getErrorLabels = (error) => error?.errorLabels || error?.result?.errorLabels || [];
 
 const isRetryableTransactionError = (error) =>
-  getErrorLabels(error).includes("TransientTransactionError");
+  getErrorLabels(error).includes('TransientTransactionError');
 
 const isUnknownCommitResult = (error) =>
-  getErrorLabels(error).includes("UnknownTransactionCommitResult");
+  getErrorLabels(error).includes('UnknownTransactionCommitResult');
+
+const order_queue = 'order_queue';
 
 /**
  * Service handling order operations
@@ -60,7 +57,7 @@ class OrderService {
         const {
           cartItemIds,
           shippingAddress,
-          paymentMethod = "cod",
+          paymentMethod = 'cod',
           shopVouchers = [], // Array of { shopId, code }
           platformVoucher, // String (code)
           note,
@@ -69,7 +66,7 @@ class OrderService {
         // 1. Get Selected Items from Cart
         const cart = await Cart.findByUserIdForCheckout(userId, session);
         if (!cart) {
-          throw new ApiError(StatusCodes.NOT_FOUND, "Cart is empty");
+          throw new ApiError(StatusCodes.NOT_FOUND, 'Cart is empty');
         }
 
         const itemsToCheckout = cart.items.filter((item) =>
@@ -77,7 +74,7 @@ class OrderService {
         );
 
         if (itemsToCheckout.length === 0) {
-          throw new ApiError(StatusCodes.BAD_REQUEST, "No items selected");
+          throw new ApiError(StatusCodes.BAD_REQUEST, 'No items selected');
         }
 
         // 2. Group items by Shop
@@ -86,7 +83,7 @@ class OrderService {
         for (const item of itemsToCheckout) {
           const product = item.productId;
           if (!product) {
-            throw new ApiError(StatusCodes.NOT_FOUND, "Product info missing");
+            throw new ApiError(StatusCodes.NOT_FOUND, 'Product info missing');
           }
 
           // Ensure shopId is available
@@ -123,22 +120,17 @@ class OrderService {
           // Batch fetch products to optimize performance
           const productIds = items.map((item) => item.productId._id);
           const products = await Product.findByIds(productIds).session(session);
-          const productMap = new Map(
-            products.map((p) => [p._id.toString(), p]),
-          );
+          const productMap = new Map(products.map((p) => [p._id.toString(), p]));
 
           // Verify Price & Build Inventory List
           for (const item of items) {
             const product = productMap.get(item.productId._id.toString());
-            if (!product || product.status !== "published") {
-              throw new ApiError(
-                StatusCodes.CONFLICT,
-                `${item.productId.name} unavailable`,
-              );
+            if (!product || product.status !== 'published') {
+              throw new ApiError(StatusCodes.CONFLICT, `${item.productId.name} unavailable`);
             }
 
             let price = product.price.currentPrice;
-            let skuCode = "";
+            let skuCode = '';
 
             if (item.modelId) {
               const variant = product.variants?.find(
@@ -177,7 +169,7 @@ class OrderService {
               sku: skuCode,
               variantId: item.modelId,
               name: product.name, // Snapshot name
-              image: product.images?.[0] || "", // simplified
+              image: product.images?.[0] || '', // simplified
               quantity: item.quantity,
               price,
               totalPrice: price * item.quantity,
@@ -189,9 +181,7 @@ class OrderService {
 
           // --- APPLY SHOP VOUCHER ---
           let discountShop = 0;
-          const shopVoucherEntry = shopVouchers.find(
-            (v) => v.shopId === shopId,
-          );
+          const shopVoucherEntry = shopVouchers.find((v) => v.shopId === shopId);
           if (shopVoucherEntry) {
             const voucherResult = await voucherService.applyVoucher(
               shopVoucherEntry.code,
@@ -207,10 +197,9 @@ class OrderService {
               { $inc: { usageCount: 1 } },
               { session },
             );
-            await VoucherUsage.create(
-              [{ voucherId: voucherResult.voucherId, userId }],
-              { session },
-            );
+            await VoucherUsage.create([{ voucherId: voucherResult.voucherId, userId }], {
+              session,
+            });
           }
 
           const totalAmount = Math.max(0, subtotal - discountShop);
@@ -228,7 +217,7 @@ class OrderService {
             discountShop, // Saved here
             discountPlatform: 0,
             totalAmount, // Temporary, will subtract platform discount later
-            status: "pending",
+            status: 'pending',
           });
 
           tempOrders.push(newOrder);
@@ -251,10 +240,7 @@ class OrderService {
           tempOrders.forEach((order, index) => {
             if (index === tempOrders.length - 1) {
               // Last order takes the remainder to handle rounding issues
-              order.discountPlatform = Math.max(
-                0,
-                totalPlatformDiscount - distributedDiscount,
-              );
+              order.discountPlatform = Math.max(0, totalPlatformDiscount - distributedDiscount);
             } else {
               const ratio = order.totalAmount / totalPlatformOrderValue;
               const portion = Math.floor(totalPlatformDiscount * ratio);
@@ -263,10 +249,7 @@ class OrderService {
             }
 
             // Recalculate Final Total per Order
-            order.totalAmount = Math.max(
-              0,
-              order.totalAmount - order.discountPlatform,
-            );
+            order.totalAmount = Math.max(0, order.totalAmount - order.discountPlatform);
           });
 
           // Increment usage count and record in VoucherUsage collection
@@ -275,10 +258,7 @@ class OrderService {
             { $inc: { usageCount: 1 } },
             { session },
           );
-          await VoucherUsage.create(
-            [{ voucherId: voucherResult.voucherId, userId }],
-            { session },
-          );
+          await VoucherUsage.create([{ voucherId: voucherResult.voucherId, userId }], { session });
         }
 
         // Save All Orders within transaction
@@ -289,9 +269,7 @@ class OrderService {
 
         // 5. Cleanup Cart
         // Filter out checked out items
-        cart.items = cart.items.filter(
-          (item) => !cartItemIds.includes(item._id.toString()),
-        );
+        cart.items = cart.items.filter((item) => !cartItemIds.includes(item._id.toString()));
         cart.totalAmount = this.calculateTotal(cart.items);
         await cart.save({ session });
 
@@ -300,7 +278,7 @@ class OrderService {
 
         // Return group details
         return {
-          message: "Orders created successfully",
+          message: 'Orders created successfully',
           orderGroupId,
           orders: createdOrders,
         };
@@ -316,15 +294,14 @@ class OrderService {
           const existingOrders = await Order.findByOrderGroupIdLean(orderGroupId);
           if (existingOrders.length > 0) {
             return {
-              message: "Orders created successfully",
+              message: 'Orders created successfully',
               orderGroupId,
               orders: existingOrders,
             };
           }
         }
 
-        const canRetry =
-          isRetryableTransactionError(error) || isUnknownCommitResult(error);
+        const canRetry = isRetryableTransactionError(error) || isUnknownCommitResult(error);
 
         if (canRetry && attempt < MAX_TX_RETRIES) {
           await sleep(TX_RETRY_DELAY_MS * (attempt + 1));
@@ -337,10 +314,7 @@ class OrderService {
       }
     }
 
-    throw new ApiError(
-      StatusCodes.INTERNAL_SERVER_ERROR,
-      "Failed to create order after retries",
-    );
+    throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to create order after retries');
   }
 
   /**
@@ -394,11 +368,7 @@ class OrderService {
     const total = await Order.countByShopWithFilters(shopId, filterArgs);
     const paginationParams = getPaginationParams(page, limit, total);
 
-    const orders = await Order.findByShopWithFilters(
-      shopId,
-      filterArgs,
-      paginationParams,
-    );
+    const orders = await Order.findByShopWithFilters(shopId, filterArgs, paginationParams);
 
     return buildPaginationResponse(orders, paginationParams);
   }
@@ -416,10 +386,7 @@ class OrderService {
     const order = await Order.findByIdAndShop(orderId, shopId);
 
     if (!order) {
-      throw new ApiError(
-        StatusCodes.NOT_FOUND,
-        "Order not found or doesn't belong to your shop",
-      );
+      throw new ApiError(StatusCodes.NOT_FOUND, "Order not found or doesn't belong to your shop");
     }
 
     if (!canTransition(order.status, newStatus, ORDER_ACTORS.SELLER)) {
@@ -431,17 +398,17 @@ class OrderService {
 
     order.status = newStatus;
 
-    if (newStatus === "cancelled") {
+    if (newStatus === 'cancelled') {
       order.cancelledAt = new Date();
       // Restore stock when seller cancels
       await this.restoreOrderStock(order);
     }
 
-    if (newStatus === "delivered") {
+    if (newStatus === 'delivered') {
       order.deliveredAt = new Date();
       // Mark as paid for COD orders
-      if (order.paymentMethod === "cod" && order.paymentStatus === "unpaid") {
-        order.paymentStatus = "paid";
+      if (order.paymentMethod === 'cod' && order.paymentStatus === 'unpaid') {
+        order.paymentStatus = 'paid';
       }
     }
 
@@ -489,10 +456,7 @@ class OrderService {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const dailyOrders = await Order.aggregateSellerDailyOrders(
-      shopObjectId,
-      thirtyDaysAgo,
-    );
+    const dailyOrders = await Order.aggregateSellerDailyOrders(shopObjectId, thirtyDaysAgo);
 
     // 4. Top selling products
     const topProducts = await Order.aggregateSellerTopProducts(shopObjectId, 10);
@@ -517,7 +481,7 @@ class OrderService {
       },
       ordersByStatus: statusStats,
       dailyOrders: dailyOrders.map((item) => ({
-        date: `${item._id.year}-${String(item._id.month).padStart(2, "0")}-${String(item._id.day).padStart(2, "0")}`,
+        date: `${item._id.year}-${String(item._id.month).padStart(2, '0')}-${String(item._id.day).padStart(2, '0')}`,
         orders: item.orders,
         revenue: item.revenue,
       })),
@@ -558,15 +522,12 @@ class OrderService {
     const order = await Order.findByIdWithShopAndProducts(orderId);
 
     if (!order) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Order not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found');
     }
 
     // Authorization check: user can only view their own orders unless admin
     if (!isAdmin && order.userId.toString() !== userId.toString()) {
-      throw new ApiError(
-        StatusCodes.FORBIDDEN,
-        "Unauthorized to view this order",
-      );
+      throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized to view this order');
     }
 
     return order;
@@ -582,34 +543,22 @@ class OrderService {
    * @returns {Promise<Object>} Updated order
    * @throws {Error} If order not found, unauthorized, or invalid status transition
    */
-  async updateOrderStatus(
-    orderId,
-    status,
-    userId,
-    isAdmin = false,
-    shopId = null,
-  ) {
+  async updateOrderStatus(orderId, status, userId, isAdmin = false, shopId = null) {
     const order = await Order.findById(orderId);
 
     if (!order) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Order not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found');
     }
 
     // Authorization check
     if (!isAdmin) {
       // Seller can only update orders for their shop
       if (shopId && order.shopId.toString() !== shopId.toString()) {
-        throw new ApiError(
-          StatusCodes.FORBIDDEN,
-          "Unauthorized to update this order",
-        );
+        throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized to update this order');
       }
       // Regular users cannot update order status
       if (!shopId) {
-        throw new ApiError(
-          StatusCodes.FORBIDDEN,
-          "Unauthorized to update order status",
-        );
+        throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized to update order status');
       }
     }
 
@@ -622,10 +571,10 @@ class OrderService {
     }
 
     order.status = status;
-    if (status === "cancelled") {
+    if (status === 'cancelled') {
       order.cancelledAt = new Date();
     }
-    if (status === "delivered") {
+    if (status === 'delivered') {
       order.deliveredAt = new Date();
     }
 
@@ -644,23 +593,17 @@ class OrderService {
   async cancelOrder(orderId, userId) {
     const order = await Order.findByIdAndUser(orderId, userId);
     if (!order) {
-      throw new ApiError(
-        StatusCodes.NOT_FOUND,
-        "Order not found or access denied",
-      );
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found or access denied');
     }
 
-    if (!canTransition(order.status, "cancelled", ORDER_ACTORS.USER)) {
-      throw new ApiError(
-        StatusCodes.BAD_REQUEST,
-        "Cannot cancel order in this status",
-      );
+    if (!canTransition(order.status, 'cancelled', ORDER_ACTORS.USER)) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Cannot cancel order in this status');
     }
 
     // Restore Stock via InventoryService
     await this.restoreOrderStock(order);
 
-    order.status = "cancelled";
+    order.status = 'cancelled';
     order.cancelledAt = new Date();
     await order.save();
     return order;
@@ -677,10 +620,7 @@ class OrderService {
     const { startDate, endDate } = filters;
 
     // 1. Total orders count by status
-    const ordersByStatus = await Order.aggregateAdminOrdersByStatusInRange(
-      startDate,
-      endDate,
-    );
+    const ordersByStatus = await Order.aggregateAdminOrdersByStatusInRange(startDate, endDate);
 
     // Convert to object for easier access
     const statusStats = {};
@@ -692,10 +632,7 @@ class OrderService {
     });
 
     // 2. Revenue statistics
-    const revenueStats = await Order.aggregateAdminRevenueStatsInRange(
-      startDate,
-      endDate,
-    );
+    const revenueStats = await Order.aggregateAdminRevenueStatsInRange(startDate, endDate);
 
     // 3. Orders by payment method
     const ordersByPaymentMethod = await Order.aggregateAdminOrdersByPaymentMethodInRange(
@@ -710,24 +647,13 @@ class OrderService {
     const dailyOrders = await Order.aggregateAdminDailyOrders(thirtyDaysAgo);
 
     // 5. Top selling products
-    const topProducts = await Order.aggregateAdminTopProductsInRange(
-      startDate,
-      endDate,
-      10,
-    );
+    const topProducts = await Order.aggregateAdminTopProductsInRange(startDate, endDate, 10);
 
     // 6. Orders by shop (for multi-vendor)
-    const ordersByShop = await Order.aggregateAdminOrdersByShopInRange(
-      startDate,
-      endDate,
-      10,
-    );
+    const ordersByShop = await Order.aggregateAdminOrdersByShopInRange(startDate, endDate, 10);
 
     // 7. Summary counts - PERFORMANCE FIX: Use single aggregation with $facet
-    const adminSummaryCounts = await Order.aggregateAdminSummaryCountsInRange(
-      startDate,
-      endDate,
-    );
+    const adminSummaryCounts = await Order.aggregateAdminSummaryCountsInRange(startDate, endDate);
 
     const adminCounts = adminSummaryCounts[0] || {};
     const totalOrders = adminCounts.total?.[0]?.count || 0;
@@ -747,7 +673,7 @@ class OrderService {
       ordersByStatus: statusStats,
       ordersByPaymentMethod,
       dailyOrders: dailyOrders.map((item) => ({
-        date: `${item._id.year}-${String(item._id.month).padStart(2, "0")}-${String(item._id.day).padStart(2, "0")}`,
+        date: `${item._id.year}-${String(item._id.month).padStart(2, '0')}-${String(item._id.day).padStart(2, '0')}`,
         orders: item.orders,
         revenue: item.revenue,
       })),
@@ -758,5 +684,3 @@ class OrderService {
 }
 
 module.exports = new OrderService();
-
-

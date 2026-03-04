@@ -1,7 +1,7 @@
-const shopCategoryService = require("../services/shop.category.service");
-const catchAsync = require("../configs/catchAsync");
-const { sendSuccess } = require("../shared/res/formatResponse");
-const { StatusCodes } = require("http-status-codes");
+const shopCategoryService = require('../services/shop.category.service');
+const catchAsync = require('../configs/catchAsync');
+const { sendSuccess } = require('../shared/res/formatResponse');
+const { StatusCodes } = require('http-status-codes');
 
 const ShopCategoryController = {
   /**
@@ -11,16 +11,8 @@ const ShopCategoryController = {
    * @returns {Promise<any>}
    */
   createCategory: catchAsync(async (req, res) => {
-    const newCategory = await shopCategoryService.createCategory(
-      req.user.userId,
-      req.body
-    );
-    return sendSuccess(
-      res,
-      newCategory,
-      "Shop category created",
-      StatusCodes.CREATED
-    );
+    const newCategory = await shopCategoryService.createCategory(req.user.userId, req.body);
+    return sendSuccess(res, newCategory, 'Shop category created', StatusCodes.CREATED);
   }),
 
   /**
@@ -30,15 +22,8 @@ const ShopCategoryController = {
    * @returns {Promise<any>}
    */
   getMyShopCategories: catchAsync(async (req, res) => {
-    const categories = await shopCategoryService.getMyShopCategories(
-      req.user.userId
-    );
-    return sendSuccess(
-      res,
-      categories,
-      "Get my shop categories success",
-      StatusCodes.OK
-    );
+    const categories = await shopCategoryService.getMyShopCategories(req.user.userId);
+    return sendSuccess(res, categories, 'Get my shop categories success', StatusCodes.OK);
   }),
 
   /**
@@ -50,14 +35,9 @@ const ShopCategoryController = {
   getShopCategories: catchAsync(async (req, res) => {
     const categories = await shopCategoryService.getShopCategories(
       req.user ? req.user.userId : null,
-      req.params.shopId
+      req.params.shopId,
     );
-    return sendSuccess(
-      res,
-      categories,
-      "Get shop categories success",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, categories, 'Get shop categories success', StatusCodes.OK);
   }),
 
   /**
@@ -70,9 +50,9 @@ const ShopCategoryController = {
     const updated = await shopCategoryService.updateCategory(
       req.user.userId,
       req.params.categoryId,
-      req.body
+      req.body,
     );
-    return sendSuccess(res, updated, "Category updated", StatusCodes.OK);
+    return sendSuccess(res, updated, 'Category updated', StatusCodes.OK);
   }),
 
   /**
@@ -84,9 +64,9 @@ const ShopCategoryController = {
   deleteCategory: catchAsync(async (req, res) => {
     const deleted = await shopCategoryService.deleteCategory(
       req.user.userId,
-      req.params.categoryId
+      req.params.categoryId,
     );
-    return sendSuccess(res, deleted, "Category deleted", StatusCodes.OK);
+    return sendSuccess(res, deleted, 'Category deleted', StatusCodes.OK);
   }),
 };
 

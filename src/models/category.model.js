@@ -1,18 +1,18 @@
-const { Schema, model, Types } = require("mongoose");
+const { Schema, model, Types } = require('mongoose');
 
 const categorySchema = new Schema(
   {
     name: { type: String, required: true, trim: true },
-    description: { type: String, default: "" },
+    description: { type: String, default: '' },
     slug: { type: String, required: true, unique: true },
-    parentCategory: { type: Types.ObjectId, ref: "Category", default: null },
+    parentCategory: { type: Types.ObjectId, ref: 'Category', default: null },
     images: { type: [String], default: [] },
     isActive: { type: Boolean, default: true },
   },
   {
     timestamps: true,
-    collection: "categories",
-  }
+    collection: 'categories',
+  },
 );
 
 // Indexes
@@ -20,4 +20,4 @@ categorySchema.index({ name: 1, parentCategory: 1 }, { unique: true }); // Same 
 categorySchema.index({ parentCategory: 1 });
 categorySchema.index({ isActive: 1 });
 
-module.exports = model("Category", categorySchema);
+module.exports = model('Category', categorySchema);

@@ -1,5 +1,5 @@
-const Joi = require("joi");
-const { objectId } = require("./common.validator");
+const Joi = require('joi');
+const { objectId } = require('./common.validator');
 
 const startConversationValidator = Joi.object({
   shopId: objectId.required(),
@@ -11,7 +11,7 @@ const sendMessageValidator = Joi.object({
   conversationId: objectId.required(),
   content: Joi.string().required(),
   attachments: Joi.array().items(Joi.string()).optional(),
-  messageType: Joi.string().valid("text", "image", "product").default("text"),
+  messageType: Joi.string().valid('text', 'image', 'product').default('text'),
   productRef: objectId.optional(),
 });
 

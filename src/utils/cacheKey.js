@@ -1,7 +1,6 @@
-const crypto = require("crypto");
+const crypto = require('crypto');
 
-const isPlainObject = (value) =>
-  Object.prototype.toString.call(value) === "[object Object]";
+const isPlainObject = (value) => Object.prototype.toString.call(value) === '[object Object]';
 
 const normalizeForStableStringify = (value) => {
   if (Array.isArray(value)) {
@@ -12,7 +11,7 @@ const normalizeForStableStringify = (value) => {
     return value.toISOString();
   }
 
-  if (typeof value === "bigint") {
+  if (typeof value === 'bigint') {
     return value.toString();
   }
 
@@ -33,13 +32,12 @@ const normalizeForStableStringify = (value) => {
   return sortedObject;
 };
 
-const stableStringify = (value) =>
-  JSON.stringify(normalizeForStableStringify(value));
+const stableStringify = (value) => JSON.stringify(normalizeForStableStringify(value));
 
-const hashQueryParams = (params, algorithm = "sha256") =>
-  crypto.createHash(algorithm).update(stableStringify(params)).digest("hex");
+const hashQueryParams = (params, algorithm = 'sha256') =>
+  crypto.createHash(algorithm).update(stableStringify(params)).digest('hex');
 
-const buildHashedCacheKey = (prefix, params, algorithm = "sha256") =>
+const buildHashedCacheKey = (prefix, params, algorithm = 'sha256') =>
   `${prefix}:${hashQueryParams(params, algorithm)}`;
 
 module.exports = {

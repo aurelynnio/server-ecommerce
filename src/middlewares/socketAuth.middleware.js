@@ -1,6 +1,6 @@
-const cookie = require("cookie");
-const logger = require("../utils/logger");
-const tokenService = require("../services/token.service");
+const cookie = require('cookie');
+const logger = require('../utils/logger');
+const tokenService = require('../services/token.service');
 
 /**
  * Socket auth middleware
@@ -19,7 +19,7 @@ const socketAuthMiddleware = (socket, next) => {
     }
 
     if (!token) {
-      return next(new Error("Authentication error: Token not found"));
+      return next(new Error('Authentication error: Token not found'));
     }
 
     // 2. Verify token
@@ -33,8 +33,8 @@ const socketAuthMiddleware = (socket, next) => {
 
     next();
   } catch (error) {
-    logger.error("Socket Auth Error:", { error: error.message });
-    next(new Error("Authentication error: Invalid token"));
+    logger.error('Socket Auth Error:', { error: error.message });
+    next(new Error('Authentication error: Invalid token'));
   }
 };
 

@@ -1,6 +1,6 @@
-const Product = require("../repositories/product.repository");
-const { StatusCodes } = require("http-status-codes");
-const { ApiError } = require("../middlewares/errorHandler.middleware");
+const Product = require('../repositories/product.repository');
+const { StatusCodes } = require('http-status-codes');
+const { ApiError } = require('../middlewares/errorHandler.middleware');
 
 /**
  * Service handling inventory operations
@@ -21,20 +21,15 @@ class InventoryService {
     for (const item of items) {
       const product = productMap.get(item.productId.toString());
 
-      if (!product || product.status !== "published") {
-        throw new ApiError(
-          StatusCodes.NOT_FOUND,
-          `Product unavailable: ${item.productId}`,
-        );
+      if (!product || product.status !== 'published') {
+        throw new ApiError(StatusCodes.NOT_FOUND, `Product unavailable: ${item.productId}`);
       }
 
       const quantity = item.quantity;
 
       if (item.modelId) {
         // Variant stock check
-        const variant = product.variants.find(
-          (v) => v._id.toString() === item.modelId.toString(),
-        );
+        const variant = product.variants.find((v) => v._id.toString() === item.modelId.toString());
 
         if (!variant) {
           throw new ApiError(
@@ -52,10 +47,7 @@ class InventoryService {
       } else {
         // Base product stock check
         if (product.stock < quantity) {
-          throw new ApiError(
-            StatusCodes.CONFLICT,
-            `Out of stock for ${product.name}`,
-          );
+          throw new ApiError(StatusCodes.CONFLICT, `Out of stock for ${product.name}`);
         }
       }
     }
@@ -73,7 +65,7 @@ class InventoryService {
     for (const item of items) {
       const productId = item.productId.toString();
       const modelId = item.modelId ? item.modelId.toString() : null;
-      const key = `${productId}:${modelId || "base"}`;
+      const key = `${productId}:${modelId || 'base'}`;
       const current = map.get(key) || { productId, modelId, quantity: 0 };
       current.quantity += item.quantity;
       map.set(key, current);
@@ -100,23 +92,13 @@ class InventoryService {
         );
 
         if (!result.matchedCount) {
-          throw new ApiError(
-            StatusCodes.CONFLICT,
-            "Out of stock or variation unavailable",
-          );
+          throw new ApiError(StatusCodes.CONFLICT, 'Out of stock or variation unavailable');
         }
       } else {
-        const result = await Product.decrementStockForBaseSale(
-          item.productId,
-          quantity,
-          session,
-        );
+        const result = await Product.decrementStockForBaseSale(item.productId, quantity, session);
 
         if (!result.matchedCount) {
-          throw new ApiError(
-            StatusCodes.CONFLICT,
-            "Out of stock or product unavailable",
-          );
+          throw new ApiError(StatusCodes.CONFLICT, 'Out of stock or product unavailable');
         }
       }
     }
@@ -134,18 +116,9 @@ class InventoryService {
     for (const item of aggregatedItems) {
       const quantity = item.quantity;
       if (item.modelId) {
-        await Product.restoreStockForVariant(
-          item.productId,
-          item.modelId,
-          quantity,
-          options,
-        );
+        await Product.restoreStockForVariant(item.productId, item.modelId, quantity, options);
       } else {
-        await Product.restoreStockForBaseProduct(
-          item.productId,
-          quantity,
-          options,
-        );
+        await Product.restoreStockForBaseProduct(item.productId, quantity, options);
       }
     }
   }

@@ -3,7 +3,7 @@
  * Tests the data transformation pipeline in getShopStatistics
  * (ordersByStatus mapping, chartData generation, formattedTopProducts, formattedRecentOrders)
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Re-implement the pure transformation logic from ShopService.getShopStatistics
 
@@ -83,7 +83,7 @@ function formatTopProducts(topProducts) {
 function formatRecentOrders(recentOrders) {
   return recentOrders.map((order) => ({
     _id: order._id,
-    customer: order.userId?.username || "Guest",
+    customer: order.userId?.username || 'Guest',
     avatar: order.userId?.avatar || null,
     totalAmount: order.totalAmount,
     status: order.status,
@@ -92,13 +92,13 @@ function formatRecentOrders(recentOrders) {
   }));
 }
 
-describe("Shop Statistics Pipeline - Integration Tests", () => {
-  describe("mapOrdersByStatus", () => {
-    it("should map aggregation results to status object", () => {
+describe('Shop Statistics Pipeline - Integration Tests', () => {
+  describe('mapOrdersByStatus', () => {
+    it('should map aggregation results to status object', () => {
       const raw = [
-        { _id: "pending", count: 5 },
-        { _id: "delivered", count: 20 },
-        { _id: "cancelled", count: 3 },
+        { _id: 'pending', count: 5 },
+        { _id: 'delivered', count: 20 },
+        { _id: 'cancelled', count: 3 },
       ];
 
       const result = mapOrdersByStatus(raw);
@@ -113,24 +113,24 @@ describe("Shop Statistics Pipeline - Integration Tests", () => {
       });
     });
 
-    it("should ignore unknown statuses", () => {
+    it('should ignore unknown statuses', () => {
       const raw = [
-        { _id: "pending", count: 1 },
-        { _id: "unknown_status", count: 99 },
+        { _id: 'pending', count: 1 },
+        { _id: 'unknown_status', count: 99 },
       ];
 
       const result = mapOrdersByStatus(raw);
       expect(result.pending).toBe(1);
-      expect(result).not.toHaveProperty("unknown_status");
+      expect(result).not.toHaveProperty('unknown_status');
     });
 
-    it("should return all zeros for empty aggregation", () => {
+    it('should return all zeros for empty aggregation', () => {
       const result = mapOrdersByStatus([]);
       Object.values(result).forEach((v) => expect(v).toBe(0));
     });
   });
 
-  describe("generateChartData", () => {
+  describe('generateChartData', () => {
     beforeEach(() => {
       vi.useFakeTimers();
     });
@@ -139,8 +139,8 @@ describe("Shop Statistics Pipeline - Integration Tests", () => {
       vi.useRealTimers();
     });
 
-    it("should generate 6 months of chart data", () => {
-      const refDate = new Date("2026-06-15");
+    it('should generate 6 months of chart data', () => {
+      const refDate = new Date('2026-06-15');
       vi.setSystemTime(refDate);
 
       const rawRevenue = [
@@ -152,8 +152,8 @@ describe("Shop Statistics Pipeline - Integration Tests", () => {
 
       expect(chartData).toHaveLength(6);
       // Months should be T1 through T6
-      expect(chartData[0].month).toBe("T1");
-      expect(chartData[5].month).toBe("T6");
+      expect(chartData[0].month).toBe('T1');
+      expect(chartData[5].month).toBe('T6');
 
       // March (index 2) should have data
       expect(chartData[2].revenue).toBe(1000000);
@@ -167,32 +167,32 @@ describe("Shop Statistics Pipeline - Integration Tests", () => {
       expect(chartData[0].orders).toBe(0);
     });
 
-    it("should handle year boundary (January reference)", () => {
-      const refDate = new Date("2026-02-15");
+    it('should handle year boundary (January reference)', () => {
+      const refDate = new Date('2026-02-15');
 
       const chartData = generateChartData([], refDate);
 
       expect(chartData).toHaveLength(6);
       // Should include months from previous year
-      expect(chartData[0].month).toBe("T9"); // Sep 2025
-      expect(chartData[5].month).toBe("T2"); // Feb 2026
+      expect(chartData[0].month).toBe('T9'); // Sep 2025
+      expect(chartData[5].month).toBe('T2'); // Feb 2026
     });
   });
 
-  describe("formatTopProducts", () => {
-    it("should format products with variant image and revenue", () => {
+  describe('formatTopProducts', () => {
+    it('should format products with variant image and revenue', () => {
       const products = [
         {
-          _id: "p1",
-          name: "iPhone 15",
-          slug: "iphone-15",
+          _id: 'p1',
+          name: 'iPhone 15',
+          slug: 'iphone-15',
           soldCount: 100,
-          variants: [{ price: 25000000, images: ["img1.jpg", "img2.jpg"] }],
+          variants: [{ price: 25000000, images: ['img1.jpg', 'img2.jpg'] }],
         },
         {
-          _id: "p2",
-          name: "AirPods",
-          slug: "airpods",
+          _id: 'p2',
+          name: 'AirPods',
+          slug: 'airpods',
           soldCount: 50,
           variants: [{ price: 3000000, images: [] }],
         },
@@ -201,10 +201,10 @@ describe("Shop Statistics Pipeline - Integration Tests", () => {
       const formatted = formatTopProducts(products);
 
       expect(formatted[0]).toEqual({
-        _id: "p1",
-        name: "iPhone 15",
-        slug: "iphone-15",
-        image: "img1.jpg",
+        _id: 'p1',
+        name: 'iPhone 15',
+        slug: 'iphone-15',
+        image: 'img1.jpg',
         sold: 100,
         revenue: 2500000000,
       });
@@ -213,23 +213,21 @@ describe("Shop Statistics Pipeline - Integration Tests", () => {
       expect(formatted[1].revenue).toBe(150000000);
     });
 
-    it("should handle products without variants", () => {
-      const products = [
-        { _id: "p1", name: "Simple", slug: "simple", soldCount: 10 },
-      ];
+    it('should handle products without variants', () => {
+      const products = [{ _id: 'p1', name: 'Simple', slug: 'simple', soldCount: 10 }];
 
       const formatted = formatTopProducts(products);
       expect(formatted[0].image).toBeNull();
       expect(formatted[0].revenue).toBe(0); // no variant price
     });
 
-    it("should handle zero soldCount", () => {
+    it('should handle zero soldCount', () => {
       const products = [
         {
-          _id: "p1",
-          name: "New",
-          slug: "new",
-          variants: [{ price: 100000, images: ["a.jpg"] }],
+          _id: 'p1',
+          name: 'New',
+          slug: 'new',
+          variants: [{ price: 100000, images: ['a.jpg'] }],
         },
       ];
 
@@ -239,74 +237,72 @@ describe("Shop Statistics Pipeline - Integration Tests", () => {
     });
   });
 
-  describe("formatRecentOrders", () => {
-    it("should format orders with customer info", () => {
+  describe('formatRecentOrders', () => {
+    it('should format orders with customer info', () => {
       const orders = [
         {
-          _id: "o1",
-          userId: { username: "john", avatar: "avatar.jpg" },
+          _id: 'o1',
+          userId: { username: 'john', avatar: 'avatar.jpg' },
           totalAmount: 500000,
-          status: "delivered",
-          paymentStatus: "paid",
-          createdAt: new Date("2026-06-01"),
+          status: 'delivered',
+          paymentStatus: 'paid',
+          createdAt: new Date('2026-06-01'),
         },
       ];
 
       const formatted = formatRecentOrders(orders);
-      expect(formatted[0].customer).toBe("john");
-      expect(formatted[0].avatar).toBe("avatar.jpg");
+      expect(formatted[0].customer).toBe('john');
+      expect(formatted[0].avatar).toBe('avatar.jpg');
       expect(formatted[0].totalAmount).toBe(500000);
     });
 
-    it("should show Guest for orders without userId", () => {
+    it('should show Guest for orders without userId', () => {
       const orders = [
         {
-          _id: "o1",
+          _id: 'o1',
           userId: null,
           totalAmount: 100000,
-          status: "pending",
-          paymentStatus: "unpaid",
+          status: 'pending',
+          paymentStatus: 'unpaid',
           createdAt: new Date(),
         },
       ];
 
       const formatted = formatRecentOrders(orders);
-      expect(formatted[0].customer).toBe("Guest");
+      expect(formatted[0].customer).toBe('Guest');
       expect(formatted[0].avatar).toBeNull();
     });
   });
 
-  describe("Full statistics assembly", () => {
-    it("should assemble complete statistics object", () => {
+  describe('Full statistics assembly', () => {
+    it('should assemble complete statistics object', () => {
       const orderStatusCounts = [
-        { _id: "pending", count: 5 },
-        { _id: "delivered", count: 50 },
-        { _id: "cancelled", count: 2 },
+        { _id: 'pending', count: 5 },
+        { _id: 'delivered', count: 50 },
+        { _id: 'cancelled', count: 2 },
       ];
       const revenueData = [{ total: 15000000 }];
       const topProducts = [
         {
-          _id: "p1",
-          name: "Top Product",
-          slug: "top",
+          _id: 'p1',
+          name: 'Top Product',
+          slug: 'top',
           soldCount: 200,
-          variants: [{ price: 100000, images: ["img.jpg"] }],
+          variants: [{ price: 100000, images: ['img.jpg'] }],
         },
       ];
       const recentOrders = [
         {
-          _id: "o1",
-          userId: { username: "buyer", avatar: null },
+          _id: 'o1',
+          userId: { username: 'buyer', avatar: null },
           totalAmount: 300000,
-          status: "confirmed",
-          paymentStatus: "paid",
-          createdAt: new Date("2026-06-10"),
+          status: 'confirmed',
+          paymentStatus: 'paid',
+          createdAt: new Date('2026-06-10'),
         },
       ];
-      const refDate = new Date("2026-06-15");
-      const monthlyRevenueRaw = [
-        { _id: { month: 6, year: 2026 }, revenue: 15000000, orders: 57 },
-      ];
+      const refDate = new Date('2026-06-15');
+      const monthlyRevenueRaw = [{ _id: { month: 6, year: 2026 }, revenue: 15000000, orders: 57 }];
 
       // Assemble like the service does
       const stats = {
@@ -326,7 +322,7 @@ describe("Shop Statistics Pipeline - Integration Tests", () => {
       expect(chartData).toHaveLength(6);
       expect(chartData[5].revenue).toBe(15000000); // June
       expect(formattedTopProducts[0].revenue).toBe(20000000);
-      expect(formattedRecentOrders[0].customer).toBe("buyer");
+      expect(formattedRecentOrders[0].customer).toBe('buyer');
     });
   });
 });

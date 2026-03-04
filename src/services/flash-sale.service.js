@@ -1,12 +1,9 @@
-const Product = require("../repositories/product.repository");
-const redisService = require("./redis.service");
-const { StatusCodes } = require("http-status-codes");
-const { ApiError } = require("../middlewares/errorHandler.middleware");
+const Product = require('../repositories/product.repository');
+const redisService = require('./redis.service');
+const { StatusCodes } = require('http-status-codes');
+const { ApiError } = require('../middlewares/errorHandler.middleware');
 
-const {
-  getPaginationParams,
-  buildPaginationResponse,
-} = require("../utils/pagination");
+const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 
 /**
  * Service handling flash sale operations
@@ -30,10 +27,7 @@ class FlashSaleService {
     const total = await Product.countActiveFlashSale(now);
     const paginationParams = getPaginationParams(page, limit, total);
 
-    const products = await Product.findActiveFlashSaleProducts(
-      now,
-      paginationParams,
-    );
+    const products = await Product.findActiveFlashSaleProducts(now, paginationParams);
 
     // Calculate remaining time and sold percentage
     const enrichedProducts = products.map((p) => ({
@@ -48,10 +42,7 @@ class FlashSaleService {
           ? Math.round((p.flashSale.soldCount / p.flashSale.stock) * 100)
           : 0,
         endTime: p.flashSale?.endTime,
-        remainingSeconds: Math.max(
-          0,
-          Math.floor((new Date(p.flashSale?.endTime) - now) / 1000),
-        ),
+        remainingSeconds: Math.max(0, Math.floor((new Date(p.flashSale?.endTime) - now) / 1000)),
       },
     }));
 
@@ -93,7 +84,7 @@ class FlashSaleService {
           schedule.push({
             startTime: saleTime,
             endTime: endTime,
-            status: "upcoming",
+            status: 'upcoming',
             label: `${hour}:00`,
           });
         }
@@ -130,7 +121,7 @@ class FlashSaleService {
    * @returns {Promise<Object>} Flash sale products for that slot
    */
   async getFlashSaleBySlot(timeSlot) {
-    const [hours] = timeSlot.split(":").map(Number);
+    const [hours] = timeSlot.split(':').map(Number);
     const now = new Date();
     const slotStart = new Date(now);
     slotStart.setHours(hours, 0, 0, 0);
@@ -142,11 +133,7 @@ class FlashSaleService {
     const slotEnd = new Date(slotStart);
     slotEnd.setHours(slotEnd.getHours() + 2);
 
-    const products = await Product.findFlashSaleProductsBySlot(
-      slotStart,
-      slotEnd,
-      50,
-    );
+    const products = await Product.findFlashSaleProductsBySlot(slotStart, slotEnd, 50);
 
     return {
       timeSlot,
@@ -163,8 +150,7 @@ class FlashSaleService {
    * @returns {Promise<Object>} Updated product
    */
   async addToFlashSale(productId, flashSaleData) {
-    const { salePrice, discountPercent, stock, startTime, endTime } =
-      flashSaleData;
+    const { salePrice, discountPercent, stock, startTime, endTime } = flashSaleData;
 
     const product = await Product.setFlashSaleByProductId(productId, {
       isActive: true,
@@ -177,10 +163,10 @@ class FlashSaleService {
     });
 
     if (!product) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
     }
 
-    await redisService.delByPattern("flash-sale:*");
+    await redisService.delByPattern('flash-sale:*');
 
     return product;
   }
@@ -194,10 +180,10 @@ class FlashSaleService {
     const product = await Product.removeFlashSaleByProductId(productId);
 
     if (!product) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
     }
 
-    await redisService.delByPattern("flash-sale:*");
+    await redisService.delByPattern('flash-sale:*');
     return product;
   }
 

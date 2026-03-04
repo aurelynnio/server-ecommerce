@@ -1,11 +1,8 @@
-const Product = require("../repositories/product.repository");
-const Category = require("../repositories/category.repository");
-const Shop = require("../repositories/shop.repository");
-const redisService = require("./redis.service");
-const {
-  getPaginationParams,
-  buildPaginationResponse,
-} = require("../utils/pagination");
+const Product = require('../repositories/product.repository');
+const Category = require('../repositories/category.repository');
+const Shop = require('../repositories/shop.repository');
+const redisService = require('./redis.service');
+const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 
 /**
  * Service handling advanced search operations
@@ -29,7 +26,7 @@ class SearchService {
     const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
-    const regex = new RegExp(keyword, "i");
+    const regex = new RegExp(keyword, 'i');
 
     // Search products - Note: images are in variants[].images, not root level
     const products = await Product.findPublishedAutocomplete(regex, limit);
@@ -37,9 +34,7 @@ class SearchService {
     // Map products to include first variant image for display in 'images' array
     const productsWithImages = products.map((product) => {
       const variantImage = product.variants?.[0]?.images?.[0];
-      const images = variantImage
-        ? [variantImage]
-        : product.descriptionImages || [];
+      const images = variantImage ? [variantImage] : product.descriptionImages || [];
       return {
         ...product,
         images,
@@ -65,7 +60,7 @@ class SearchService {
    * @returns {Promise<Array>} Trending search terms
    */
   async getTrendingSearches(limit = 10) {
-    const cacheKey = "search:trending";
+    const cacheKey = 'search:trending';
     const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
@@ -74,7 +69,7 @@ class SearchService {
 
     const trending = trendingProducts.map((p) => ({
       keyword: p.name,
-      type: "product",
+      type: 'product',
     }));
 
     await redisService.set(cacheKey, trending, 3600); // 1 hour cache
@@ -87,7 +82,7 @@ class SearchService {
    * @returns {Promise<Array>} Hot keywords
    */
   async getHotKeywords(limit = 20) {
-    const cacheKey = "search:hot-keywords";
+    const cacheKey = 'search:hot-keywords';
     const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
@@ -97,10 +92,7 @@ class SearchService {
       Category.findActiveNames(10),
     ]);
 
-    const keywords = [
-      ...products.map((p) => p.name),
-      ...categories.map((c) => c.name),
-    ];
+    const keywords = [...products.map((p) => p.name), ...categories.map((c) => c.name)];
 
     // Remove duplicates and limit
     const uniqueKeywords = [...new Set(keywords)].slice(0, limit);
@@ -121,7 +113,7 @@ class SearchService {
       minPrice,
       maxPrice,
       rating,
-      sortBy = "relevance",
+      sortBy = 'relevance',
       page = 1,
       limit = 20,
     } = params;
@@ -148,14 +140,11 @@ class SearchService {
     const total = await Product.countByAdvancedSearchParams(searchParams);
     const paginationParams = getPaginationParams(page, limit, total);
 
-    const products = await Product.findByAdvancedSearchParams(
-      searchParams,
-      {
-        sortBy,
-        skip: paginationParams.skip,
-        limit: paginationParams.limit,
-      },
-    );
+    const products = await Product.findByAdvancedSearchParams(searchParams, {
+      sortBy,
+      skip: paginationParams.skip,
+      limit: paginationParams.limit,
+    });
 
     const facets = await this.getSearchFacets(searchParams);
 
@@ -171,13 +160,10 @@ class SearchService {
    * @returns {Promise<Object>} Facets data
    */
   async getSearchFacets(searchParams) {
-    const [priceRanges, categories, ratings] =
-      await Product.getSearchFacetsByParams(searchParams);
+    const [priceRanges, categories, ratings] = await Product.getSearchFacetsByParams(searchParams);
 
     return { priceRanges, categories, ratings };
   }
 }
 
 module.exports = new SearchService();
-
-

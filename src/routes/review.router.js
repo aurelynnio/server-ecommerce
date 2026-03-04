@@ -1,16 +1,12 @@
-
-const express = require("express");
+const express = require('express');
 
 const router = express.Router();
 
-const reviewController = require("../controllers/review.controller");
+const reviewController = require('../controllers/review.controller');
 
-const {
-  verifyAccessToken,
-  requireRole,
-} = require("../middlewares/auth.middleware");
+const { verifyAccessToken, requireRole } = require('../middlewares/auth.middleware');
 
-const validate = require("../middlewares/validate.middleware");
+const validate = require('../middlewares/validate.middleware');
 
 const {
   createReviewValidator,
@@ -18,7 +14,7 @@ const {
   reviewIdParamValidator,
   productIdParamValidator,
   getReviewsQueryValidator,
-} = require("../validations/review.validator");
+} = require('../validations/review.validator');
 
 /**
  * Public Routes
@@ -30,12 +26,12 @@ const {
  * @query   page, limit, rating, sort
  */
 router.get(
-  "/product/:productId",
+  '/product/:productId',
   validate({
     params: productIdParamValidator,
     query: getReviewsQueryValidator,
   }),
-  reviewController.getProductReviews
+  reviewController.getProductReviews,
 );
 
 /**
@@ -44,9 +40,9 @@ router.get(
  * @param   reviewId - Review ID
  */
 router.get(
-  "/:reviewId",
+  '/:reviewId',
   validate({ params: reviewIdParamValidator }),
-  reviewController.getReviewById
+  reviewController.getReviewById,
 );
 
 /**
@@ -57,12 +53,7 @@ router.get(
  * @access  Private (Authenticated users - must have purchased product)
  * @body    { productId, rating, comment, images? }
  */
-router.post(
-  "/",
-  verifyAccessToken,
-  validate(createReviewValidator),
-  reviewController.createReview
-);
+router.post('/', verifyAccessToken, validate(createReviewValidator), reviewController.createReview);
 
 /**
  * @desc    Get current user's reviews
@@ -70,10 +61,10 @@ router.post(
  * @query   page, limit
  */
 router.get(
-  "/user/me",
+  '/user/me',
   verifyAccessToken,
   validate({ query: getReviewsQueryValidator }),
-  reviewController.getUserReviews
+  reviewController.getUserReviews,
 );
 
 /**
@@ -82,10 +73,10 @@ router.get(
  * @param   productId - Product ID to check
  */
 router.get(
-  "/check/:productId",
+  '/check/:productId',
   verifyAccessToken,
   validate({ params: productIdParamValidator }),
-  reviewController.canUserReview
+  reviewController.canUserReview,
 );
 
 /**
@@ -95,13 +86,13 @@ router.get(
  * @body    { rating?, comment?, images? }
  */
 router.put(
-  "/:reviewId",
+  '/:reviewId',
   verifyAccessToken,
   validate({
     params: reviewIdParamValidator,
     body: updateReviewValidator,
   }),
-  reviewController.updateReview
+  reviewController.updateReview,
 );
 
 /**
@@ -110,10 +101,10 @@ router.put(
  * @param   reviewId - Review ID to delete
  */
 router.delete(
-  "/:reviewId",
+  '/:reviewId',
   verifyAccessToken,
   validate({ params: reviewIdParamValidator }),
-  reviewController.deleteReview
+  reviewController.deleteReview,
 );
 
 /**
@@ -124,11 +115,11 @@ router.delete(
  * @access  Private (Seller/Admin)
  */
 router.get(
-  "/seller/me",
+  '/seller/me',
   verifyAccessToken,
-  requireRole("seller", "admin"),
+  requireRole('seller', 'admin'),
   validate({ query: getReviewsQueryValidator }),
-  reviewController.getShopReviews
+  reviewController.getShopReviews,
 );
 
 /**
@@ -136,11 +127,11 @@ router.get(
  * @access  Private (Seller/Admin)
  */
 router.post(
-  "/seller/:reviewId/reply",
+  '/seller/:reviewId/reply',
   verifyAccessToken,
-  requireRole("seller", "admin"),
+  requireRole('seller', 'admin'),
   validate({ params: reviewIdParamValidator }),
-  reviewController.replyReview
+  reviewController.replyReview,
 );
 
 /**
@@ -151,11 +142,11 @@ router.post(
  * @access  Private (Admin)
  */
 router.get(
-  "/",
+  '/',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({ query: getReviewsQueryValidator }),
-  reviewController.getAllReviews
+  reviewController.getAllReviews,
 );
 
 /**
@@ -163,10 +154,10 @@ router.get(
  * @access  Private (Admin only)
  */
 router.get(
-  "/statistics/overview",
+  '/statistics/overview',
   verifyAccessToken,
-  requireRole("admin"),
-  reviewController.getReviewStatistics
+  requireRole('admin'),
+  reviewController.getReviewStatistics,
 );
 
 module.exports = router;

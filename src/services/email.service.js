@@ -1,31 +1,31 @@
-require("@babel/register")({
-  presets: ["@babel/preset-react", "@babel/preset-env"],
+require('@babel/register')({
+  presets: ['@babel/preset-react', '@babel/preset-env'],
   ignore: [/node_modules/],
-  extensions: [".jsx", ".js"],
+  extensions: ['.jsx', '.js'],
   cache: false,
 });
 
-const nodemailer = require("nodemailer");
-const React = require("react");
-const { render } = require("@react-email/render");
-const VerificationEmail = require("../emails/VerificationEmail").default;
-const logger = require("../utils/logger");
-const { StatusCodes } = require("http-status-codes");
-const { ApiError } = require("../middlewares/errorHandler.middleware");
+const nodemailer = require('nodemailer');
+const React = require('react');
+const { render } = require('@react-email/render');
+const VerificationEmail = require('../emails/VerificationEmail').default;
+const logger = require('../utils/logger');
+const { StatusCodes } = require('http-status-codes');
+const { ApiError } = require('../middlewares/errorHandler.middleware');
 
 let transporter = null;
 
 // Email configuration from environment variables
 const EMAIL_CONFIG = {
-  host: process.env.EMAIL_HOST || "smtp.gmail.com",
+  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
   port: Number(process.env.EMAIL_PORT) || 587,
-  secure: process.env.EMAIL_SECURE === "true",
+  secure: process.env.EMAIL_SECURE === 'true',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
   from: process.env.EMAIL_FROM,
-  baseUrl: process.env.EMAIL_BASE_URL || "https://cyhin.engineer",
+  baseUrl: process.env.EMAIL_BASE_URL || 'https://cyhin.engineer',
   maxConnections: Number(process.env.EMAIL_MAX_CONNECTIONS) || 5,
   maxMessages: Number(process.env.EMAIL_MAX_MESSAGES) || 100,
 };
@@ -63,14 +63,12 @@ const getTransporter = () => {
  * @param {String} code - Verification code
  * @param {String} type - Type of code: 'email_verification' or 'password_reset'
  */
-const sendVerificationCode = async (to, code, type = "email_verification") => {
+const sendVerificationCode = async (to, code, type = 'email_verification') => {
   try {
     const transporter = getTransporter();
 
     const subject =
-      type === "email_verification"
-        ? "Verify Your Email Address"
-        : "Reset Your Password";
+      type === 'email_verification' ? 'Verify Your Email Address' : 'Reset Your Password';
 
     const verificationLink = `${EMAIL_CONFIG.baseUrl}/verify-code?email=${to}&code=${code}`;
 
@@ -95,11 +93,8 @@ const sendVerificationCode = async (to, code, type = "email_verification") => {
       messageId: info.messageId,
     };
   } catch (error) {
-    logger.error("Error sending email:", { error: error.message });
-    throw new ApiError(
-      StatusCodes.SERVICE_UNAVAILABLE,
-      `Failed to send email: ${error.message}`,
-    );
+    logger.error('Error sending email:', { error: error.message });
+    throw new ApiError(StatusCodes.SERVICE_UNAVAILABLE, `Failed to send email: ${error.message}`);
   }
 };
 
@@ -109,7 +104,7 @@ const sendVerificationCode = async (to, code, type = "email_verification") => {
  * @param {String} code - Verification code
  */
 const sendEmailVerificationCode = async (to, code) => {
-  return sendVerificationCode(to, code, "email_verification");
+  return sendVerificationCode(to, code, 'email_verification');
 };
 
 /**
@@ -118,7 +113,7 @@ const sendEmailVerificationCode = async (to, code) => {
  * @param {String} code - Reset code
  */
 const sendPasswordResetCode = async (to, code) => {
-  return sendVerificationCode(to, code, "password_reset");
+  return sendVerificationCode(to, code, 'password_reset');
 };
 
 module.exports = {

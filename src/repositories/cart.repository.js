@@ -1,5 +1,5 @@
-const Cart = require("../models/cart.model");
-const BaseRepository = require("./base.repository");
+const Cart = require('../models/cart.model');
+const BaseRepository = require('./base.repository');
 
 class CartRepository extends BaseRepository {
   constructor() {
@@ -17,16 +17,16 @@ class CartRepository extends BaseRepository {
   findByUserIdWithItemDetails(userId) {
     return this.findOneByFilter({ userId })
       .populate({
-        path: "items.productId",
-        select: "name slug images price status tierVariations models shop variants sizes",
+        path: 'items.productId',
+        select: 'name slug images price status tierVariations models shop variants sizes',
         populate: [
-          { path: "category", select: "name slug" },
-          { path: "shop", select: "name logo" },
+          { path: 'category', select: 'name slug' },
+          { path: 'shop', select: 'name logo' },
         ],
       })
       .populate({
-        path: "items.shopId",
-        select: "name logo",
+        path: 'items.shopId',
+        select: 'name logo',
       })
       .lean();
   }
@@ -36,9 +36,7 @@ class CartRepository extends BaseRepository {
   }
 
   findByUserIdForCheckout(userId, session) {
-    return this.findOneByFilter({ userId })
-      .populate("items.productId")
-      .session(session);
+    return this.findOneByFilter({ userId }).populate('items.productId').session(session);
   }
 }
 

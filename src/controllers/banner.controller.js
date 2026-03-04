@@ -1,7 +1,7 @@
-const catchAsync = require("../configs/catchAsync");
-const bannerService = require("../services/banner.service");
-const { StatusCodes } = require("http-status-codes");
-const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
+const catchAsync = require('../configs/catchAsync');
+const bannerService = require('../services/banner.service');
+const { StatusCodes } = require('http-status-codes');
+const { sendSuccess, sendFail } = require('../shared/res/formatResponse');
 
 const BannerController = {
   /**
@@ -12,12 +12,7 @@ const BannerController = {
    */
   createBanner: catchAsync(async (req, res) => {
     const banner = await bannerService.createBanner(req.body, req.file);
-    return sendSuccess(
-      res,
-      banner,
-      "Banner created successfully",
-      StatusCodes.CREATED
-    );
+    return sendSuccess(res, banner, 'Banner created successfully', StatusCodes.CREATED);
   }),
 
   /**
@@ -34,7 +29,7 @@ const BannerController = {
       filter: { isActive: true, ...filter },
     });
 
-    return sendSuccess(res, result, "Get banners successfully", StatusCodes.OK);
+    return sendSuccess(res, result, 'Get banners successfully', StatusCodes.OK);
   }),
 
   /**
@@ -51,7 +46,7 @@ const BannerController = {
       filter,
     });
 
-    return sendSuccess(res, result, "Get all banners for admin successfully", StatusCodes.OK);
+    return sendSuccess(res, result, 'Get all banners for admin successfully', StatusCodes.OK);
   }),
 
   /**
@@ -63,10 +58,10 @@ const BannerController = {
   getBannerById: catchAsync(async (req, res) => {
     const banner = await bannerService.getBannerById(req.params.id);
     if (!banner) {
-      return sendFail(res, "Banner not found", StatusCodes.NOT_FOUND);
+      return sendFail(res, 'Banner not found', StatusCodes.NOT_FOUND);
     }
-    
-    return sendSuccess(res, banner, "Get banner successfully", StatusCodes.OK);
+
+    return sendSuccess(res, banner, 'Get banner successfully', StatusCodes.OK);
   }),
 
   /**
@@ -78,10 +73,10 @@ const BannerController = {
   updateBanner: catchAsync(async (req, res) => {
     const banner = await bannerService.updateBanner(req.params.id, req.body, req.file);
     if (!banner) {
-      return sendFail(res, "Banner not found", StatusCodes.NOT_FOUND);
+      return sendFail(res, 'Banner not found', StatusCodes.NOT_FOUND);
     }
-    
-    return sendSuccess(res, banner, "Update banner successfully", StatusCodes.OK);
+
+    return sendSuccess(res, banner, 'Update banner successfully', StatusCodes.OK);
   }),
 
   /**
@@ -93,9 +88,9 @@ const BannerController = {
   deleteBanner: catchAsync(async (req, res) => {
     const result = await bannerService.deleteBanner(req.params.id);
     if (!result) {
-      return sendFail(res, "Banner not found", StatusCodes.NOT_FOUND);
+      return sendFail(res, 'Banner not found', StatusCodes.NOT_FOUND);
     }
-    
+
     return sendSuccess(res, result, result.message, StatusCodes.OK);
   }),
 };

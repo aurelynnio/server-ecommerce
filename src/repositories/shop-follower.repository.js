@@ -1,5 +1,5 @@
-const ShopFollower = require("../models/shop-follower.model");
-const BaseRepository = require("./base.repository");
+const ShopFollower = require('../models/shop-follower.model');
+const BaseRepository = require('./base.repository');
 
 class ShopFollowerRepository extends BaseRepository {
   constructor() {
@@ -19,7 +19,7 @@ class ShopFollowerRepository extends BaseRepository {
   }
 
   findByUserSelectShopIds(userId) {
-    return this.findManyByFilter({ userId }).select("shopId").lean();
+    return this.findManyByFilter({ userId }).select('shopId').lean();
   }
 }
 

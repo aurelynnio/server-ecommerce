@@ -1,36 +1,36 @@
 const RESOURCES = {
-  PRODUCT: "product",
-  ORDER: "order",
-  USER: "user",
-  SHOP: "shop",
-  CATEGORY: "category",
-  VOUCHER: "voucher",
-  BANNER: "banner",
-  NOTIFICATION: "notification",
-  FLASH_SALE: "flash-sale",
-  REVIEW: "review",
-  CART: "cart",
-  WISHLIST: "wishlist",
-  SHIPPING: "shipping",
-  STATISTICS: "statistics",
-  CHAT: "chat",
-  SHOP_CATEGORY: "shop-category",
-  PAYMENT: "payment",
+  PRODUCT: 'product',
+  ORDER: 'order',
+  USER: 'user',
+  SHOP: 'shop',
+  CATEGORY: 'category',
+  VOUCHER: 'voucher',
+  BANNER: 'banner',
+  NOTIFICATION: 'notification',
+  FLASH_SALE: 'flash-sale',
+  REVIEW: 'review',
+  CART: 'cart',
+  WISHLIST: 'wishlist',
+  SHIPPING: 'shipping',
+  STATISTICS: 'statistics',
+  CHAT: 'chat',
+  SHOP_CATEGORY: 'shop-category',
+  PAYMENT: 'payment',
 };
 
 const ACTIONS = {
-  CREATE: "create",
-  READ: "read",
-  UPDATE: "update",
-  DELETE: "delete",
-  MANAGE: "manage",
+  CREATE: 'create',
+  READ: 'read',
+  UPDATE: 'update',
+  DELETE: 'delete',
+  MANAGE: 'manage',
 };
 
 const permission = (resource, action) => `${resource}:${action}`;
 
 const SPECIAL_PERMISSIONS = {
-  ADMIN_ACCESS: "admin:access",
-  SELLER_ACCESS: "seller:access",
+  ADMIN_ACCESS: 'admin:access',
+  SELLER_ACCESS: 'seller:access',
 };
 
 const buildPermissions = () => {
@@ -38,10 +38,7 @@ const buildPermissions = () => {
 
   for (const [resourceKey, resourceValue] of Object.entries(RESOURCES)) {
     for (const [actionKey, actionValue] of Object.entries(ACTIONS)) {
-      generated[`${resourceKey}_${actionKey}`] = permission(
-        resourceValue,
-        actionValue,
-      );
+      generated[`${resourceKey}_${actionKey}`] = permission(resourceValue, actionValue);
     }
   }
 
@@ -55,7 +52,7 @@ const PERMISSIONS = {
 };
 
 const ROLE_PERMISSIONS = {
-  admin: ["*"],
+  admin: ['*'],
   seller: [
     SPECIAL_PERMISSIONS.SELLER_ACCESS,
     PERMISSIONS.PRODUCT_CREATE,
@@ -107,8 +104,8 @@ const getPermissionsByResource = () => {
   const grouped = {};
 
   for (const value of Object.values(PERMISSIONS)) {
-    if (!value.includes(":")) continue;
-    const [resource] = value.split(":");
+    if (!value.includes(':')) continue;
+    const [resource] = value.split(':');
 
     if (!grouped[resource]) {
       grouped[resource] = [];
@@ -120,8 +117,8 @@ const getPermissionsByResource = () => {
 };
 
 const isValidPermission = (perm) => {
-  if (!perm || typeof perm !== "string") return false;
-  if (perm === "*") return true;
+  if (!perm || typeof perm !== 'string') return false;
+  if (perm === '*') return true;
   return ALL_PERMISSIONS_SET.has(perm);
 };
 
@@ -130,9 +127,9 @@ const expandManagePermissions = (permissions) => {
 
   for (const perm of permissions) {
     expanded.add(perm);
-    if (!perm.endsWith(":manage")) continue;
+    if (!perm.endsWith(':manage')) continue;
 
-    const [resource] = perm.split(":");
+    const [resource] = perm.split(':');
     expanded.add(permission(resource, ACTIONS.CREATE));
     expanded.add(permission(resource, ACTIONS.READ));
     expanded.add(permission(resource, ACTIONS.UPDATE));

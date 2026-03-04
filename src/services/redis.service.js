@@ -1,5 +1,5 @@
-const logger = require("../utils/logger");
-const redisClient = require("../configs/redis.config");
+const logger = require('../utils/logger');
+const redisClient = require('../configs/redis.config');
 
 class RedisService {
   constructor(redisClient) {
@@ -9,7 +9,7 @@ class RedisService {
   async set(key, value, ttl = 3600) {
     try {
       const stringValue = JSON.stringify(value);
-      await this.redisClient.set(key, stringValue, "EX", ttl);
+      await this.redisClient.set(key, stringValue, 'EX', ttl);
     } catch (error) {
       logger.error(`Redis Set Error [${key}]:`, { error });
     }
@@ -35,15 +35,15 @@ class RedisService {
 
   async delByPattern(pattern) {
     try {
-      let cursor = "0";
+      let cursor = '0';
       let deletedCount = 0;
 
       do {
         const [newCursor, keys] = await this.redisClient.scan(
           cursor,
-          "MATCH",
+          'MATCH',
           pattern,
-          "COUNT",
+          'COUNT',
           100,
         );
         cursor = newCursor;
@@ -52,12 +52,10 @@ class RedisService {
           await this.redisClient.del(...keys);
           deletedCount += keys.length;
         }
-      } while (cursor !== "0");
+      } while (cursor !== '0');
 
       if (deletedCount > 0) {
-        logger.info(
-          `Redis: Deleted ${deletedCount} keys matching pattern [${pattern}]`,
-        );
+        logger.info(`Redis: Deleted ${deletedCount} keys matching pattern [${pattern}]`);
       }
     } catch (error) {
       logger.error(`Redis DelPattern Error [${pattern}]:`, { error });

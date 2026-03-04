@@ -1,4 +1,4 @@
-const { Schema, model, Types } = require("mongoose");
+const { Schema, model, Types } = require('mongoose');
 
 const voucherSchema = new Schema(
   {
@@ -14,7 +14,7 @@ const voucherSchema = new Schema(
 
     type: {
       type: String,
-      enum: ["fixed_amount", "percentage"],
+      enum: ['fixed_amount', 'percentage'],
       required: true,
     },
     value: { type: Number, required: true }, // 10000 or 10 (%)
@@ -23,10 +23,10 @@ const voucherSchema = new Schema(
     // Scope: Shop or Platform
     scope: {
       type: String,
-      enum: ["shop", "platform"],
-      default: "shop",
+      enum: ['shop', 'platform'],
+      default: 'shop',
     },
-    shopId: { type: Types.ObjectId, ref: "Shop" }, // Required if scope is "shop"
+    shopId: { type: Types.ObjectId, ref: 'Shop' }, // Required if scope is "shop"
 
     minOrderValue: { type: Number, default: 0 },
 
@@ -43,11 +43,11 @@ const voucherSchema = new Schema(
   },
   {
     timestamps: true,
-    collection: "vouchers",
-  }
+    collection: 'vouchers',
+  },
 );
 
 voucherSchema.index({ shopId: 1 });
 voucherSchema.index({ startDate: 1, endDate: 1 });
 
-module.exports = model("Voucher", voucherSchema);
+module.exports = model('Voucher', voucherSchema);

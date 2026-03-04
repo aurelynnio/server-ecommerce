@@ -1,5 +1,5 @@
-const { StatusCodes } = require("http-status-codes");
-const { ApiError } = require("./errorHandler.middleware");
+const { StatusCodes } = require('http-status-codes');
+const { ApiError } = require('./errorHandler.middleware');
 
 /**
  * Middleware to parse JSON string fields from multipart/form-data
@@ -14,7 +14,7 @@ const parseJsonFields =
     const errors = [];
 
     fields.forEach((field) => {
-      if (req.body[field] && typeof req.body[field] === "string") {
+      if (req.body[field] && typeof req.body[field] === 'string') {
         try {
           req.body[field] = JSON.parse(req.body[field]);
         } catch (_error) {
@@ -24,7 +24,7 @@ const parseJsonFields =
     });
 
     if (errors.length > 0) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, errors.join(", "));
+      throw new ApiError(StatusCodes.BAD_REQUEST, errors.join(', '));
     }
 
     next();

@@ -1,20 +1,15 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const productController = require("../controllers/product.controller");
-const {
-  verifyAccessToken,
-  requireRole,
-} = require("../middlewares/auth.middleware");
+const productController = require('../controllers/product.controller');
+const { verifyAccessToken, requireRole } = require('../middlewares/auth.middleware');
 const {
   verifyShopOwnership,
   verifyProductOwnership,
-} = require("../middlewares/ownership.middleware");
-const upload = require("../configs/upload");
-const {
-  validateImageSignature,
-} = require("../middlewares/uploadSignature.middleware");
-const validate = require("../middlewares/validate.middleware");
-const parseJsonFields = require("../middlewares/parseJsonFields.middleware");
+} = require('../middlewares/ownership.middleware');
+const upload = require('../configs/upload');
+const { validateImageSignature } = require('../middlewares/uploadSignature.middleware');
+const validate = require('../middlewares/validate.middleware');
+const parseJsonFields = require('../middlewares/parseJsonFields.middleware');
 const {
   createProductValidator,
   updateProductValidator,
@@ -28,34 +23,26 @@ const {
   paginationQueryValidator,
   limitQueryValidator,
   searchQueryValidator,
-} = require("../validations/product.validator");
+} = require('../validations/product.validator');
 
 /**
  * @desc    Get all products with filters and pagination
  * @access  Public
  */
-router.get(
-  "/",
-  validate({ query: getProductsQueryValidator }),
-  productController.getAllProducts,
-);
+router.get('/', validate({ query: getProductsQueryValidator }), productController.getAllProducts);
 
 /**
  * @desc    Search products (autocomplete)
  * @access  Public
  */
-router.get(
-  "/search",
-  validate({ query: searchQueryValidator }),
-  productController.searchProducts,
-);
+router.get('/search', validate({ query: searchQueryValidator }), productController.searchProducts);
 
 /**
  * @desc    Get featured products
  * @access  Public
  */
 router.get(
-  "/featured",
+  '/featured',
   validate({ query: limitQueryValidator }),
   productController.getFeaturedProducts,
 );
@@ -64,20 +51,20 @@ router.get(
  * @desc    Get new arrival products
  * @access  Public
  */
-router.get("/new-arrivals", productController.getNewArrivalProducts);
+router.get('/new-arrivals', productController.getNewArrivalProducts);
 
 /**
  * @desc    Get products on sale
  * @access  Public
  */
-router.get("/on-sale", productController.getOnSaleProducts);
+router.get('/on-sale', productController.getOnSaleProducts);
 
 /**
  * @desc    Get product by slug
  * @access  Public
  */
 router.get(
-  "/slug/:slug",
+  '/slug/:slug',
   validate({ params: slugParamValidator }),
   productController.getProductBySlug,
 );
@@ -87,7 +74,7 @@ router.get(
  * @access  Public
  */
 router.get(
-  "/category/:slug",
+  '/category/:slug',
   validate({
     params: categorySlugParamValidator,
     query: paginationQueryValidator,
@@ -100,7 +87,7 @@ router.get(
  * @access  Public
  */
 router.get(
-  "/related/:id",
+  '/related/:id',
   validate({ params: mongoIdParamValidator }),
   productController.getRelatedProducts,
 );
@@ -110,24 +97,24 @@ router.get(
  * @access  Private (Seller or Admin)
  */
 router.put(
-  "/seller/:id",
+  '/seller/:id',
   verifyAccessToken,
-  requireRole("seller", "admin"),
+  requireRole('seller', 'admin'),
   verifyShopOwnership,
   verifyProductOwnership,
   upload.any(),
   validateImageSignature,
   parseJsonFields([
-    "price",
-    "variants",
-    "tags",
-    "tierVariations",
-    "models",
-    "attributes",
-    "dimensions",
-    "variantImageMapping",
-    "existingDescriptionImages",
-    "existingVariantImages",
+    'price',
+    'variants',
+    'tags',
+    'tierVariations',
+    'models',
+    'attributes',
+    'dimensions',
+    'variantImageMapping',
+    'existingDescriptionImages',
+    'existingVariantImages',
   ]),
   validate({ params: mongoIdParamValidator, body: updateProductValidator }),
   productController.updateProductBySeller,
@@ -138,9 +125,9 @@ router.put(
  * @access  Private (Seller or Admin)
  */
 router.delete(
-  "/seller/:id",
+  '/seller/:id',
   verifyAccessToken,
-  requireRole("seller", "admin"),
+  requireRole('seller', 'admin'),
   verifyShopOwnership,
   verifyProductOwnership,
   validate({ params: mongoIdParamValidator }),
@@ -151,31 +138,27 @@ router.delete(
  * @desc    Get product by ID
  * @access  Public
  */
-router.get(
-  "/:id",
-  validate({ params: mongoIdParamValidator }),
-  productController.getProductById,
-);
+router.get('/:id', validate({ params: mongoIdParamValidator }), productController.getProductById);
 
 /**
  * @desc    Create new product
  * @access  Private (Seller/Admin)
  */
 router.post(
-  "/",
+  '/',
   verifyAccessToken,
-  requireRole("seller", "admin"),
+  requireRole('seller', 'admin'),
   upload.any(),
   validateImageSignature,
   parseJsonFields([
-    "price",
-    "variants",
-    "tags",
-    "tierVariations",
-    "models",
-    "attributes",
-    "dimensions",
-    "variantImageMapping",
+    'price',
+    'variants',
+    'tags',
+    'tierVariations',
+    'models',
+    'attributes',
+    'dimensions',
+    'variantImageMapping',
   ]),
   validate(createProductValidator),
   productController.createProduct,
@@ -186,14 +169,14 @@ router.post(
  * @access  Private (Seller/Admin)
  */
 router.post(
-  "/seller/:id/variants",
+  '/seller/:id/variants',
   verifyAccessToken,
-  requireRole("seller", "admin"),
+  requireRole('seller', 'admin'),
   verifyShopOwnership,
   verifyProductOwnership,
-  upload.array("images", 10),
+  upload.array('images', 10),
   validateImageSignature,
-  parseJsonFields(["price"]),
+  parseJsonFields(['price']),
   validate({ params: mongoIdParamValidator, body: addVariantValidator }),
   productController.addVariantBySeller,
 );
@@ -203,9 +186,9 @@ router.post(
  * @access  Private (Seller/Admin)
  */
 router.put(
-  "/seller/:id/variants/:variantId",
+  '/seller/:id/variants/:variantId',
   verifyAccessToken,
-  requireRole("seller", "admin"),
+  requireRole('seller', 'admin'),
   verifyShopOwnership,
   verifyProductOwnership,
   validate({ params: variantIdsParamValidator, body: updateVariantValidator }),
@@ -217,9 +200,9 @@ router.put(
  * @access  Private (Seller/Admin)
  */
 router.delete(
-  "/seller/:id/variants/:variantId",
+  '/seller/:id/variants/:variantId',
   verifyAccessToken,
-  requireRole("seller", "admin"),
+  requireRole('seller', 'admin'),
   verifyShopOwnership,
   verifyProductOwnership,
   validate({ params: variantIdsParamValidator }),
@@ -231,9 +214,9 @@ router.delete(
  * @access  Private (Admin only)
  */
 router.delete(
-  "/:id/permanent",
+  '/:id/permanent',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({ params: mongoIdParamValidator }),
   productController.permanentDeleteProduct,
 );

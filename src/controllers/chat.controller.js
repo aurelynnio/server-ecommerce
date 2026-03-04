@@ -1,7 +1,7 @@
-const chatService = require("../services/chat.service");
-const catchAsync = require("../configs/catchAsync");
-const { sendSuccess } = require("../shared/res/formatResponse");
-const { StatusCodes } = require("http-status-codes");
+const chatService = require('../services/chat.service');
+const catchAsync = require('../configs/catchAsync');
+const { sendSuccess } = require('../shared/res/formatResponse');
+const { StatusCodes } = require('http-status-codes');
 
 const ChatController = {
   /**
@@ -11,16 +11,8 @@ const ChatController = {
    * @returns {Promise<any>}
    */
   startConversation: catchAsync(async (req, res) => {
-    const conversation = await chatService.startConversation(
-      req.user.userId,
-      req.body
-    );
-    return sendSuccess(
-      res,
-      conversation,
-      "Conversation started",
-      StatusCodes.OK
-    );
+    const conversation = await chatService.startConversation(req.user.userId, req.body);
+    return sendSuccess(res, conversation, 'Conversation started', StatusCodes.OK);
   }),
 
   /**
@@ -31,7 +23,7 @@ const ChatController = {
    */
   sendMessage: catchAsync(async (req, res) => {
     const info = await chatService.sendMessage(req.user.userId, req.body);
-    return sendSuccess(res, info, "Message sent", StatusCodes.CREATED);
+    return sendSuccess(res, info, 'Message sent', StatusCodes.CREATED);
   }),
 
   /**
@@ -42,12 +34,7 @@ const ChatController = {
    */
   getMyConversations: catchAsync(async (req, res) => {
     const conversations = await chatService.getMyConversations(req.user.userId);
-    return sendSuccess(
-      res,
-      conversations,
-      "Get conversations success",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, conversations, 'Get conversations success', StatusCodes.OK);
   }),
 
   /**
@@ -58,7 +45,7 @@ const ChatController = {
    */
   getMessages: catchAsync(async (req, res) => {
     const messages = await chatService.getMessages(req.params.conversationId, req.query);
-    return sendSuccess(res, messages, "Get messages success", StatusCodes.OK);
+    return sendSuccess(res, messages, 'Get messages success', StatusCodes.OK);
   }),
 
   /**
@@ -71,7 +58,7 @@ const ChatController = {
     const { conversationId } = req.params;
     const userId = req.user.userId;
     const result = await chatService.markAsRead(conversationId, userId);
-    return sendSuccess(res, result, "Messages marked as read", StatusCodes.OK);
+    return sendSuccess(res, result, 'Messages marked as read', StatusCodes.OK);
   }),
 };
 

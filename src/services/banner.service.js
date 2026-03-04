@@ -1,7 +1,6 @@
-const bannerRepository = require("../repositories/banner.repository");
-const { uploadImage } = require("../configs/cloudinary");
-const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
-
+const bannerRepository = require('../repositories/banner.repository');
+const { uploadImage } = require('../configs/cloudinary');
+const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 
 /**
  * Service handling banner operations
@@ -22,7 +21,7 @@ class BannerService {
    */
   async createBanner(payload, file) {
     if (file) {
-      const result = await uploadImage(file.buffer, "banners");
+      const result = await uploadImage(file.buffer, 'banners');
       payload.imageUrl = result.secure_url;
     }
     return await bannerRepository.create(payload);
@@ -47,7 +46,6 @@ class BannerService {
     return buildPaginationResponse(banners, paginationParams);
   }
 
-
   /**
    * Get banner by ID
    * @param {string} id - Banner ID
@@ -66,7 +64,7 @@ class BannerService {
    */
   async updateBanner(id, payload, file) {
     if (file) {
-      const result = await uploadImage(file.buffer, "banners");
+      const result = await uploadImage(file.buffer, 'banners');
       payload.imageUrl = result.secure_url;
     }
     return await bannerRepository.updateById(id, payload);
@@ -80,7 +78,7 @@ class BannerService {
   async deleteBanner(id) {
     const result = await bannerRepository.deleteById(id);
     if (!result) return null;
-    return { message: "Banner deleted successfully" };
+    return { message: 'Banner deleted successfully' };
   }
 }
 

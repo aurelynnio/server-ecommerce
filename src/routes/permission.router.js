@@ -3,22 +3,19 @@
  * API endpoints for permission management
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const permissionController = require("../controllers/permission.controller");
-const {
-  verifyAccessToken,
-  requireRole,
-} = require("../middlewares/auth.middleware");
+const permissionController = require('../controllers/permission.controller');
+const { verifyAccessToken, requireRole } = require('../middlewares/auth.middleware');
 
-const validate = require("../middlewares/validate.middleware");
+const validate = require('../middlewares/validate.middleware');
 
 const {
   userIdParamValidator,
   updatePermissionsValidator,
   grantRevokePermissionValidator,
   auditLogsQueryValidator,
-} = require("../validations/permission.validator");
+} = require('../validations/permission.validator');
 
 /**
  * Public Routes
@@ -27,13 +24,13 @@ const {
  * @desc    Get all available permissions
  * @access  Public
  */
-router.get("/", permissionController.getAllPermissions);
+router.get('/', permissionController.getAllPermissions);
 
 /**
  * @desc    Get default permissions for each role
  * @access  Public
  */
-router.get("/roles", permissionController.getRolePermissions);
+router.get('/roles', permissionController.getRolePermissions);
 
 /**
  * Protected Routes (Authenticated users)
@@ -42,7 +39,7 @@ router.get("/roles", permissionController.getRolePermissions);
  * @desc    Get current user's effective permissions
  * @access  Private (Authenticated users)
  */
-router.get("/me", verifyAccessToken, permissionController.getMyPermissions);
+router.get('/me', verifyAccessToken, permissionController.getMyPermissions);
 
 /**
  * Admin Routes
@@ -53,9 +50,9 @@ router.get("/me", verifyAccessToken, permissionController.getMyPermissions);
  * @query   { page, limit, userId, action }
  */
 router.get(
-  "/audit",
+  '/audit',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({ query: auditLogsQueryValidator }),
   permissionController.getAuditLogs,
 );
@@ -66,9 +63,9 @@ router.get(
  * @param   userId - User ID
  */
 router.get(
-  "/user/:userId",
+  '/user/:userId',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({ params: userIdParamValidator }),
   permissionController.getUserPermissions,
 );
@@ -80,9 +77,9 @@ router.get(
  * @body    { permissions: string[] }
  */
 router.put(
-  "/user/:userId",
+  '/user/:userId',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({ params: userIdParamValidator, body: updatePermissionsValidator }),
   permissionController.updateUserPermissions,
 );
@@ -94,9 +91,9 @@ router.put(
  * @body    { permission: string }
  */
 router.post(
-  "/user/:userId/grant",
+  '/user/:userId/grant',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({
     params: userIdParamValidator,
     body: grantRevokePermissionValidator,
@@ -111,9 +108,9 @@ router.post(
  * @body    { permission: string }
  */
 router.post(
-  "/user/:userId/revoke",
+  '/user/:userId/revoke',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({
     params: userIdParamValidator,
     body: grantRevokePermissionValidator,

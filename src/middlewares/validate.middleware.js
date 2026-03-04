@@ -1,5 +1,5 @@
-const { ApiError } = require("./errorHandler.middleware");
-const { StatusCodes } = require("http-status-codes");
+const { ApiError } = require('./errorHandler.middleware');
+const { StatusCodes } = require('http-status-codes');
 
 /**
  * Middleware to validate request data using Joi schemas
@@ -34,7 +34,7 @@ const validate = (schemaParam) => (req, res, next) => {
   });
 
   if (validationErrors.length > 0) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, validationErrors.join(", "));
+    throw new ApiError(StatusCodes.BAD_REQUEST, validationErrors.join(', '));
   }
 
   next();

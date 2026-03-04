@@ -1,12 +1,12 @@
-const { Schema, model, Types } = require("mongoose");
+const { Schema, model, Types } = require('mongoose');
 
 const shippingRuleSchema = new Schema(
   {
     name: { type: String, required: true }, // e.g: "Standard"
     type: {
       type: String,
-      enum: ["fixed", "weight_based", "quantity_based"],
-      default: "fixed",
+      enum: ['fixed', 'weight_based', 'quantity_based'],
+      default: 'fixed',
     },
     baseFee: { type: Number, required: true, min: 0 },
 
@@ -22,17 +22,17 @@ const shippingRuleSchema = new Schema(
 
 const shippingTemplateSchema = new Schema(
   {
-    shop: { type: Types.ObjectId, ref: "Shop", required: true },
+    shop: { type: Types.ObjectId, ref: 'Shop', required: true },
     name: { type: String, required: true }, // e.g. "Free ship for light items"
     isDefault: { type: Boolean, default: false },
     rules: [shippingRuleSchema],
   },
   {
     timestamps: true,
-    collection: "shipping_templates",
+    collection: 'shipping_templates',
   },
 );
 
 shippingTemplateSchema.index({ shop: 1 });
 
-module.exports = model("ShippingTemplate", shippingTemplateSchema);
+module.exports = model('ShippingTemplate', shippingTemplateSchema);

@@ -30,7 +30,7 @@ const permissionAuditSchema = new Schema(
   {
     timestamps: true,
     collection: 'permission_audits',
-  }
+  },
 );
 
 // Indexes for efficient querying

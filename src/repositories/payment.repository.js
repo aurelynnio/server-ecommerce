@@ -1,5 +1,5 @@
-const Payment = require("../models/payment.model");
-const BaseRepository = require("./base.repository");
+const Payment = require('../models/payment.model');
+const BaseRepository = require('./base.repository');
 
 class PaymentRepository extends BaseRepository {
   constructor() {
@@ -11,15 +11,13 @@ class PaymentRepository extends BaseRepository {
   }
 
   findByOrderIdWithOrderAndUser(orderId) {
-    return this.findOneByFilter({ orderId })
-      .populate("orderId")
-      .populate("userId", "email name");
+    return this.findOneByFilter({ orderId }).populate('orderId').populate('userId', 'email name');
   }
 
   findByTransactionIdWithOrderAndUser(transactionId) {
     return this.findOneByFilter({ transactionId })
-      .populate("orderId")
-      .populate("userId", "email name");
+      .populate('orderId')
+      .populate('userId', 'email name');
   }
 }
 

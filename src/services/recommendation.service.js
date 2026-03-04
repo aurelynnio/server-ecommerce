@@ -1,10 +1,9 @@
-const Product = require("../repositories/product.repository");
-const Order = require("../repositories/order.repository");
-const Wishlist = require("../repositories/wishlist.repository");
-const redisService = require("./redis.service");
-const { StatusCodes } = require("http-status-codes");
-const { ApiError } = require("../middlewares/errorHandler.middleware");
-
+const Product = require('../repositories/product.repository');
+const Order = require('../repositories/order.repository');
+const Wishlist = require('../repositories/wishlist.repository');
+const redisService = require('./redis.service');
+const { StatusCodes } = require('http-status-codes');
+const { ApiError } = require('../middlewares/errorHandler.middleware');
 
 /**
  * Service handling product recommendations
@@ -26,13 +25,11 @@ class RecommendationService {
     const orders = await Order.findRecentNonCancelledOrdersByUser(userId, 10);
 
     const purchasedProductIds = orders.flatMap((o) =>
-      o.products.map((p) => p.productId.toString())
+      o.products.map((p) => p.productId.toString()),
     );
 
     // Get categories from purchased products
-    const purchasedProducts = await Product.findByIdsSelectCategory(
-      purchasedProductIds,
-    );
+    const purchasedProducts = await Product.findByIdsSelectCategory(purchasedProductIds);
 
     const categoryIds = [...new Set(purchasedProducts.map((p) => p.category?.toString()))];
 
@@ -47,11 +44,7 @@ class RecommendationService {
     let recommendations = [];
 
     if (categoryIds.length > 0) {
-      recommendations = await Product.findPersonalizedByCategory(
-        categoryIds,
-        excludeIds,
-        limit,
-      );
+      recommendations = await Product.findPersonalizedByCategory(categoryIds, excludeIds, limit);
     }
 
     // If not enough, fill with popular products
@@ -77,7 +70,7 @@ class RecommendationService {
    * @returns {Promise<Array>} Popular products
    */
   async getGuestRecommendations(limit = 20) {
-    const cacheKey = "recommendations:guest";
+    const cacheKey = 'recommendations:guest';
     const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
@@ -133,9 +126,8 @@ class RecommendationService {
   async getSimilarProducts(productId, limit = 10) {
     const product = await Product.findById(productId);
     if (!product) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
     }
-
 
     const priceRange = 0.3; // 30% price difference
     const minPrice = product.price.currentPrice * (1 - priceRange);
@@ -227,5 +219,3 @@ class RecommendationService {
 }
 
 module.exports = new RecommendationService();
-
-

@@ -1,9 +1,9 @@
-const catchAsync = require("../configs/catchAsync");
-const authService = require("../services/auth.service");
-const { sendFail, sendSuccess } = require("../shared/res/formatResponse");
-const parseDurationMs = require("../utils/parseDurationMs");
+const catchAsync = require('../configs/catchAsync');
+const authService = require('../services/auth.service');
+const { sendFail, sendSuccess } = require('../shared/res/formatResponse');
+const parseDurationMs = require('../utils/parseDurationMs');
 
-const { StatusCodes } = require("http-status-codes");
+const { StatusCodes } = require('http-status-codes');
 
 const AuthController = {
   /**
@@ -17,8 +17,8 @@ const AuthController = {
     return sendSuccess(
       res,
       result,
-      "Registration successful. Please verify your email.",
-      StatusCodes.CREATED
+      'Registration successful. Please verify your email.',
+      StatusCodes.CREATED,
     );
   }),
 
@@ -35,33 +35,25 @@ const AuthController = {
 
     const refreshTtlMs = parseDurationMs(
       process.env.JWT_REFRESH_EXPIRES_IN,
-      16 * 24 * 60 * 60 * 1000
+      16 * 24 * 60 * 60 * 1000,
     );
-    const accessTtlMs = parseDurationMs(
-      process.env.JWT_ACCESS_EXPIRES_IN,
-      30 * 60 * 1000
-    );
+    const accessTtlMs = parseDurationMs(process.env.JWT_ACCESS_EXPIRES_IN, 30 * 60 * 1000);
 
-    res.cookie("refreshToken", refreshToken, {
+    res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
       maxAge: refreshTtlMs,
     });
 
-    res.cookie("accessToken", accessToken, {
+    res.cookie('accessToken', accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
       maxAge: accessTtlMs,
     });
 
-    return sendSuccess(
-      res,
-      user,
-      "Login successful",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, user, 'Login successful', StatusCodes.OK);
   }),
 
   /**
@@ -73,12 +65,7 @@ const AuthController = {
   sendVerificationCode: catchAsync(async (req, res) => {
     const { email } = req.body;
     const result = await authService.sendVerificationCode(email);
-    return sendSuccess(
-      res,
-      result,
-      "Verification code sent successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, result, 'Verification code sent successfully', StatusCodes.OK);
   }),
 
   /**
@@ -90,12 +77,7 @@ const AuthController = {
   verifyEmail: catchAsync(async (req, res) => {
     const { email, code } = req.body;
     const result = await authService.verifyEmail(email, code);
-    return sendSuccess(
-      res,
-      result.user,
-      "Email verified successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, result.user, 'Email verified successfully', StatusCodes.OK);
   }),
 
   /**
@@ -107,12 +89,7 @@ const AuthController = {
   forgotPassword: catchAsync(async (req, res) => {
     const { email } = req.body;
     const result = await authService.forgotPassword(email);
-    return sendSuccess(
-      res,
-      result,
-      "Password reset code sent to your email",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, result, 'Password reset code sent to your email', StatusCodes.OK);
   }),
 
   /**
@@ -124,12 +101,7 @@ const AuthController = {
   resetPassword: catchAsync(async (req, res) => {
     const { email, code, newPassword } = req.body;
     const result = await authService.resetPassword(email, code, newPassword);
-    return sendSuccess(
-      res,
-      result,
-      "Password reset successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, result, 'Password reset successfully', StatusCodes.OK);
   }),
 
   /**
@@ -142,36 +114,29 @@ const AuthController = {
     const refreshToken = req.cookies?.refreshToken;
 
     if (!refreshToken) {
-      return sendFail(
-        res,
-        "Refresh token is required",
-        StatusCodes.BAD_REQUEST
-      );
+      return sendFail(res, 'Refresh token is required', StatusCodes.BAD_REQUEST);
     }
 
     const result = await authService.refreshAccessToken(refreshToken);
 
-    const accessTtlMs = parseDurationMs(
-      process.env.JWT_ACCESS_EXPIRES_IN,
-      30 * 60 * 1000
-    );
+    const accessTtlMs = parseDurationMs(process.env.JWT_ACCESS_EXPIRES_IN, 30 * 60 * 1000);
     const refreshTtlMs = parseDurationMs(
       process.env.JWT_REFRESH_EXPIRES_IN,
-      16 * 24 * 60 * 60 * 1000
+      16 * 24 * 60 * 60 * 1000,
     );
 
-    res.cookie("accessToken", result.accessToken, {
+    res.cookie('accessToken', result.accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
       maxAge: accessTtlMs,
     });
 
     if (result.refreshToken) {
-      res.cookie("refreshToken", result.refreshToken, {
+      res.cookie('refreshToken', result.refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
         maxAge: refreshTtlMs,
       });
     }
@@ -179,8 +144,8 @@ const AuthController = {
     return sendSuccess(
       res,
       { permissions: result.permissions },
-      "Access token refreshed successfully",
-      StatusCodes.OK
+      'Access token refreshed successfully',
+      StatusCodes.OK,
     );
   }),
 
@@ -196,19 +161,19 @@ const AuthController = {
       await authService.revokeRefreshToken(refreshToken);
     }
 
-    res.clearCookie("accessToken", {
+    res.clearCookie('accessToken', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
     });
 
-    res.clearCookie("refreshToken", {
+    res.clearCookie('refreshToken', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
     });
 
-    return sendSuccess(res, null, "Logged out successfully", StatusCodes.OK);
+    return sendSuccess(res, null, 'Logged out successfully', StatusCodes.OK);
   }),
 
   /**
@@ -222,20 +187,11 @@ const AuthController = {
     const userId = req.user?.userId;
 
     if (!userId) {
-      return sendFail(res, "Unauthorized", StatusCodes.UNAUTHORIZED);
+      return sendFail(res, 'Unauthorized', StatusCodes.UNAUTHORIZED);
     }
 
-    const result = await authService.changePassword(
-      userId,
-      oldPassword,
-      newPassword
-    );
-    return sendSuccess(
-      res,
-      result,
-      "Password changed successfully",
-      StatusCodes.OK
-    );
+    const result = await authService.changePassword(userId, oldPassword, newPassword);
+    return sendSuccess(res, result, 'Password changed successfully', StatusCodes.OK);
   }),
 };
 

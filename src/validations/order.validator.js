@@ -1,6 +1,6 @@
-const Joi = require("joi");
-const { objectId, pagination } = require("./common.validator");
-const { sanitizedString } = require("./sanitize");
+const Joi = require('joi');
+const { objectId, pagination } = require('./common.validator');
+const { sanitizedString } = require('./sanitize');
 
 const shippingAddressSchema = Joi.object({
   fullName: sanitizedString().min(2).max(100).required(),
@@ -9,16 +9,16 @@ const shippingAddressSchema = Joi.object({
     .required(),
   address: sanitizedString().min(5).required(),
   city: sanitizedString().required(),
-  district: sanitizedString().allow(""),
-  ward: sanitizedString().allow(""),
-  note: sanitizedString().allow(""),
+  district: sanitizedString().allow(''),
+  ward: sanitizedString().allow(''),
+  note: sanitizedString().allow(''),
 });
 
 const createOrderValidator = Joi.object({
   cartItemIds: Joi.array().items(objectId).min(1).required(),
   shippingAddress: shippingAddressSchema.required(),
-  paymentMethod: Joi.string().valid("cod", "vnpay", "momo").default("cod"),
-  platformVoucher: Joi.string().uppercase().trim().allow("", null),
+  paymentMethod: Joi.string().valid('cod', 'vnpay', 'momo').default('cod'),
+  platformVoucher: Joi.string().uppercase().trim().allow('', null),
   shopVouchers: Joi.array()
     .items(
       Joi.object({
@@ -27,20 +27,12 @@ const createOrderValidator = Joi.object({
       }),
     )
     .default([]),
-  note: sanitizedString().allow(""),
+  note: sanitizedString().allow(''),
 });
 
 const updateOrderStatusValidator = Joi.object({
   status: Joi.string()
-    .valid(
-      "pending",
-      "confirmed",
-      "processing",
-      "shipped",
-      "delivered",
-      "cancelled",
-      "returned",
-    )
+    .valid('pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'returned')
     .required(),
 });
 
@@ -50,16 +42,16 @@ const orderIdParamValidator = Joi.object({
 const getOrdersQueryValidator = Joi.object({
   ...pagination,
   status: Joi.string().valid(
-    "pending",
-    "confirmed",
-    "processing",
-    "shipped",
-    "delivered",
-    "cancelled",
-    "returned",
+    'pending',
+    'confirmed',
+    'processing',
+    'shipped',
+    'delivered',
+    'cancelled',
+    'returned',
   ),
-  paymentStatus: Joi.string().valid("unpaid", "paid", "refunded"),
-  paymentMethod: Joi.string().valid("cod", "vnpay", "momo"),
+  paymentStatus: Joi.string().valid('unpaid', 'paid', 'refunded'),
+  paymentMethod: Joi.string().valid('cod', 'vnpay', 'momo'),
   userId: objectId,
   shop: objectId,
 });

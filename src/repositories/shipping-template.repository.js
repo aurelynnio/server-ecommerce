@@ -1,4 +1,4 @@
-const ShippingTemplate = require("../models/shipping.template.model");
+const ShippingTemplate = require('../models/shipping.template.model');
 
 class ShippingTemplateRepository {
   create(payload) {
@@ -10,11 +10,9 @@ class ShippingTemplateRepository {
   }
 
   findByIdAndShopIdAndUpdate(templateId, shopId, updates) {
-    return ShippingTemplate.findOneAndUpdate(
-      { _id: templateId, shop: shopId },
-      updates,
-      { new: true },
-    );
+    return ShippingTemplate.findOneAndUpdate({ _id: templateId, shop: shopId }, updates, {
+      new: true,
+    });
   }
 
   findByIdAndShopIdAndDelete(templateId, shopId) {

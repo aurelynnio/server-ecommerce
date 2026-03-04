@@ -1,5 +1,5 @@
-const VoucherUsage = require("../models/voucher-usage.model");
-const BaseRepository = require("./base.repository");
+const VoucherUsage = require('../models/voucher-usage.model');
+const BaseRepository = require('./base.repository');
 
 class VoucherUsageRepository extends BaseRepository {
   constructor() {
@@ -13,7 +13,7 @@ class VoucherUsageRepository extends BaseRepository {
   aggregateUsageByVoucherIdsAndUser(voucherIds, userObjectId) {
     return this.aggregateByPipeline([
       { $match: { voucherId: { $in: voucherIds }, userId: userObjectId } },
-      { $group: { _id: "$voucherId", count: { $sum: 1 } } },
+      { $group: { _id: '$voucherId', count: { $sum: 1 } } },
     ]);
   }
 }

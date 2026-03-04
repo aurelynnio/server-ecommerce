@@ -1,5 +1,5 @@
-const Order = require("../models/order.model");
-const BaseRepository = require("./base.repository");
+const Order = require('../models/order.model');
+const BaseRepository = require('./base.repository');
 
 class OrderRepository extends BaseRepository {
   constructor() {
@@ -25,10 +25,10 @@ class OrderRepository extends BaseRepository {
       {
         $facet: {
           totalRevenue: [
-            { $match: { paymentStatus: "paid" } },
-            { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+            { $match: { paymentStatus: 'paid' } },
+            { $group: { _id: null, total: { $sum: '$totalAmount' } } },
           ],
-          totalOrders: [{ $count: "count" }],
+          totalOrders: [{ $count: 'count' }],
         },
       },
     ]);
@@ -38,7 +38,7 @@ class OrderRepository extends BaseRepository {
     return this.findManyByFilter()
       .sort({ createdAt: -1 })
       .limit(limit)
-      .populate("userId", "username email avatar")
+      .populate('userId', 'username email avatar')
       .lean();
   }
 
@@ -49,25 +49,25 @@ class OrderRepository extends BaseRepository {
       {
         $match: {
           ...extraMatch,
-          status: { $ne: "cancelled" },
+          status: { $ne: 'cancelled' },
           createdAt: { $gte: fromDate },
         },
       },
       {
         $group: {
           _id: {
-            month: { $month: "$createdAt" },
-            year: { $year: "$createdAt" },
+            month: { $month: '$createdAt' },
+            year: { $year: '$createdAt' },
           },
           revenue: {
             $sum: {
-              $cond: [{ $eq: ["$paymentStatus", "paid"] }, "$totalAmount", 0],
+              $cond: [{ $eq: ['$paymentStatus', 'paid'] }, '$totalAmount', 0],
             },
           },
           orders: { $sum: 1 },
         },
       },
-      { $sort: { "_id.year": 1, "_id.month": 1 } },
+      { $sort: { '_id.year': 1, '_id.month': 1 } },
     ]);
   }
 
@@ -78,14 +78,14 @@ class OrderRepository extends BaseRepository {
   aggregateStatusCountsByShopId(shopId) {
     return this.aggregateByPipeline([
       { $match: { shopId } },
-      { $group: { _id: "$status", count: { $sum: 1 } } },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
     ]);
   }
 
   aggregatePaidRevenueByShopId(shopId) {
     return this.aggregateByPipeline([
-      { $match: { shopId, paymentStatus: "paid" } },
-      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+      { $match: { shopId, paymentStatus: 'paid' } },
+      { $group: { _id: null, total: { $sum: '$totalAmount' } } },
     ]);
   }
 
@@ -93,8 +93,8 @@ class OrderRepository extends BaseRepository {
     return this.findManyByFilter({ shopId })
       .sort({ createdAt: -1 })
       .limit(limit)
-      .populate("userId", "username avatar")
-      .select("_id status totalAmount createdAt paymentStatus")
+      .populate('userId', 'username avatar')
+      .select('_id status totalAmount createdAt paymentStatus')
       .lean();
   }
 
@@ -104,47 +104,43 @@ class OrderRepository extends BaseRepository {
 
   findByUserIdWithShopAndProducts(userId) {
     return this.findManyByFilter({ userId })
-      .populate("shopId", "name logo")
-      .populate("products.productId", "name slug")
+      .populate('shopId', 'name logo')
+      .populate('products.productId', 'name slug')
       .sort({ createdAt: -1 })
       .lean();
   }
 
   findByShopIdWithUser(shopId) {
     return this.findManyByFilter({ shopId })
-      .populate("userId", "username")
+      .populate('userId', 'username')
       .sort({ createdAt: -1 })
       .lean();
   }
 
   countByShopWithFilters(shopId, { status, paymentStatus } = {}) {
     const query = { shopId };
-    if (status && status !== "all") {
+    if (status && status !== 'all') {
       query.status = status;
     }
-    if (paymentStatus && paymentStatus !== "all") {
+    if (paymentStatus && paymentStatus !== 'all') {
       query.paymentStatus = paymentStatus;
     }
 
     return this.countByFilter(query);
   }
 
-  findByShopWithFilters(
-    shopId,
-    { status, paymentStatus } = {},
-    { skip = 0, limit = 10 } = {},
-  ) {
+  findByShopWithFilters(shopId, { status, paymentStatus } = {}, { skip = 0, limit = 10 } = {}) {
     const query = { shopId };
-    if (status && status !== "all") {
+    if (status && status !== 'all') {
       query.status = status;
     }
-    if (paymentStatus && paymentStatus !== "all") {
+    if (paymentStatus && paymentStatus !== 'all') {
       query.paymentStatus = paymentStatus;
     }
 
     return this.findManyByFilter(query)
-      .populate("userId", "username email avatar")
-      .populate("products.productId", "name slug images")
+      .populate('userId', 'username email avatar')
+      .populate('products.productId', 'name slug images')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -161,35 +157,35 @@ class OrderRepository extends BaseRepository {
 
   findByIdWithShopAndProducts(orderId) {
     return this.findById(orderId)
-      .populate("shopId", "name logo slug")
-      .populate("products.productId", "name slug images")
+      .populate('shopId', 'name logo slug')
+      .populate('products.productId', 'name slug images')
       .lean();
   }
 
   existsDeliveredOrderForProductByUser(userId, productId) {
     return this.existsByFilter({
       userId,
-      "products.productId": productId,
-      status: "delivered",
+      'products.productId': productId,
+      status: 'delivered',
     });
   }
 
   findRecentNonCancelledOrdersByUser(userId, limit = 10) {
     return this.findManyByFilter({
       userId,
-      status: { $ne: "cancelled" },
+      status: { $ne: 'cancelled' },
     })
-      .select("products.productId")
+      .select('products.productId')
       .limit(limit)
       .lean();
   }
 
   findOrdersContainingProduct(productId, limit = 100) {
     return this.findManyByFilter({
-      "products.productId": productId,
-      status: { $ne: "cancelled" },
+      'products.productId': productId,
+      status: { $ne: 'cancelled' },
     })
-      .select("products.productId")
+      .select('products.productId')
       .limit(limit)
       .lean();
   }
@@ -199,9 +195,9 @@ class OrderRepository extends BaseRepository {
       { $match: { shopId } },
       {
         $group: {
-          _id: "$status",
+          _id: '$status',
           count: { $sum: 1 },
-          totalAmount: { $sum: "$totalAmount" },
+          totalAmount: { $sum: '$totalAmount' },
         },
       },
     ]);
@@ -212,15 +208,15 @@ class OrderRepository extends BaseRepository {
       {
         $match: {
           shopId,
-          paymentStatus: "paid",
+          paymentStatus: 'paid',
         },
       },
       {
         $group: {
           _id: null,
-          totalRevenue: { $sum: "$totalAmount" },
+          totalRevenue: { $sum: '$totalAmount' },
           totalOrders: { $sum: 1 },
-          avgOrderValue: { $avg: "$totalAmount" },
+          avgOrderValue: { $avg: '$totalAmount' },
         },
       },
     ]);
@@ -237,19 +233,19 @@ class OrderRepository extends BaseRepository {
       {
         $group: {
           _id: {
-            year: { $year: "$createdAt" },
-            month: { $month: "$createdAt" },
-            day: { $dayOfMonth: "$createdAt" },
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' },
+            day: { $dayOfMonth: '$createdAt' },
           },
           orders: { $sum: 1 },
           revenue: {
             $sum: {
-              $cond: [{ $eq: ["$paymentStatus", "paid"] }, "$totalAmount", 0],
+              $cond: [{ $eq: ['$paymentStatus', 'paid'] }, '$totalAmount', 0],
             },
           },
         },
       },
-      { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 } },
+      { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } },
     ]);
   }
 
@@ -258,16 +254,16 @@ class OrderRepository extends BaseRepository {
       {
         $match: {
           shopId,
-          status: { $ne: "cancelled" },
+          status: { $ne: 'cancelled' },
         },
       },
-      { $unwind: "$products" },
+      { $unwind: '$products' },
       {
         $group: {
-          _id: "$products.productId",
-          productName: { $first: "$products.name" },
-          totalQuantity: { $sum: "$products.quantity" },
-          totalRevenue: { $sum: "$products.totalPrice" },
+          _id: '$products.productId',
+          productName: { $first: '$products.name' },
+          totalQuantity: { $sum: '$products.quantity' },
+          totalRevenue: { $sum: '$products.totalPrice' },
         },
       },
       { $sort: { totalQuantity: -1 } },
@@ -280,10 +276,10 @@ class OrderRepository extends BaseRepository {
       { $match: { shopId } },
       {
         $facet: {
-          total: [{ $count: "count" }],
-          pending: [{ $match: { status: "pending" } }, { $count: "count" }],
-          completed: [{ $match: { status: "delivered" } }, { $count: "count" }],
-          cancelled: [{ $match: { status: "cancelled" } }, { $count: "count" }],
+          total: [{ $count: 'count' }],
+          pending: [{ $match: { status: 'pending' } }, { $count: 'count' }],
+          completed: [{ $match: { status: 'delivered' } }, { $count: 'count' }],
+          cancelled: [{ $match: { status: 'cancelled' } }, { $count: 'count' }],
         },
       },
     ]);
@@ -294,28 +290,25 @@ class OrderRepository extends BaseRepository {
     if (shop) {
       query.shopId = shop;
     }
-    if (status && status !== "all") {
+    if (status && status !== 'all') {
       query.status = status;
     }
 
     return this.countByFilter(query);
   }
 
-  findAllWithFilters(
-    { shop, status } = {},
-    { skip = 0, limit = 20 } = {},
-  ) {
+  findAllWithFilters({ shop, status } = {}, { skip = 0, limit = 20 } = {}) {
     const query = {};
     if (shop) {
       query.shopId = shop;
     }
-    if (status && status !== "all") {
+    if (status && status !== 'all') {
       query.status = status;
     }
 
     return this.findManyByFilter(query)
-      .populate("userId", "username email")
-      .populate("shopId", "name logo slug")
+      .populate('userId', 'username email')
+      .populate('shopId', 'name logo slug')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -327,9 +320,9 @@ class OrderRepository extends BaseRepository {
       { $match: dateFilter },
       {
         $group: {
-          _id: "$status",
+          _id: '$status',
           count: { $sum: 1 },
-          totalAmount: { $sum: "$totalAmount" },
+          totalAmount: { $sum: '$totalAmount' },
         },
       },
     ]);
@@ -340,15 +333,15 @@ class OrderRepository extends BaseRepository {
       {
         $match: {
           ...dateFilter,
-          paymentStatus: "paid",
+          paymentStatus: 'paid',
         },
       },
       {
         $group: {
           _id: null,
-          totalRevenue: { $sum: "$totalAmount" },
+          totalRevenue: { $sum: '$totalAmount' },
           totalOrders: { $sum: 1 },
-          avgOrderValue: { $avg: "$totalAmount" },
+          avgOrderValue: { $avg: '$totalAmount' },
         },
       },
     ]);
@@ -359,9 +352,9 @@ class OrderRepository extends BaseRepository {
       { $match: dateFilter },
       {
         $group: {
-          _id: "$paymentMethod",
+          _id: '$paymentMethod',
           count: { $sum: 1 },
-          totalAmount: { $sum: "$totalAmount" },
+          totalAmount: { $sum: '$totalAmount' },
         },
       },
     ]);
@@ -377,32 +370,32 @@ class OrderRepository extends BaseRepository {
       {
         $group: {
           _id: {
-            year: { $year: "$createdAt" },
-            month: { $month: "$createdAt" },
-            day: { $dayOfMonth: "$createdAt" },
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' },
+            day: { $dayOfMonth: '$createdAt' },
           },
           orders: { $sum: 1 },
           revenue: {
             $sum: {
-              $cond: [{ $eq: ["$paymentStatus", "paid"] }, "$totalAmount", 0],
+              $cond: [{ $eq: ['$paymentStatus', 'paid'] }, '$totalAmount', 0],
             },
           },
         },
       },
-      { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 } },
+      { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } },
     ]);
   }
 
   aggregateAdminTopProducts(dateFilter = {}, limit = 10) {
     return this.aggregateByPipeline([
-      { $match: { ...dateFilter, status: { $ne: "cancelled" } } },
-      { $unwind: "$products" },
+      { $match: { ...dateFilter, status: { $ne: 'cancelled' } } },
+      { $unwind: '$products' },
       {
         $group: {
-          _id: "$products.productId",
-          productName: { $first: "$products.name" },
-          totalQuantity: { $sum: "$products.quantity" },
-          totalRevenue: { $sum: "$products.totalPrice" },
+          _id: '$products.productId',
+          productName: { $first: '$products.name' },
+          totalQuantity: { $sum: '$products.quantity' },
+          totalRevenue: { $sum: '$products.totalPrice' },
         },
       },
       { $sort: { totalQuantity: -1 } },
@@ -415,26 +408,26 @@ class OrderRepository extends BaseRepository {
       { $match: dateFilter },
       {
         $group: {
-          _id: "$shopId",
+          _id: '$shopId',
           orderCount: { $sum: 1 },
-          totalRevenue: { $sum: "$totalAmount" },
+          totalRevenue: { $sum: '$totalAmount' },
         },
       },
       { $sort: { totalRevenue: -1 } },
       { $limit: limit },
       {
         $lookup: {
-          from: "shops",
-          localField: "_id",
-          foreignField: "_id",
-          as: "shop",
+          from: 'shops',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'shop',
         },
       },
-      { $unwind: { path: "$shop", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$shop', preserveNullAndEmptyArrays: true } },
       {
         $project: {
-          shopId: "$_id",
-          shopName: "$shop.name",
+          shopId: '$_id',
+          shopName: '$shop.name',
           orderCount: 1,
           totalRevenue: 1,
         },
@@ -447,10 +440,10 @@ class OrderRepository extends BaseRepository {
       { $match: dateFilter },
       {
         $facet: {
-          total: [{ $count: "count" }],
-          pending: [{ $match: { status: "pending" } }, { $count: "count" }],
-          completed: [{ $match: { status: "delivered" } }, { $count: "count" }],
-          cancelled: [{ $match: { status: "cancelled" } }, { $count: "count" }],
+          total: [{ $count: 'count' }],
+          pending: [{ $match: { status: 'pending' } }, { $count: 'count' }],
+          completed: [{ $match: { status: 'delivered' } }, { $count: 'count' }],
+          cancelled: [{ $match: { status: 'cancelled' } }, { $count: 'count' }],
         },
       },
     ]);
@@ -465,16 +458,11 @@ class OrderRepository extends BaseRepository {
   }
 
   aggregateAdminOrdersByPaymentMethodInRange(startDate, endDate) {
-    return this.aggregateAdminOrdersByPaymentMethod(
-      this._buildDateFilter(startDate, endDate),
-    );
+    return this.aggregateAdminOrdersByPaymentMethod(this._buildDateFilter(startDate, endDate));
   }
 
   aggregateAdminTopProductsInRange(startDate, endDate, limit = 10) {
-    return this.aggregateAdminTopProducts(
-      this._buildDateFilter(startDate, endDate),
-      limit,
-    );
+    return this.aggregateAdminTopProducts(this._buildDateFilter(startDate, endDate), limit);
   }
 
   aggregateAdminOrdersByShopInRange(startDate, endDate, limit = 10) {

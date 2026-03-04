@@ -1,43 +1,30 @@
-const shopService = require("../services/shop.service");
-const catchAsync = require("../configs/catchAsync");
-const { uploadImage } = require("../configs/cloudinary");
-const { sendSuccess, sendFail } = require("../shared/res/formatResponse");
-const { StatusCodes } = require("http-status-codes");
+const shopService = require('../services/shop.service');
+const catchAsync = require('../configs/catchAsync');
+const { uploadImage } = require('../configs/cloudinary');
+const { sendSuccess, sendFail } = require('../shared/res/formatResponse');
+const { StatusCodes } = require('http-status-codes');
 
 const handleUploadShopImage = async (req, res, type) => {
   const file = req.file;
 
   if (!file) {
-    return sendFail(res, "No file uploaded", StatusCodes.BAD_REQUEST);
+    return sendFail(res, 'No file uploaded', StatusCodes.BAD_REQUEST);
   }
 
-  if (!type || !["logo", "banner"].includes(type)) {
-    return sendFail(
-      res,
-      "Invalid image type. Must be 'logo' or 'banner'",
-      StatusCodes.BAD_REQUEST
-    );
+  if (!type || !['logo', 'banner'].includes(type)) {
+    return sendFail(res, "Invalid image type. Must be 'logo' or 'banner'", StatusCodes.BAD_REQUEST);
   }
 
-  const folder = type === "logo" ? "shop-logos" : "shop-banners";
+  const folder = type === 'logo' ? 'shop-logos' : 'shop-banners';
   const result = await uploadImage(file.buffer, folder);
 
   if (!result) {
-    return sendFail(
-      res,
-      "Image upload failed",
-      StatusCodes.INTERNAL_SERVER_ERROR
-    );
+    return sendFail(res, 'Image upload failed', StatusCodes.INTERNAL_SERVER_ERROR);
   }
 
-  const payload = type === "logo" ? { logo: result.secure_url } : { banner: result.secure_url };
+  const payload = type === 'logo' ? { logo: result.secure_url } : { banner: result.secure_url };
 
-  return sendSuccess(
-    res,
-    payload,
-    "Image uploaded successfully",
-    StatusCodes.OK
-  );
+  return sendSuccess(res, payload, 'Image uploaded successfully', StatusCodes.OK);
 };
 
 const ShopController = {
@@ -56,7 +43,7 @@ const ShopController = {
       search,
       sort,
     });
-    return sendSuccess(res, result, "Get all shops success", StatusCodes.OK);
+    return sendSuccess(res, result, 'Get all shops success', StatusCodes.OK);
   }),
 
   /**
@@ -70,11 +57,11 @@ const ShopController = {
     const result = await shopService.getAllShops({
       page,
       limit,
-      status: "active",
+      status: 'active',
       search,
       sort,
     });
-    return sendSuccess(res, result, "Get shops success", StatusCodes.OK);
+    return sendSuccess(res, result, 'Get shops success', StatusCodes.OK);
   }),
 
   /**
@@ -87,7 +74,7 @@ const ShopController = {
     const { shopId } = req.params;
     const { status } = req.body;
     const shop = await shopService.updateShopStatus(shopId, status);
-    return sendSuccess(res, shop, "Shop status updated", StatusCodes.OK);
+    return sendSuccess(res, shop, 'Shop status updated', StatusCodes.OK);
   }),
 
   /**
@@ -98,12 +85,7 @@ const ShopController = {
    */
   createShop: catchAsync(async (req, res) => {
     const newShop = await shopService.createShop(req.user.userId, req.body);
-    return sendSuccess(
-      res,
-      newShop,
-      "Shop registered successfully",
-      StatusCodes.CREATED,
-    );
+    return sendSuccess(res, newShop, 'Shop registered successfully', StatusCodes.CREATED);
   }),
 
   /**
@@ -114,7 +96,7 @@ const ShopController = {
    */
   getShopInfo: catchAsync(async (req, res) => {
     const shop = await shopService.getShopInfo(req.params.shopId);
-    return sendSuccess(res, shop, "Get shop info success", StatusCodes.OK);
+    return sendSuccess(res, shop, 'Get shop info success', StatusCodes.OK);
   }),
 
   /**
@@ -125,7 +107,7 @@ const ShopController = {
    */
   getShopBySlug: catchAsync(async (req, res) => {
     const shop = await shopService.getShopBySlug(req.params.slug);
-    return sendSuccess(res, shop, "Get shop info success", StatusCodes.OK);
+    return sendSuccess(res, shop, 'Get shop info success', StatusCodes.OK);
   }),
 
   /**
@@ -136,7 +118,7 @@ const ShopController = {
    */
   getMyShop: catchAsync(async (req, res) => {
     const shop = await shopService.getMyShop(req.user.userId);
-    return sendSuccess(res, shop, "Get my shop success", StatusCodes.OK);
+    return sendSuccess(res, shop, 'Get my shop success', StatusCodes.OK);
   }),
 
   /**
@@ -147,7 +129,7 @@ const ShopController = {
    */
   updateShop: catchAsync(async (req, res) => {
     const updatedShop = await shopService.updateShop(req.user.userId, req.body);
-    return sendSuccess(res, updatedShop, "Update shop success", StatusCodes.OK);
+    return sendSuccess(res, updatedShop, 'Update shop success', StatusCodes.OK);
   }),
 
   /**
@@ -158,12 +140,7 @@ const ShopController = {
    */
   getShopStatistics: catchAsync(async (req, res) => {
     const statistics = await shopService.getShopStatistics(req.user.userId);
-    return sendSuccess(
-      res,
-      statistics,
-      "Get shop statistics success",
-      StatusCodes.OK,
-    );
+    return sendSuccess(res, statistics, 'Get shop statistics success', StatusCodes.OK);
   }),
 
   /**
@@ -184,7 +161,7 @@ const ShopController = {
    * @returns {Promise<any>}
    */
   uploadLogo: catchAsync(async (req, res) => {
-    return handleUploadShopImage(req, res, "logo");
+    return handleUploadShopImage(req, res, 'logo');
   }),
 
   /**
@@ -194,7 +171,7 @@ const ShopController = {
    * @returns {Promise<any>}
    */
   uploadBanner: catchAsync(async (req, res) => {
-    return handleUploadShopImage(req, res, "banner");
+    return handleUploadShopImage(req, res, 'banner');
   }),
 };
 

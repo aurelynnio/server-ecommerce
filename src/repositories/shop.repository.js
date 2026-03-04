@@ -1,5 +1,5 @@
-const Shop = require("../models/shop.model");
-const BaseRepository = require("./base.repository");
+const Shop = require('../models/shop.model');
+const BaseRepository = require('./base.repository');
 
 class ShopRepository extends BaseRepository {
   constructor() {
@@ -19,17 +19,13 @@ class ShopRepository extends BaseRepository {
   }
 
   findBySlugActive(slug) {
-    return this.findOneByFilter({ slug, status: "active" })
-      .populate("owner", "username avatar")
+    return this.findOneByFilter({ slug, status: 'active' })
+      .populate('owner', 'username avatar')
       .lean();
   }
 
   updateByOwnerId(ownerId, updates) {
-    return this.findOneAndUpdateByFilter(
-      { owner: ownerId },
-      updates,
-      { new: true },
-    );
+    return this.findOneAndUpdateByFilter({ owner: ownerId }, updates, { new: true });
   }
 
   countWithFilters({ status, search } = {}) {
@@ -39,31 +35,28 @@ class ShopRepository extends BaseRepository {
     }
     if (search) {
       query.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
       ];
     }
 
     return this.countByFilter(query);
   }
 
-  findWithFilters(
-    { status, search } = {},
-    { sort = "-createdAt", skip = 0, limit = 10 } = {},
-  ) {
+  findWithFilters({ status, search } = {}, { sort = '-createdAt', skip = 0, limit = 10 } = {}) {
     const query = {};
     if (status) {
       query.status = status;
     }
     if (search) {
       query.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
       ];
     }
 
     return this.findManyByFilter(query)
-      .populate("owner", "username email")
+      .populate('owner', 'username email')
       .sort(sort)
       .skip(skip)
       .limit(limit)
@@ -77,18 +70,18 @@ class ShopRepository extends BaseRepository {
   findActiveByIds(shopIds) {
     return this.findManyByFilter({
       _id: { $in: shopIds },
-      status: "active",
+      status: 'active',
     })
-      .select("name slug logo rating")
+      .select('name slug logo rating')
       .lean();
   }
 
   findActiveByNameRegex(regex, limit = 5) {
     return this.findManyByFilter({
-      status: "active",
+      status: 'active',
       name: regex,
     })
-      .select("name slug logo")
+      .select('name slug logo')
       .limit(limit)
       .lean();
   }

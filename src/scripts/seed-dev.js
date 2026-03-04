@@ -12,35 +12,35 @@
  *   node src/scripts/seed-dev.js --reset
  */
 
-require("dotenv").config();
+require('dotenv').config();
 
-const mongoose = require("mongoose");
-const slugify = require("slugify");
-const crypto = require("crypto");
-const bcrypt = require("bcrypt");
-const { faker } = require("@faker-js/faker");
+const mongoose = require('mongoose');
+const slugify = require('slugify');
+const crypto = require('crypto');
+const bcrypt = require('bcrypt');
+const { faker } = require('@faker-js/faker');
 
 // Caches
-const redisService = require("../services/redis.service");
-const redis = require("../configs/redis.config");
+const redisService = require('../services/redis.service');
+const redis = require('../configs/redis.config');
 
 // Models
-const Banner = require("../models/banner.model");
-const Cart = require("../models/cart.model");
-const Category = require("../models/category.model");
-const Notification = require("../models/notification.model");
-const Order = require("../models/order.model");
-const Payment = require("../models/payment.model");
-const Product = require("../models/product.model");
-const Review = require("../models/review.model");
-const Settings = require("../models/settings.model");
-const Shop = require("../models/shop.model");
-const ShopCategory = require("../models/shop.category.model");
-const User = require("../models/user.model");
-const { Conversation, Message } = require("../models/conversation.model");
-const ShopFollower = require("../models/shop-follower.model");
-const Wishlist = require("../models/wishlist.model");
-const VoucherUsage = require("../models/voucher-usage.model");
+const Banner = require('../models/banner.model');
+const Cart = require('../models/cart.model');
+const Category = require('../models/category.model');
+const Notification = require('../models/notification.model');
+const Order = require('../models/order.model');
+const Payment = require('../models/payment.model');
+const Product = require('../models/product.model');
+const Review = require('../models/review.model');
+const Settings = require('../models/settings.model');
+const Shop = require('../models/shop.model');
+const ShopCategory = require('../models/shop.category.model');
+const User = require('../models/user.model');
+const { Conversation, Message } = require('../models/conversation.model');
+const ShopFollower = require('../models/shop-follower.model');
+const Wishlist = require('../models/wishlist.model');
+const VoucherUsage = require('../models/voucher-usage.model');
 
 function hasFlag(flag) {
   return process.argv.includes(flag);
@@ -55,27 +55,27 @@ function parseArgInt(flag, fallback) {
 }
 
 const defaultGlobalCategories = [
-  { name: "Điện thoại & Phụ kiện", slug: "dien-thoai-phu-kien" },
-  { name: "Thời trang", slug: "thoi-trang" },
-  { name: "Làm đẹp", slug: "lam-dep" },
-  { name: "Nhà cửa & Đời sống", slug: "nha-cua-doi-song" },
-  { name: "Máy tính & Thiết bị", slug: "may-tinh-thiet-bi" },
-  { name: "Thể thao & Du lịch", slug: "the-thao-du-lich" },
-  { name: "Thực phẩm & Đồ uống", slug: "thuc-pham-do-uong" },
+  { name: 'Điện thoại & Phụ kiện', slug: 'dien-thoai-phu-kien' },
+  { name: 'Thời trang', slug: 'thoi-trang' },
+  { name: 'Làm đẹp', slug: 'lam-dep' },
+  { name: 'Nhà cửa & Đời sống', slug: 'nha-cua-doi-song' },
+  { name: 'Máy tính & Thiết bị', slug: 'may-tinh-thiet-bi' },
+  { name: 'Thể thao & Du lịch', slug: 'the-thao-du-lich' },
+  { name: 'Thực phẩm & Đồ uống', slug: 'thuc-pham-do-uong' },
 ];
 
 const unsplash = [
   // A small curated list of stable Unsplash image URLs
-  "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1585386959984-a41552231693?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=1200&q=80",
+  'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1585386959984-a41552231693?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=1200&q=80',
 ];
 
 function pick(arr) {
@@ -93,7 +93,7 @@ function pickMany(arr, n) {
 }
 
 async function ensureCategories() {
-  const existing = await Category.find({ isActive: true }).select("_id slug");
+  const existing = await Category.find({ isActive: true }).select('_id slug');
   if (existing.length > 0) return existing;
 
   try {
@@ -101,7 +101,7 @@ async function ensureCategories() {
       defaultGlobalCategories.map((c) => ({
         name: c.name,
         slug: c.slug,
-        description: "",
+        description: '',
         images: [],
         isActive: true,
       })),
@@ -110,22 +110,22 @@ async function ensureCategories() {
   } catch (_e) {
     // ignore duplicates
   }
-  return await Category.find({ isActive: true }).select("_id slug");
+  return await Category.find({ isActive: true }).select('_id slug');
 }
 
 async function ensureSettings() {
-  const existing = await Settings.findOne({ key: "main" });
+  const existing = await Settings.findOne({ key: 'main' });
   if (existing) return existing;
   return await Settings.create({
-    key: "main",
+    key: 'main',
     store: {
-      name: "Nantian Seed Store",
-      email: "support@seed.local",
-      phone: "0900000000",
-      address: "HCMC, Vietnam",
-      description: "Seed data store configuration",
-      logo: "",
-      favicon: "",
+      name: 'Nantian Seed Store',
+      email: 'support@seed.local',
+      phone: '0900000000',
+      address: 'HCMC, Vietnam',
+      description: 'Seed data store configuration',
+      logo: '',
+      favicon: '',
     },
   });
 }
@@ -136,29 +136,29 @@ async function ensureBanners() {
   await Banner.insertMany(
     [
       {
-        title: "Flash Sale",
-        subtitle: "Giảm sâu trong hôm nay",
+        title: 'Flash Sale',
+        subtitle: 'Giảm sâu trong hôm nay',
         imageUrl: pick(unsplash),
-        link: "/flash-sale",
-        theme: "light",
+        link: '/flash-sale',
+        theme: 'light',
         order: 1,
         isActive: true,
       },
       {
-        title: "Hàng mới về",
-        subtitle: "Cập nhật mỗi ngày",
+        title: 'Hàng mới về',
+        subtitle: 'Cập nhật mỗi ngày',
         imageUrl: pick(unsplash),
-        link: "/products",
-        theme: "light",
+        link: '/products',
+        theme: 'light',
         order: 2,
         isActive: true,
       },
       {
-        title: "Freeship",
-        subtitle: "Đơn từ 0đ",
+        title: 'Freeship',
+        subtitle: 'Đơn từ 0đ',
         imageUrl: pick(unsplash),
-        link: "/products",
-        theme: "light",
+        link: '/products',
+        theme: 'light',
         order: 3,
         isActive: true,
       },
@@ -168,18 +168,18 @@ async function ensureBanners() {
 }
 
 async function hardReset() {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("Refusing to reset in production");
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Refusing to reset in production');
   }
   // Extra guard: avoid nuking Atlas / remote DB by accident.
   // To override, set SEED_RESET_OK=YES explicitly.
   if (
-    process.env.SEED_RESET_OK !== "YES" &&
-    typeof process.env.MONGODB_URI === "string" &&
-    process.env.MONGODB_URI.includes("mongodb+srv://")
+    process.env.SEED_RESET_OK !== 'YES' &&
+    typeof process.env.MONGODB_URI === 'string' &&
+    process.env.MONGODB_URI.includes('mongodb+srv://')
   ) {
     throw new Error(
-      "Refusing to reset on mongodb+srv (Atlas). Set SEED_RESET_OK=YES if you really want to wipe remote data.",
+      'Refusing to reset on mongodb+srv (Atlas). Set SEED_RESET_OK=YES if you really want to wipe remote data.',
     );
   }
 
@@ -206,19 +206,19 @@ async function hardReset() {
 }
 
 async function ensureUsers({ sellers, buyers }) {
-  const passwordHash = await bcrypt.hash("123456", 10);
+  const passwordHash = await bcrypt.hash('123456', 10);
 
   // Admin
-  const adminEmail = "admin@seed.local";
+  const adminEmail = 'admin@seed.local';
   let admin = await User.findOne({ email: adminEmail });
   if (!admin) {
     admin = await User.create({
-      username: "admin_seed",
+      username: 'admin_seed',
       email: adminEmail,
       password: passwordHash,
-      roles: "admin",
+      roles: 'admin',
       isVerifiedEmail: true,
-      provider: "local",
+      provider: 'local',
     });
   }
 
@@ -233,9 +233,9 @@ async function ensureUsers({ sellers, buyers }) {
         username: `seller_seed_${i}`,
         email,
         password: passwordHash,
-        roles: "seller",
+        roles: 'seller',
         isVerifiedEmail: true,
-        provider: "local",
+        provider: 'local',
       });
     }
     sellerUsers.push(u);
@@ -249,9 +249,9 @@ async function ensureUsers({ sellers, buyers }) {
         username: `buyer_seed_${i}`,
         email,
         password: passwordHash,
-        roles: "user",
+        roles: 'user',
         isVerifiedEmail: true,
-        provider: "local",
+        provider: 'local',
       });
     }
     buyerUsers.push(u);
@@ -269,18 +269,19 @@ async function ensureShopsForSellers(sellerUsers) {
     if (!shop) {
       shop = await Shop.create({
         owner: seller._id,
-        name: `${faker.company.name()} ${faker.helpers.arrayElement(["Official", "Store", "Mall"])}`,
-        slug: slugify(
-          `seed-${seller.username}-${crypto.randomBytes(2).toString("hex")}`,
-          { lower: true, strict: true, locale: "vi" },
-        ),
-        logo: "",
-        banner: "",
+        name: `${faker.company.name()} ${faker.helpers.arrayElement(['Official', 'Store', 'Mall'])}`,
+        slug: slugify(`seed-${seller.username}-${crypto.randomBytes(2).toString('hex')}`, {
+          lower: true,
+          strict: true,
+          locale: 'vi',
+        }),
+        logo: '',
+        banner: '',
         description: faker.company.catchPhrase(),
-        status: "active",
+        status: 'active',
         pickupAddress: {
           fullName: faker.person.fullName(),
-          phone: faker.phone.number("09########"),
+          phone: faker.phone.number('09########'),
           address: faker.location.streetAddress(),
           city: faker.location.city(),
           district: faker.location.city(),
@@ -305,12 +306,12 @@ async function ensureShopCategories(shops) {
     }
 
     const names = [
-      "New Arrivals",
-      "Best Sellers",
-      "Flash Deals",
-      "Phụ kiện",
-      "Premium",
-      "Sale Off",
+      'New Arrivals',
+      'Best Sellers',
+      'Flash Deals',
+      'Phụ kiện',
+      'Premium',
+      'Sale Off',
     ];
     const created = [];
     for (let i = 0; i < names.length; i++) {
@@ -318,7 +319,7 @@ async function ensureShopCategories(shops) {
         await ShopCategory.create({
           shopId: shop._id,
           name: names[i],
-          description: "",
+          description: '',
           image: pick(unsplash),
           isActive: true,
           displayOrder: i,
@@ -333,7 +334,7 @@ async function ensureShopCategories(shops) {
 function buildVariants({ basePrice }) {
   const variantCount = faker.number.int({ min: 1, max: 4 });
   const colors = pickMany(
-    ["Đen", "Trắng", "Đỏ", "Xanh", "Vàng", "Tím", "Hồng", "Xám"],
+    ['Đen', 'Trắng', 'Đỏ', 'Xanh', 'Vàng', 'Tím', 'Hồng', 'Xám'],
     variantCount,
   );
 
@@ -347,64 +348,48 @@ function buildVariants({ basePrice }) {
       stock: faker.number.int({ min: 5, max: 120 }),
       sold: faker.number.int({ min: 0, max: 200 }),
       // Some DBs may have a unique index on variants.sku; keep this globally unique.
-      sku: `SKU-${crypto.randomBytes(6).toString("hex").toUpperCase()}-${String(
-        idx + 1,
-      ).padStart(2, "0")}`,
+      sku: `SKU-${crypto.randomBytes(6).toString('hex').toUpperCase()}-${String(idx + 1).padStart(
+        2,
+        '0',
+      )}`,
       images: pickMany(unsplash, faker.number.int({ min: 1, max: 3 })),
     };
   });
 }
 
 function buildAttributes() {
-  const keys = [
-    "Chất liệu",
-    "Kích thước",
-    "Xuất xứ",
-    "Bảo hành",
-    "Hướng dẫn sử dụng",
-  ];
+  const keys = ['Chất liệu', 'Kích thước', 'Xuất xứ', 'Bảo hành', 'Hướng dẫn sử dụng'];
   return pickMany(keys, faker.number.int({ min: 2, max: 4 })).map((k) => ({
     name: k,
     value: faker.commerce.productAdjective(),
   }));
 }
 
-async function seedProducts({
-  shops,
-  shopCategories,
-  categories,
-  productsPerShop,
-}) {
+async function seedProducts({ shops, shopCategories, categories, productsPerShop }) {
   for (const shop of shops) {
     const existing = await Product.countDocuments({ shop: shop._id });
     if (existing >= productsPerShop) continue;
 
-    const shopCats = shopCategories.filter(
-      (c) => c.shopId.toString() === shop._id.toString(),
-    );
+    const shopCats = shopCategories.filter((c) => c.shopId.toString() === shop._id.toString());
 
     const batch = [];
     const createCount = productsPerShop - existing;
     for (let i = 0; i < createCount; i++) {
       const name = `${faker.commerce.productName()} ${faker.string.alphanumeric(4).toUpperCase()}`;
-      const slug = slugify(
-        `seed-${name}-${crypto.randomBytes(2).toString("hex")}`,
-        { lower: true, strict: true, locale: "vi" },
-      );
+      const slug = slugify(`seed-${name}-${crypto.randomBytes(2).toString('hex')}`, {
+        lower: true,
+        strict: true,
+        locale: 'vi',
+      });
       const basePrice = faker.number.int({ min: 80, max: 2000 }) * 1000;
       const discountRoll = Math.random() > 0.65;
       const discountPrice = discountRoll
-        ? Math.round(
-            basePrice *
-              faker.number.float({ min: 0.7, max: 0.95, precision: 0.01 }),
-          )
+        ? Math.round(basePrice * faker.number.float({ min: 0.7, max: 0.95, precision: 0.01 }))
         : null;
 
       const now = new Date();
       const flashSaleEnabled = Math.random() > 0.88;
-      const discountPercent = flashSaleEnabled
-        ? faker.number.int({ min: 5, max: 35 })
-        : null;
+      const discountPercent = flashSaleEnabled ? faker.number.int({ min: 5, max: 35 }) : null;
       const salePrice =
         flashSaleEnabled && discountPercent
           ? Math.max(1000, Math.round(basePrice * (1 - discountPercent / 100)))
@@ -413,10 +398,7 @@ async function seedProducts({
       const variants = buildVariants({ basePrice });
       const stock = variants.reduce((s, v) => s + (v.stock || 0), 0);
       const soldFromVariants = variants.reduce((s, v) => s + (v.sold || 0), 0);
-      const descImages = pickMany(
-        unsplash,
-        faker.number.int({ min: 1, max: 6 }),
-      );
+      const descImages = pickMany(unsplash, faker.number.int({ min: 1, max: 6 }));
 
       batch.push({
         name,
@@ -427,19 +409,16 @@ async function seedProducts({
         shopCategory: shopCats.length ? pick(shopCats)._id : undefined,
         brand: faker.company.name(),
         tags: pickMany(
-          ["seed", "hot", "deal", "new", "best", "sale", "freeship", "auth"],
+          ['seed', 'hot', 'deal', 'new', 'best', 'sale', 'freeship', 'auth'],
           faker.number.int({ min: 1, max: 4 }),
         ),
-        sizes: pickMany(
-          ["S", "M", "L", "XL", "XXL"],
-          faker.number.int({ min: 0, max: 3 }),
-        ),
+        sizes: pickMany(['S', 'M', 'L', 'XL', 'XXL'], faker.number.int({ min: 0, max: 3 })),
         descriptionImages: descImages,
-        video: "",
+        video: '',
         price: {
           currentPrice: basePrice,
           discountPrice,
-          currency: "VND",
+          currency: 'VND',
         },
         stock,
         soldCount: soldFromVariants,
@@ -458,10 +437,7 @@ async function seedProducts({
               isActive: true,
               salePrice,
               discountPercent,
-              stock: Math.max(
-                1,
-                Math.min(stock, faker.number.int({ min: 10, max: 80 })),
-              ),
+              stock: Math.max(1, Math.min(stock, faker.number.int({ min: 10, max: 80 }))),
               soldCount: faker.number.int({ min: 0, max: 50 }),
               startTime: new Date(now.getTime() - 60 * 60 * 1000),
               endTime: new Date(now.getTime() + 6 * 60 * 60 * 1000),
@@ -469,7 +445,7 @@ async function seedProducts({
           : { isActive: false },
         isFeatured: Math.random() > 0.8,
         isNewArrival: Math.random() > 0.85,
-        status: "published",
+        status: 'published',
       });
     }
 
@@ -480,8 +456,8 @@ async function seedProducts({
 }
 
 async function seedCarts(buyerUsers) {
-  const products = await Product.find({ status: "published" })
-    .select("_id shop price variants")
+  const products = await Product.find({ status: 'published' })
+    .select('_id shop price variants')
     .lean();
   if (products.length === 0) return;
 
@@ -496,7 +472,7 @@ async function seedCarts(buyerUsers) {
       const priceObj = p.price || {
         currentPrice: variant?.price || 0,
         discountPrice: null,
-        currency: "VND",
+        currency: 'VND',
       };
       return {
         productId: p._id,
@@ -517,8 +493,8 @@ async function seedCarts(buyerUsers) {
 }
 
 async function seedOrdersPaymentsReviews({ buyerUsers, shops }) {
-  const products = await Product.find({ status: "published" })
-    .select("_id name shop category price variants descriptionImages")
+  const products = await Product.find({ status: 'published' })
+    .select('_id name shop category price variants descriptionImages')
     .lean();
   if (products.length === 0) return;
 
@@ -536,22 +512,16 @@ async function seedOrdersPaymentsReviews({ buyerUsers, shops }) {
       const chosenShops = pickMany(shops, shopCount);
 
       for (const shop of chosenShops) {
-        const shopProducts = products.filter(
-          (p) => p.shop?.toString() === shop._id.toString(),
-        );
+        const shopProducts = products.filter((p) => p.shop?.toString() === shop._id.toString());
         const lines = pickMany(
           shopProducts.length ? shopProducts : products,
           faker.number.int({ min: 1, max: 3 }),
         );
         const orderLines = lines.map((p) => {
           const variant = p.variants?.[0];
-          const unitPrice =
-            variant?.price ||
-            p.price?.discountPrice ||
-            p.price?.currentPrice ||
-            0;
+          const unitPrice = variant?.price || p.price?.discountPrice || p.price?.currentPrice || 0;
           const qty = faker.number.int({ min: 1, max: 3 });
-          const img = variant?.images?.[0] || p.descriptionImages?.[0] || "";
+          const img = variant?.images?.[0] || p.descriptionImages?.[0] || '';
           return {
             productId: p._id,
             sku: variant?.sku,
@@ -568,13 +538,10 @@ async function seedOrdersPaymentsReviews({ buyerUsers, shops }) {
         const shippingFee = faker.number.int({ min: 0, max: 4 }) * 10000;
         const discountShop = faker.number.int({ min: 0, max: 2 }) * 10000;
         const discountPlatform = faker.number.int({ min: 0, max: 2 }) * 10000;
-        const totalAmount = Math.max(
-          0,
-          subtotal + shippingFee - discountShop - discountPlatform,
-        );
+        const totalAmount = Math.max(0, subtotal + shippingFee - discountShop - discountPlatform);
 
-        const paymentMethod = Math.random() > 0.6 ? "vnpay" : "cod";
-        const paymentStatus = paymentMethod === "vnpay" ? "paid" : "unpaid";
+        const paymentMethod = Math.random() > 0.6 ? 'vnpay' : 'cod';
+        const paymentStatus = paymentMethod === 'vnpay' ? 'paid' : 'unpaid';
 
         const order = await Order.create({
           orderGroupId,
@@ -583,12 +550,12 @@ async function seedOrdersPaymentsReviews({ buyerUsers, shops }) {
           products: orderLines,
           shippingAddress: {
             fullName: faker.person.fullName(),
-            phone: faker.phone.number("09########"),
+            phone: faker.phone.number('09########'),
             address: faker.location.streetAddress(),
             city: faker.location.city(),
             district: faker.location.city(),
             ward: faker.location.street(),
-            note: "",
+            note: '',
           },
           paymentMethod,
           paymentStatus,
@@ -597,24 +564,18 @@ async function seedOrdersPaymentsReviews({ buyerUsers, shops }) {
           discountShop,
           discountPlatform,
           totalAmount,
-          status: pick([
-            "pending",
-            "confirmed",
-            "processing",
-            "shipped",
-            "delivered",
-          ]),
+          status: pick(['pending', 'confirmed', 'processing', 'shipped', 'delivered']),
         });
 
-        if (paymentMethod === "vnpay") {
+        if (paymentMethod === 'vnpay') {
           await Payment.create({
             orderId: order._id,
             userId: buyer._id,
             amount: totalAmount,
-            status: "completed",
-            paymentMethod: "vnpay",
-            transactionId: `VNP_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`,
-            paymentUrl: "",
+            status: 'completed',
+            paymentMethod: 'vnpay',
+            transactionId: `VNP_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+            paymentUrl: '',
             gatewayData: null,
             paymentDate: new Date(),
           });
@@ -624,8 +585,8 @@ async function seedOrdersPaymentsReviews({ buyerUsers, shops }) {
             orderId: order._id,
             userId: buyer._id,
             amount: totalAmount,
-            status: "pending",
-            paymentMethod: "cod",
+            status: 'pending',
+            paymentMethod: 'cod',
             paymentUrl: null,
             gatewayData: null,
             paymentDate: null,
@@ -638,20 +599,20 @@ async function seedOrdersPaymentsReviews({ buyerUsers, shops }) {
           [
             {
               userId: buyer._id,
-              type: "order_status",
-              title: "Đơn hàng mới",
+              type: 'order_status',
+              title: 'Đơn hàng mới',
               message: `Đơn hàng ${order._id.toString().slice(-6)} đã được tạo.`,
               orderId: order._id,
-              link: "/user/purchase",
+              link: '/user/purchase',
               isRead: false,
             },
             {
               userId: sellerShop?.owner,
-              type: "order_status",
-              title: "Bạn có đơn hàng mới",
+              type: 'order_status',
+              title: 'Bạn có đơn hàng mới',
               message: `Có đơn hàng mới từ ${buyer.username}.`,
               orderId: order._id,
-              link: "/seller/orders",
+              link: '/seller/orders',
               isRead: false,
             },
           ].filter((n) => n.userId),
@@ -665,7 +626,7 @@ async function seedOrdersPaymentsReviews({ buyerUsers, shops }) {
             members: [buyer._id, sellerUserId],
             shopId: shop._id,
             lastMessage: {
-              content: "Chào shop, mình cần tư vấn đơn hàng.",
+              content: 'Chào shop, mình cần tư vấn đơn hàng.',
               senderId: buyer._id,
               createdAt: new Date(),
             },
@@ -684,14 +645,14 @@ async function seedOrdersPaymentsReviews({ buyerUsers, shops }) {
               senderId: fromBuyer ? buyer._id : sellerUserId,
               content: fromBuyer
                 ? faker.helpers.arrayElement([
-                    "Shop ơi, sản phẩm này còn hàng không?",
-                    "Mình muốn đổi màu thì có được không?",
-                    "Bao lâu thì nhận được hàng vậy shop?",
+                    'Shop ơi, sản phẩm này còn hàng không?',
+                    'Mình muốn đổi màu thì có được không?',
+                    'Bao lâu thì nhận được hàng vậy shop?',
                   ])
                 : faker.helpers.arrayElement([
-                    "Dạ còn hàng ạ.",
-                    "Shop hỗ trợ đổi màu tuỳ variant ạ.",
-                    "Dự kiến 2-3 ngày là bạn nhận được nhé.",
+                    'Dạ còn hàng ạ.',
+                    'Shop hỗ trợ đổi màu tuỳ variant ạ.',
+                    'Dự kiến 2-3 ngày là bạn nhận được nhé.',
                   ]),
               attachments: [],
               isRead: false,
@@ -701,7 +662,7 @@ async function seedOrdersPaymentsReviews({ buyerUsers, shops }) {
         }
 
         // Reviews for some delivered orders
-        if (order.status === "delivered" && Math.random() > 0.4) {
+        if (order.status === 'delivered' && Math.random() > 0.4) {
           for (const line of orderLines.slice(
             0,
             faker.number.int({ min: 1, max: orderLines.length }),
@@ -711,9 +672,9 @@ async function seedOrdersPaymentsReviews({ buyerUsers, shops }) {
               product: line.productId,
               rating: faker.number.int({ min: 4, max: 5 }),
               comment: faker.helpers.arrayElement([
-                "Sản phẩm đúng mô tả, đóng gói kỹ.",
-                "Giao nhanh, chất lượng ổn trong tầm giá.",
-                "Mua lần 2, vẫn rất hài lòng.",
+                'Sản phẩm đúng mô tả, đóng gói kỹ.',
+                'Giao nhanh, chất lượng ổn trong tầm giá.',
+                'Mua lần 2, vẫn rất hài lòng.',
               ]),
             });
           }
@@ -725,7 +686,7 @@ async function seedOrdersPaymentsReviews({ buyerUsers, shops }) {
   // Recompute ratingAverage/reviewCount to match seeded reviews
   const stats = await Review.aggregate([
     {
-      $group: { _id: "$product", avg: { $avg: "$rating" }, count: { $sum: 1 } },
+      $group: { _id: '$product', avg: { $avg: '$rating' }, count: { $sum: 1 } },
     },
   ]);
   for (const s of stats) {
@@ -743,10 +704,7 @@ async function seedShopFollowers({ buyerUsers, shops }) {
   const docs = [];
   for (const buyer of buyerUsers) {
     // Each buyer follows 1-3 random shops
-    const followed = pickMany(
-      shops,
-      faker.number.int({ min: 1, max: Math.min(3, shops.length) }),
-    );
+    const followed = pickMany(shops, faker.number.int({ min: 1, max: Math.min(3, shops.length) }));
     for (const shop of followed) {
       docs.push({ shopId: shop._id, userId: buyer._id });
     }
@@ -756,7 +714,7 @@ async function seedShopFollowers({ buyerUsers, shops }) {
     await ShopFollower.insertMany(docs, { ordered: false }).catch(() => {});
     // Update followerCount cache on Shop documents
     const counts = await ShopFollower.aggregate([
-      { $group: { _id: "$shopId", count: { $sum: 1 } } },
+      { $group: { _id: '$shopId', count: { $sum: 1 } } },
     ]);
     for (const c of counts) {
       await Shop.findByIdAndUpdate(c._id, { followerCount: c.count });
@@ -769,9 +727,7 @@ async function seedWishlists({ buyerUsers }) {
   const existing = await Wishlist.estimatedDocumentCount();
   if (existing > 0) return;
 
-  const products = await Product.find({ status: "published" })
-    .select("_id")
-    .lean();
+  const products = await Product.find({ status: 'published' }).select('_id').lean();
   if (products.length === 0) return;
 
   const docs = [];
@@ -793,16 +749,16 @@ async function seedWishlists({ buyerUsers }) {
 }
 
 async function main() {
-  const quick = hasFlag("--quick");
-  const force = hasFlag("--force");
-  const reset = hasFlag("--reset");
+  const quick = hasFlag('--quick');
+  const force = hasFlag('--force');
+  const reset = hasFlag('--reset');
 
-  const sellers = quick ? 6 : parseArgInt("--sellers", 20);
-  const buyers = quick ? 12 : parseArgInt("--buyers", 80);
-  const productsPerShop = quick ? 25 : parseArgInt("--products-per-shop", 80);
+  const sellers = quick ? 6 : parseArgInt('--sellers', 20);
+  const buyers = quick ? 12 : parseArgInt('--buyers', 80);
+  const productsPerShop = quick ? 25 : parseArgInt('--products-per-shop', 80);
 
   if (!process.env.MONGODB_URI) {
-    throw new Error("Missing MONGODB_URI");
+    throw new Error('Missing MONGODB_URI');
   }
 
   console.log(
@@ -817,18 +773,16 @@ async function main() {
     const clearCaches = async () => {
       // Best-effort: Redis volumes persist across runs; clear stale keys.
       await Promise.allSettled([
-        redisService.delByPattern("categories:*"),
-        redisService.delByPattern("products:*"),
-        redisService.delByPattern("flash-sale:*"),
+        redisService.delByPattern('categories:*'),
+        redisService.delByPattern('products:*'),
+        redisService.delByPattern('flash-sale:*'),
       ]);
     };
 
     const productCount = await Product.estimatedDocumentCount();
     if (productCount > 0 && !force && !reset) {
       await clearCaches();
-      console.log(
-        "seed-dev: products already exist, skipping (use --force or --reset).",
-      );
+      console.log('seed-dev: products already exist, skipping (use --force or --reset).');
       return;
     }
 
@@ -848,7 +802,7 @@ async function main() {
 
     await clearCaches();
 
-    console.log("seed-dev: done");
+    console.log('seed-dev: done');
   } finally {
     await mongoose.disconnect();
     await Promise.allSettled([redis.quit?.()]);
@@ -856,6 +810,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("seed-dev error:", err?.message || err);
+  console.error('seed-dev error:', err?.message || err);
   process.exit(1);
 });

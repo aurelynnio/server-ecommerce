@@ -1,24 +1,24 @@
-const Settings = require("../models/settings.model");
+const Settings = require('../models/settings.model');
 
 class SettingsRepository {
   findMain() {
-    return Settings.findOne({ key: "main" });
+    return Settings.findOne({ key: 'main' });
   }
 
   createMain(data = {}) {
-    return Settings.create({ ...data, key: "main" });
+    return Settings.create({ ...data, key: 'main' });
   }
 
   upsertMainBySet(updateData) {
     return Settings.findOneAndUpdate(
-      { key: "main" },
+      { key: 'main' },
       { $set: updateData },
       { new: true, upsert: true },
     );
   }
 
   deleteMain() {
-    return Settings.deleteOne({ key: "main" });
+    return Settings.deleteOne({ key: 'main' });
   }
 }
 

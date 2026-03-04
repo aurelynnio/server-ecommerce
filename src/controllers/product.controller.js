@@ -1,7 +1,7 @@
-const catchAsync = require("../configs/catchAsync");
-const productService = require("../services/product.service");
-const { StatusCodes } = require("http-status-codes");
-const { sendSuccess } = require("../shared/res/formatResponse");
+const catchAsync = require('../configs/catchAsync');
+const productService = require('../services/product.service');
+const { StatusCodes } = require('http-status-codes');
+const { sendSuccess } = require('../shared/res/formatResponse');
 
 const ProductController = {
   /**
@@ -12,12 +12,7 @@ const ProductController = {
    */
   getAllProducts: catchAsync(async (req, res) => {
     const result = await productService.getAllProducts(req.query);
-    return sendSuccess(
-      res,
-      result,
-      "Products retrieved successfully",
-      StatusCodes.OK,
-    );
+    return sendSuccess(res, result, 'Products retrieved successfully', StatusCodes.OK);
   }),
 
   /**
@@ -28,12 +23,7 @@ const ProductController = {
    */
   getProductById: catchAsync(async (req, res) => {
     const product = await productService.getProductById(req.params.id);
-    return sendSuccess(
-      res,
-      product,
-      "Product retrieved successfully",
-      StatusCodes.OK,
-    );
+    return sendSuccess(res, product, 'Product retrieved successfully', StatusCodes.OK);
   }),
 
   /**
@@ -44,12 +34,7 @@ const ProductController = {
    */
   getProductBySlug: catchAsync(async (req, res) => {
     const product = await productService.getProductBySlug(req.params.slug);
-    return sendSuccess(
-      res,
-      product,
-      "Product retrieved successfully",
-      StatusCodes.OK,
-    );
+    return sendSuccess(res, product, 'Product retrieved successfully', StatusCodes.OK);
   }),
 
   /**
@@ -59,18 +44,9 @@ const ProductController = {
    * @returns {Promise<any>}
    */
   createProduct: catchAsync(async (req, res) => {
-    const product = await productService.createProduct(
-      req.body,
-      req.files,
-      req.user.userId,
-    );
+    const product = await productService.createProduct(req.body, req.files, req.user.userId);
 
-    return sendSuccess(
-      res,
-      product,
-      "Product created successfully",
-      StatusCodes.CREATED,
-    );
+    return sendSuccess(res, product, 'Product created successfully', StatusCodes.CREATED);
   }),
 
   /**
@@ -81,12 +57,7 @@ const ProductController = {
    */
   permanentDeleteProduct: catchAsync(async (req, res) => {
     await productService.permanentDeleteProduct(req.params.id);
-    return sendSuccess(
-      res,
-      null,
-      "Product permanently deleted",
-      StatusCodes.OK,
-    );
+    return sendSuccess(res, null, 'Product permanently deleted', StatusCodes.OK);
   }),
 
   /**
@@ -96,16 +67,8 @@ const ProductController = {
    * @returns {Promise<any>}
    */
   getProductsByCategory: catchAsync(async (req, res) => {
-    const result = await productService.getProductsByCategory(
-      req.params.categoryId,
-      req.query,
-    );
-    return sendSuccess(
-      res,
-      result,
-      "Products retrieved successfully",
-      StatusCodes.OK,
-    );
+    const result = await productService.getProductsByCategory(req.params.categoryId, req.query);
+    return sendSuccess(res, result, 'Products retrieved successfully', StatusCodes.OK);
   }),
 
   /**
@@ -115,16 +78,8 @@ const ProductController = {
    * @returns {Promise<any>}
    */
   getProductsByCategorySlug: catchAsync(async (req, res) => {
-    const result = await productService.getProductsByCategorySlug(
-      req.params.slug,
-      req.query,
-    );
-    return sendSuccess(
-      res,
-      result,
-      "Products retrieved successfully",
-      StatusCodes.OK,
-    );
+    const result = await productService.getProductsByCategorySlug(req.params.slug, req.query);
+    return sendSuccess(res, result, 'Products retrieved successfully', StatusCodes.OK);
   }),
 
   /**
@@ -134,15 +89,8 @@ const ProductController = {
    * @returns {Promise<any>}
    */
   getFeaturedProducts: catchAsync(async (req, res) => {
-    const products = await productService.getFeaturedProductsSimple(
-      req.query.limit,
-    );
-    return sendSuccess(
-      res,
-      products,
-      "Featured products retrieved successfully",
-      StatusCodes.OK,
-    );
+    const products = await productService.getFeaturedProductsSimple(req.query.limit);
+    return sendSuccess(res, products, 'Featured products retrieved successfully', StatusCodes.OK);
   }),
 
   /**
@@ -153,12 +101,7 @@ const ProductController = {
    */
   getNewArrivalProducts: catchAsync(async (req, res) => {
     const result = await productService.getNewArrivalProducts();
-    return sendSuccess(
-      res,
-      result,
-      "New arrival products retrieved successfully",
-      StatusCodes.OK,
-    );
+    return sendSuccess(res, result, 'New arrival products retrieved successfully', StatusCodes.OK);
   }),
 
   /**
@@ -169,12 +112,7 @@ const ProductController = {
    */
   getOnSaleProducts: catchAsync(async (req, res) => {
     const result = await productService.getOnSaleProducts();
-    return sendSuccess(
-      res,
-      result,
-      "On sale products retrieved successfully",
-      StatusCodes.OK,
-    );
+    return sendSuccess(res, result, 'On sale products retrieved successfully', StatusCodes.OK);
   }),
 
   /**
@@ -184,16 +122,8 @@ const ProductController = {
    * @returns {Promise<any>}
    */
   searchProducts: catchAsync(async (req, res) => {
-    const result = await productService.searchProducts(
-      req.query.q,
-      req.query.limit,
-    );
-    return sendSuccess(
-      res,
-      result,
-      "Products found successfully",
-      StatusCodes.OK,
-    );
+    const result = await productService.searchProducts(req.query.q, req.query.limit);
+    return sendSuccess(res, result, 'Products found successfully', StatusCodes.OK);
   }),
 
   /**
@@ -207,12 +137,7 @@ const ProductController = {
 
     const result = await productService.getRelatedProducts(id);
 
-    return sendSuccess(
-      res,
-      result,
-      "Related products retrieved successfully",
-      StatusCodes.OK,
-    );
+    return sendSuccess(res, result, 'Related products retrieved successfully', StatusCodes.OK);
   }),
 
   /**
@@ -225,18 +150,8 @@ const ProductController = {
     const { id } = req.params;
     const shopId = req.shop._id;
 
-    const product = await productService.updateProductBySeller(
-      id,
-      shopId,
-      req.body,
-      req.files,
-    );
-    return sendSuccess(
-      res,
-      product,
-      "Product updated successfully",
-      StatusCodes.OK,
-    );
+    const product = await productService.updateProductBySeller(id, shopId, req.body, req.files);
+    return sendSuccess(res, product, 'Product updated successfully', StatusCodes.OK);
   }),
 
   /**
@@ -250,12 +165,7 @@ const ProductController = {
     const shopId = req.shop._id;
 
     const product = await productService.deleteProductBySeller(id, shopId);
-    return sendSuccess(
-      res,
-      product,
-      "Product deleted successfully",
-      StatusCodes.OK,
-    );
+    return sendSuccess(res, product, 'Product deleted successfully', StatusCodes.OK);
   }),
 
   /**
@@ -268,18 +178,8 @@ const ProductController = {
     const { id } = req.params;
     const shopId = req.shop._id;
 
-    const product = await productService.addVariantBySeller(
-      id,
-      shopId,
-      req.body,
-      req.files,
-    );
-    return sendSuccess(
-      res,
-      product,
-      "Variant added successfully",
-      StatusCodes.CREATED,
-    );
+    const product = await productService.addVariantBySeller(id, shopId, req.body, req.files);
+    return sendSuccess(res, product, 'Variant added successfully', StatusCodes.CREATED);
   }),
 
   /**
@@ -292,18 +192,8 @@ const ProductController = {
     const { id, variantId } = req.params;
     const shopId = req.shop._id;
 
-    const product = await productService.updateVariantBySeller(
-      id,
-      shopId,
-      variantId,
-      req.body,
-    );
-    return sendSuccess(
-      res,
-      product,
-      "Variant updated successfully",
-      StatusCodes.OK,
-    );
+    const product = await productService.updateVariantBySeller(id, shopId, variantId, req.body);
+    return sendSuccess(res, product, 'Variant updated successfully', StatusCodes.OK);
   }),
 
   /**
@@ -316,17 +206,8 @@ const ProductController = {
     const { id, variantId } = req.params;
     const shopId = req.shop._id;
 
-    const product = await productService.deleteVariantBySeller(
-      id,
-      shopId,
-      variantId,
-    );
-    return sendSuccess(
-      res,
-      product,
-      "Variant deleted successfully",
-      StatusCodes.OK,
-    );
+    const product = await productService.deleteVariantBySeller(id, shopId, variantId);
+    return sendSuccess(res, product, 'Variant deleted successfully', StatusCodes.OK);
   }),
 };
 

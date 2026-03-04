@@ -5,7 +5,7 @@
  * @returns {number|null}
  */
 const parseDurationMs = (value, fallbackMs = null) => {
-  if (typeof value === "number" && Number.isFinite(value)) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
   }
 
@@ -19,15 +19,15 @@ const parseDurationMs = (value, fallbackMs = null) => {
   const unit = match[2];
 
   switch (unit) {
-    case "ms":
+    case 'ms':
       return amount;
-    case "s":
+    case 's':
       return amount * 1000;
-    case "m":
+    case 'm':
       return amount * 60 * 1000;
-    case "h":
+    case 'h':
       return amount * 60 * 60 * 1000;
-    case "d":
+    case 'd':
       return amount * 24 * 60 * 60 * 1000;
     default:
       return fallbackMs;

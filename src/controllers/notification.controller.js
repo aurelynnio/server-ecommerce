@@ -1,7 +1,7 @@
-const notificationService = require("../services/notification.service");
-const catchAsync = require("../configs/catchAsync");
-const { StatusCodes } = require("http-status-codes");
-const { sendSuccess } = require("../shared/res/formatResponse");
+const notificationService = require('../services/notification.service');
+const catchAsync = require('../configs/catchAsync');
+const { StatusCodes } = require('http-status-codes');
+const { sendSuccess } = require('../shared/res/formatResponse');
 
 const NotificationController = {
   /**
@@ -16,12 +16,7 @@ const NotificationController = {
       userId: req.user.userId,
     });
 
-    return sendSuccess(
-      res,
-      notification,
-      "Notification created successfully",
-      StatusCodes.CREATED
-    );
+    return sendSuccess(res, notification, 'Notification created successfully', StatusCodes.CREATED);
   }),
 
   /**
@@ -31,13 +26,10 @@ const NotificationController = {
    * @returns {Promise<any>}
    */
   getListNotification: catchAsync(async (req, res) => {
-    const result = await notificationService.getListNotification(
-      req.user.userId,
-      {
-        page: req.query.page || 1,
-        limit: req.query.limit || 10,
-      }
-    );
+    const result = await notificationService.getListNotification(req.user.userId, {
+      page: req.query.page || 1,
+      limit: req.query.limit || 10,
+    });
 
     const response = {
       data: result.data,
@@ -45,12 +37,7 @@ const NotificationController = {
       unreadCount: result.metadata?.unreadCount || 0,
     };
 
-    return sendSuccess(
-      res,
-      response,
-      "Get list notification successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, response, 'Get list notification successfully', StatusCodes.OK);
   }),
 
   /**
@@ -62,12 +49,7 @@ const NotificationController = {
   markReadAll: catchAsync(async (req, res) => {
     await notificationService.markReadAll(req.user.userId);
 
-    return sendSuccess(
-      res,
-      null,
-      "Mark all notifications as read successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, null, 'Mark all notifications as read successfully', StatusCodes.OK);
   }),
 
   /**
@@ -79,12 +61,7 @@ const NotificationController = {
   cleanNotification: catchAsync(async (req, res) => {
     await notificationService.cleanNotification(req.user.userId);
 
-    return sendSuccess(
-      res,
-      null,
-      "Clean all notifications successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, null, 'Clean all notifications successfully', StatusCodes.OK);
   }),
 
   /**
@@ -96,12 +73,7 @@ const NotificationController = {
   countUnread: catchAsync(async (req, res) => {
     const count = await notificationService.countUnread(req.user.userId);
 
-    return sendSuccess(
-      res,
-      { count },
-      "Count unread notifications successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, { count }, 'Count unread notifications successfully', StatusCodes.OK);
   }),
 
   /**
@@ -112,16 +84,8 @@ const NotificationController = {
    */
   getNotificationById: catchAsync(async (req, res) => {
     const { id } = req.params;
-    const notification = await notificationService.getNotificationById(
-      id,
-      req.user.userId
-    );
-    return sendSuccess(
-      res,
-      notification,
-      "Get notification details successfully",
-      StatusCodes.OK
-    );
+    const notification = await notificationService.getNotificationById(id, req.user.userId);
+    return sendSuccess(res, notification, 'Get notification details successfully', StatusCodes.OK);
   }),
 
   /**
@@ -136,14 +100,9 @@ const NotificationController = {
     const notification = await notificationService.updateNotification(
       id,
       req.user.userId,
-      req.body
+      req.body,
     );
-    return sendSuccess(
-      res,
-      notification,
-      "Update notification successfully",
-      StatusCodes.OK
-    );
+    return sendSuccess(res, notification, 'Update notification successfully', StatusCodes.OK);
   }),
 };
 

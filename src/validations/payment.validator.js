@@ -1,5 +1,5 @@
-const Joi = require("joi");
-const { objectId } = require("./common.validator");
+const Joi = require('joi');
+const { objectId } = require('./common.validator');
 
 module.exports = {
   createPaymentValidator: Joi.object({

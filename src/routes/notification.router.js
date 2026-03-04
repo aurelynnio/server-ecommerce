@@ -1,15 +1,14 @@
-
-const express = require("express");
+const express = require('express');
 
 const router = express.Router();
 
-const NotificationController = require("../controllers/notification.controller");
+const NotificationController = require('../controllers/notification.controller');
 
-const { verifyAccessToken } = require("../middlewares/auth.middleware");
+const { verifyAccessToken } = require('../middlewares/auth.middleware');
 
-const validate = require("../middlewares/validate.middleware");
+const validate = require('../middlewares/validate.middleware');
 
-const notificationValidator = require("../validations/notification.validator");
+const notificationValidator = require('../validations/notification.validator');
 // All notification routes require authentication
 
 router.use(verifyAccessToken);
@@ -20,9 +19,9 @@ router.use(verifyAccessToken);
  * @body    { title, message, type?, link?, orderId? }
  */
 router.post(
-  "/",
+  '/',
   validate(notificationValidator.createNotification),
-  NotificationController.createNotification
+  NotificationController.createNotification,
 );
 
 /**
@@ -31,34 +30,34 @@ router.post(
  * @query   page, limit
  */
 router.get(
-  "/",
+  '/',
   validate({ query: notificationValidator.getListNotification }),
-  NotificationController.getListNotification
+  NotificationController.getListNotification,
 );
 
 /**
  * @desc    Mark all notifications as read
  * @access  Private (Authenticated users)
  */
-router.patch("/read-all", NotificationController.markReadAll);
+router.patch('/read-all', NotificationController.markReadAll);
 
 /**
  * @desc    Delete all notifications for current user
  * @access  Private (Authenticated users)
  */
-router.delete("/", NotificationController.cleanNotification);
+router.delete('/', NotificationController.cleanNotification);
 
 /**
  * @desc    Get count of unread notifications
  * @access  Private (Authenticated users)
  */
-router.get("/count", NotificationController.countUnread);
+router.get('/count', NotificationController.countUnread);
 
 /**
  * @desc    Get notification by ID
  * @access  Private (Authenticated users)
  */
-router.get("/:id", NotificationController.getNotificationById);
+router.get('/:id', NotificationController.getNotificationById);
 
 /**
  * @desc    Update notification (e.g., mark as read)
@@ -66,9 +65,9 @@ router.get("/:id", NotificationController.getNotificationById);
  * @body    { isRead?, title?, message? }
  */
 router.patch(
-  "/:id",
+  '/:id',
   validate(notificationValidator.updateNotification),
-  NotificationController.updateNotification
+  NotificationController.updateNotification,
 );
 
 module.exports = router;

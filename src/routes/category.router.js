@@ -1,43 +1,40 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const categoryController = require("../controllers/category.controller");
-const {
-  verifyAccessToken,
-  requireRole,
-} = require("../middlewares/auth.middleware");
-const validate = require("../middlewares/validate.middleware");
+const categoryController = require('../controllers/category.controller');
+const { verifyAccessToken, requireRole } = require('../middlewares/auth.middleware');
+const validate = require('../middlewares/validate.middleware');
 const {
   createCategoryValidator,
   updateCategoryValidator,
   categoryIdParamValidator,
   categorySlugParamValidator,
   getCategoriesQueryValidator,
-} = require("../validations/category.validator");
+} = require('../validations/category.validator');
 
 /**
  * @desc    Get active categories
  * @access  Public
  */
 router.get(
-  "/active",
+  '/active',
   validate({ query: getCategoriesQueryValidator }),
-  categoryController.getActiveCategories
+  categoryController.getActiveCategories,
 );
 
 /**
  * @desc    Get category tree
  * @access  Public
  */
-router.get("/tree", categoryController.getCategoryTree);
+router.get('/tree', categoryController.getCategoryTree);
 
 /**
  * @desc    Get category by slug
  * @access  Public
  */
 router.get(
-  "/slug/:slug",
+  '/slug/:slug',
   validate({ params: categorySlugParamValidator }),
-  categoryController.getCategoryBySlug
+  categoryController.getCategoryBySlug,
 );
 
 /**
@@ -45,11 +42,11 @@ router.get(
  * @access  Private (Admin)
  */
 router.post(
-  "/",
+  '/',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate(createCategoryValidator),
-  categoryController.createCategory
+  categoryController.createCategory,
 );
 
 /**
@@ -57,11 +54,11 @@ router.post(
  * @access  Private (Admin)
  */
 router.get(
-  "/",
+  '/',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({ query: getCategoriesQueryValidator }),
-  categoryController.getAllCategories
+  categoryController.getAllCategories,
 );
 
 /**
@@ -69,10 +66,10 @@ router.get(
  * @access  Private (Admin)
  */
 router.get(
-  "/statistics",
+  '/statistics',
   verifyAccessToken,
-  requireRole("admin"),
-  categoryController.getCategoryStatistics
+  requireRole('admin'),
+  categoryController.getCategoryStatistics,
 );
 
 /**
@@ -80,11 +77,11 @@ router.get(
  * @access  Private (Admin)
  */
 router.get(
-  "/:categoryId",
+  '/:categoryId',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({ params: categoryIdParamValidator }),
-  categoryController.getCategoryById
+  categoryController.getCategoryById,
 );
 
 /**
@@ -92,11 +89,11 @@ router.get(
  * @access  Private (Admin)
  */
 router.get(
-  "/:categoryId/subcategories",
+  '/:categoryId/subcategories',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({ params: categoryIdParamValidator }),
-  categoryController.getCategoryWithSubcategories
+  categoryController.getCategoryWithSubcategories,
 );
 
 /**
@@ -104,14 +101,14 @@ router.get(
  * @access  Private (Admin)
  */
 router.put(
-  "/:categoryId",
+  '/:categoryId',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({
     params: categoryIdParamValidator,
     body: updateCategoryValidator,
   }),
-  categoryController.updateCategory
+  categoryController.updateCategory,
 );
 
 /**
@@ -119,11 +116,11 @@ router.put(
  * @access  Private (Admin)
  */
 router.delete(
-  "/:categoryId",
+  '/:categoryId',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({ params: categoryIdParamValidator }),
-  categoryController.deleteCategory
+  categoryController.deleteCategory,
 );
 
 module.exports = router;

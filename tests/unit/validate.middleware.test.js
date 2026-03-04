@@ -2,12 +2,12 @@
  * Unit Tests: Validate Middleware
  * Tests Joi schema validation middleware
  */
-import { describe, it, expect, vi } from "vitest";
-import Joi from "joi";
+import { describe, it, expect, vi } from 'vitest';
+import Joi from 'joi';
 
-const validate = require("../../src/middlewares/validate.middleware");
+const validate = require('../../src/middlewares/validate.middleware');
 
-describe("Validate Middleware", () => {
+describe('Validate Middleware', () => {
   const createMockReqRes = (body = {}, params = {}, query = {}) => {
     const req = { body, params, query };
     const res = {
@@ -18,7 +18,7 @@ describe("Validate Middleware", () => {
     return { req, res, next };
   };
 
-  describe("Body Validation", () => {
+  describe('Body Validation', () => {
     const schema = {
       body: Joi.object({
         email: Joi.string().email().required(),
@@ -26,57 +26,54 @@ describe("Validate Middleware", () => {
       }),
     };
 
-    it("should call next for valid body", () => {
+    it('should call next for valid body', () => {
       const { req, res, next } = createMockReqRes({
-        email: "test@test.com",
-        password: "password123",
+        email: 'test@test.com',
+        password: 'password123',
       });
 
       validate(schema)(req, res, next);
       expect(next).toHaveBeenCalled();
     });
 
-    it("should throw ApiError for invalid body", () => {
+    it('should throw ApiError for invalid body', () => {
       const { req, res, next } = createMockReqRes({
-        email: "not-an-email",
-        password: "123",
+        email: 'not-an-email',
+        password: '123',
       });
 
       expect(() => validate(schema)(req, res, next)).toThrow();
     });
 
-    it("should throw for missing required fields", () => {
+    it('should throw for missing required fields', () => {
       const { req, res, next } = createMockReqRes({});
 
       expect(() => validate(schema)(req, res, next)).toThrow();
     });
   });
 
-  describe("Params Validation", () => {
+  describe('Params Validation', () => {
     const schema = {
       params: Joi.object({
         id: Joi.string().required(),
       }),
     };
 
-    it("should validate params", () => {
-      const { req, res, next } = createMockReqRes(
-        {},
-        { id: "507f1f77bcf86cd799439011" },
-      );
+    it('should validate params', () => {
+      const { req, res, next } = createMockReqRes({}, { id: '507f1f77bcf86cd799439011' });
 
       validate(schema)(req, res, next);
       expect(next).toHaveBeenCalled();
     });
 
-    it("should throw for missing params", () => {
+    it('should throw for missing params', () => {
       const { req, res, next } = createMockReqRes({}, {});
 
       expect(() => validate(schema)(req, res, next)).toThrow();
     });
   });
 
-  describe("Query Validation", () => {
+  describe('Query Validation', () => {
     const schema = {
       query: Joi.object({
         page: Joi.number().integer().min(1).default(1),
@@ -84,7 +81,7 @@ describe("Validate Middleware", () => {
       }),
     };
 
-    it("should apply defaults for missing query params", () => {
+    it('should apply defaults for missing query params', () => {
       const { req, res, next } = createMockReqRes({}, {}, {});
 
       validate(schema)(req, res, next);
@@ -93,49 +90,45 @@ describe("Validate Middleware", () => {
       expect(req.query.limit).toBe(10);
     });
 
-    it("should accept valid query params", () => {
-      const { req, res, next } = createMockReqRes(
-        {},
-        {},
-        { page: 3, limit: 20 },
-      );
+    it('should accept valid query params', () => {
+      const { req, res, next } = createMockReqRes({}, {}, { page: 3, limit: 20 });
 
       validate(schema)(req, res, next);
       expect(next).toHaveBeenCalled();
     });
   });
 
-  describe("Single Schema (body-only shorthand)", () => {
+  describe('Single Schema (body-only shorthand)', () => {
     const schema = Joi.object({
       name: Joi.string().required(),
     });
 
-    it("should validate body when passed a single Joi schema", () => {
-      const { req, res, next } = createMockReqRes({ name: "Test" });
+    it('should validate body when passed a single Joi schema', () => {
+      const { req, res, next } = createMockReqRes({ name: 'Test' });
 
       validate(schema)(req, res, next);
       expect(next).toHaveBeenCalled();
     });
 
-    it("should throw for invalid body with single schema", () => {
+    it('should throw for invalid body with single schema', () => {
       const { req, res, next } = createMockReqRes({});
 
       expect(() => validate(schema)(req, res, next)).toThrow();
     });
   });
 
-  describe("Strip Unknown Fields", () => {
+  describe('Strip Unknown Fields', () => {
     const schema = {
       body: Joi.object({
         email: Joi.string().email().required(),
       }),
     };
 
-    it("should strip unknown fields from request", () => {
+    it('should strip unknown fields from request', () => {
       const { req, res, next } = createMockReqRes({
-        email: "test@test.com",
-        maliciousField: "hack",
-        __proto__: "pollution",
+        email: 'test@test.com',
+        maliciousField: 'hack',
+        __proto__: 'pollution',
       });
 
       validate(schema)(req, res, next);

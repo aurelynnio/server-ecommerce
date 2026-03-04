@@ -1,11 +1,8 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const userController = require("../controllers/user.controller");
-const {
-  verifyAccessToken,
-  requireRole,
-} = require("../middlewares/auth.middleware");
-const validate = require("../middlewares/validate.middleware");
+const userController = require('../controllers/user.controller');
+const { verifyAccessToken, requireRole } = require('../middlewares/auth.middleware');
+const validate = require('../middlewares/validate.middleware');
 const {
   updateProfileValidator,
   addAddressValidator,
@@ -18,37 +15,37 @@ const {
   addressIdParamValidator,
   paginationQueryValidator,
   changePasswordValidator,
-} = require("../validations/user.validator");
-const upload = require("../configs/upload");
-const { validateImageSignature } = require("../middlewares/uploadSignature.middleware");
+} = require('../validations/user.validator');
+const upload = require('../configs/upload');
+const { validateImageSignature } = require('../middlewares/uploadSignature.middleware');
 
 /**
  * @desc    Upload user avatar image
  * @access  Private
  */
 router.post(
-  "/upload-avatar",
+  '/upload-avatar',
   verifyAccessToken,
-  upload.single("avatar"),
+  upload.single('avatar'),
   validateImageSignature,
-  userController.uploadAvatar
+  userController.uploadAvatar,
 );
 
 /**
  * @desc    Get current user's profile
  * @access  Private
  */
-router.get("/profile", verifyAccessToken, userController.getProfile);
+router.get('/profile', verifyAccessToken, userController.getProfile);
 
 /**
  * @desc    Update current user's profile
  * @access  Private
  */
 router.put(
-  "/profile",
+  '/profile',
   verifyAccessToken,
   validate(updateProfileValidator),
-  userController.updateProfile
+  userController.updateProfile,
 );
 
 /**
@@ -56,10 +53,10 @@ router.put(
  * @access  Private
  */
 router.post(
-  "/addresses",
+  '/addresses',
   verifyAccessToken,
   validate(addAddressValidator),
-  userController.addAddress
+  userController.addAddress,
 );
 
 /**
@@ -67,13 +64,13 @@ router.post(
  * @access  Private
  */
 router.put(
-  "/addresses/:addressId",
+  '/addresses/:addressId',
   verifyAccessToken,
   validate({
     params: addressIdParamValidator,
     body: updateAddressValidator,
   }),
-  userController.updateAddress
+  userController.updateAddress,
 );
 
 /**
@@ -81,27 +78,27 @@ router.put(
  * @access  Private
  */
 router.delete(
-  "/addresses/:addressId",
+  '/addresses/:addressId',
   verifyAccessToken,
   validate({ params: addressIdParamValidator }),
-  userController.deleteAddress
+  userController.deleteAddress,
 );
 
 /**
  * @desc    Get all addresses for current user
  * @access  Private
  */
-router.get("/addresses", verifyAccessToken, userController.getAddresses);
+router.get('/addresses', verifyAccessToken, userController.getAddresses);
 
 /**
  * @desc    Set address as default
  * @access  Private
  */
 router.put(
-  "/addresses/:addressId/default",
+  '/addresses/:addressId/default',
   verifyAccessToken,
   validate({ params: addressIdParamValidator }),
-  userController.setDefaultAddress
+  userController.setDefaultAddress,
 );
 
 /**
@@ -109,10 +106,10 @@ router.put(
  * @access  Private
  */
 router.put(
-  "/change-password",
+  '/change-password',
   verifyAccessToken,
   validate(changePasswordValidator),
-  userController.changePassword
+  userController.changePassword,
 );
 
 /**
@@ -120,11 +117,11 @@ router.put(
  * @access  Private (Admin)
  */
 router.get(
-  "/",
+  '/',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({ query: paginationQueryValidator }),
-  userController.getAllUsers
+  userController.getAllUsers,
 );
 
 /**
@@ -132,11 +129,11 @@ router.get(
  * @access  Private (Admin)
  */
 router.post(
-  "/",
+  '/',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate(createUserValidator),
-  userController.createUser
+  userController.createUser,
 );
 
 /**
@@ -144,11 +141,11 @@ router.post(
  * @access  Private (Admin)
  */
 router.put(
-  "/",
+  '/',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate(updateUserValidator),
-  userController.updateUser
+  userController.updateUser,
 );
 
 /**
@@ -157,14 +154,14 @@ router.put(
  * @param   id - User ID
  */
 router.put(
-  "/:id",
+  '/:id',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({
     params: mongoIdParamValidator,
     body: updateUserByIdValidator,
   }),
-  userController.updateUserById
+  userController.updateUserById,
 );
 
 /**
@@ -172,14 +169,14 @@ router.put(
  * @access  Private (Admin)
  */
 router.put(
-  "/:id/role",
+  '/:id/role',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({
     params: mongoIdParamValidator,
     body: updateRoleValidator,
   }),
-  userController.updateUserRole
+  userController.updateUserRole,
 );
 
 /**
@@ -187,11 +184,11 @@ router.put(
  * @access  Private (Admin)
  */
 router.get(
-  "/:id",
+  '/:id',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({ params: mongoIdParamValidator }),
-  userController.getUserById
+  userController.getUserById,
 );
 
 /**
@@ -199,11 +196,11 @@ router.get(
  * @access  Private (Admin)
  */
 router.delete(
-  "/:id",
+  '/:id',
   verifyAccessToken,
-  requireRole("admin"),
+  requireRole('admin'),
   validate({ params: mongoIdParamValidator }),
-  userController.deleteUser
+  userController.deleteUser,
 );
 
 module.exports = router;

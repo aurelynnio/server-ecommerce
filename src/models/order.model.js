@@ -1,4 +1,4 @@
-const { Schema, model, Types } = require("mongoose");
+const { Schema, model, Types } = require('mongoose');
 
 const orderSchema = new Schema(
   {
@@ -7,14 +7,14 @@ const orderSchema = new Schema(
 
     userId: {
       type: Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
 
     // Critical for Multi-Vendor: Which shop does this order belong to?
     shopId: {
       type: Types.ObjectId,
-      ref: "Shop",
+      ref: 'Shop',
       required: true,
     },
 
@@ -22,7 +22,7 @@ const orderSchema = new Schema(
       {
         productId: {
           type: Types.ObjectId,
-          ref: "Product",
+          ref: 'Product',
           required: true,
         },
         // Variant identification
@@ -50,14 +50,14 @@ const orderSchema = new Schema(
 
     paymentMethod: {
       type: String,
-      enum: ["cod", "vnpay", "momo"],
-      default: "cod",
+      enum: ['cod', 'vnpay', 'momo'],
+      default: 'cod',
     },
 
     paymentStatus: {
       type: String,
-      enum: ["unpaid", "paid", "refunded"],
-      default: "unpaid",
+      enum: ['unpaid', 'paid', 'refunded'],
+      default: 'unpaid',
     },
 
     // Financials
@@ -70,15 +70,15 @@ const orderSchema = new Schema(
     status: {
       type: String,
       enum: [
-        "pending",
-        "confirmed",
-        "processing", // Shop packing
-        "shipped", // Handed to carrier
-        "delivered",
-        "cancelled",
-        "returned",
+        'pending',
+        'confirmed',
+        'processing', // Shop packing
+        'shipped', // Handed to carrier
+        'delivered',
+        'cancelled',
+        'returned',
       ],
-      default: "pending",
+      default: 'pending',
     },
 
     // Tracking
@@ -89,7 +89,7 @@ const orderSchema = new Schema(
     cancelledAt: { type: Date },
     cancelReason: { type: String },
   },
-  { timestamps: true, collection: "orders" },
+  { timestamps: true, collection: 'orders' },
 );
 
 // Indexes
@@ -101,4 +101,4 @@ orderSchema.index({ orderGroupId: 1 }); // User finding their "checkout history"
 orderSchema.index({ status: 1 });
 orderSchema.index({ paymentStatus: 1 });
 
-module.exports = model("Order", orderSchema);
+module.exports = model('Order', orderSchema);

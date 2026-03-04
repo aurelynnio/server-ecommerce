@@ -1,7 +1,7 @@
-const Cart = require("../repositories/cart.repository");
-const Product = require("../repositories/product.repository");
-const { StatusCodes } = require("http-status-codes");
-const { ApiError } = require("../middlewares/errorHandler.middleware");
+const Cart = require('../repositories/cart.repository');
+const Product = require('../repositories/product.repository');
+const { StatusCodes } = require('http-status-codes');
+const { ApiError } = require('../middlewares/errorHandler.middleware');
 
 /**
  * Service handling shopping cart operations
@@ -30,7 +30,7 @@ class CartService {
         // Handle color variants
         if (item.variantId && product.variants && product.variants.length > 0) {
           const variant = product.variants.find(
-            (v) => v._id.toString() === item.variantId.toString()
+            (v) => v._id.toString() === item.variantId.toString(),
           );
           if (variant) {
             item.variant = {
@@ -42,8 +42,8 @@ class CartService {
               stock: variant.stock,
             };
             // Override price from variant
-            item.price = { currentPrice: variant.price, currency: "VND" };
-            
+            item.price = { currentPrice: variant.price, currency: 'VND' };
+
             // Build variationInfo string
             const parts = [];
             if (variant.color) parts.push(variant.color);
@@ -56,7 +56,7 @@ class CartService {
         // Backward compatibility: Check modelId for variants
         else if (item.modelId && product.variants && product.variants.length > 0) {
           const variant = product.variants.find(
-            (v) => v._id.toString() === item.modelId.toString()
+            (v) => v._id.toString() === item.modelId.toString(),
           );
           if (variant) {
             item.variant = {
@@ -68,8 +68,8 @@ class CartService {
               stock: variant.stock,
             };
             item.variantId = variant._id;
-            item.price = { currentPrice: variant.price, currency: "VND" };
-            
+            item.price = { currentPrice: variant.price, currency: 'VND' };
+
             const parts = [];
             if (variant.color) parts.push(variant.color);
             if (item.size) parts.push(`Size: ${item.size}`);
@@ -80,13 +80,11 @@ class CartService {
         }
         // Handle legacy Tier Variations (SKU)
         else if (item.modelId && product.models) {
-          const model = product.models.find(
-            (m) => m._id.toString() === item.modelId.toString()
-          );
+          const model = product.models.find((m) => m._id.toString() === item.modelId.toString());
           if (model) {
             // Map tierIndex to actual names (e.g., [0, 0] -> "Red", "S")
             const variationOptions = model.tierIndex.map((tIdx, i) => {
-              return product.tierVariations?.[i]?.options[tIdx] || "";
+              return product.tierVariations?.[i]?.options[tIdx] || '';
             });
 
             item.model = {
@@ -94,11 +92,11 @@ class CartService {
               sku: model.sku,
               price: model.price,
               stock: model.stock,
-              name: variationOptions.join(" - "),
+              name: variationOptions.join(' - '),
             };
 
-            item.variationInfo = variationOptions.join(" - ");
-            item.price = { currentPrice: model.price, currency: "VND" };
+            item.variationInfo = variationOptions.join(' - ');
+            item.price = { currentPrice: model.price, currency: 'VND' };
           }
         }
 
@@ -113,7 +111,7 @@ class CartService {
           delete item.productId.tierVariations;
           // Keep variants for image fallback but remove detailed info
           if (item.productId.variants) {
-            item.productId.variants = item.productId.variants.map(v => ({
+            item.productId.variants = item.productId.variants.map((v) => ({
               _id: v._id,
               images: v.images,
             }));
@@ -142,28 +140,25 @@ class CartService {
 
     // Validate quantity
     if (!quantity || quantity < 1) {
-      throw new ApiError(
-        StatusCodes.BAD_REQUEST,
-        "Quantity must be at least 1"
-      );
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Quantity must be at least 1');
     }
 
     // Check if product exists and is published
     const product = await Product.findById(productId);
     if (!product) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
     }
-    if (product.status !== "published") {
-      throw new ApiError(StatusCodes.CONFLICT, "Product is not available");
+    if (product.status !== 'published') {
+      throw new ApiError(StatusCodes.CONFLICT, 'Product is not available');
     }
 
     // Validate size selection if product has sizes
     if (product.sizes && product.sizes.length > 0) {
       if (!size) {
-        throw new ApiError(StatusCodes.BAD_REQUEST, "Please select a size");
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Please select a size');
       }
       if (!product.sizes.includes(size)) {
-        throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid size selected");
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid size selected');
       }
     }
 
@@ -180,14 +175,11 @@ class CartService {
         // Find variant by ID
         const variant = product.variants.find((v) => v._id.toString() === modelId);
         if (!variant) {
-          throw new ApiError(StatusCodes.NOT_FOUND, "Variant not found");
+          throw new ApiError(StatusCodes.NOT_FOUND, 'Variant not found');
         }
 
         if (variant.stock < quantity) {
-          throw new ApiError(
-            StatusCodes.CONFLICT,
-            `Only ${variant.stock} item(s) available`
-          );
+          throw new ApiError(StatusCodes.CONFLICT, `Only ${variant.stock} item(s) available`);
         }
         price = variant.price;
         selectedVariantId = modelId;
@@ -195,7 +187,7 @@ class CartService {
         // Default to first variant if not specified
         const variant = product.variants[0];
         if (variant.stock < quantity) {
-          throw new ApiError(StatusCodes.CONFLICT, "Out of stock");
+          throw new ApiError(StatusCodes.CONFLICT, 'Out of stock');
         }
         price = variant.price;
         selectedVariantId = variant._id.toString();
@@ -206,21 +198,18 @@ class CartService {
       if (modelId) {
         const model = product.models.find((m) => m._id.toString() === modelId);
         if (!model) {
-          throw new ApiError(StatusCodes.NOT_FOUND, "Model variation not found");
+          throw new ApiError(StatusCodes.NOT_FOUND, 'Model variation not found');
         }
 
         if (model.stock < quantity) {
-          throw new ApiError(
-            StatusCodes.CONFLICT,
-            `Only ${model.stock} item(s) available`
-          );
+          throw new ApiError(StatusCodes.CONFLICT, `Only ${model.stock} item(s) available`);
         }
         price = model.price;
         selectedVariantId = modelId;
       } else {
         const model = product.models[0];
         if (model.stock < quantity) {
-          throw new ApiError(StatusCodes.CONFLICT, "Out of stock");
+          throw new ApiError(StatusCodes.CONFLICT, 'Out of stock');
         }
         price = model.price;
         selectedVariantId = model._id.toString();
@@ -238,10 +227,10 @@ class CartService {
       (item) =>
         item.productId.toString() === productId &&
         (selectedVariantId
-          ? (item.modelId?.toString() === selectedVariantId.toString() || 
-             item.variantId?.toString() === selectedVariantId.toString())
-          : (!item.modelId && !item.variantId)) &&
-        (size ? item.size === size : !item.size)
+          ? item.modelId?.toString() === selectedVariantId.toString() ||
+            item.variantId?.toString() === selectedVariantId.toString()
+          : !item.modelId && !item.variantId) &&
+        (size ? item.size === size : !item.size),
     );
 
     if (existingItemIndex > -1) {
@@ -249,7 +238,7 @@ class CartService {
       // Update price if changed
       cart.items[existingItemIndex].price = {
         currentPrice: price,
-        currency: "VND",
+        currency: 'VND',
       };
     } else {
       cart.items.push({
@@ -259,7 +248,7 @@ class CartService {
         variantId: selectedVariantId,
         size: size || null,
         quantity,
-        price: { currentPrice: price, currency: "VND" },
+        price: { currentPrice: price, currency: 'VND' },
       });
     }
 
@@ -281,12 +270,12 @@ class CartService {
   async updateCartItem(userId, itemId, quantity) {
     const cart = await Cart.findByUserId(userId);
     if (!cart) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Cart not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Cart not found');
     }
 
     const item = cart.items.id(itemId);
     if (!item) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Item not found in cart");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Item not found in cart');
     }
 
     // If quantity is 0 or less, remove the item
@@ -296,51 +285,40 @@ class CartService {
 
     // Check product stock
     const product = await Product.findById(item.productId);
-    if (!product || product.status !== "published") {
-      throw new ApiError(StatusCodes.CONFLICT, "Product is not available");
+    if (!product || product.status !== 'published') {
+      throw new ApiError(StatusCodes.CONFLICT, 'Product is not available');
     }
 
     // Only validate stock when INCREASING quantity
     const isIncreasing = quantity > item.quantity;
-    
+
     if (isIncreasing) {
       // Check variantId first
       if (item.variantId && product.variants && product.variants.length > 0) {
         const variant = product.variants.find(
-          (v) => v._id.toString() === item.variantId.toString()
+          (v) => v._id.toString() === item.variantId.toString(),
         );
         if (!variant) {
-          throw new ApiError(StatusCodes.NOT_FOUND, "Product variant not found");
+          throw new ApiError(StatusCodes.NOT_FOUND, 'Product variant not found');
         }
         if (variant.stock < quantity) {
-          throw new ApiError(
-            StatusCodes.CONFLICT,
-            `Only ${variant.stock} item(s) available`
-          );
+          throw new ApiError(StatusCodes.CONFLICT, `Only ${variant.stock} item(s) available`);
         }
       }
       // Check modelId for tier variations (legacy)
       else if (item.modelId && product.models && product.models.length > 0) {
-        const model = product.models.find(
-          (m) => m._id.toString() === item.modelId.toString()
-        );
+        const model = product.models.find((m) => m._id.toString() === item.modelId.toString());
         if (!model) {
-          throw new ApiError(StatusCodes.NOT_FOUND, "Product variation not found");
+          throw new ApiError(StatusCodes.NOT_FOUND, 'Product variation not found');
         }
         if (model.stock < quantity) {
-          throw new ApiError(
-            StatusCodes.CONFLICT,
-            `Only ${model.stock} item(s) available`
-          );
+          throw new ApiError(StatusCodes.CONFLICT, `Only ${model.stock} item(s) available`);
         }
       } else {
         // Simple Product stock
         const availableStock = product.stock ?? product.quantity ?? 999;
         if (availableStock < quantity) {
-          throw new ApiError(
-            StatusCodes.CONFLICT,
-            `Only ${availableStock} item(s) available`
-          );
+          throw new ApiError(StatusCodes.CONFLICT, `Only ${availableStock} item(s) available`);
         }
       }
     }
@@ -366,7 +344,7 @@ class CartService {
   async removeCartItem(userId, itemId) {
     const cart = await Cart.findByUserId(userId);
     if (!cart) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Cart not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Cart not found');
     }
 
     // Remove item using pull
@@ -378,8 +356,8 @@ class CartService {
     await cart.save();
 
     await cart.populate({
-      path: "items.productId",
-      select: "name slug images price status",
+      path: 'items.productId',
+      select: 'name slug images price status',
     });
 
     return cart;
@@ -394,7 +372,7 @@ class CartService {
   async clearCart(userId) {
     const cart = await Cart.findByUserId(userId);
     if (!cart) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Cart not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Cart not found');
     }
 
     cart.items = [];
@@ -444,5 +422,3 @@ class CartService {
 }
 
 module.exports = new CartService();
-
-

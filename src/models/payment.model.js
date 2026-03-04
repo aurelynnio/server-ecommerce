@@ -1,15 +1,15 @@
-const { Schema, model, Types } = require("mongoose");
+const { Schema, model, Types } = require('mongoose');
 
 const paymentSchema = new Schema(
   {
     orderId: {
       type: Types.ObjectId,
-      ref: "Order",
+      ref: 'Order',
       required: true,
     },
     userId: {
       type: Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     amount: {
@@ -18,13 +18,13 @@ const paymentSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "completed", "failed"],
-      default: "pending",
+      enum: ['pending', 'completed', 'failed'],
+      default: 'pending',
     },
     paymentMethod: {
       type: String,
-      enum: ["cod", "vnpay", "momo"],
-      default: "cod",
+      enum: ['cod', 'vnpay', 'momo'],
+      default: 'cod',
     },
     // Payment gateway specific fields
     transactionId: {
@@ -47,7 +47,7 @@ const paymentSchema = new Schema(
   },
   {
     timestamps: true,
-    collection: "payments",
+    collection: 'payments',
   },
 );
 
@@ -56,4 +56,4 @@ paymentSchema.index({ orderId: 1 });
 paymentSchema.index({ userId: 1 });
 paymentSchema.index({ status: 1 });
 
-module.exports = model("Payment", paymentSchema);
+module.exports = model('Payment', paymentSchema);

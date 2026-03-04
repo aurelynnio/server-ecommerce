@@ -1,12 +1,10 @@
-const Notification = require("../repositories/notification.repository");
-const User = require("../repositories/user.repository");
-const mongoose = require("mongoose");
-const logger = require("../utils/logger");
-const { StatusCodes } = require("http-status-codes");
-const { ApiError } = require("../middlewares/errorHandler.middleware");
-const { getPaginationParams, buildPaginationResponse } = require("../utils/pagination");
-
-
+const Notification = require('../repositories/notification.repository');
+const User = require('../repositories/user.repository');
+const mongoose = require('mongoose');
+const logger = require('../utils/logger');
+const { StatusCodes } = require('http-status-codes');
+const { ApiError } = require('../middlewares/errorHandler.middleware');
+const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 
 /**
  * Service handling notification operations
@@ -26,20 +24,20 @@ class NotificationService {
    */
   async createNotification({
     userId,
-    type = "system",
+    type = 'system',
     title,
     message,
     orderId = null,
     link = null,
   }) {
-    const { getIO } = require("../socket/index");
+    const { getIO } = require('../socket/index');
 
     // Broadcast Logic for Promotion
     // PERFORMANCE FIX: Use cursor with batch processing instead of loading ALL users
-    if (type === "promotion") {
+    if (type === 'promotion') {
       const BATCH_SIZE = 1000;
       let processedCount = 0;
-      
+
       // Use cursor to stream users without loading all into memory
       const cursor = User.streamAllUserIds();
       let batch = [];
@@ -56,25 +54,25 @@ class NotificationService {
               link,
               isRead: false,
               createdAt: new Date(),
-            }
-          }
+            },
+          },
         });
 
         if (batch.length >= BATCH_SIZE) {
           await Notification.bulkWriteNotifications(batch);
-          
+
           // Emit socket notifications for this batch
           try {
             const io = getIO();
-            batch.forEach(item => {
+            batch.forEach((item) => {
               const userStrId = item.insertOne.document.userId.toString();
-              io.to(userStrId).emit("new_notification", {
+              io.to(userStrId).emit('new_notification', {
                 _id: new mongoose.Types.ObjectId(),
                 ...item.insertOne.document,
               });
             });
           } catch (error) {
-            logger.error("Socket broadcast error:", { error: error.message });
+            logger.error('Socket broadcast error:', { error: error.message });
           }
 
           processedCount += batch.length;
@@ -85,18 +83,18 @@ class NotificationService {
       // Process remaining batch
       if (batch.length > 0) {
         await Notification.bulkWriteNotifications(batch);
-        
+
         try {
           const io = getIO();
-          batch.forEach(item => {
+          batch.forEach((item) => {
             const userStrId = item.insertOne.document.userId.toString();
-            io.to(userStrId).emit("new_notification", {
+            io.to(userStrId).emit('new_notification', {
               _id: new mongoose.Types.ObjectId(),
               ...item.insertOne.document,
             });
           });
         } catch (error) {
-          logger.error("Socket broadcast error:", { error: error.message });
+          logger.error('Socket broadcast error:', { error: error.message });
         }
 
         processedCount += batch.length;
@@ -117,11 +115,11 @@ class NotificationService {
 
     try {
       const io = getIO();
-      io.to(userId).emit("new_notification", notification);
+      io.to(userId).emit('new_notification', notification);
       const unreadCount = await this.countUnread(userId);
-      io.to(userId).emit("unread_count", unreadCount);
+      io.to(userId).emit('unread_count', unreadCount);
     } catch (error) {
-      logger.error("Socket error:", { error: error.message });
+      logger.error('Socket error:', { error: error.message });
     }
 
     return notification;
@@ -140,10 +138,7 @@ class NotificationService {
     const total = await Notification.countByUserId(userId);
     const paginationParams = getPaginationParams(page, limit, total || 0);
 
-    const notifications = await Notification.findByUserIdWithPagination(
-      userId,
-      paginationParams,
-    );
+    const notifications = await Notification.findByUserIdWithPagination(userId, paginationParams);
 
     const unreadCount = await Notification.countUnreadByUserId(userId);
 
@@ -155,7 +150,6 @@ class NotificationService {
     };
   }
 
-
   /**
    * Mark all notifications as read for a user
    * @param {string} userId - User ID
@@ -166,9 +160,9 @@ class NotificationService {
     const result = await Notification.markAllReadByUserId(userId);
     // Update real-time count
     try {
-      const { getIO } = require("../socket/index");
+      const { getIO } = require('../socket/index');
       const io = getIO();
-      io.to(userId).emit("unread_count", 0);
+      io.to(userId).emit('unread_count', 0);
     } catch (_error) {}
 
     return result;
@@ -183,9 +177,9 @@ class NotificationService {
 
     // Update real-time count
     try {
-      const { getIO } = require("../socket/index");
+      const { getIO } = require('../socket/index');
       const io = getIO();
-      io.to(userId).emit("unread_count", 0);
+      io.to(userId).emit('unread_count', 0);
     } catch (_error) {}
 
     return result;
@@ -208,10 +202,9 @@ class NotificationService {
   async getNotificationById(id, userId) {
     const notification = await Notification.findByIdAndUserId(id, userId);
     if (!notification) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Notification not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Notification not found');
     }
     return notification;
-
   }
 
   /**
@@ -223,17 +216,16 @@ class NotificationService {
   async updateNotification(id, userId, data) {
     const notification = await Notification.updateByIdAndUserId(id, userId, data);
     if (!notification) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Notification not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Notification not found');
     }
-
 
     // If update affects read status, emit new count
     if (data.isRead !== undefined) {
       try {
-        const { getIO } = require("../socket/index");
+        const { getIO } = require('../socket/index');
         const io = getIO();
         const count = await this.countUnread(userId);
-        io.to(userId).emit("unread_count", count);
+        io.to(userId).emit('unread_count', count);
       } catch (_error) {}
     }
 
@@ -242,5 +234,3 @@ class NotificationService {
 }
 
 module.exports = new NotificationService();
-
-
