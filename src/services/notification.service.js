@@ -5,12 +5,61 @@ const logger = require('../utils/logger');
 const { StatusCodes } = require('http-status-codes');
 const { ApiError } = require('../middlewares/errorHandler.middleware');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
+const { connectRabbitMQ, config_rabbitMQ } = require('../configs/rabbitMQ.config');
+const { buildNotificationUpdatePayload } = require('../utils/notification-update.util');
 
 /**
  * Service handling notification operations
  * Manages creating, retrieving, and updating notifications
  */
 class NotificationService {
+  constructor() {
+    this.rabbitChannel = null;
+    this.rabbitConnection = null;
+    this.rabbitQueue = null;
+  }
+
+  async initRabbitMQ() {
+    if (this.rabbitChannel && this.rabbitQueue) {
+      return {
+        channel: this.rabbitChannel,
+        queue: this.rabbitQueue,
+      };
+    }
+
+    const { connection, channel, queue } = await connectRabbitMQ('notification');
+    this.rabbitConnection = connection;
+    this.rabbitChannel = channel;
+    this.rabbitQueue = queue;
+
+    return { channel, queue };
+  }
+
+  async publishNotification(payload, routingKey) {
+    const { channel, queue } = await this.initRabbitMQ();
+    const content = Buffer.from(JSON.stringify(payload));
+    const exchange = config_rabbitMQ.exchange.name;
+
+    if (!routingKey.startsWith('notification.')) {
+      logger.warn(`Unexpected notification routing key: ${routingKey}`);
+    }
+
+    const isPublished = channel.publish(exchange, routingKey, content, {
+      persistent: true,
+      contentType: 'application/json',
+    });
+    if (!isPublished) {
+      logger.warn('RabbitMQ queue buffer is full for notification exchange');
+    }
+
+    return {
+      published: isPublished,
+      exchange,
+      routingKey,
+      queue: queue.name,
+    };
+  }
+
   /**
    * Create a new notification and emit real-time event
    * @param {Object} data - Notification data
@@ -19,6 +68,8 @@ class NotificationService {
    * @param {string} data.title - Notification title
    * @param {string} data.message - Notification message
    * @param {string} [data.orderId] - Related order ID
+   * @param {string} [data.actorUserId] - User who triggered the notification
+   * @param {string} [data.shopId] - Related shop ID
    * @param {string} [data.link] - Action link
    * @returns {Promise<Object>} Created notification object
    */
@@ -28,9 +79,26 @@ class NotificationService {
     title,
     message,
     orderId = null,
+    actorUserId = null,
+    shopId = null,
     link = null,
   }) {
     const { getIO } = require('../socket/index');
+    const emitBatchNotifications = async (batchItems) => {
+      const io = getIO();
+      const userIds = batchItems.map((item) => item.insertOne.document.userId);
+      const unreadCounts = await Notification.countUnreadByUserIds(userIds);
+      const unreadCountMap = new Map(unreadCounts.map((item) => [item._id.toString(), item.count]));
+
+      batchItems.forEach((item) => {
+        const userStrId = item.insertOne.document.userId.toString();
+        io.to(userStrId).emit('new_notification', {
+          _id: new mongoose.Types.ObjectId(),
+          ...item.insertOne.document,
+        });
+        io.to(userStrId).emit('unread_count', unreadCountMap.get(userStrId) || 0);
+      });
+    };
 
     // Broadcast Logic for Promotion
     // PERFORMANCE FIX: Use cursor with batch processing instead of loading ALL users
@@ -51,6 +119,8 @@ class NotificationService {
               title,
               message,
               orderId,
+              actorUserId,
+              shopId,
               link,
               isRead: false,
               createdAt: new Date(),
@@ -63,14 +133,7 @@ class NotificationService {
 
           // Emit socket notifications for this batch
           try {
-            const io = getIO();
-            batch.forEach((item) => {
-              const userStrId = item.insertOne.document.userId.toString();
-              io.to(userStrId).emit('new_notification', {
-                _id: new mongoose.Types.ObjectId(),
-                ...item.insertOne.document,
-              });
-            });
+            await emitBatchNotifications(batch);
           } catch (error) {
             logger.error('Socket broadcast error:', { error: error.message });
           }
@@ -85,14 +148,7 @@ class NotificationService {
         await Notification.bulkWriteNotifications(batch);
 
         try {
-          const io = getIO();
-          batch.forEach((item) => {
-            const userStrId = item.insertOne.document.userId.toString();
-            io.to(userStrId).emit('new_notification', {
-              _id: new mongoose.Types.ObjectId(),
-              ...item.insertOne.document,
-            });
-          });
+          await emitBatchNotifications(batch);
         } catch (error) {
           logger.error('Socket broadcast error:', { error: error.message });
         }
@@ -110,6 +166,8 @@ class NotificationService {
       title,
       message,
       orderId,
+      actorUserId,
+      shopId,
       link,
     });
 
@@ -214,13 +272,16 @@ class NotificationService {
    * @param {Object} data
    */
   async updateNotification(id, userId, data) {
-    const notification = await Notification.updateByIdAndUserId(id, userId, data);
-    if (!notification) {
+    const existingNotification = await Notification.findByIdAndUserId(id, userId);
+    if (!existingNotification) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Notification not found');
     }
 
+    const updatePayload = buildNotificationUpdatePayload(existingNotification, data);
+    const notification = await Notification.updateByIdAndUserId(id, userId, updatePayload);
+
     // If update affects read status, emit new count
-    if (data.isRead !== undefined) {
+    if (data.isRead !== undefined && data.isRead !== existingNotification.isRead) {
       try {
         const { getIO } = require('../socket/index');
         const io = getIO();

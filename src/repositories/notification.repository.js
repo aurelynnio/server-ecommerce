@@ -15,7 +15,9 @@ class NotificationRepository extends BaseRepository {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate('orderId', 'orderCode totalAmount status');
+      .populate('orderId', 'totalAmount status')
+      .populate('actorUserId', 'username avatar')
+      .populate('shopId', 'name slug logo');
   }
 
   countByUserId(userId) {
@@ -24,6 +26,23 @@ class NotificationRepository extends BaseRepository {
 
   countUnreadByUserId(userId) {
     return this.countByFilter({ userId, isRead: false });
+  }
+
+  countUnreadByUserIds(userIds) {
+    return this.aggregateByPipeline([
+      {
+        $match: {
+          userId: { $in: userIds },
+          isRead: false,
+        },
+      },
+      {
+        $group: {
+          _id: '$userId',
+          count: { $sum: 1 },
+        },
+      },
+    ]);
   }
 
   markAllReadByUserId(userId) {
@@ -43,7 +62,10 @@ class NotificationRepository extends BaseRepository {
   }
 
   findByIdAndUserId(id, userId) {
-    return this.findOneByFilter({ _id: id, userId }).populate('orderId');
+    return this.findOneByFilter({ _id: id, userId })
+      .populate('orderId')
+      .populate('actorUserId', 'username avatar')
+      .populate('shopId', 'name slug logo');
   }
 
   updateByIdAndUserId(id, userId, update) {

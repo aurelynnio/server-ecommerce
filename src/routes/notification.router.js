@@ -4,7 +4,7 @@ const router = express.Router();
 
 const NotificationController = require('../controllers/notification.controller');
 
-const { verifyAccessToken } = require('../middlewares/auth.middleware');
+const { verifyAccessToken, requireRole } = require('../middlewares/auth.middleware');
 
 const validate = require('../middlewares/validate.middleware');
 
@@ -15,12 +15,13 @@ router.use(verifyAccessToken);
 
 /**
  * @desc    Create a new notification
- * @access  Private (Authenticated users)
+ * @access  Private (Admin only)
  * @body    { title, message, type?, link?, orderId? }
  */
 router.post(
   '/',
-  validate(notificationValidator.createNotification),
+  requireRole('admin'),
+  validate({ body: notificationValidator.createNotificationValidator }),
   NotificationController.createNotification,
 );
 
@@ -31,7 +32,7 @@ router.post(
  */
 router.get(
   '/',
-  validate({ query: notificationValidator.getListNotification }),
+  validate({ query: notificationValidator.getListNotificationValidator }),
   NotificationController.getListNotification,
 );
 
@@ -57,7 +58,11 @@ router.get('/count', NotificationController.countUnread);
  * @desc    Get notification by ID
  * @access  Private (Authenticated users)
  */
-router.get('/:id', NotificationController.getNotificationById);
+router.get(
+  '/:id',
+  validate({ params: notificationValidator.notificationIdParamValidator }),
+  NotificationController.getNotificationById,
+);
 
 /**
  * @desc    Update notification (e.g., mark as read)
@@ -66,7 +71,10 @@ router.get('/:id', NotificationController.getNotificationById);
  */
 router.patch(
   '/:id',
-  validate(notificationValidator.updateNotification),
+  validate({
+    params: notificationValidator.notificationIdParamValidator,
+    body: notificationValidator.updateNotificationValidator,
+  }),
   NotificationController.updateNotification,
 );
 

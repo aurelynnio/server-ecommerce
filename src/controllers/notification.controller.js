@@ -11,12 +11,16 @@ const NotificationController = {
    * @returns {Promise<any>}
    */
   createNotification: catchAsync(async (req, res) => {
-    const notification = await notificationService.createNotification({
-      ...req.body,
-      userId: req.user.userId,
-    });
+    const { recipient, ...notificationPayload } = req.body;
 
-    return sendSuccess(res, notification, 'Notification created successfully', StatusCodes.CREATED);
+    const notification = await notificationService.publishNotification(
+      {
+        ...notificationPayload,
+        userId: recipient || req.user.userId,
+      },
+      'notification.created',
+    );
+    return sendSuccess(res, notification, 'Notification queued successfully', StatusCodes.CREATED);
   }),
 
   /**

@@ -5,18 +5,20 @@ const cluster = require('cluster');
 const mongoose = require('mongoose');
 const { initSocket, shutdownSocket } = require('./socket');
 const logger = require('./utils/logger');
+const { startQueueWorkers } = require('./workers');
 
 const PORT = process.env.PORT || 3000;
 const SHUTDOWN_TIMEOUT_MS = Number(process.env.SHUTDOWN_TIMEOUT_MS) || 10 * 1000;
 
 const redis = require('./configs/redis.config');
-const { connectRabbitMQ } = require('./configs/rabbitMQ.config');
-connectRabbitMQ();
 
 const startServer = async () => {
   try {
     await connectDB();
     logger.info('Database connected successfully');
+
+    await startQueueWorkers();
+    logger.info('Queue workers started successfully');
 
     server.listen(PORT, () => {
       logger.info(`Server is running on port ${PORT}`);
