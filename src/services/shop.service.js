@@ -4,7 +4,9 @@ const Product = require('../repositories/product.repository');
 const Order = require('../repositories/order.repository');
 const Review = require('../repositories/review.repository');
 const ShopFollower = require('../repositories/shop-follower.repository');
+const notificationService = require('./notification.service');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
+const logger = require('../utils/logger');
 
 const slugify = require('slugify');
 const { StatusCodes } = require('http-status-codes');
@@ -302,7 +304,33 @@ class ShopService {
     // Increment cached follower count
     await Shop.updateById(shopId, { $inc: { followerCount: 1 } });
 
-    const followerCount = await ShopFollower.countByShopId(shopId);
+    const [followerCount, follower] = await Promise.all([
+      ShopFollower.countByShopId(shopId),
+      User.findById(userId).select('username'),
+    ]);
+
+    const shopOwnerId = shop.owner?.toString();
+    const followerId = userId?.toString();
+
+    if (shopOwnerId && followerId && shopOwnerId !== followerId) {
+      try {
+        await notificationService.createNotification({
+          userId: shop.owner,
+          type: 'shop_follow',
+          title: 'Shop co follower moi',
+          message: `${follower?.username || 'Mot nguoi dung'} da follow shop cua ban.`,
+          actorUserId: userId,
+          shopId: shop._id,
+          link: shop.slug ? `/shops/${shop.slug}` : `/shops/${shop._id}`,
+        });
+      } catch (error) {
+        logger.error('Failed to create shop follow notification', {
+          error: error.message,
+          shopId: shop._id?.toString(),
+          followerId,
+        });
+      }
+    }
 
     return {
       message: 'Shop followed successfully',

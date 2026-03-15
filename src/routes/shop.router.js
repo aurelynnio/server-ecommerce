@@ -3,7 +3,11 @@ const router = express.Router();
 const shopController = require('../controllers/shop.controller');
 const { verifyAccessToken, requireRole } = require('../middlewares/auth.middleware');
 const validate = require('../middlewares/validate.middleware');
-const { createShopValidator, updateShopValidator } = require('../validations/shop.validator');
+const {
+  createShopValidator,
+  updateShopValidator,
+  shopIdParamValidator,
+} = require('../validations/shop.validator');
 const upload = require('../configs/upload');
 const { validateImageSignature } = require('../middlewares/uploadSignature.middleware');
 
@@ -78,6 +82,12 @@ router.get(
   requireRole('seller', 'admin'),
   shopController.getShopStatistics,
 );
+
+/**
+ * @desc    Get shops followed by current user
+ * @access  Private
+ */
+router.get('/following', verifyAccessToken, shopController.getFollowedShops);
 
 /**
  * @desc    Get current user's shop information
@@ -162,6 +172,28 @@ router.post(
   normalizeSingleFile,
   validateImageSignature,
   shopController.uploadBanner,
+);
+
+/**
+ * @desc    Follow a shop
+ * @access  Private
+ */
+router.post(
+  '/:shopId/follow',
+  verifyAccessToken,
+  validate({ params: shopIdParamValidator }),
+  shopController.followShop,
+);
+
+/**
+ * @desc    Unfollow a shop
+ * @access  Private
+ */
+router.delete(
+  '/:shopId/follow',
+  verifyAccessToken,
+  validate({ params: shopIdParamValidator }),
+  shopController.unfollowShop,
 );
 
 /**

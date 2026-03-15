@@ -144,6 +144,39 @@ const ShopController = {
   }),
 
   /**
+   * Follow a shop
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  followShop: catchAsync(async (req, res) => {
+    const result = await shopService.followShop(req.user.userId, req.params.shopId);
+    return sendSuccess(res, result, result.message, StatusCodes.OK);
+  }),
+
+  /**
+   * Unfollow a shop
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  unfollowShop: catchAsync(async (req, res) => {
+    const result = await shopService.unfollowShop(req.user.userId, req.params.shopId);
+    return sendSuccess(res, result, result.message, StatusCodes.OK);
+  }),
+
+  /**
+   * Get followed shops
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  getFollowedShops: catchAsync(async (req, res) => {
+    const shops = await shopService.getFollowedShops(req.user.userId);
+    return sendSuccess(res, shops, 'Get followed shops success', StatusCodes.OK);
+  }),
+
+  /**
    * Upload image
    * @param {Object} req
    * @param {Object} res

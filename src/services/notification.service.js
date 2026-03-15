@@ -13,30 +13,64 @@ const { buildNotificationUpdatePayload } = require('../utils/notification-update
  * Manages creating, retrieving, and updating notifications
  */
 class NotificationService {
-  constructor() {
-    this.rabbitChannel = null;
-    this.rabbitConnection = null;
-    this.rabbitQueue = null;
+  async initRabbitMQ(clientName = 'publisher') {
+    return connectRabbitMQ('notification', { confirm: true, clientName });
   }
 
-  async initRabbitMQ() {
-    if (this.rabbitChannel && this.rabbitQueue) {
-      return {
-        channel: this.rabbitChannel,
-        queue: this.rabbitQueue,
-      };
+  async waitForPublishConfirm(channel, errorMessage, meta) {
+    try {
+      await channel.waitForConfirms();
+    } catch (error) {
+      logger.error(errorMessage, {
+        error: error.message,
+        ...meta,
+      });
+      throw error;
+    }
+  }
+
+  async publishToQueue({
+    clientName,
+    queueName,
+    content,
+    headers = {},
+    bufferWarningMessage,
+    confirmErrorMessage,
+    successMessage,
+    successMeta = {},
+  }) {
+    const { channel } = await this.initRabbitMQ(clientName);
+    const queueContent = Buffer.isBuffer(content) ? content : Buffer.from(JSON.stringify(content));
+
+    const isBuffered = channel.sendToQueue(queueName, queueContent, {
+      persistent: true,
+      contentType: 'application/json',
+      headers,
+    });
+
+    if (!isBuffered) {
+      logger.warn(bufferWarningMessage, { queue: queueName });
     }
 
-    const { connection, channel, queue } = await connectRabbitMQ('notification');
-    this.rabbitConnection = connection;
-    this.rabbitChannel = channel;
-    this.rabbitQueue = queue;
+    await this.waitForPublishConfirm(channel, confirmErrorMessage, {
+      queue: queueName,
+      ...successMeta,
+    });
 
-    return { channel, queue };
+    logger.info(successMessage, {
+      queue: queueName,
+      ...successMeta,
+    });
+
+    return {
+      published: true,
+      queue: queueName,
+      ...successMeta,
+    };
   }
 
   async publishNotification(payload, routingKey) {
-    const { channel, queue } = await this.initRabbitMQ();
+    const { channel, queue } = await this.initRabbitMQ('publisher');
     const content = Buffer.from(JSON.stringify(payload));
     const exchange = config_rabbitMQ.exchange.name;
 
@@ -44,20 +78,67 @@ class NotificationService {
       logger.warn(`Unexpected notification routing key: ${routingKey}`);
     }
 
-    const isPublished = channel.publish(exchange, routingKey, content, {
+    const isBuffered = channel.publish(exchange, routingKey, content, {
       persistent: true,
       contentType: 'application/json',
     });
-    if (!isPublished) {
+
+    if (!isBuffered) {
       logger.warn('RabbitMQ queue buffer is full for notification exchange');
     }
 
+    await this.waitForPublishConfirm(channel, 'Failed to confirm notification message', {
+      routingKey,
+      userId: payload.userId,
+      type: payload.type || 'system',
+    });
+
+    logger.info('Notification message published', {
+      routingKey,
+      queue: queue.name,
+      userId: payload.userId,
+      type: payload.type || 'system',
+    });
+
     return {
-      published: isPublished,
+      published: true,
       exchange,
       routingKey,
       queue: queue.name,
     };
+  }
+
+  async publishNotificationRetry(content, retryCount) {
+    const retryQueue = config_rabbitMQ.queues.notification.retryQueue;
+    return this.publishToQueue({
+      clientName: 'retry-publisher',
+      queueName: retryQueue,
+      content,
+      headers: {
+        'x-retry-count': retryCount,
+      },
+      bufferWarningMessage: 'RabbitMQ queue buffer is full for notification retry queue',
+      confirmErrorMessage: 'Failed to confirm notification retry message',
+      successMessage: 'Notification message sent to retry queue',
+      successMeta: { retryCount },
+    });
+  }
+
+  async publishNotificationFailed(content, retryCount) {
+    const failedQueue = config_rabbitMQ.queues.notification.failedQueue;
+    return this.publishToQueue({
+      clientName: 'final-failed-publisher',
+      queueName: failedQueue,
+      content,
+      headers: {
+        'x-retry-count': retryCount,
+        'x-final-failure-reason': 'max_retries_exceeded',
+      },
+      bufferWarningMessage: 'RabbitMQ queue buffer is full for notification final failed queue',
+      confirmErrorMessage: 'Failed to confirm final failed notification message',
+      successMessage: 'Notification message moved to final failed queue',
+      successMeta: { retryCount },
+    });
   }
 
   /**

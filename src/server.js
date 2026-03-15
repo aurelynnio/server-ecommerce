@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const { initSocket, shutdownSocket } = require('./socket');
 const logger = require('./utils/logger');
 const { startQueueWorkers } = require('./workers');
+const { closeRabbitMQConnections } = require('./configs/rabbitMQ.config');
 
 const PORT = process.env.PORT || 3000;
 const SHUTDOWN_TIMEOUT_MS = Number(process.env.SHUTDOWN_TIMEOUT_MS) || 10 * 1000;
@@ -49,7 +50,11 @@ const shutdown = async (signal) => {
 
   await shutdownSocket();
 
-  await Promise.allSettled([mongoose.connection.close(false), redis.quit?.()]);
+  await Promise.allSettled([
+    closeRabbitMQConnections(),
+    mongoose.connection.close(false),
+    redis.quit?.(),
+  ]);
 
   clearTimeout(forceTimer);
   process.exit(0);

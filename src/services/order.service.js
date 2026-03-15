@@ -7,10 +7,12 @@ const voucherService = require('./voucher.service');
 const Voucher = require('../repositories/voucher.repository');
 const VoucherUsage = require('../repositories/voucher-usage.repository');
 const inventoryService = require('./inventory.service');
+const logger = require('../utils/logger');
 const { StatusCodes } = require('http-status-codes');
 const { ApiError } = require('../middlewares/errorHandler.middleware');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 const { ORDER_ACTORS, canTransition } = require('../shared/order/orderState');
+const { config_rabbitMQ, connectRabbitMQ } = require('../configs/rabbitMQ.config');
 
 const MAX_TX_RETRIES = Number(process.env.TXN_MAX_RETRIES) || 3;
 const TX_RETRY_DELAY_MS = Number(process.env.TXN_RETRY_DELAY_MS) || 50;
@@ -25,13 +27,51 @@ const isRetryableTransactionError = (error) =>
 const isUnknownCommitResult = (error) =>
   getErrorLabels(error).includes('UnknownTransactionCommitResult');
 
-const order_queue = 'order_queue';
-
 /**
  * Service handling order operations
  * Manages order creation, retrieval, status updates, and statistics
  */
 class OrderService {
+  constructor() {
+    this.rabbitChannel = null;
+    this.rabbitQueue = null;
+    this.rabbitConnection = null;
+  }
+  async initRabbitMQ() {
+    if (!this.rabbitChannel || !this.rabbitQueue) {
+      const { connection, channel, queue } = await connectRabbitMQ('order');
+      this.rabbitConnection = connection;
+      this.rabbitChannel = channel;
+      this.rabbitQueue = queue;
+    }
+
+    return {
+      channel: this.rabbitChannel,
+      queue: this.rabbitQueue,
+    };
+  }
+
+  async publishOrderEvent(payload, routingKey) {
+    const { channel, queue } = await this.initRabbitMQ();
+    const content = Buffer.from(JSON.stringify(payload));
+    const exchange = config_rabbitMQ.exchange.name;
+
+    // routingKey được dùng để xác định loại message, giúp hệ thống có thể phân loại và xử lý message một cách hiệu quả
+    const isPublished = channel.publish(exchange, routingKey, content, {
+      persistent: true,
+      contentType: 'application/json',
+    });
+    if (!isPublished) {
+      logger.warn('RabbitMQ queue buffer is full for order exchange');
+    }
+
+    return {
+      published: isPublished,
+      exchange,
+      routingKey,
+      queue: queue.name,
+    };
+  }
   /**
    * Create orders from cart items with transaction support
    * Splits items by shop and creates separate orders per shop
