@@ -24,7 +24,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: '20'
           cache: npm
 
       - name: Install dependencies
@@ -44,7 +44,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: '20'
           cache: npm
 
       - name: Install dependencies
@@ -63,7 +63,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: '20'
           cache: npm
 
       - name: Install dependencies
@@ -83,6 +83,8 @@ jobs:
 
       - name: Build Docker image
         run: docker build -t backend_ecommerce:${{ github.sha }} .
+        # Nếu file vẫn tên DockerFile thì đổi thành:
+        # run: docker build -f DockerFile -t backend_ecommerce:${{ github.sha }} .
 
   deploy:
     name: Push ECR and Deploy EC2
@@ -105,28 +107,29 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Set image URIs
+      - name: Set image URI
         id: image
         run: |
-          IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
-          IMAGE_URI_LATEST=${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:latest
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          IMAGE_TAG="sha-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
+          IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${IMAGE_TAG}"
 
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
           echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_OUTPUT
           echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_OUTPUT
-          echo "IMAGE_URI_LATEST=$IMAGE_URI_LATEST" >> $GITHUB_ENV
-          echo "IMAGE_URI_LATEST=$IMAGE_URI_LATEST" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
         run: |
           docker build \
             -t "$IMAGE_URI" \
-            -t "$IMAGE_URI_LATEST" \
             .
+        # Nếu file vẫn tên DockerFile thì đổi thành:
+        # docker build -f DockerFile -t "$IMAGE_URI" .
 
-      - name: Push Docker images to ECR
+      - name: Push Docker image to ECR
         run: |
           docker push "$IMAGE_URI"
-          docker push "$IMAGE_URI_LATEST"
 
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -139,19 +142,19 @@ jobs:
             AWS_REGION="${{ vars.AWS_REGION }}"
             ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
             IMAGE_URI="${{ steps.image.outputs.IMAGE_URI }}"
-            
+
             aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
-            
+
             docker pull "$IMAGE_URI"
-            
+
             docker stop backend_ecommerce || true
             docker rm backend_ecommerce || true
-            
+
             docker run -d \
               --name backend_ecommerce \
               --restart unless-stopped \
               -p 5000:5000 \
               --env-file /home/ubuntu/.env.backend \
               "$IMAGE_URI"
-            
+
             docker image prune -af
