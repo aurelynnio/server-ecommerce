@@ -1,41 +1,12 @@
 const Product = require('../repositories/product.repository');
 const { StatusCodes } = require('http-status-codes');
 const { ApiError } = require('../middlewares/errorHandler.middleware');
-const { connectRabbitMQ } = require('../configs/rabbitMQ.config');
 
 /**
  * Service handling inventory operations
  * Manages stock checking, reservation, deduction, and restoration
  */
 class InventoryService {
-  async initRabbitMQ() {
-    return connectRabbitMQ('inventory');
-  }
-
-  async publicInventory(payload, routingKey) {
-    const { channel, queue } = await this.initRabbitMQ();
-    const content = Buffer.from(JSON.stringify(payload));
-    const exchange = config_rabbitMQ.exchange.name;
-
-    if (!routingKey.startsWith('notification.')) {
-      logger.warn(`Unexpected notification routing key: ${routingKey}`);
-    }
-
-    const isPublished = channel.publish(exchange, routingKey, content, {
-      persistent: true,
-      contentType: 'application/json',
-    });
-    if (!isPublished) {
-      logger.warn('RabbitMQ queue buffer is full for notification exchange');
-    }
-
-    return {
-      published: isPublished,
-      exchange,
-      routingKey,
-      queue: queue.name,
-    };
-  }
   /**
    * Check if products have sufficient stock
    * @param {Array} items - List of items [{ productId, modelId, quantity }]

@@ -17,18 +17,6 @@ class NotificationService {
     return connectRabbitMQ('notification', { confirm: true, clientName });
   }
 
-  async waitForPublishConfirm(channel, errorMessage, meta) {
-    try {
-      await channel.waitForConfirms();
-    } catch (error) {
-      logger.error(errorMessage, {
-        error: error.message,
-        ...meta,
-      });
-      throw error;
-    }
-  }
-
   async publishToQueue({
     clientName,
     queueName,
@@ -42,20 +30,25 @@ class NotificationService {
     const { channel } = await this.initRabbitMQ(clientName);
     const queueContent = Buffer.isBuffer(content) ? content : Buffer.from(JSON.stringify(content));
 
-    const isBuffered = channel.sendToQueue(queueName, queueContent, {
-      persistent: true,
-      contentType: 'application/json',
-      headers,
-    });
+    let isBuffered;
+    try {
+      isBuffered = await channel.sendToQueue(queueName, queueContent, {
+        persistent: true,
+        contentType: 'application/json',
+        headers,
+      });
+    } catch (error) {
+      logger.error(confirmErrorMessage, {
+        error: error.message,
+        queue: queueName,
+        ...successMeta,
+      });
+      throw error;
+    }
 
     if (!isBuffered) {
       logger.warn(bufferWarningMessage, { queue: queueName });
     }
-
-    await this.waitForPublishConfirm(channel, confirmErrorMessage, {
-      queue: queueName,
-      ...successMeta,
-    });
 
     logger.info(successMessage, {
       queue: queueName,
@@ -78,20 +71,25 @@ class NotificationService {
       logger.warn(`Unexpected notification routing key: ${routingKey}`);
     }
 
-    const isBuffered = channel.publish(exchange, routingKey, content, {
-      persistent: true,
-      contentType: 'application/json',
-    });
+    let isBuffered;
+    try {
+      isBuffered = await channel.publish(exchange, routingKey, content, {
+        persistent: true,
+        contentType: 'application/json',
+      });
+    } catch (error) {
+      logger.error('Failed to confirm notification message', {
+        error: error.message,
+        routingKey,
+        userId: payload.userId,
+        type: payload.type || 'system',
+      });
+      throw error;
+    }
 
     if (!isBuffered) {
       logger.warn('RabbitMQ queue buffer is full for notification exchange');
     }
-
-    await this.waitForPublishConfirm(channel, 'Failed to confirm notification message', {
-      routingKey,
-      userId: payload.userId,
-      type: payload.type || 'system',
-    });
 
     logger.info('Notification message published', {
       routingKey,

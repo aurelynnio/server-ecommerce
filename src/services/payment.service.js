@@ -5,7 +5,6 @@ const { getIO } = require('../socket/index');
 const logger = require('../utils/logger');
 const { StatusCodes } = require('http-status-codes');
 const { ApiError } = require('../middlewares/errorHandler.middleware');
-const { config_rabbitMQ, connectRabbitMQ } = require('../configs/rabbitMQ.config');
 
 /**
  * PERFORMANCE FIX: Singleton VNPay instance - reuse across requests
@@ -39,45 +38,6 @@ const getVNPayInstance = () => {
  * Integrates with VNPay for payment processing
  */
 class PaymentService {
-  constructor() {
-    this.rabbitChannel = null;
-    this.rabbitQueue = null;
-    this.rabbitConnection = null;
-  }
-
-  async initRabbitMQ() {
-    if (this.rabbitChannel && this.rabbitQueue) {
-      return {
-        channel: this.rabbitChannel,
-        queue: this.rabbitQueue,
-      };
-    }
-
-    const { connection, channel, queue } = await connectRabbitMQ('payment');
-    this.rabbitConnection = connection;
-    this.rabbitChannel = channel;
-    this.rabbitQueue = queue;
-    return { channel, queue };
-  }
-
-  async publishPaymentEvent(payload, routingKey = 'payment.created') {
-    const { channel, queue } = await this.initRabbitMQ();
-    const content = Buffer.from(JSON.stringify(payload));
-    const exchange = config_rabbitMQ.exchange.name;
-    const isPublished = channel.publish(exchange, routingKey, content, {
-      persistent: true,
-      contentType: 'application/json',
-    });
-    if (!isPublished) {
-      logger.error('Failed to publish payment event', { payload, routingKey });
-    }
-    return {
-      published: isPublished,
-      exchange,
-      routingKey,
-      queue: queue.name,
-    };
-  }
   /**
    * Create VNPay payment URL and save payment record
    * @param {string} orderId - Order ID

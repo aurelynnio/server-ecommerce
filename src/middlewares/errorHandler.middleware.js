@@ -7,6 +7,8 @@ const { StatusCodes } = require('http-status-codes');
 const logger = require('../utils/logger');
 const { sendJson } = require('../shared/res/formatResponse');
 
+const shouldExposeErrorDetails = () => process.env.EXPOSE_ERROR_DETAILS === 'true';
+
 /**
  * Custom API Error class for consistent error handling
  */
@@ -127,7 +129,7 @@ const errorHandler = (err, req, res, _next) => {
         name: err.name,
         message: err.message,
         statusCode,
-        stack: err.stack,
+        ...(shouldExposeErrorDetails() && { stack: err.stack }),
       });
     } else {
       logger.error('Request error', {
@@ -145,7 +147,7 @@ const errorHandler = (err, req, res, _next) => {
       status,
       message,
       code: statusCode,
-      ...(process.env.NODE_ENV !== 'production' && {
+      ...(shouldExposeErrorDetails() && {
         stack: err.stack,
         error: err.name,
       }),

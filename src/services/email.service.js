@@ -24,10 +24,20 @@ const EMAIL_CONFIG = {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  from: process.env.EMAIL_FROM,
+  from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
   baseUrl: process.env.EMAIL_BASE_URL || 'https://cyhin.engineer',
   maxConnections: Number(process.env.EMAIL_MAX_CONNECTIONS) || 5,
   maxMessages: Number(process.env.EMAIL_MAX_MESSAGES) || 100,
+};
+
+const getMissingEmailConfig = () => {
+  const missing = [];
+
+  if (!EMAIL_CONFIG.auth.user) missing.push('EMAIL_USER');
+  if (!EMAIL_CONFIG.auth.pass) missing.push('EMAIL_PASS');
+  if (!EMAIL_CONFIG.from) missing.push('EMAIL_FROM');
+
+  return missing;
 };
 
 /**
@@ -35,6 +45,14 @@ const EMAIL_CONFIG = {
  * @returns {Object} Nodemailer transporter instance
  */
 const getTransporter = () => {
+  const missingConfig = getMissingEmailConfig();
+  if (missingConfig.length > 0) {
+    throw new ApiError(
+      StatusCodes.SERVICE_UNAVAILABLE,
+      `Email service is not configured: missing ${missingConfig.join(', ')}`,
+    );
+  }
+
   /**
    * If
    * @param {any} !transporter
@@ -93,8 +111,14 @@ const sendVerificationCode = async (to, code, type = 'email_verification') => {
       messageId: info.messageId,
     };
   } catch (error) {
-    logger.error('Error sending email:', { error: error.message });
-    throw new ApiError(StatusCodes.SERVICE_UNAVAILABLE, `Failed to send email: ${error.message}`);
+    logger.error('Error sending email', {
+      message: error.message,
+      code: error.code,
+      response: error.response,
+      responseCode: error.responseCode,
+      command: error.command,
+    });
+    throw new ApiError(StatusCodes.SERVICE_UNAVAILABLE, 'Email delivery failed');
   }
 };
 

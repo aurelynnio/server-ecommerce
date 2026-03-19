@@ -4,7 +4,6 @@ const router = express.Router();
 
 const chatbotController = require('../controllers/chatbot.controller');
 
-const { chatbotLimiter } = require('../middlewares/rateLimited.middleware');
 const { verifyAccessToken, requireRole } = require('../middlewares/auth.middleware');
 
 /**
@@ -12,14 +11,14 @@ const { verifyAccessToken, requireRole } = require('../middlewares/auth.middlewa
  * @access  Public
  * @body    { message, sessionId? }
  */
-router.post('/message', chatbotLimiter, chatbotController.sendMessage);
+router.post('/message', chatbotController.sendMessage);
 
 /**
  * @desc    Send message to AI chatbot with streaming response (SSE)
  * @access  Public
  * @body    { message, sessionId? }
  */
-router.post('/stream', chatbotLimiter, chatbotController.streamMessage);
+router.post('/stream', chatbotController.streamMessage);
 
 /**
  * @desc    Get chat history by session ID

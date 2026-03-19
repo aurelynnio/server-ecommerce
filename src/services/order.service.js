@@ -32,23 +32,8 @@ const isUnknownCommitResult = (error) =>
  * Manages order creation, retrieval, status updates, and statistics
  */
 class OrderService {
-  constructor() {
-    this.rabbitChannel = null;
-    this.rabbitQueue = null;
-    this.rabbitConnection = null;
-  }
   async initRabbitMQ() {
-    if (!this.rabbitChannel || !this.rabbitQueue) {
-      const { connection, channel, queue } = await connectRabbitMQ('order');
-      this.rabbitConnection = connection;
-      this.rabbitChannel = channel;
-      this.rabbitQueue = queue;
-    }
-
-    return {
-      channel: this.rabbitChannel,
-      queue: this.rabbitQueue,
-    };
+    return connectRabbitMQ('order', { confirm: true, clientName: 'publisher' });
   }
 
   async publishOrderEvent(payload, routingKey) {
@@ -57,7 +42,7 @@ class OrderService {
     const exchange = config_rabbitMQ.exchange.name;
 
     // routingKey được dùng để xác định loại message, giúp hệ thống có thể phân loại và xử lý message một cách hiệu quả
-    const isPublished = channel.publish(exchange, routingKey, content, {
+    const isPublished = await channel.publish(exchange, routingKey, content, {
       persistent: true,
       contentType: 'application/json',
     });

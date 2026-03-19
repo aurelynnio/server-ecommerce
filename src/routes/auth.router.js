@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/auth.controller');
 const { verifyAccessToken } = require('../middlewares/auth.middleware');
-const { authLimiter, sensitiveLimiter } = require('../middlewares/rateLimited.middleware');
 const validate = require('../middlewares/validate.middleware');
 const {
   loginValidator,
@@ -18,13 +17,13 @@ const {
  * @desc    Register a new user
  * @access  Public
  */
-router.post('/register', authLimiter, validate(registerValidator), authController.register);
+router.post('/register', validate(registerValidator), authController.register);
 
 /**
  * @desc    Login user and return tokens in cookies
  * @access  Public
  */
-router.post('/login', authLimiter, validate(loginValidator), authController.login);
+router.post('/login', validate(loginValidator), authController.login);
 
 /**
  * @desc    Send verification code to email (new or resend)
@@ -32,7 +31,6 @@ router.post('/login', authLimiter, validate(loginValidator), authController.logi
  */
 router.post(
   '/send-verification-code',
-  sensitiveLimiter,
   validate(sendVerificationCodeValidator),
   authController.sendVerificationCode,
 );
@@ -43,7 +41,6 @@ router.post(
  */
 router.post(
   '/verify-code',
-  sensitiveLimiter,
   validate(verifyEmailValidator),
   authController.verifyEmail,
 );
@@ -54,7 +51,6 @@ router.post(
  */
 router.post(
   '/forgot-password',
-  sensitiveLimiter,
   validate(forgotPasswordValidator),
   authController.forgotPassword,
 );
@@ -65,7 +61,6 @@ router.post(
  */
 router.post(
   '/reset-password',
-  sensitiveLimiter,
   validate(resetPasswordValidator),
   authController.resetPassword,
 );

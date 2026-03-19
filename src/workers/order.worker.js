@@ -1,21 +1,9 @@
 const { connectRabbitMQ } = require('../configs/rabbitMQ.config');
 const logger = require('../utils/logger');
 
-const Reconnect_delay_ms = Number(process.env.RABBITMQ_RECONNECT_DELAY_MS) || 5000;
-
-let timer = null;
-let workerReady = false;
-
-const scheduleReconnect = () => {
-  if (timer) return;
-
-  timer = setTimeout(() => {}, Reconnect_delay_ms);
-};
-
 const consumerOrderQueue = async () => {
   try {
-    const { channel, queue } = await connectRabbitMQ('order');
-    await channel.prefetch(10);
+    const { channel, queue } = await connectRabbitMQ('order', { clientName: 'consumer' });
     await channel.consume(
       queue.name,
       (msg) => {
@@ -32,6 +20,7 @@ const consumerOrderQueue = async () => {
       },
       {
         noAck: false,
+        prefetch: 10,
       },
     );
   } catch (e) {

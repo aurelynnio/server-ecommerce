@@ -6,7 +6,6 @@ const initRoutes = require('./routes');
 const http = require('http');
 const { errorHandler, notFoundHandler } = require('./middlewares/errorHandler.middleware');
 const corsMiddleware = require('./middlewares/cors.middleware');
-const { globalLimiter } = require('./middlewares/rateLimited.middleware');
 const { sanitizeMiddleware } = require('./validations/sanitize');
 const { sendJson } = require('./shared/res/formatResponse');
 const app = ex();
@@ -37,7 +36,6 @@ if (morganEnabled) {
   app.use(morgan(process.env.MORGAN_FORMAT || 'dev'));
 }
 app.use(corsMiddleware);
-app.use(globalLimiter);
 app.use(ex.json());
 app.use(ex.urlencoded({ extended: true }));
 app.use(sanitizeMiddleware);

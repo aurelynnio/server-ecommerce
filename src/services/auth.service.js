@@ -366,6 +366,7 @@ class AuthService {
       await sendPasswordResetCode(email, resetCode);
     } catch (error) {
       logger.error('Failed to send password reset email:', error);
+      await redisService.del(`otp:reset-password:${email}`);
       throw new ApiError(
         StatusCodes.INTERNAL_SERVER_ERROR,
         'Failed to send password reset email. Please try again.',

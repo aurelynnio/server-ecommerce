@@ -2,7 +2,7 @@
  * Integration Tests: Error Handling Pipeline
  * Tests error flow from controller through middleware to response
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { StatusCodes } from 'http-status-codes';
 
 const catchAsync = require('../../src/configs/catchAsync');
@@ -14,6 +14,17 @@ const {
 const { sendSuccess, sendFail } = require('../../src/shared/res/formatResponse');
 
 describe('Error Handling Pipeline - Integration Tests', () => {
+  const originalExposeErrorDetails = process.env.EXPOSE_ERROR_DETAILS;
+
+  afterEach(() => {
+    if (originalExposeErrorDetails === undefined) {
+      delete process.env.EXPOSE_ERROR_DETAILS;
+      return;
+    }
+
+    process.env.EXPOSE_ERROR_DETAILS = originalExposeErrorDetails;
+  });
+
   const createMockRes = () => {
     const res = {
       status: vi.fn().mockReturnThis(),
@@ -202,6 +213,34 @@ describe('Error Handling Pipeline - Integration Tests', () => {
         expect(res.status).toHaveBeenCalledWith(code);
         expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ status, message }));
       });
+    });
+  });
+
+  describe('Error detail exposure', () => {
+    it('should not expose stack trace unless explicitly enabled', () => {
+      delete process.env.EXPOSE_ERROR_DETAILS;
+
+      const error = new ApiError(500, 'Internal Error');
+      const res = createMockRes();
+
+      errorHandler(error, {}, res, vi.fn());
+
+      const responseBody = res.json.mock.calls[0][0];
+      expect(responseBody.stack).toBeUndefined();
+      expect(responseBody.error).toBeUndefined();
+    });
+
+    it('should expose stack trace when EXPOSE_ERROR_DETAILS=true', () => {
+      process.env.EXPOSE_ERROR_DETAILS = 'true';
+
+      const error = new ApiError(500, 'Internal Error');
+      const res = createMockRes();
+
+      errorHandler(error, {}, res, vi.fn());
+
+      const responseBody = res.json.mock.calls[0][0];
+      expect(responseBody.stack).toBeDefined();
+      expect(responseBody.error).toBe('Error');
     });
   });
 });
