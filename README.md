@@ -1,5 +1,7 @@
 # Server E-commerce
 
+# Hello World
+
 Backend API cho hệ thống thương mại điện tử, được xây dựng bằng Node.js và Express.
 
 ## 🛠 Công nghệ sử dụng

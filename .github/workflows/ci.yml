@@ -6,43 +6,45 @@ on:
   pull_request:
     branches: [main]
 
-env:
-  NODE_VERSION: '20'
+concurrency:
+  group: backend-ecommerce-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  # ──────────────────────────────────────
-  # Job 1: Lint
-  # ──────────────────────────────────────
   lint:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout source
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: "20"
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: ESLint
+      - name: Run lint
         run: npm run lint
 
-  # ──────────────────────────────────────
-  # Job 2: Test
-  # ──────────────────────────────────────
   test:
     name: Test
     runs-on: ubuntu-latest
     needs: lint
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout source
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: "20"
           cache: npm
 
       - name: Install dependencies
@@ -51,23 +53,105 @@ jobs:
       - name: Run tests
         run: npm test
 
-  # ──────────────────────────────────────
-  # Job 3: Security Audit
-  # ──────────────────────────────────────
   security:
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout source
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: "20"
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: npm audit
+      - name: Run npm audit
         run: npm audit --audit-level=high
         continue-on-error: true
+
+  docker-check:
+    name: Docker Build Check
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t backend_ecommerce:${{ github.sha }} .
+
+  deploy:
+    name: Push ECR and Deploy EC2
+    runs-on: ubuntu-latest
+    needs: [docker-check, security]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image URIs
+        id: image
+        run: |
+          IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
+          IMAGE_URI_LATEST=${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:latest
+
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_OUTPUT
+          echo "IMAGE_URI_LATEST=$IMAGE_URI_LATEST" >> $GITHUB_ENV
+          echo "IMAGE_URI_LATEST=$IMAGE_URI_LATEST" >> $GITHUB_OUTPUT
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t "$IMAGE_URI" \
+            -t "$IMAGE_URI_LATEST" \
+            .
+
+      - name: Push Docker images to ECR
+        run: |
+          docker push "$IMAGE_URI"
+          docker push "$IMAGE_URI_LATEST"
+
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ vars.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          script_stop: true
+          script: |
+            AWS_REGION="${{ vars.AWS_REGION }}"
+            ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
+            IMAGE_URI="${{ steps.image.outputs.IMAGE_URI }}"
+            
+            aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+            
+            docker pull "$IMAGE_URI"
+            
+            docker stop backend_ecommerce || true
+            docker rm backend_ecommerce || true
+            
+            docker run -d \
+              --name backend_ecommerce \
+              --restart unless-stopped \
+              -p 5000:5000 \
+              --env-file /home/ubuntu/.env.backend \
+              "$IMAGE_URI"
+            
+            docker image prune -af
