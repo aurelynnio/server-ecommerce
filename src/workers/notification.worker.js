@@ -7,33 +7,14 @@ const getRetryCount = (data) => {
   return Number.isNaN(retryCount) ? 0 : retryCount;
 };
 
-const startWorkerConsumer = async ({
-  clientName,
-  prefetch,
-  getQueueName,
-  onMessage,
-  startedLogMessage,
-  getStartedLogMeta,
-}) => {
-  const { channel, queue } = await connectRabbitMQ('notification', {
-    clientName,
-  });
-  const queueName = getQueueName(queue);
-
-  await channel.consume(queueName, async (data) => onMessage(data, channel, queue), {
-    noAck: false,
-    prefetch,
-  });
-
-  logger.info(startedLogMessage, getStartedLogMeta(queue));
-};
-
 const startNotificationConsumer = async () => {
-  await startWorkerConsumer({
+  const { channel, queue } = await connectRabbitMQ('notification', {
     clientName: 'consumer',
-    prefetch: 10,
-    getQueueName: (queue) => queue.name,
-    onMessage: async (data, channel) => {
+  });
+
+  await channel.consume(
+    queue.name,
+    async (data) => {
       if (!data) return;
 
       try {
@@ -45,17 +26,23 @@ const startNotificationConsumer = async () => {
         channel.nack(data, false, false);
       }
     },
-    startedLogMessage: 'Notification consumer started',
-    getStartedLogMeta: (queue) => ({ queue: queue.name }),
-  });
+    {
+      noAck: false,
+      prefetch: 10,
+    },
+  );
+
+  logger.info('Notification consumer started', { queue: queue.name });
 };
 
 const startNotificationDLQConsumer = async () => {
-  await startWorkerConsumer({
+  const { channel, queue } = await connectRabbitMQ('notification', {
     clientName: 'dlq-consumer',
-    prefetch: 5,
-    getQueueName: (queue) => queue.dlq,
-    onMessage: async (data, channel, queue) => {
+  });
+
+  await channel.consume(
+    queue.dlq,
+    async (data) => {
       if (!data) return;
 
       try {
@@ -82,13 +69,17 @@ const startNotificationDLQConsumer = async () => {
         channel.nack(data, false, true);
       }
     },
-    startedLogMessage: 'Notification DLQ consumer started',
-    getStartedLogMeta: (queue) => ({
-      queue: queue.dlq,
-      retryQueue: queue.retryQueue,
-      failedQueue: queue.failedQueue,
-      retryDelayMs: queue.retryDelayMs,
-    }),
+    {
+      noAck: false,
+      prefetch: 5,
+    },
+  );
+
+  logger.info('Notification DLQ consumer started', {
+    queue: queue.dlq,
+    retryQueue: queue.retryQueue,
+    failedQueue: queue.failedQueue,
+    retryDelayMs: queue.retryDelayMs,
   });
 };
 

@@ -83,8 +83,6 @@ jobs:
 
       - name: Build Docker image
         run: docker build -t backend_ecommerce:${{ github.sha }} .
-        # Nếu file vẫn tên DockerFile thì đổi thành:
-        # run: docker build -f DockerFile -t backend_ecommerce:${{ github.sha }} .
 
   deploy:
     name: Push ECR and Deploy EC2
@@ -111,7 +109,7 @@ jobs:
         id: image
         run: |
           SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
-          IMAGE_TAG="sha-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
+          IMAGE_TAG="sha-${SHORT_SHA}-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
           IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${IMAGE_TAG}"
 
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV

@@ -1,35 +1,63 @@
 const { connectRabbitMQ } = require('../configs/rabbitMQ.config');
 const logger = require('../utils/logger');
 
-const consumerOrderQueue = async () => {
-  try {
-    const { channel, queue } = await connectRabbitMQ('order', { clientName: 'consumer' });
-    await channel.consume(
-      queue.name,
-      (msg) => {
-        if (!msg) return;
-        try {
-          logger.info('Received message from order queue', { msg: msg.content.toString() });
-          channel.ack(msg);
-        } catch (error) {
-          logger.error('Error occurred while processing order message', {
-            error: error.message,
-          });
-          channel.nack(msg, false, false);
+const getRetryCount = (data) => {
+  const retryCount = Number(data.properties?.headers?.['x-retry-count'] || 0);
+  return Number.isNaN(retryCount) ? 0 : retryCount;
+};
+
+const startWorkerConsumer = async ({
+  clientName,
+  prefetch,
+  getQueueName,
+  onMessage,
+  startedLogMessage,
+  getStartedLogMeta,
+}) => {
+  const { channel, queue } = await connectRabbitMQ('order', {
+    clientName,
+  });
+  const queueName = getQueueName(queue);
+
+  await channel.consume(queueName, async (data) => onMessage(data, channel, queue), {
+    noAck: false,
+    prefetch,
+  });
+  logger.info(startedLogMessage, getStartedLogMeta(queue));
+};
+
+const startOrderConsumer = async () => {
+  await startWorkerConsumer({
+    clientName: 'consumer',
+    prefetch: 10,
+    getQueueName: (queue) => queue.name,
+    onMessage: async (data, channel) => {},
+    startedLogMessage: 'Order consumer started',
+    getStartedLogMeta: (queue) => ({ queue: queue.name }),
+  });
+};
+
+const startOrderDLQConsumer = async () => {
+  await startWorkerConsumer({
+    clientName: 'dlq-consumer',
+    prefetch: 5,
+    getQueueName: (queue) => queue.dlq,
+    onMessage: async (data, channel, queue) => {
+      if (!data) return;
+      try {
+        const nextRetryCount = getRetryCount(data) + 1;
+        if (nextRetryCount > queue.maxReties) {
         }
-      },
-      {
-        noAck: false,
-        prefetch: 10,
-      },
-    );
-  } catch (e) {
-    logger.error('Error occurred while consuming order queue', e);
-  }
+      } catch (error) {}
+    },
+  });
+};
+
+const consumerOrderQueue = async () => {
+  await Promise.all([startOrderConsumer(), startOrderDLQConsumer()]);
 };
 
 if (require.main === module) {
   consumerOrderQueue().catch(logger.error);
 }
-
 module.exports = consumerOrderQueue;

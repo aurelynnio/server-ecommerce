@@ -33,7 +33,7 @@ const isUnknownCommitResult = (error) =>
  */
 class OrderService {
   async initRabbitMQ() {
-    return connectRabbitMQ('order', { confirm: true, clientName: 'publisher' });
+    return connectRabbitMQ('order', {confirm: true, clientName: 'publisher'});
   }
 
   async publishOrderEvent(payload, routingKey) {
@@ -110,7 +110,7 @@ class OrderService {
           if (!product) {
             throw new ApiError(StatusCodes.NOT_FOUND, 'Product info missing');
           }
-
+          
           // Ensure shopId is available
           let shopId = item.shopId;
           if (!shopId && product.shop) shopId = product.shop;
