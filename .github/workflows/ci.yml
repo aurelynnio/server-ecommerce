@@ -87,7 +87,7 @@ jobs:
   deploy:
     name: Push ECR and Deploy EC2
     runs-on: ubuntu-latest
-    needs: [docker-check, security]
+    needs: [security]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
