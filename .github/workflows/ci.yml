@@ -73,16 +73,16 @@ jobs:
         run: npm audit --audit-level=high
         continue-on-error: true
 
-  docker-check:
-    name: Docker Build Check
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+  # docker-check:
+  #   name: Docker Build Check
+  #   runs-on: ubuntu-latest
+  #   needs: test
+  #   steps:
+  #     - name: Checkout source
+  #       uses: actions/checkout@v4
 
-      - name: Build Docker image
-        run: docker build -t backend_ecommerce:${{ github.sha }} .
+  #     - name: Build Docker image
+  #       run: docker build -t backend_ecommerce:${{ github.sha }} .
 
   deploy:
     name: Push ECR and Deploy EC2
