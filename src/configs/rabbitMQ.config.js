@@ -43,6 +43,11 @@ const config_rabbitMQ = {
       routingKey: 'order.*',
       dlq: 'order_queue_dlq',
       dlRoutingKey: 'order.dlq',
+      retryQueue: 'order_queue_retry',
+      retryRoutingKey: 'order.retry',
+      failedQueue: 'order_queue_failed',
+      retryDelayMs: Number(process.env.ORDER_RETRY_DELAY_MS) || 5000,
+      maxRetries: Number(process.env.ORDER_MAX_RETRIES) || 3,
     },
   },
 };

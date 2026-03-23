@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const PaymentController = require('../controllers/payment.controller');
 const { verifyAccessToken } = require('../middlewares/auth.middleware');
-const { sensitiveLimiter } = require('../middlewares/rateLimited.middleware');
 const validate = require('../middlewares/validate.middleware');
 const {
   createPaymentValidator,
@@ -16,7 +15,6 @@ const {
 router.post(
   '/',
   verifyAccessToken,
-  sensitiveLimiter,
   validate(createPaymentValidator),
   PaymentController.createPayment,
 );
@@ -29,7 +27,6 @@ router.post(
 router.get(
   '/order/:orderId',
   verifyAccessToken,
-  sensitiveLimiter,
   validate({ params: paymentOrderIdParamValidator }),
   PaymentController.getPaymentByOrder,
 );

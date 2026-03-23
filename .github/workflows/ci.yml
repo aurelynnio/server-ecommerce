@@ -122,8 +122,6 @@ jobs:
           docker build \
             -t "$IMAGE_URI" \
             .
-        # Nếu file vẫn tên DockerFile thì đổi thành:
-        # docker build -f DockerFile -t "$IMAGE_URI" .
 
       - name: Push Docker image to ECR
         run: |

@@ -32,9 +32,54 @@ const isUnknownCommitResult = (error) =>
  * Manages order creation, retrieval, status updates, and statistics
  */
 class OrderService {
-  async initRabbitMQ() {
-    return connectRabbitMQ('order', {confirm: true, clientName: 'publisher'});
+  async initRabbitMQ(clientName = 'publisher') {
+    return connectRabbitMQ('order', { confirm: true, clientName: clientName });
   }
+  async publicToQueue({
+    clientName,
+    queueName,
+    content,
+    headers = {},
+    bufferWarningMessage,
+    confirmErrorMessage,
+    sussessMessage,
+    successMeta = {},
+  }) {
+    const { channel } = await this.initRabbitMQ(clientName);
+    const queueContent = Buffer.isBuffer(content) ? content : Buffer.from(JSON.stringify(content));
+    let isBuffered;
+    try {
+      isBuffered = await channel.sendToQueue(queueName, queueContent, {
+        persistent: true,
+        contentType: 'application/json',
+        headers,
+      });
+    } catch (error) {
+      logger.error(confirmErrorMessage, { error: error.message, queue: queueName, ...successMeta });
+      throw error;
+    }
+    if (!isBuffered) {
+      logger.warn(bufferWarningMessage, {
+        queue: queueName,
+      });
+    }
+    logger.info(sussessMessage, { queue: queueName, ...successMeta });
+    return {
+      published: isBuffered,
+      queue: queueName,
+      ...successMeta,
+    };
+  }
+
+  // async publishOrder(payload, routingKey) {
+  //   const { channel, queue } = await this.initRabbitMQ();
+  //   const content = Buffer.from(JSON.stringify(payload));
+  //   const exchange = config_rabbitMQ.exchange.name;
+
+  //   if (!routingKey.startsWith('order.')) {
+  //     logger.error();
+  //   }
+  // }
 
   async publishOrderEvent(payload, routingKey) {
     const { channel, queue } = await this.initRabbitMQ();
@@ -110,7 +155,7 @@ class OrderService {
           if (!product) {
             throw new ApiError(StatusCodes.NOT_FOUND, 'Product info missing');
           }
-          
+
           // Ensure shopId is available
           let shopId = item.shopId;
           if (!shopId && product.shop) shopId = product.shop;
