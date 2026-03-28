@@ -3,10 +3,10 @@ const Cart = require('../repositories/cart.repository');
 const Product = require('../repositories/product.repository');
 const { Types } = require('mongoose');
 const mongoose = require('mongoose');
+const inventoryService = require('./inventory.service');
 const voucherService = require('./voucher.service');
 const Voucher = require('../repositories/voucher.repository');
 const VoucherUsage = require('../repositories/voucher-usage.repository');
-const inventoryService = require('./inventory.service');
 const logger = require('../utils/logger');
 const { StatusCodes } = require('http-status-codes');
 const { ApiError } = require('../middlewares/errorHandler.middleware');
@@ -16,8 +16,15 @@ const { config_rabbitMQ, connectRabbitMQ } = require('../configs/rabbitMQ.config
 
 const MAX_TX_RETRIES = Number(process.env.TXN_MAX_RETRIES) || 3;
 const TX_RETRY_DELAY_MS = Number(process.env.TXN_RETRY_DELAY_MS) || 50;
+const ORDER_EVENT_TYPES = {
+  CREATED: 'order.created',
+  STATUS_CHANGED: 'order.status_changed',
+};
+const SYSTEM_ORDER_ACTOR = 'system';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const toObjectIdString = (value) => (value ? value.toString() : null);
+const getOrderCode = (order) => order.orderNumber || order._id.toString().slice(-6).toUpperCase();
 
 const getErrorLabels = (error) => error?.errorLabels || error?.result?.errorLabels || [];
 
@@ -35,14 +42,15 @@ class OrderService {
   async initRabbitMQ(clientName = 'publisher') {
     return connectRabbitMQ('order', { confirm: true, clientName: clientName });
   }
-  async publicToQueue({
+
+  async publishToQueue({
     clientName,
     queueName,
     content,
     headers = {},
     bufferWarningMessage,
     confirmErrorMessage,
-    sussessMessage,
+    successMessage,
     successMeta = {},
   }) {
     const { channel } = await this.initRabbitMQ(clientName);
@@ -63,7 +71,7 @@ class OrderService {
         queue: queueName,
       });
     }
-    logger.info(sussessMessage, { queue: queueName, ...successMeta });
+    logger.info(successMessage, { queue: queueName, ...successMeta });
     return {
       published: isBuffered,
       queue: queueName,
@@ -71,36 +79,114 @@ class OrderService {
     };
   }
 
-  // async publishOrder(payload, routingKey) {
-  //   const { channel, queue } = await this.initRabbitMQ();
-  //   const content = Buffer.from(JSON.stringify(payload));
-  //   const exchange = config_rabbitMQ.exchange.name;
-
-  //   if (!routingKey.startsWith('order.')) {
-  //     logger.error();
-  //   }
-  // }
-
-  async publishOrderEvent(payload, routingKey) {
-    const { channel, queue } = await this.initRabbitMQ();
+  async publishOrder(payload, routingKey) {
+    const { channel } = await this.initRabbitMQ('publisher');
     const content = Buffer.from(JSON.stringify(payload));
     const exchange = config_rabbitMQ.exchange.name;
 
-    // routingKey được dùng để xác định loại message, giúp hệ thống có thể phân loại và xử lý message một cách hiệu quả
-    const isPublished = await channel.publish(exchange, routingKey, content, {
-      persistent: true,
-      contentType: 'application/json',
-    });
-    if (!isPublished) {
-      logger.warn('RabbitMQ queue buffer is full for order exchange');
+    if (!routingKey.startsWith('order.')) {
+      logger.warn('Unexpected routing key format for order message', { routingKey: routingKey });
     }
+    try {
+      await channel.publish(exchange, routingKey, content, {
+        persistent: true,
+        contentType: 'application/json',
+      });
+    } catch (error) {
+      logger.error('Failed to confirm order message', {
+        error: error.message,
+        routingKey,
+        userId: payload.userId,
+      });
+    }
+  }
 
+  async publishOrderRetry(content, retryCount) {
+    const retryQueue = config_rabbitMQ.queues.order.retryQueue;
+    return this.publishToQueue({
+      clientName: 'retry-publisher',
+      queueName: retryQueue,
+      content,
+      headers: {
+        'x-retry-count': retryCount,
+      },
+      bufferWarningMessage: 'RabbitMQ queue buffer is full for order retry queue',
+      confirmErrorMessage: 'Failed to confirm order retry message',
+      successMessage: 'Order message sent to retry queue',
+      successMeta: { retryCount },
+    });
+  }
+
+  async publishOrderFailed(content, retryCount) {
+    const failedQueue = config_rabbitMQ.queues.order.failedQueue;
+    return this.publishToQueue({
+      clientName: 'failed-publisher',
+      queueName: failedQueue,
+      content,
+      headers: {
+        'x-retry-count': retryCount,
+        'x-final-failure-reason': 'max_retries_exceeded',
+      },
+      bufferWarningMessage: 'RabbitMQ queue buffer is full for order final failed queue',
+      confirmErrorMessage: 'Failed to confirm final failed order message ',
+      successMessage: 'Order message sent to failed queue',
+      successMeta: { retryCount },
+    });
+  }
+
+  buildOrderEventPayload(order, extra = {}) {
     return {
-      published: isPublished,
-      exchange,
-      routingKey,
-      queue: queue.name,
+      orderId: toObjectIdString(order._id),
+      orderGroupId: toObjectIdString(order.orderGroupId),
+      orderCode: getOrderCode(order),
+      userId: toObjectIdString(order.userId),
+      shopId: toObjectIdString(order.shopId),
+      status: order.status,
+      paymentStatus: order.paymentStatus || 'unpaid',
+      paymentMethod: order.paymentMethod,
+      totalAmount: order.totalAmount,
+      customerName: order.shippingAddress?.fullName || null,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+      ...extra,
     };
+  }
+
+  async publishOrderEvent(eventName, payload) {
+    return this.publishOrder(
+      {
+        eventName,
+        ...payload,
+      },
+      eventName,
+    );
+  }
+
+  async publishOrderCreatedEvents(orders) {
+    await Promise.all(
+      orders.map((order) =>
+        this.publishOrderEvent(
+          ORDER_EVENT_TYPES.CREATED,
+          this.buildOrderEventPayload(order),
+        ),
+      ),
+    );
+  }
+
+  async publishOrderStatusChangedEvent(
+    order,
+    previousStatus,
+    actor = SYSTEM_ORDER_ACTOR,
+    extra = {},
+  ) {
+    return this.publishOrderEvent(
+      ORDER_EVENT_TYPES.STATUS_CHANGED,
+      this.buildOrderEventPayload(order, {
+        previousStatus,
+        actor,
+        ...extra,
+      }),
+    );
   }
   /**
    * Create orders from cart items with transaction support
@@ -246,6 +332,8 @@ class OrderService {
             });
           }
 
+          await inventoryService.checkStockAvailability(inventoryItems);
+
           // --- DEDUCT STOCK (via InventoryService) ---
           await inventoryService.deductStock(inventoryItems, session);
 
@@ -345,6 +433,7 @@ class OrderService {
 
         // Commit the transaction
         await session.commitTransaction();
+        await this.publishOrderCreatedEvents(createdOrders);
 
         // Return group details
         return {
@@ -363,6 +452,7 @@ class OrderService {
         if (isUnknownCommitResult(error)) {
           const existingOrders = await Order.findByOrderGroupIdLean(orderGroupId);
           if (existingOrders.length > 0) {
+            await this.publishOrderCreatedEvents(existingOrders);
             return {
               message: 'Orders created successfully',
               orderGroupId,
@@ -466,6 +556,7 @@ class OrderService {
       );
     }
 
+    const previousStatus = order.status;
     order.status = newStatus;
 
     if (newStatus === 'cancelled') {
@@ -483,6 +574,7 @@ class OrderService {
     }
 
     await order.save();
+    await this.publishOrderStatusChangedEvent(order, previousStatus, ORDER_ACTORS.SELLER);
     return order;
   }
 
@@ -640,6 +732,7 @@ class OrderService {
       );
     }
 
+    const previousStatus = order.status;
     order.status = status;
     if (status === 'cancelled') {
       order.cancelledAt = new Date();
@@ -649,6 +742,7 @@ class OrderService {
     }
 
     await order.save();
+    await this.publishOrderStatusChangedEvent(order, previousStatus, actor);
     return order;
   }
 
@@ -673,9 +767,11 @@ class OrderService {
     // Restore Stock via InventoryService
     await this.restoreOrderStock(order);
 
+    const previousStatus = order.status;
     order.status = 'cancelled';
     order.cancelledAt = new Date();
     await order.save();
+    await this.publishOrderStatusChangedEvent(order, previousStatus, ORDER_ACTORS.USER);
     return order;
   }
 

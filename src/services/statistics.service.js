@@ -9,7 +9,6 @@ class StatisticsService {
    * @returns {Promise<Object>} Dashboard data
    */
   async getDashboardStats() {
-    // PERFORMANCE FIX: Combine all counts into single aggregation with $facet
     const [countsResult, recentOrdersRaw, topProductsRaw, monthlyStatsRaw] = await Promise.all([
       // Single aggregation for all counts
       Promise.all([

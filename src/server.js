@@ -12,6 +12,12 @@ const PORT = process.env.PORT || 3000;
 const SHUTDOWN_TIMEOUT_MS = Number(process.env.SHUTDOWN_TIMEOUT_MS) || 10 * 1000;
 
 const redis = require('./configs/redis.config');
+const clusterEnabled = process.env.NODE_ENV === 'production' && process.env.ENABLE_CLUSTER !== 'false';
+const configuredWorkers = Number(process.env.WEB_CONCURRENCY);
+const workerCount =
+  Number.isInteger(configuredWorkers) && configuredWorkers > 0
+    ? configuredWorkers
+    : require('os').cpus().length;
 
 const startServer = async () => {
   try {
@@ -76,13 +82,12 @@ const setupProcessHandlers = () => {
   });
 };
 
-if (cluster.isPrimary && process.env.NODE_ENV === 'production') {
-  const numWorkers = require('os').cpus().length;
+if (cluster.isPrimary && clusterEnabled) {
   logger.info(
-    `Primary ${process.pid} is running in production mode. Forking ${numWorkers} workers...`,
+    `Primary ${process.pid} is running in production mode. Forking ${workerCount} workers...`,
   );
 
-  for (let i = 0; i < numWorkers; i++) {
+  for (let i = 0; i < workerCount; i++) {
     cluster.fork();
   }
 

@@ -8,6 +8,11 @@ const { errorHandler, notFoundHandler } = require('./middlewares/errorHandler.mi
 const corsMiddleware = require('./middlewares/cors.middleware');
 const { sanitizeMiddleware } = require('./validations/sanitize');
 const { sendJson } = require('./shared/res/formatResponse');
+const {
+  isMetricsEnabled,
+  metricsMiddleware,
+  metricsHandler,
+} = require('./monitoring/prometheus');
 const app = ex();
 
 const server = http.createServer(app);
@@ -36,11 +41,16 @@ if (morganEnabled) {
   app.use(morgan(process.env.MORGAN_FORMAT || 'dev'));
 }
 app.use(corsMiddleware);
+app.use(metricsMiddleware);
 app.use(ex.json());
 app.use(ex.urlencoded({ extended: true }));
 app.use(sanitizeMiddleware);
 app.use(cookieParser());
 app.use(helmet());
+
+if (isMetricsEnabled()) {
+  app.get('/metrics', metricsHandler);
+}
 
 initRoutes(app);
 

@@ -1,4 +1,5 @@
 const consumerNotificationQueue = require('./notification.worker');
+const consumerOrderQueue = require('./order.worker');
 const logger = require('../utils/logger');
 
 let workersStarted = false;
@@ -10,19 +11,20 @@ const startQueueWorkers = async () => {
 
   workersStarted = true;
 
-  const results = await Promise.allSettled([consumerNotificationQueue()]);
+  const workerNames = ['notification', 'order'];
+  const results = await Promise.allSettled([consumerNotificationQueue(), consumerOrderQueue()]);
 
   results.forEach((result, index) => {
     if (result.status === 'rejected') {
       logger.error('Queue worker failed to start', {
-        worker: ['notification'][index],
+        worker: workerNames[index],
         error: result.reason?.message || String(result.reason),
       });
     }
   });
 
   const failedWorkers = results
-    .map((result, index) => (result.status === 'rejected' ? ['notification'][index] : null))
+    .map((result, index) => (result.status === 'rejected' ? workerNames[index] : null))
     .filter(Boolean);
 
   if (failedWorkers.length > 0) {

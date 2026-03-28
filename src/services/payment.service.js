@@ -1,6 +1,7 @@
 const { VNPay, ProductCode, VnpLocale, dateFormat, getDateInGMT7 } = require('vnpay');
 const Payment = require('../repositories/payment.repository');
 const Order = require('../repositories/order.repository');
+const orderService = require('./order.service');
 const { getIO } = require('../socket/index');
 const logger = require('../utils/logger');
 const { StatusCodes } = require('http-status-codes');
@@ -149,9 +150,14 @@ class PaymentService {
 
     // Update order payment status if successful
     if (isSuccess) {
+      const previousStatus = order.status;
+      const previousPaymentStatus = order.paymentStatus;
       order.paymentStatus = 'paid';
       order.status = 'confirmed';
       await order.save();
+      if (previousStatus !== order.status || previousPaymentStatus !== order.paymentStatus) {
+        await orderService.publishOrderStatusChangedEvent(order, previousStatus, 'system');
+      }
 
       // Emit socket event to update dashboard
       try {
@@ -239,9 +245,14 @@ class PaymentService {
     await payment.save();
 
     if (isSuccess) {
+      const previousStatus = order.status;
+      const previousPaymentStatus = order.paymentStatus;
       order.paymentStatus = 'paid';
       order.status = 'confirmed';
       await order.save();
+      if (previousStatus !== order.status || previousPaymentStatus !== order.paymentStatus) {
+        await orderService.publishOrderStatusChangedEvent(order, previousStatus, 'system');
+      }
     }
 
     return {
