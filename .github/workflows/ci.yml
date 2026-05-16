@@ -124,8 +124,7 @@ jobs:
             .
 
       - name: Push Docker image to ECR
-        run: |
-          docker push "$IMAGE_URI"
+        run: docker push "$IMAGE_URI"
 
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -135,22 +134,51 @@ jobs:
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           script_stop: true
           script: |
+            set -e
+
             AWS_REGION="${{ vars.AWS_REGION }}"
             ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
             IMAGE_URI="${{ steps.image.outputs.IMAGE_URI }}"
 
+            cd /srv/ecommerce
+
+            echo "Starting infrastructure containers..."
+            docker compose up -d mongodb redis rabbitmq
+
+            NETWORK_NAME="$(docker network ls --format '{{.Name}}' | grep -E '^(ecommerce-network|ecommerce_ecommerce-network)$' | head -n 1)"
+
+            if [ -z "$NETWORK_NAME" ]; then
+              echo "Docker network not found. Creating ecommerce-network..."
+              docker network create ecommerce-network
+              NETWORK_NAME="ecommerce-network"
+            fi
+
+            echo "Using Docker network: $NETWORK_NAME"
+
+            echo "Logging in to ECR..."
             aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
+            echo "Pulling new backend image..."
             docker pull "$IMAGE_URI"
 
+            echo "Stopping old backend container..."
             docker stop backend_ecommerce || true
             docker rm backend_ecommerce || true
 
+            echo "Starting new backend container..."
             docker run -d \
               --name backend_ecommerce \
               --restart unless-stopped \
+              --network "$NETWORK_NAME" \
               -p 5000:5000 \
-              --env-file /home/ubuntu/.env.backend \
+              --env-file /srv/ecommerce/.env \
               "$IMAGE_URI"
 
+            echo "Backend container status:"
+            docker ps --filter "name=backend_ecommerce"
+
+            echo "Recent backend logs:"
+            docker logs backend_ecommerce --tail=80 || true
+
+            echo "Cleaning old images..."
             docker image prune -af

@@ -13,6 +13,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "benchmark:cv": "node src/scripts/cv-backend-benchmark.js",
+    "benchmark:autocannon": "node src/scripts/autocannon-cache-benchmark.js",
+    "benchmark:rabbitmq": "node src/scripts/rabbitmq-load-benchmark.js",
     "seed:dev": "node src/scripts/seed-dev.js",
     "seed:dev:quick": "node src/scripts/seed-dev.js --quick",
     "seed:dev:reset": "node src/scripts/seed-dev.js --reset"
