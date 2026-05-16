@@ -7,6 +7,7 @@ const socketAuthMiddleware = require('../middlewares/socketAuth.middleware');
 const logger = require('../utils/logger');
 const { StatusCodes } = require('http-status-codes');
 const { ApiError } = require('../middlewares/errorHandler.middleware');
+const { getAllowedOrigins } = require('../configs/clientOrigins.config');
 
 let io = null;
 let redisPubClient = null;
@@ -54,7 +55,7 @@ const setupRedisAdapter = async () => {
 const initSocket = (httpServer) => {
   io = new Server(httpServer, {
     cors: {
-      origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+      origin: getAllowedOrigins(),
       methods: ['GET', 'POST'],
       credentials: true,
     },
