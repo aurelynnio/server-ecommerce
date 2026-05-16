@@ -171,7 +171,7 @@ jobs:
               --restart unless-stopped \
               --network "$NETWORK_NAME" \
               -p 5000:5000 \
-              --env-file /srv/ecommerce/.env \
+              --env-file /home/ubuntu/.env.backend \
               "$IMAGE_URI"
 
             echo "Backend container status:"
