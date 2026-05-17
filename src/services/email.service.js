@@ -17,15 +17,15 @@ let transporter = null;
 
 // Email configuration from environment variables
 const EMAIL_CONFIG = {
-  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-  port: Number(process.env.EMAIL_PORT) || 587,
+  host: process.env.EMAIL_HOST,
+  port: Number(process.env.EMAIL_PORT),
   secure: process.env.EMAIL_SECURE === 'true',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
   from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-  baseUrl: process.env.EMAIL_BASE_URL || 'https://cyhin.engineer',
+  baseUrl: process.env.EMAIL_BASE_URL,
   maxConnections: Number(process.env.EMAIL_MAX_CONNECTIONS) || 5,
   maxMessages: Number(process.env.EMAIL_MAX_MESSAGES) || 100,
 };
@@ -33,9 +33,12 @@ const EMAIL_CONFIG = {
 const getMissingEmailConfig = () => {
   const missing = [];
 
+  if (!EMAIL_CONFIG.host) missing.push('EMAIL_HOST');
+  if (!EMAIL_CONFIG.port) missing.push('EMAIL_PORT');
   if (!EMAIL_CONFIG.auth.user) missing.push('EMAIL_USER');
   if (!EMAIL_CONFIG.auth.pass) missing.push('EMAIL_PASS');
   if (!EMAIL_CONFIG.from) missing.push('EMAIL_FROM');
+  if (!EMAIL_CONFIG.baseUrl) missing.push('EMAIL_BASE_URL');
 
   return missing;
 };
