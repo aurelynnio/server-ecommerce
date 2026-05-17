@@ -478,7 +478,21 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async updateVariant(productId, variantId, variantData) {
+    const currentProduct = await Product.findById(productId);
+    if (!currentProduct) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
+    }
+
+    const currentVariant = currentProduct.variants?.find(
+      (variant) => variant._id.toString() === variantId.toString(),
+    );
+
+    if (!currentVariant) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Variant not found');
+    }
+
     const allowedVariantData = {
+      ...currentVariant.toObject(),
       ...variantData,
       _id: variantId,
     };

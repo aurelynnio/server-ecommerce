@@ -661,9 +661,17 @@ class OrderService {
    * @returns {Promise<Object>} All orders with pagination
    */
   async getAllOrders(filters = {}) {
-    const { shop, status, page = 1, limit = 20 } = filters;
+    const {
+      shop,
+      status,
+      paymentStatus,
+      paymentMethod,
+      userId,
+      page = 1,
+      limit = 20,
+    } = filters;
 
-    const filterArgs = { shop, status };
+    const filterArgs = { shop, status, paymentStatus, paymentMethod, userId };
     const total = await Order.countAllWithFilters(filterArgs);
     const paginationParams = getPaginationParams(page, limit, total);
 
@@ -770,6 +778,35 @@ class OrderService {
     const previousStatus = order.status;
     order.status = 'cancelled';
     order.cancelledAt = new Date();
+    await order.save();
+    await this.publishOrderStatusChangedEvent(order, previousStatus, ORDER_ACTORS.USER);
+    return order;
+  }
+
+  /**
+   * Confirm delivery by the buyer.
+   * @param {string} orderId - Order ID
+   * @param {string} userId - User ID
+   * @returns {Promise<Object>} Delivered order
+   */
+  async confirmDelivery(orderId, userId) {
+    const order = await Order.findByIdAndUser(orderId, userId);
+    if (!order) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found or access denied');
+    }
+
+    if (order.status !== 'shipped') {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Only shipped orders can be confirmed');
+    }
+
+    const previousStatus = order.status;
+    order.status = 'delivered';
+    order.deliveredAt = new Date();
+
+    if (order.paymentMethod === 'cod' && order.paymentStatus === 'unpaid') {
+      order.paymentStatus = 'paid';
+    }
+
     await order.save();
     await this.publishOrderStatusChangedEvent(order, previousStatus, ORDER_ACTORS.USER);
     return order;

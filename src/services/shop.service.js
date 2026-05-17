@@ -376,7 +376,7 @@ class ShopService {
    * @returns {Promise<Object>} Updated shop
    */
   async updateShopStatus(shopId, status) {
-    const validStatuses = ['pending', 'active', 'suspended', 'closed'];
+    const validStatuses = ['active', 'inactive', 'banned'];
     if (!validStatuses.includes(status)) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid status');
     }

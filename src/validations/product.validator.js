@@ -25,10 +25,15 @@ const attributeSchema = Joi.object({
 
 const createProductValidator = Joi.object({
   name: sanitizedString().min(3).max(200).required(),
+  slug: Joi.string()
+    .lowercase()
+    .pattern(/^[a-z0-9-]+$/),
   description: sanitizedString().min(10).required(),
   category: objectId.required(),
   shopCategory: objectId.allow('', null),
   brand: Joi.string().allow(''),
+  tags: Joi.array().items(Joi.string()),
+  sizes: Joi.array().items(Joi.string()),
   price: priceSchema.required(),
   stock: Joi.number().integer().min(0).default(0),
   variants: Joi.array().items(variantSchema),
@@ -40,6 +45,9 @@ const createProductValidator = Joi.object({
     length: Joi.number().min(0),
   }),
   images: Joi.array().items(Joi.string()),
+  descriptionImages: Joi.array().items(Joi.string()),
+  isFeatured: Joi.boolean(),
+  isNewArrival: Joi.boolean(),
   status: Joi.string().valid('draft', 'published', 'suspended').default('published'),
 });
 
@@ -60,8 +68,15 @@ const getProductsQueryValidator = Joi.object({
   ...pagination,
   category: objectId,
   brand: Joi.string(),
+  shop: objectId,
+  shopCategory: objectId,
   minPrice: Joi.number().min(0),
   maxPrice: Joi.number().min(0),
+  tags: Joi.string(),
+  search: searchString(),
+  colors: Joi.string(),
+  sizes: Joi.string(),
+  rating: Joi.string(),
   status: Joi.string().valid('draft', 'published', 'suspended', 'all'),
 });
 

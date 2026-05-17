@@ -285,25 +285,46 @@ class OrderRepository extends BaseRepository {
     ]);
   }
 
-  countAllWithFilters({ shop, status } = {}) {
+  countAllWithFilters({ shop, status, paymentStatus, paymentMethod, userId } = {}) {
     const query = {};
     if (shop) {
       query.shopId = shop;
     }
+    if (userId) {
+      query.userId = userId;
+    }
     if (status && status !== 'all') {
       query.status = status;
+    }
+    if (paymentStatus && paymentStatus !== 'all') {
+      query.paymentStatus = paymentStatus;
+    }
+    if (paymentMethod && paymentMethod !== 'all') {
+      query.paymentMethod = paymentMethod;
     }
 
     return this.countByFilter(query);
   }
 
-  findAllWithFilters({ shop, status } = {}, { skip = 0, limit = 20 } = {}) {
+  findAllWithFilters(
+    { shop, status, paymentStatus, paymentMethod, userId } = {},
+    { skip = 0, limit = 20 } = {},
+  ) {
     const query = {};
     if (shop) {
       query.shopId = shop;
     }
+    if (userId) {
+      query.userId = userId;
+    }
     if (status && status !== 'all') {
       query.status = status;
+    }
+    if (paymentStatus && paymentStatus !== 'all') {
+      query.paymentStatus = paymentStatus;
+    }
+    if (paymentMethod && paymentMethod !== 'all') {
+      query.paymentMethod = paymentMethod;
     }
 
     return this.findManyByFilter(query)

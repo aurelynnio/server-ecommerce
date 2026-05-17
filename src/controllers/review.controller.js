@@ -120,6 +120,18 @@ const ReviewController = {
   }),
 
   /**
+   * Get public reviews by shop ID
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  getReviewsByShopId: catchAsync(async (req, res) => {
+    const result = await reviewService.getReviewsByShopId(req.params.shopId, req.query);
+
+    return sendSuccess(res, result, 'Shop reviews retrieved successfully', StatusCodes.OK);
+  }),
+
+  /**
    * Reply review
    * @param {Object} req
    * @param {Object} res

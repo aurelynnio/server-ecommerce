@@ -14,6 +14,11 @@ const {
   getOrdersQueryValidator,
 } = require('../validations/order.validator');
 
+const verifyShopOwnershipForSeller = (req, res, next) => {
+  if (req.user?.role === 'admin') return next();
+  return verifyShopOwnership(req, res, next);
+};
+
 /**
  * @desc    Create a new order from cart items
  * @access  Private
@@ -54,6 +59,17 @@ router.delete(
 );
 
 /**
+ * @desc    Confirm delivery by current user
+ * @access  Private
+ */
+router.post(
+  '/:orderId/confirm-delivery',
+  verifyAccessToken,
+  validate({ params: orderIdParamValidator }),
+  orderController.confirmDelivery,
+);
+
+/**
  * @desc    Get all orders with filters (Admin)
  * @access  Private (Admin)
  */
@@ -88,6 +104,22 @@ router.get(
   requireRole('seller', 'admin'),
   verifyShopOwnership,
   orderController.getSellerOrderStatistics,
+);
+
+/**
+ * @desc    Update order status by admin or seller
+ * @access  Private (Admin/Seller)
+ */
+router.put(
+  '/:orderId/status',
+  verifyAccessToken,
+  requireRole('seller', 'admin'),
+  verifyShopOwnershipForSeller,
+  validate({
+    params: orderIdParamValidator,
+    body: updateOrderStatusValidator,
+  }),
+  orderController.updateOrderStatus,
 );
 
 /**

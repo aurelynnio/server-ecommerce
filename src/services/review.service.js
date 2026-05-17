@@ -387,6 +387,27 @@ class ReviewService {
   }
 
   /**
+   * Get public reviews for products in a specific shop.
+   */
+  async getReviewsByShopId(shopId, filters = {}) {
+    const products = await Product.findByShopIdSelectIds(shopId);
+    const productIds = products.map((p) => p._id);
+
+    const { page = 1, limit = 10, rating, search } = filters;
+    const filterArgs = { rating, search };
+    const total = await Review.countByProductIdsWithFilters(productIds, filterArgs);
+    const paginationParams = getPaginationParams(page, limit, total);
+
+    const reviews = await Review.findByProductIdsWithFilters(
+      productIds,
+      filterArgs,
+      paginationParams,
+    );
+
+    return buildPaginationResponse(reviews, paginationParams);
+  }
+
+  /**
    * Reply to a review (shop owner only)
    * @param {string} userId - Shop owner user ID
    * @param {string} reviewId - Review ID

@@ -15,6 +15,7 @@ const updateReviewValidator = Joi.object({
 
 const reviewIdParamValidator = Joi.object({ reviewId: objectId.required() });
 const productIdParamValidator = Joi.object({ productId: objectId.required() });
+const shopIdParamValidator = Joi.object({ shopId: objectId.required() });
 
 const getReviewsQueryValidator = Joi.object({
   ...pagination,
@@ -26,5 +27,6 @@ module.exports = {
   updateReviewValidator,
   reviewIdParamValidator,
   productIdParamValidator,
+  shopIdParamValidator,
   getReviewsQueryValidator,
 };

@@ -13,6 +13,7 @@ const {
   updateReviewValidator,
   reviewIdParamValidator,
   productIdParamValidator,
+  shopIdParamValidator,
   getReviewsQueryValidator,
 } = require('../validations/review.validator');
 
@@ -32,6 +33,20 @@ router.get(
     query: getReviewsQueryValidator,
   }),
   reviewController.getProductReviews,
+);
+
+/**
+ * @desc    Get public reviews for a specific shop
+ * @access  Public
+ * @param   shopId - Shop ID to get reviews for
+ */
+router.get(
+  '/shop/:shopId',
+  validate({
+    params: shopIdParamValidator,
+    query: getReviewsQueryValidator,
+  }),
+  reviewController.getReviewsByShopId,
 );
 
 /**

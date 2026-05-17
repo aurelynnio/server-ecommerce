@@ -8,7 +8,11 @@ const { verifyAccessToken, requireRole } = require('../middlewares/auth.middlewa
 
 const validate = require('../middlewares/validate.middleware');
 
-const { createVoucherValidator } = require('../validations/voucher.validator');
+const {
+  createVoucherValidator,
+  updateVoucherValidator,
+  voucherIdParamValidator,
+} = require('../validations/voucher.validator');
 
 /**
  * @desc    Get platform vouchers
@@ -57,7 +61,12 @@ router.get(
  * @access  Private
  * @param   id - Voucher ID
  */
-router.get('/:id', verifyAccessToken, voucherController.getVoucherById);
+router.get(
+  '/:id',
+  verifyAccessToken,
+  validate({ params: voucherIdParamValidator }),
+  voucherController.getVoucherById,
+);
 
 /**
  * @desc    Create voucher
@@ -75,14 +84,24 @@ router.post(
  * @access  Private
  * @param   id - Voucher ID
  */
-router.put('/:id', verifyAccessToken, voucherController.updateVoucher);
+router.put(
+  '/:id',
+  verifyAccessToken,
+  validate({ params: voucherIdParamValidator, body: updateVoucherValidator }),
+  voucherController.updateVoucher,
+);
 
 /**
  * @desc    Delete voucher (soft delete)
  * @access  Private
  * @param   id - Voucher ID
  */
-router.delete('/:id', verifyAccessToken, voucherController.deleteVoucher);
+router.delete(
+  '/:id',
+  verifyAccessToken,
+  validate({ params: voucherIdParamValidator }),
+  voucherController.deleteVoucher,
+);
 
 /**
  * @desc    Delete voucher permanently (Admin)
@@ -93,6 +112,7 @@ router.delete(
   '/:id/permanent',
   verifyAccessToken,
   requireRole(['admin']),
+  validate({ params: voucherIdParamValidator }),
   voucherController.permanentDeleteVoucher,
 );
 

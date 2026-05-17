@@ -71,6 +71,19 @@ const OrderController = {
   }),
 
   /**
+   * Confirm delivery
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  confirmDelivery: catchAsync(async (req, res) => {
+    const userId = req.user.userId;
+    const order = await orderService.confirmDelivery(req.params.orderId, userId);
+
+    return sendSuccess(res, order, 'Order delivery confirmed successfully', StatusCodes.OK);
+  }),
+
+  /**
    * Get order statistics
    * @param {Object} req
    * @param {Object} res
@@ -107,6 +120,21 @@ const OrderController = {
     const { status } = req.body;
 
     const order = await orderService.updateOrderStatusBySeller(orderId, shopId, status);
+
+    return sendSuccess(res, order, 'Order status updated successfully', StatusCodes.OK);
+  }),
+
+  /**
+   * Update order status by admin or seller.
+   */
+  updateOrderStatus: catchAsync(async (req, res) => {
+    const userId = req.user.userId;
+    const isAdmin = req.user.role === 'admin';
+    const shopId = req.shop?._id || null;
+    const { orderId } = req.params;
+    const { status } = req.body;
+
+    const order = await orderService.updateOrderStatus(orderId, status, userId, isAdmin, shopId);
 
     return sendSuccess(res, order, 'Order status updated successfully', StatusCodes.OK);
   }),
