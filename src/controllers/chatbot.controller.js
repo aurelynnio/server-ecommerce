@@ -55,6 +55,73 @@ const extractMessageContent = (payload) => {
   return '[Không đọc được nội dung tin nhắn]';
 };
 
+const normalizeRole = (value) => {
+  if (!value) return null;
+  const normalized = String(value).toLowerCase();
+
+  if (normalized === 'human' || normalized === 'user') return 'user';
+  if (normalized === 'ai' || normalized === 'assistant') return 'assistant';
+
+  return null;
+};
+
+const normalizeTimestamp = (value, fallbackTimestamp) => {
+  if (value instanceof Date) return value;
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+
+  return fallbackTimestamp;
+};
+
+const extractConversationMessages = (payload, fallbackTimestamp = new Date()) => {
+  if (!payload) return [];
+
+  if (Array.isArray(payload)) {
+    return payload.flatMap((item) => extractConversationMessages(item, fallbackTimestamp));
+  }
+
+  if (typeof payload !== 'object') return [];
+
+  const detectedRole =
+    normalizeRole(payload.role) ||
+    normalizeRole(payload.type) ||
+    normalizeRole(payload?.data?.role) ||
+    normalizeRole(payload?.data?.type);
+
+  if (detectedRole) {
+    return [
+      {
+        role: detectedRole,
+        content: extractMessageContent(payload),
+        timestamp: normalizeTimestamp(
+          payload.timestamp || payload.createdAt || payload.updatedAt,
+          fallbackTimestamp,
+        ),
+      },
+    ];
+  }
+
+  const nestedSources = [
+    payload.messages,
+    payload.history,
+    payload.items,
+    payload.entries,
+    payload.data,
+    payload.message,
+    payload.lc_kwargs,
+  ].filter(Boolean);
+
+  for (const source of nestedSources) {
+    const nestedMessages = extractConversationMessages(source, fallbackTimestamp);
+    if (nestedMessages.length > 0) return nestedMessages;
+  }
+
+  return [];
+};
+
 const ChatbotController = {
   /**
    * Send message
@@ -133,11 +200,9 @@ const ChatbotController = {
     const collection = mongoose.connection.collection('chatbot_messages');
     const messages = await collection.find({ sessionId }).sort({ _id: 1 }).toArray();
 
-    const formattedMessages = messages.map((msg) => ({
-      role: msg.type === 'human' ? 'user' : 'assistant',
-      content: extractMessageContent(msg),
-      timestamp: msg._id.getTimestamp(),
-    }));
+    const formattedMessages = messages.flatMap((msg) =>
+      extractConversationMessages(msg, msg._id.getTimestamp()),
+    );
 
     return sendSuccess(
       res,
@@ -201,9 +266,7 @@ const ChatbotController = {
           $group: {
             _id: '$sessionId',
             lastMessageAt: { $max: '$_id' },
-            createdAt: { $min: '$_id' },
-            messageCount: { $sum: 1 },
-            lastMessageData: { $last: '$data' },
+            docs: { $push: '$$ROOT' },
           },
         },
         {
@@ -220,13 +283,21 @@ const ChatbotController = {
 
     const result = sessions[0];
     const total = result.metadata[0]?.total || 0;
-    const sessionData = result.data.map((s) => ({
-      sessionId: s._id,
-      lastMessage: extractMessageContent({ data: s.lastMessageData }),
-      messageCount: s.messageCount,
-      createdAt: s.createdAt.getTimestamp(),
-      updatedAt: s.lastMessageAt.getTimestamp(),
-    }));
+    const sessionData = result.data.map((s) => {
+      const flattenedMessages = s.docs.flatMap((doc) =>
+        extractConversationMessages(doc, doc._id.getTimestamp()),
+      );
+      const firstMessage = flattenedMessages[0] || null;
+      const lastMessage = flattenedMessages[flattenedMessages.length - 1] || null;
+
+      return {
+        sessionId: s._id,
+        lastMessage: lastMessage?.content || '[Không đọc được nội dung tin nhắn]',
+        messageCount: flattenedMessages.length,
+        createdAt: (firstMessage?.timestamp || s.lastMessageAt.getTimestamp()).toISOString(),
+        updatedAt: (lastMessage?.timestamp || s.lastMessageAt.getTimestamp()).toISOString(),
+      };
+    });
 
     return sendSuccess(
       res,
