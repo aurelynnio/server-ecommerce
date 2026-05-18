@@ -1,6 +1,10 @@
-const defaultDevOrigins = [
+const defaultProductionOrigins = [
   'https://nantianshop.tech',
   'https://www.nantianshop.tech',
+];
+
+const defaultDevOrigins = [
+  ...defaultProductionOrigins,
   'http://localhost:3001',
   'https://etiso.me',
 ];
@@ -30,7 +34,7 @@ const getAllowedOrigins = () => {
   const configuredOrigins = getConfiguredFrontendOrigins();
 
   if (process.env.NODE_ENV === 'production') {
-    return configuredOrigins;
+    return uniqueOrigins([...defaultProductionOrigins, ...configuredOrigins]);
   }
 
   return uniqueOrigins([...defaultDevOrigins, ...configuredOrigins]);
@@ -52,6 +56,7 @@ const isAllowedOrigin = (origin) => {
 
 module.exports = {
   defaultDevOrigins,
+  defaultProductionOrigins,
   getAllowedOrigins,
   isAllowedOrigin,
   isLocalhostOrigin,
