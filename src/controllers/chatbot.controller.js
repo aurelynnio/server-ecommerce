@@ -5,6 +5,56 @@ const { sendSuccess, sendFail } = require('../shared/res/formatResponse');
 const { StatusCodes } = require('http-status-codes');
 const logger = require('../utils/logger');
 
+const PRIORITY_TEXT_KEYS = ['content', 'text'];
+
+const extractTextValue = (value) => {
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => extractTextValue(item))
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+  }
+
+  if (value && typeof value === 'object') {
+    for (const key of PRIORITY_TEXT_KEYS) {
+      const candidate = extractTextValue(value[key]);
+      if (candidate) return candidate;
+    }
+
+    const nestedObjects = Object.values(value).filter(
+      (item) => item && (Array.isArray(item) || typeof item === 'object'),
+    );
+
+    for (const item of nestedObjects) {
+      const candidate = extractTextValue(item);
+      if (candidate) return candidate;
+    }
+  }
+
+  return '';
+};
+
+const extractMessageContent = (payload) => {
+  const prioritizedSources = [
+    payload?.data,
+    payload?.message,
+    payload?.lc_kwargs,
+    payload,
+  ];
+
+  for (const source of prioritizedSources) {
+    const extracted = extractTextValue(source);
+    if (extracted) return extracted;
+  }
+
+  return '[Không đọc được nội dung tin nhắn]';
+};
+
 const ChatbotController = {
   /**
    * Send message
@@ -85,7 +135,7 @@ const ChatbotController = {
 
     const formattedMessages = messages.map((msg) => ({
       role: msg.type === 'human' ? 'user' : 'assistant',
-      content: msg.data?.content || '',
+      content: extractMessageContent(msg),
       timestamp: msg._id.getTimestamp(),
     }));
 
@@ -153,7 +203,7 @@ const ChatbotController = {
             lastMessageAt: { $max: '$_id' },
             createdAt: { $min: '$_id' },
             messageCount: { $sum: 1 },
-            lastMessage: { $last: '$data.content' },
+            lastMessageData: { $last: '$data' },
           },
         },
         {
@@ -172,7 +222,7 @@ const ChatbotController = {
     const total = result.metadata[0]?.total || 0;
     const sessionData = result.data.map((s) => ({
       sessionId: s._id,
-      lastMessage: s.lastMessage,
+      lastMessage: extractMessageContent({ data: s.lastMessageData }),
       messageCount: s.messageCount,
       createdAt: s.createdAt.getTimestamp(),
       updatedAt: s.lastMessageAt.getTimestamp(),
