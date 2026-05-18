@@ -281,17 +281,12 @@ describe('Sanitize + Validate Pipeline - Integration Tests', () => {
       expect(finalReq.body.$gt).toBeUndefined();
     });
 
-    it('should validate order with sanitized shipping address', async () => {
+    it('should validate order with sanitized address reference', async () => {
       const chain = [sanitizeMiddleware, validate(createOrderValidator)];
       const req = {
         body: {
           cartItemIds: ['507f1f77bcf86cd799439011'],
-          shippingAddress: {
-            fullName: '  Nguyễn Văn A  ',
-            phone: '0901234567',
-            address: '  123 Lê Lợi, Quận 1  ',
-            city: '  TP.HCM  ',
-          },
+          addressId: '507f1f77bcf86cd799439012',
           paymentMethod: 'cod',
         },
         query: {},
@@ -299,8 +294,7 @@ describe('Sanitize + Validate Pipeline - Integration Tests', () => {
       };
 
       const { req: finalReq } = await runMiddlewareChain(chain, req);
-      expect(finalReq.body.shippingAddress.fullName).toBe('Nguyễn Văn A');
-      expect(finalReq.body.shippingAddress.address).toBe('123 Lê Lợi, Quận 1');
+      expect(finalReq.body.addressId).toBe('507f1f77bcf86cd799439012');
     });
   });
 

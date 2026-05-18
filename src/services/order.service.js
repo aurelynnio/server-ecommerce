@@ -7,6 +7,7 @@ const inventoryService = require('./inventory.service');
 const voucherService = require('./voucher.service');
 const Voucher = require('../repositories/voucher.repository');
 const VoucherUsage = require('../repositories/voucher-usage.repository');
+const User = require('../repositories/user.repository');
 const logger = require('../utils/logger');
 const { StatusCodes } = require('http-status-codes');
 const { ApiError } = require('../middlewares/errorHandler.middleware');
@@ -35,6 +36,34 @@ const requireFiniteNumber = (value, message) => {
     throw new ApiError(StatusCodes.UNPROCESSABLE_ENTITY, message);
   }
   return parsed;
+};
+const sanitizeAddressField = (value) => (typeof value === 'string' ? value.trim() : '');
+const buildShippingAddressSnapshot = (address, note = '') => {
+  const snapshot = {
+    fullName: sanitizeAddressField(address?.fullName),
+    phone: sanitizeAddressField(address?.phone),
+    address: sanitizeAddressField(address?.address),
+    city: sanitizeAddressField(address?.city),
+    district: sanitizeAddressField(address?.district),
+    ward: sanitizeAddressField(address?.ward),
+    note: sanitizeAddressField(note),
+  };
+
+  if (
+    !snapshot.fullName ||
+    !snapshot.phone ||
+    !snapshot.address ||
+    !snapshot.city ||
+    !snapshot.district ||
+    !snapshot.ward
+  ) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Selected shipping address is incomplete. Please update your profile address.',
+    );
+  }
+
+  return snapshot;
 };
 
 const getErrorLabels = (error) => error?.errorLabels || error?.result?.errorLabels || [];
@@ -205,7 +234,7 @@ class OrderService {
    * @param {string} userId - User ID placing the order
    * @param {Object} orderData - Order details
    * @param {string[]} orderData.cartItemIds - Cart item IDs to checkout
-   * @param {Object} orderData.shippingAddress - Shipping address details
+   * @param {string} orderData.addressId - User address ID selected for delivery
    * @param {string} [orderData.paymentMethod="cod"] - Payment method
    * @param {Array} [orderData.shopVouchers] - Shop-specific vouchers [{shopId, code}]
    * @param {string} [orderData.platformVoucher] - Platform voucher code
@@ -223,12 +252,27 @@ class OrderService {
 
         const {
           cartItemIds,
-          shippingAddress,
+          addressId,
           paymentMethod = 'cod',
           shopVouchers = [], // Array of { shopId, code }
           platformVoucher, // String (code)
           note,
         } = orderData;
+
+        const user = await User.findByIdWithAddresses(userId).session(session);
+        if (!user) {
+          throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
+        }
+
+        const selectedAddress = user.addresses?.id(addressId);
+        if (!selectedAddress) {
+          throw new ApiError(
+            StatusCodes.BAD_REQUEST,
+            'Shipping address not found for current user',
+          );
+        }
+
+        const shippingAddress = buildShippingAddressSnapshot(selectedAddress, note);
 
         // 1. Get Selected Items from Cart
         const cart = await Cart.findByUserIdForCheckout(userId, session);
@@ -401,7 +445,7 @@ class OrderService {
             userId,
             shopId,
             products: orderProducts,
-            shippingAddress: { ...shippingAddress, note },
+            shippingAddress,
             paymentMethod,
             subtotal,
             discountShop, // Saved here

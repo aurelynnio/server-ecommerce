@@ -2,21 +2,9 @@ const Joi = require('joi');
 const { objectId, pagination } = require('./common.validator');
 const { sanitizedString } = require('./sanitize');
 
-const shippingAddressSchema = Joi.object({
-  fullName: sanitizedString().min(2).max(100).required(),
-  phone: Joi.string()
-    .pattern(/^[0-9]{10,11}$/)
-    .required(),
-  address: sanitizedString().min(5).required(),
-  city: sanitizedString().required(),
-  district: sanitizedString().allow(''),
-  ward: sanitizedString().allow(''),
-  note: sanitizedString().allow(''),
-});
-
 const createOrderValidator = Joi.object({
   cartItemIds: Joi.array().items(objectId).min(1).required(),
-  shippingAddress: shippingAddressSchema.required(),
+  addressId: objectId.required(),
   paymentMethod: Joi.string().valid('cod', 'vnpay', 'momo').default('cod'),
   platformVoucher: Joi.string().uppercase().trim().allow('', null),
   shopVouchers: Joi.array()

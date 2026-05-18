@@ -310,12 +310,7 @@ describe('Validators', () => {
     describe('createOrderValidator', () => {
       const validOrder = {
         cartItemIds: ['507f1f77bcf86cd799439011'],
-        shippingAddress: {
-          fullName: 'Nguyễn Văn A',
-          phone: '0901234567',
-          address: '123 Lê Lợi, Quận 1',
-          city: 'TP.HCM',
-        },
+        addressId: '507f1f77bcf86cd799439012',
         paymentMethod: 'cod',
       };
 
@@ -350,13 +345,10 @@ describe('Validators', () => {
         }
       });
 
-      it('should reject short phone number', () => {
+      it('should reject invalid address id', () => {
         const { error } = createOrderValidator.validate({
           ...validOrder,
-          shippingAddress: {
-            ...validOrder.shippingAddress,
-            phone: '123',
-          },
+          addressId: 'invalid-id',
         });
         expect(error).toBeDefined();
       });
