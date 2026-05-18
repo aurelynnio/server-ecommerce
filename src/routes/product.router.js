@@ -107,6 +107,7 @@ router.put(
   parseJsonFields([
     'price',
     'variants',
+    'sizes',
     'tags',
     'tierVariations',
     'models',
@@ -153,6 +154,7 @@ router.post(
   parseJsonFields([
     'price',
     'variants',
+    'sizes',
     'tags',
     'tierVariations',
     'models',

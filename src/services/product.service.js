@@ -11,6 +11,16 @@ const { StatusCodes } = require('http-status-codes');
 const { ApiError } = require('../middlewares/errorHandler.middleware');
 
 class ProductService {
+  syncVariantAggregates(payload) {
+    if (!payload.variants || !Array.isArray(payload.variants) || payload.variants.length === 0) {
+      return payload;
+    }
+
+    payload.stock = payload.variants.reduce((sum, variant) => sum + (variant.stock || 0), 0);
+    payload.soldCount = payload.variants.reduce((sum, variant) => sum + (variant.sold || 0), 0);
+    return payload;
+  }
+
   /**
    * Get all products
    * @param {Object} filters
@@ -188,6 +198,8 @@ class ProductService {
           ...(_id && /^[0-9a-fA-F]{24}$/.test(_id) ? { _id } : {}),
         };
       });
+
+      this.syncVariantAggregates(productData);
     }
 
     // Check if slug already exists
@@ -367,6 +379,8 @@ class ProductService {
 
           return variantData;
         });
+
+        this.syncVariantAggregates(updateData);
 
         if (updateData.variants[0]?.images?.length > 0) {
           updateData.images = updateData.variants[0].images;
