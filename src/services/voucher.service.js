@@ -246,6 +246,11 @@ class VoucherService {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Voucher not found or inactive');
     }
 
+    const normalizedOrderValue = Number(orderValue);
+    if (!Number.isFinite(normalizedOrderValue) || normalizedOrderValue < 0) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Order value is invalid');
+    }
+
     // 1. Check Date
     const now = new Date();
     if (now < voucher.startDate || now > voucher.endDate) {
@@ -263,7 +268,7 @@ class VoucherService {
     }
 
     // 3. Check Min Order Value
-    if (orderValue < voucher.minOrderValue) {
+    if (normalizedOrderValue < voucher.minOrderValue) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
         `Order value must be at least ${voucher.minOrderValue}`,
@@ -287,11 +292,15 @@ class VoucherService {
     if (voucher.type === 'fixed_amount') {
       discountAmount = voucher.value;
     } else if (voucher.type === 'percentage') {
-      discountAmount = (orderValue * voucher.value) / 100;
+      discountAmount = (normalizedOrderValue * voucher.value) / 100;
       if (voucher.maxValue > 0) {
         discountAmount = Math.min(discountAmount, voucher.maxValue);
       }
     }
+    if (!Number.isFinite(discountAmount) || discountAmount < 0) {
+      throw new ApiError(StatusCodes.UNPROCESSABLE_ENTITY, 'Voucher discount is invalid');
+    }
+    discountAmount = Math.min(discountAmount, normalizedOrderValue);
 
     return {
       voucherId: voucher._id,

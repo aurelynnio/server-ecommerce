@@ -93,44 +93,71 @@ describe('OrderService Logic', () => {
   });
 
   describe('Discount Distribution', () => {
-    it('should distribute platform discount proportionally', () => {
-      const orders = [{ totalAmount: 200000 }, { totalAmount: 300000 }];
-      const totalPlatformOrderValue = 500000;
-      const totalPlatformDiscount = 50000;
+    const distributeDiscount = (orders, totalPlatformDiscount) => {
+      const totalPlatformOrderValue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
+
+      if (totalPlatformOrderValue <= 0 || totalPlatformDiscount <= 0) {
+        return orders.map((order) => ({
+          ...order,
+          discountPlatform: 0,
+          totalAmount: Math.max(0, order.totalAmount),
+        }));
+      }
+
       let distributedDiscount = 0;
 
-      orders.forEach((order, index) => {
+      return orders.map((order, index) => {
+        let discountPlatform;
         if (index === orders.length - 1) {
-          order.discountPlatform = Math.max(0, totalPlatformDiscount - distributedDiscount);
+          discountPlatform = Math.max(0, totalPlatformDiscount - distributedDiscount);
         } else {
           const ratio = order.totalAmount / totalPlatformOrderValue;
-          const portion = Math.floor(totalPlatformDiscount * ratio);
-          order.discountPlatform = portion;
-          distributedDiscount += portion;
+          discountPlatform = Math.floor(totalPlatformDiscount * ratio);
+          distributedDiscount += discountPlatform;
         }
-        order.totalAmount = Math.max(0, order.totalAmount - order.discountPlatform);
+
+        return {
+          ...order,
+          discountPlatform,
+          totalAmount: Math.max(0, order.totalAmount - discountPlatform),
+        };
       });
+    };
+
+    it('should distribute platform discount proportionally', () => {
+      const orders = [{ totalAmount: 200000 }, { totalAmount: 300000 }];
+      const totalPlatformDiscount = 50000;
+      const result = distributeDiscount(orders, totalPlatformDiscount);
 
       // First order: 200000/500000 * 50000 = 20000
-      expect(orders[0].discountPlatform).toBe(20000);
-      expect(orders[0].totalAmount).toBe(180000);
+      expect(result[0].discountPlatform).toBe(20000);
+      expect(result[0].totalAmount).toBe(180000);
 
       // Last order gets remainder: 50000 - 20000 = 30000
-      expect(orders[1].discountPlatform).toBe(30000);
-      expect(orders[1].totalAmount).toBe(270000);
+      expect(result[1].discountPlatform).toBe(30000);
+      expect(result[1].totalAmount).toBe(270000);
 
       // Total discount should match
-      expect(orders[0].discountPlatform + orders[1].discountPlatform).toBe(totalPlatformDiscount);
+      expect(result[0].discountPlatform + result[1].discountPlatform).toBe(totalPlatformDiscount);
     });
 
     it('should not result in negative totalAmount', () => {
       const orders = [{ totalAmount: 10000 }];
       const totalPlatformDiscount = 50000;
+      const result = distributeDiscount(orders, totalPlatformDiscount);
 
-      orders[0].discountPlatform = totalPlatformDiscount;
-      orders[0].totalAmount = Math.max(0, orders[0].totalAmount - orders[0].discountPlatform);
+      expect(result[0].discountPlatform).toBe(totalPlatformDiscount);
+      expect(result[0].totalAmount).toBe(0);
+    });
 
-      expect(orders[0].totalAmount).toBe(0);
+    it('should not generate NaN when total platform order value is zero', () => {
+      const orders = [{ totalAmount: 0 }, { totalAmount: 0 }];
+      const result = distributeDiscount(orders, 50000);
+
+      expect(result[0].discountPlatform).toBe(0);
+      expect(result[1].discountPlatform).toBe(0);
+      expect(result[0].totalAmount).toBe(0);
+      expect(result[1].totalAmount).toBe(0);
     });
   });
 

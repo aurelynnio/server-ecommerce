@@ -21,6 +21,13 @@ describe('Order Processing Flow - Integration Tests', () => {
 
   const distributeDiscount = (orders, totalDiscount) => {
     const totalValue = orders.reduce((sum, o) => sum + o.totalAmount, 0);
+    if (totalValue <= 0 || totalDiscount <= 0) {
+      return orders.map((order) => ({
+        ...order,
+        discountPlatform: 0,
+        totalAmount: Math.max(0, order.totalAmount),
+      }));
+    }
     let distributed = 0;
 
     return orders.map((order, index) => {
@@ -171,6 +178,20 @@ describe('Order Processing Flow - Integration Tests', () => {
 
       // Last order gets remainder, so total should exactly match
       expect(totalApplied).toBe(100);
+    });
+
+    it('should not create NaN when every shop total is zero', () => {
+      const orders = [
+        { shopId: 's1', totalAmount: 0 },
+        { shopId: 's2', totalAmount: 0 },
+      ];
+
+      const result = distributeDiscount(orders, 50000);
+
+      expect(result[0].discountPlatform).toBe(0);
+      expect(result[1].discountPlatform).toBe(0);
+      expect(result[0].totalAmount).toBe(0);
+      expect(result[1].totalAmount).toBe(0);
     });
   });
 

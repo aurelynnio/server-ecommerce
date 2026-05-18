@@ -25,6 +25,17 @@ const SYSTEM_ORDER_ACTOR = 'system';
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const toObjectIdString = (value) => (value ? value.toString() : null);
 const getOrderCode = (order) => order.orderNumber || order._id.toString().slice(-6).toUpperCase();
+const toFiniteNumber = (value) => {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+const requireFiniteNumber = (value, message) => {
+  const parsed = toFiniteNumber(value);
+  if (parsed === null) {
+    throw new ApiError(StatusCodes.UNPROCESSABLE_ENTITY, message);
+  }
+  return parsed;
+};
 
 const getErrorLabels = (error) => error?.errorLabels || error?.result?.errorLabels || [];
 
@@ -285,7 +296,21 @@ class OrderService {
               throw new ApiError(StatusCodes.CONFLICT, `${item.productId.name} unavailable`);
             }
 
-            let price = product.price.currentPrice;
+            const quantity = requireFiniteNumber(
+              item.quantity,
+              `Invalid quantity for product ${product.name}`,
+            );
+            if (!Number.isInteger(quantity) || quantity < 1) {
+              throw new ApiError(
+                StatusCodes.UNPROCESSABLE_ENTITY,
+                `Invalid quantity for product ${product.name}`,
+              );
+            }
+
+            let price = requireFiniteNumber(
+              product.price?.currentPrice,
+              `Invalid base price for product ${product.name}`,
+            );
             let skuCode = '';
 
             if (item.modelId) {
@@ -302,23 +327,27 @@ class OrderService {
 
               // Note: Stock check is now handled by inventoryService.deductStock
 
-              price = variant.price;
+              price = requireFiniteNumber(
+                variant.price,
+                `Invalid variant price for product ${product.name}`,
+              );
               skuCode = variant.sku;
 
               inventoryItems.push({
                 productId: product._id,
                 modelId: item.modelId,
-                quantity: item.quantity,
+                quantity,
               });
             } else {
               // Base product
               inventoryItems.push({
                 productId: product._id,
-                quantity: item.quantity,
+                quantity,
               });
             }
 
-            subtotal += price * item.quantity;
+            const lineTotal = price * quantity;
+            subtotal += lineTotal;
 
             orderProducts.push({
               productId: product._id,
@@ -326,9 +355,9 @@ class OrderService {
               variantId: item.modelId,
               name: product.name, // Snapshot name
               image: product.images?.[0] || '', // simplified
-              quantity: item.quantity,
+              quantity,
               price,
-              totalPrice: price * item.quantity,
+              totalPrice: lineTotal,
             });
           }
 
@@ -347,7 +376,10 @@ class OrderService {
               subtotal,
               shopId,
             );
-            discountShop = voucherResult.discountAmount;
+            discountShop = requireFiniteNumber(
+              voucherResult.discountAmount,
+              `Invalid shop voucher discount for shop ${shopId}`,
+            );
 
             // Increment usage count and record in VoucherUsage collection
             await Voucher.updateById(
@@ -389,26 +421,39 @@ class OrderService {
             totalPlatformOrderValue,
           );
 
-          const totalPlatformDiscount = voucherResult.discountAmount;
+          const totalPlatformDiscount = requireFiniteNumber(
+            voucherResult.discountAmount,
+            'Invalid platform voucher discount',
+          );
 
-          // Distribute platform discount to each order proportionally
-          // Weight = Order.totalAmount / totalPlatformOrderValue
-          let distributedDiscount = 0;
+          if (totalPlatformOrderValue > 0 && totalPlatformDiscount > 0) {
+            // Distribute platform discount to each order proportionally
+            // Weight = Order.totalAmount / totalPlatformOrderValue
+            let distributedDiscount = 0;
 
-          tempOrders.forEach((order, index) => {
-            if (index === tempOrders.length - 1) {
-              // Last order takes the remainder to handle rounding issues
-              order.discountPlatform = Math.max(0, totalPlatformDiscount - distributedDiscount);
-            } else {
-              const ratio = order.totalAmount / totalPlatformOrderValue;
-              const portion = Math.floor(totalPlatformDiscount * ratio);
-              order.discountPlatform = portion;
-              distributedDiscount += portion;
-            }
+            tempOrders.forEach((order, index) => {
+              if (index === tempOrders.length - 1) {
+                // Last order takes the remainder to handle rounding issues
+                order.discountPlatform = Math.max(0, totalPlatformDiscount - distributedDiscount);
+              } else {
+                const ratio = order.totalAmount / totalPlatformOrderValue;
+                const portion = Math.floor(totalPlatformDiscount * ratio);
+                order.discountPlatform = requireFiniteNumber(
+                  portion,
+                  'Invalid platform discount distribution',
+                );
+                distributedDiscount += order.discountPlatform;
+              }
 
-            // Recalculate Final Total per Order
-            order.totalAmount = Math.max(0, order.totalAmount - order.discountPlatform);
-          });
+              // Recalculate Final Total per Order
+              order.totalAmount = Math.max(0, order.totalAmount - order.discountPlatform);
+            });
+          } else {
+            tempOrders.forEach((order) => {
+              order.discountPlatform = 0;
+              order.totalAmount = Math.max(0, order.totalAmount);
+            });
+          }
 
           // Increment usage count and record in VoucherUsage collection
           await Voucher.updateById(
