@@ -58,6 +58,10 @@ const userSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    isTwoFactorEnabled: {
+      type: Boolean,
+      default: false,
+    },
     expiresCodeVerifiEmail: {
       type: Date,
     },

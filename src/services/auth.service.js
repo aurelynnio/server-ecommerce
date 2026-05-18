@@ -5,7 +5,11 @@ const hashPassword = require('../utils/hashPasword');
 const { getIO } = require('../socket/index');
 const { StatusCodes } = require('http-status-codes');
 const { ApiError } = require('../middlewares/errorHandler.middleware');
-const { sendEmailVerificationCode, sendPasswordResetCode } = require('./email.service');
+const {
+  sendEmailVerificationCode,
+  sendPasswordResetCode,
+  sendTwoFactorCode,
+} = require('./email.service');
 const redisService = require('./redis.service');
 const logger = require('../utils/logger');
 const tokenService = require('./token.service');
@@ -41,6 +45,65 @@ class AuthService {
   _getRefreshTokenExpiresAt() {
     const ttlMs = parseDurationMs(process.env.JWT_REFRESH_EXPIRES_IN, 16 * 24 * 60 * 60 * 1000);
     return new Date(Date.now() + ttlMs);
+  }
+
+  _sanitizeUser(user) {
+    const {
+      password: _password,
+      codeVerifiEmail: _codeVerifiEmail,
+      codeVerifiPassword: _codeVerifiPassword,
+      refreshTokenHash: _refreshTokenHash,
+      refreshTokenExpiresAt: _refreshTokenExpiresAt,
+      ...userWithoutPassword
+    } = user.toObject();
+
+    return userWithoutPassword;
+  }
+
+  async _createAuthenticatedSession(user) {
+    const permissions = tokenService.getPermissionsForUser(user);
+    const tokens = tokenService.generateTokensWithPermissions(user);
+
+    user.refreshTokenHash = this._hashToken(tokens.refreshToken);
+    user.refreshTokenExpiresAt = this._getRefreshTokenExpiresAt();
+    await user.save();
+
+    return {
+      user: {
+        ...this._sanitizeUser(user),
+        permissions,
+      },
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
+  }
+
+  async _sendLoginTwoFactorChallenge(user) {
+    const challengeToken = crypto.randomBytes(32).toString('hex');
+    const verificationCode = this._generateVerificationCode();
+    const challengeKey = `2fa:login:challenge:${challengeToken}`;
+    const codeKey = `otp:2fa:login:${user._id}`;
+
+    await redisService.set(challengeKey, { userId: user._id.toString() }, 600);
+    await redisService.set(codeKey, verificationCode, 600);
+
+    try {
+      await sendTwoFactorCode(user.email, verificationCode);
+    } catch (_error) {
+      await redisService.del(challengeKey);
+      await redisService.del(codeKey);
+      throw new ApiError(
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        'Failed to send two-factor authentication code. Please try again.',
+      );
+    }
+
+    return {
+      requiresTwoFactor: true,
+      challengeToken,
+      email: user.email,
+      expiresIn: '10 minutes',
+    };
   }
 
   /**
@@ -134,30 +197,11 @@ class AuthService {
       throw new ApiError(StatusCodes.FORBIDDEN, 'Please verify your email before logging in');
     }
 
-    const permissions = tokenService.getPermissionsForUser(user);
-    const tokens = tokenService.generateTokensWithPermissions(user);
+    if (user.isTwoFactorEnabled) {
+      return this._sendLoginTwoFactorChallenge(user);
+    }
 
-    user.refreshTokenHash = this._hashToken(tokens.refreshToken);
-    user.refreshTokenExpiresAt = this._getRefreshTokenExpiresAt();
-    await user.save();
-
-    const {
-      password: _,
-      codeVerifiEmail: _codeVerifiEmail,
-      codeVerifiPassword: _codeVerifiPassword,
-      refreshTokenHash: _refreshTokenHash,
-      refreshTokenExpiresAt: _refreshTokenExpiresAt,
-      ...userWithoutPassword
-    } = user.toObject();
-
-    return {
-      user: {
-        ...userWithoutPassword,
-        permissions,
-      },
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-    };
+    return this._createAuthenticatedSession(user);
   }
 
   /**
@@ -434,6 +478,118 @@ class AuthService {
     await user.save();
 
     return { userId: user._id };
+  }
+
+  async sendTwoFactorManagementCode(userId, action) {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
+    }
+
+    if (!user.isVerifiedEmail) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        'Please verify your email before enabling two-factor authentication',
+      );
+    }
+
+    if (action === 'enable' && user.isTwoFactorEnabled) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Two-factor authentication is already enabled');
+    }
+
+    if (action === 'disable' && !user.isTwoFactorEnabled) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Two-factor authentication is not enabled');
+    }
+
+    const code = this._generateVerificationCode();
+    const cacheKey = `otp:2fa:${action}:${userId}`;
+    await redisService.set(cacheKey, code, 600);
+
+    try {
+      await sendTwoFactorCode(user.email, code);
+    } catch (_error) {
+      await redisService.del(cacheKey);
+      throw new ApiError(
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        'Failed to send two-factor authentication code. Please try again.',
+      );
+    }
+
+    return {
+      action,
+      email: user.email,
+      expiresIn: '10 minutes',
+    };
+  }
+
+  async confirmTwoFactorManagement(userId, action, code) {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
+    }
+
+    const cacheKey = `otp:2fa:${action}:${userId}`;
+    await this.ensureValidOtp(cacheKey, code);
+
+    user.isTwoFactorEnabled = action === 'enable';
+    await user.save();
+    await redisService.del(cacheKey);
+
+    return this._sanitizeUser(user);
+  }
+
+  async verifyLoginTwoFactor(challengeToken, code) {
+    const challengeKey = `2fa:login:challenge:${challengeToken}`;
+    const challenge = await redisService.get(challengeKey);
+
+    if (!challenge?.userId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid or expired two-factor challenge');
+    }
+
+    const user = await User.findById(challenge.userId);
+    if (!user) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
+    }
+
+    await this.ensureValidOtp(`otp:2fa:login:${user._id}`, code);
+
+    await redisService.del(challengeKey);
+    await redisService.del(`otp:2fa:login:${user._id}`);
+
+    return this._createAuthenticatedSession(user);
+  }
+
+  async resendLoginTwoFactorCode(challengeToken) {
+    const challengeKey = `2fa:login:challenge:${challengeToken}`;
+    const challenge = await redisService.get(challengeKey);
+
+    if (!challenge?.userId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid or expired two-factor challenge');
+    }
+
+    const user = await User.findById(challenge.userId);
+    if (!user) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
+    }
+
+    const verificationCode = this._generateVerificationCode();
+    const codeKey = `otp:2fa:login:${user._id}`;
+    await redisService.set(codeKey, verificationCode, 600);
+
+    try {
+      await sendTwoFactorCode(user.email, verificationCode);
+    } catch (_error) {
+      await redisService.del(codeKey);
+      throw new ApiError(
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        'Failed to send two-factor authentication code. Please try again.',
+      );
+    }
+
+    return {
+      email: user.email,
+      expiresIn: '10 minutes',
+    };
   }
 }
 

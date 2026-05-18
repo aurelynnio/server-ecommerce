@@ -58,6 +58,24 @@ const changePasswordValidator = Joi.object({
   }),
 });
 
+const sendTwoFactorCodeValidator = Joi.object({
+  action: Joi.string().valid('enable', 'disable').required(),
+});
+
+const confirmTwoFactorValidator = Joi.object({
+  action: Joi.string().valid('enable', 'disable').required(),
+  code: sanitizedString().length(6).pattern(/^\d+$/).required(),
+});
+
+const verifyLoginTwoFactorValidator = Joi.object({
+  challengeToken: sanitizedString().min(32).required(),
+  code: sanitizedString().length(6).pattern(/^\d+$/).required(),
+});
+
+const resendLoginTwoFactorValidator = Joi.object({
+  challengeToken: sanitizedString().min(32).required(),
+});
+
 module.exports = {
   registerValidator,
   loginValidator,
@@ -66,4 +84,8 @@ module.exports = {
   forgotPasswordValidator,
   resetPasswordValidator,
   changePasswordValidator,
+  sendTwoFactorCodeValidator,
+  confirmTwoFactorValidator,
+  verifyLoginTwoFactorValidator,
+  resendLoginTwoFactorValidator,
 };

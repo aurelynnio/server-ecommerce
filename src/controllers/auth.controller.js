@@ -5,6 +5,28 @@ const parseDurationMs = require('../utils/parseDurationMs');
 
 const { StatusCodes } = require('http-status-codes');
 
+const setAuthCookies = (res, accessToken, refreshToken) => {
+  const refreshTtlMs = parseDurationMs(
+    process.env.JWT_REFRESH_EXPIRES_IN,
+    16 * 24 * 60 * 60 * 1000,
+  );
+  const accessTtlMs = parseDurationMs(process.env.JWT_ACCESS_EXPIRES_IN, 30 * 60 * 1000);
+
+  res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: refreshTtlMs,
+  });
+
+  res.cookie('accessToken', accessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: accessTtlMs,
+  });
+};
+
 const AuthController = {
   /**
    * Register
@@ -31,29 +53,38 @@ const AuthController = {
   login: catchAsync(async (req, res) => {
     const { email, password } = req.body;
     const result = await authService.login(email, password);
+
+    if (result.requiresTwoFactor) {
+      return sendSuccess(
+        res,
+        result,
+        'Two-factor authentication code sent successfully',
+        StatusCodes.OK,
+      );
+    }
+
     const { accessToken, refreshToken, user } = result;
-
-    const refreshTtlMs = parseDurationMs(
-      process.env.JWT_REFRESH_EXPIRES_IN,
-      16 * 24 * 60 * 60 * 1000,
-    );
-    const accessTtlMs = parseDurationMs(process.env.JWT_ACCESS_EXPIRES_IN, 30 * 60 * 1000);
-
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: refreshTtlMs,
-    });
-
-    res.cookie('accessToken', accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: accessTtlMs,
-    });
-
+    setAuthCookies(res, accessToken, refreshToken);
     return sendSuccess(res, user, 'Login successful', StatusCodes.OK);
+  }),
+
+  verifyLoginTwoFactor: catchAsync(async (req, res) => {
+    const { challengeToken, code } = req.body;
+    const result = await authService.verifyLoginTwoFactor(challengeToken, code);
+    const { accessToken, refreshToken, user } = result;
+    setAuthCookies(res, accessToken, refreshToken);
+    return sendSuccess(res, user, 'Two-factor authentication verified successfully', StatusCodes.OK);
+  }),
+
+  resendLoginTwoFactorCode: catchAsync(async (req, res) => {
+    const { challengeToken } = req.body;
+    const result = await authService.resendLoginTwoFactorCode(challengeToken);
+    return sendSuccess(
+      res,
+      result,
+      'Two-factor authentication code resent successfully',
+      StatusCodes.OK,
+    );
   }),
 
   /**
@@ -192,6 +223,37 @@ const AuthController = {
 
     const result = await authService.changePassword(userId, oldPassword, newPassword);
     return sendSuccess(res, result, 'Password changed successfully', StatusCodes.OK);
+  }),
+
+  sendTwoFactorCode: catchAsync(async (req, res) => {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return sendFail(res, 'Unauthorized', StatusCodes.UNAUTHORIZED);
+    }
+
+    const result = await authService.sendTwoFactorManagementCode(userId, req.body.action);
+    return sendSuccess(
+      res,
+      result,
+      'Two-factor authentication code sent successfully',
+      StatusCodes.OK,
+    );
+  }),
+
+  confirmTwoFactor: catchAsync(async (req, res) => {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return sendFail(res, 'Unauthorized', StatusCodes.UNAUTHORIZED);
+    }
+
+    const user = await authService.confirmTwoFactorManagement(
+      userId,
+      req.body.action,
+      req.body.code,
+    );
+    return sendSuccess(res, user, 'Two-factor authentication updated successfully', StatusCodes.OK);
   }),
 };
 

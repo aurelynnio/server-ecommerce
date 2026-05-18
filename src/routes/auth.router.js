@@ -11,6 +11,10 @@ const {
   forgotPasswordValidator,
   resetPasswordValidator,
   changePasswordValidator,
+  sendTwoFactorCodeValidator,
+  confirmTwoFactorValidator,
+  verifyLoginTwoFactorValidator,
+  resendLoginTwoFactorValidator,
 } = require('../validations/auth.validator');
 
 /**
@@ -24,6 +28,16 @@ router.post('/register', validate(registerValidator), authController.register);
  * @access  Public
  */
 router.post('/login', validate(loginValidator), authController.login);
+router.post(
+  '/2fa/verify-login',
+  validate(verifyLoginTwoFactorValidator),
+  authController.verifyLoginTwoFactor,
+);
+router.post(
+  '/2fa/resend-login-code',
+  validate(resendLoginTwoFactorValidator),
+  authController.resendLoginTwoFactorCode,
+);
 
 /**
  * @desc    Send verification code to email (new or resend)
@@ -86,6 +100,18 @@ router.post(
   verifyAccessToken,
   validate(changePasswordValidator),
   authController.changePassword,
+);
+router.post(
+  '/2fa/send-code',
+  verifyAccessToken,
+  validate(sendTwoFactorCodeValidator),
+  authController.sendTwoFactorCode,
+);
+router.post(
+  '/2fa/confirm',
+  verifyAccessToken,
+  validate(confirmTwoFactorValidator),
+  authController.confirmTwoFactor,
 );
 
 module.exports = router;

@@ -88,8 +88,12 @@ const sendVerificationCode = async (to, code, type = 'email_verification') => {
   try {
     const transporter = getTransporter();
 
-    const subject =
-      type === 'email_verification' ? 'Verify Your Email Address' : 'Reset Your Password';
+    let subject = 'Verify Your Email Address';
+    if (type === 'password_reset') {
+      subject = 'Reset Your Password';
+    } else if (type === 'two_factor_auth') {
+      subject = 'Your Two-Factor Authentication Code';
+    }
 
     const verificationLink = `${EMAIL_CONFIG.baseUrl}/verify-code?email=${to}&code=${code}`;
 
@@ -143,8 +147,18 @@ const sendPasswordResetCode = async (to, code) => {
   return sendVerificationCode(to, code, 'password_reset');
 };
 
+/**
+ * Send two-factor authentication code
+ * @param {String} to - Recipient email address
+ * @param {String} code - 2FA code
+ */
+const sendTwoFactorCode = async (to, code) => {
+  return sendVerificationCode(to, code, 'two_factor_auth');
+};
+
 module.exports = {
   sendVerificationCode,
   sendEmailVerificationCode,
   sendPasswordResetCode,
+  sendTwoFactorCode,
 };
