@@ -2,6 +2,7 @@ const catchAsync = require('../configs/catchAsync');
 const reviewService = require('../services/review.service');
 const { StatusCodes } = require('http-status-codes');
 const { sendSuccess } = require('../shared/res/formatResponse');
+const { getRequestUserId, isRequestUserAdmin } = require('../utils/requestUser');
 
 const ReviewController = {
   /**
@@ -11,7 +12,7 @@ const ReviewController = {
    * @returns {Promise<any>}
    */
   createReview: catchAsync(async (req, res) => {
-    const userId = req.user.userId;
+    const userId = getRequestUserId(req.user);
     const review = await reviewService.createReview(userId, req.body);
 
     return sendSuccess(res, review, 'Review created successfully', StatusCodes.CREATED);
@@ -36,7 +37,7 @@ const ReviewController = {
    * @returns {Promise<any>}
    */
   getUserReviews: catchAsync(async (req, res) => {
-    const userId = req.user.userId;
+    const userId = getRequestUserId(req.user);
     const result = await reviewService.getUserReviews(userId, req.query);
 
     return sendSuccess(res, result, 'User reviews retrieved successfully', StatusCodes.OK);
@@ -61,7 +62,7 @@ const ReviewController = {
    * @returns {Promise<any>}
    */
   updateReview: catchAsync(async (req, res) => {
-    const userId = req.user.userId;
+    const userId = getRequestUserId(req.user);
     const review = await reviewService.updateReview(req.params.reviewId, userId, req.body);
 
     return sendSuccess(res, review, 'Review updated successfully', StatusCodes.OK);
@@ -74,8 +75,8 @@ const ReviewController = {
    * @returns {Promise<any>}
    */
   deleteReview: catchAsync(async (req, res) => {
-    const userId = req.user.userId;
-    const isAdmin = req.user.role === 'admin';
+    const userId = getRequestUserId(req.user);
+    const isAdmin = isRequestUserAdmin(req.user);
     const result = await reviewService.deleteReview(req.params.reviewId, userId, isAdmin);
 
     return sendSuccess(res, result, result.message, StatusCodes.OK);
@@ -88,7 +89,7 @@ const ReviewController = {
    * @returns {Promise<any>}
    */
   canUserReview: catchAsync(async (req, res) => {
-    const userId = req.user.userId;
+    const userId = getRequestUserId(req.user);
     const result = await reviewService.canUserReview(userId, req.params.productId);
 
     return sendSuccess(res, result, 'Review eligibility checked', StatusCodes.OK);
@@ -113,7 +114,7 @@ const ReviewController = {
    * @returns {Promise<any>}
    */
   getShopReviews: catchAsync(async (req, res) => {
-    const userId = req.user.userId;
+    const userId = getRequestUserId(req.user);
     const result = await reviewService.getShopReviews(userId, req.query);
 
     return sendSuccess(res, result, 'Shop reviews retrieved successfully', StatusCodes.OK);
@@ -138,7 +139,7 @@ const ReviewController = {
    * @returns {Promise<any>}
    */
   replyReview: catchAsync(async (req, res) => {
-    const userId = req.user.userId;
+    const userId = getRequestUserId(req.user);
     const { reviewId } = req.params;
     const { content } = req.body;
 

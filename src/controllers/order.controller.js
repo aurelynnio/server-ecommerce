@@ -2,6 +2,7 @@ const catchAsync = require('../configs/catchAsync');
 const orderService = require('../services/order.service');
 const { StatusCodes } = require('http-status-codes');
 const { sendSuccess } = require('../shared/res/formatResponse');
+const { getRequestUserId, isRequestUserAdmin } = require('../utils/requestUser');
 
 const OrderController = {
   /**
@@ -11,7 +12,7 @@ const OrderController = {
    * @returns {Promise<any>}
    */
   createOrder: catchAsync(async (req, res) => {
-    const userId = req.user.userId;
+    const userId = getRequestUserId(req.user);
     const order = await orderService.createOrder(userId, req.body);
 
     return sendSuccess(res, order, 'Order created successfully', StatusCodes.CREATED);
@@ -36,7 +37,7 @@ const OrderController = {
    * @returns {Promise<any>}
    */
   getUserOrders: catchAsync(async (req, res) => {
-    const userId = req.user.userId;
+    const userId = getRequestUserId(req.user);
     const result = await orderService.getUserOrders(userId, req.query);
 
     return sendSuccess(res, result, 'Orders retrieved successfully', StatusCodes.OK);
@@ -49,8 +50,8 @@ const OrderController = {
    * @returns {Promise<any>}
    */
   getOrderById: catchAsync(async (req, res) => {
-    const userId = req.user.userId;
-    const isAdmin = req.user.role === 'admin';
+    const userId = getRequestUserId(req.user);
+    const isAdmin = isRequestUserAdmin(req.user);
     const order = await orderService.getOrderById(req.params.orderId, userId, isAdmin);
 
     return sendSuccess(res, order, 'Order retrieved successfully', StatusCodes.OK);
@@ -63,8 +64,8 @@ const OrderController = {
    * @returns {Promise<any>}
    */
   cancelOrder: catchAsync(async (req, res) => {
-    const userId = req.user.userId;
-    const isAdmin = req.user.role === 'admin';
+    const userId = getRequestUserId(req.user);
+    const isAdmin = isRequestUserAdmin(req.user);
     const order = await orderService.cancelOrder(req.params.orderId, userId, isAdmin);
 
     return sendSuccess(res, order, 'Order cancelled successfully', StatusCodes.OK);
@@ -77,7 +78,7 @@ const OrderController = {
    * @returns {Promise<any>}
    */
   confirmDelivery: catchAsync(async (req, res) => {
-    const userId = req.user.userId;
+    const userId = getRequestUserId(req.user);
     const order = await orderService.confirmDelivery(req.params.orderId, userId);
 
     return sendSuccess(res, order, 'Order delivery confirmed successfully', StatusCodes.OK);
@@ -128,8 +129,8 @@ const OrderController = {
    * Update order status by admin or seller.
    */
   updateOrderStatus: catchAsync(async (req, res) => {
-    const userId = req.user.userId;
-    const isAdmin = req.user.role === 'admin';
+    const userId = getRequestUserId(req.user);
+    const isAdmin = isRequestUserAdmin(req.user);
     const shopId = req.shop?._id || null;
     const { orderId } = req.params;
     const { status } = req.body;

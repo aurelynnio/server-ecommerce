@@ -5,12 +5,47 @@ const { getPaginationParams, buildPaginationResponse } = require('../utils/pagin
 
 const { StatusCodes } = require('http-status-codes');
 const { ApiError } = require('../middlewares/errorHandler.middleware');
+const { ensureFound } = require('../utils/serviceAssertions');
 
 /**
  * Service handling user management operations
  * Manages user creation, profile updates, and retrieval
  */
 class UserService {
+  _sanitizeUserResponse(user) {
+    const userResponse = user.toObject();
+    delete userResponse.password;
+    return userResponse;
+  }
+
+  _ensureUserFound(user) {
+    return ensureFound(user, 'User not found');
+  }
+
+  async _ensureUniqueUsername(username, excludeUserId = null) {
+    if (!username) return;
+
+    const existingUser = excludeUserId
+      ? await userModel.findByUsernameExcludingId(username, excludeUserId)
+      : await userModel.findByUsername(username);
+
+    if (existingUser) {
+      throw new ApiError(StatusCodes.CONFLICT, 'Username already exists');
+    }
+  }
+
+  async _ensureUniqueEmail(email, excludeUserId = null) {
+    if (!email) return;
+
+    const existingUser = excludeUserId
+      ? await userModel.findByEmailExcludingId(email, excludeUserId)
+      : await userModel.findByEmail(email);
+
+    if (existingUser) {
+      throw new ApiError(StatusCodes.CONFLICT, 'Email already exists');
+    }
+  }
+
   /**
    * Create a new user (Admin function)
    * @param {Object} userData - User details
@@ -35,17 +70,8 @@ class UserService {
       permissions = [],
     } = userData;
 
-    // Check if username already exists
-    const existingUsername = await userModel.findByUsername(username);
-    if (existingUsername) {
-      throw new ApiError(StatusCodes.CONFLICT, 'Username already exists');
-    }
-
-    // Check if email already exists
-    const existingEmail = await userModel.findByEmail(email);
-    if (existingEmail) {
-      throw new ApiError(StatusCodes.CONFLICT, 'Email already exists');
-    }
+    await this._ensureUniqueUsername(username);
+    await this._ensureUniqueEmail(email);
 
     if (!password) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Password is required');
@@ -65,10 +91,7 @@ class UserService {
     });
 
     // Remove password from response
-    const userResponse = user.toObject();
-    delete userResponse.password;
-
-    return userResponse;
+    return this._sanitizeUserResponse(user);
   }
 
   /**
@@ -85,11 +108,7 @@ class UserService {
       { new: true, select: '-password' },
     );
 
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
-
-    return user;
+    return this._ensureUserFound(user);
   }
 
   /**
@@ -99,13 +118,7 @@ class UserService {
    * @throws {Error} If user not found
    */
   async getUserProfile(userId) {
-    const user = await userModel.findByIdWithoutPassword(userId);
-
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
-
-    return user;
+    return this._ensureUserFound(await userModel.findByIdWithoutPassword(userId));
   }
 
   /**
@@ -118,20 +131,8 @@ class UserService {
    * @throws {Error} If username or email already exists
    */
   async updateProfile(userId, data) {
-    // Check if username or email already exists
-    if (data.username) {
-      const existingUser = await userModel.findByUsernameExcludingId(data.username, userId);
-      if (existingUser) {
-        throw new ApiError(StatusCodes.CONFLICT, 'Username already exists');
-      }
-    }
-
-    if (data.email) {
-      const existingUser = await userModel.findByEmailExcludingId(data.email, userId);
-      if (existingUser) {
-        throw new ApiError(StatusCodes.CONFLICT, 'Email already exists');
-      }
-    }
+    await this._ensureUniqueUsername(data.username, userId);
+    await this._ensureUniqueEmail(data.email, userId);
 
     const user = await userModel.updateById(userId, data, {
       new: true,
@@ -139,11 +140,7 @@ class UserService {
       select: '-password',
     });
 
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
-
-    return user;
+    return this._ensureUserFound(user);
   }
 
   /**
@@ -160,11 +157,7 @@ class UserService {
       { new: true, runValidators: true, select: '-password' },
     );
 
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
-
-    return user;
+    return this._ensureUserFound(user);
   }
 
   /**
@@ -176,11 +169,7 @@ class UserService {
    * @throws {Error} If user or address not found
    */
   async updateAddress(userId, addressId, addressData) {
-    const user = await userModel.findById(userId);
-
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
+    const user = this._ensureUserFound(await userModel.findById(userId));
 
     const address = user.addresses.id(addressId);
     if (!address) {
@@ -215,11 +204,7 @@ class UserService {
       { new: true, select: '-password' },
     );
 
-    if (!userAfter) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
-
-    return userAfter;
+    return this._ensureUserFound(userAfter);
   }
 
   /**
@@ -229,12 +214,7 @@ class UserService {
    * @throws {Error} If user not found
    */
   async getAddresses(userId) {
-    const user = await userModel.findByIdWithAddresses(userId);
-
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
-
+    const user = this._ensureUserFound(await userModel.findByIdWithAddresses(userId));
     return user.addresses;
   }
 
@@ -246,11 +226,7 @@ class UserService {
    * @throws {Error} If user or address not found
    */
   async setDefaultAddress(userId, addressId) {
-    const user = await userModel.findById(userId);
-
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
+    const user = this._ensureUserFound(await userModel.findById(userId));
 
     const address = user.addresses.id(addressId);
     if (!address) {
@@ -279,11 +255,7 @@ class UserService {
    * @throws {Error} If user not found or old password incorrect
    */
   async changePassword(userId, oldPassword, newPassword) {
-    const user = await userModel.findById(userId);
-
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
+    const user = this._ensureUserFound(await userModel.findById(userId));
 
     // Verify old password
     const isMatch = await comparePassword(oldPassword, user.password);
@@ -338,13 +310,7 @@ class UserService {
    * @throws {Error} If user not found
    */
   async getUserById(userId) {
-    const user = await userModel.findByIdWithoutPassword(userId);
-
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
-
-    return user;
+    return this._ensureUserFound(await userModel.findByIdWithoutPassword(userId));
   }
 
   /**
@@ -356,28 +322,16 @@ class UserService {
    */
   async updateUserById(userId, updateData) {
     // Check if user exists
-    const user = await userModel.findById(userId);
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
+    const user = this._ensureUserFound(await userModel.findById(userId));
 
     // Check if updating username and it already exists
     if (updateData.username && updateData.username !== user.username) {
-      const existingUsername = await userModel.findByUsernameExcludingId(
-        updateData.username,
-        userId,
-      );
-      if (existingUsername) {
-        throw new ApiError(StatusCodes.CONFLICT, 'Username already exists');
-      }
+      await this._ensureUniqueUsername(updateData.username, userId);
     }
 
     // Check if updating email and it already exists
     if (updateData.email && updateData.email !== user.email) {
-      const existingEmail = await userModel.findByEmailExcludingId(updateData.email, userId);
-      if (existingEmail) {
-        throw new ApiError(StatusCodes.CONFLICT, 'Email already exists');
-      }
+      await this._ensureUniqueEmail(updateData.email, userId);
     }
 
     // Update user
@@ -404,11 +358,7 @@ class UserService {
       { new: true, runValidators: true, select: '-password' },
     );
 
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
-
-    return user;
+    return this._ensureUserFound(user);
   }
 
   /**
@@ -425,11 +375,7 @@ class UserService {
       { new: true, runValidators: true, select: '-password' },
     );
 
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
-
-    return user;
+    return this._ensureUserFound(user);
   }
 
   /**
@@ -439,11 +385,7 @@ class UserService {
    * @throws {Error} If user not found
    */
   async deleteUser(userId) {
-    const user = await userModel.deleteById(userId);
-
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
+    this._ensureUserFound(await userModel.deleteById(userId));
 
     return { message: 'User deleted successfully' };
   }

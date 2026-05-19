@@ -2,6 +2,7 @@ const { StatusCodes } = require('http-status-codes');
 const { sendFail } = require('../shared/res/formatResponse');
 const User = require('../models/user.model');
 const tokenService = require('../services/token.service');
+const { getRequestUserId, getRequestUserRoles } = require('../utils/requestUser');
 
 /**
  * Verify JWT access token from cookie or Authorization header
@@ -103,15 +104,7 @@ const requireRole = (...allowedRoles) => {
         return sendFail(res, 'Authentication required', StatusCodes.UNAUTHORIZED);
       }
 
-      // Support both 'role' and 'roles' field (string or array)
-      let userRoles = [];
-      if (req.user.role) {
-        userRoles = Array.isArray(req.user.role) ? req.user.role : [req.user.role];
-      }
-      if (req.user.roles) {
-        const roles = Array.isArray(req.user.roles) ? req.user.roles : [req.user.roles];
-        userRoles = [...userRoles, ...roles];
-      }
+      const userRoles = getRequestUserRoles(req.user);
 
       // If user already has any allowed role, skip extra lookups
       const alreadyAllowed = flatRoles.some((role) => userRoles.includes(role));
@@ -123,7 +116,7 @@ const requireRole = (...allowedRoles) => {
       if (flatRoles.includes('seller') && !userRoles.includes('seller')) {
         try {
           const Shop = require('../models/shop.model');
-          const shop = await Shop.findOne({ owner: req.user.userId });
+          const shop = await Shop.findOne({ owner: getRequestUserId(req.user) });
           if (shop) {
             userRoles.push('seller');
           }

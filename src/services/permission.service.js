@@ -10,6 +10,7 @@ const logger = require('../utils/logger');
 const { StatusCodes } = require('http-status-codes');
 const { ApiError } = require('../middlewares/errorHandler.middleware');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
+const { ensureFound } = require('../utils/serviceAssertions');
 
 class PermissionService {
   _normalizeRoles(roleOrRoles) {
@@ -22,6 +23,10 @@ class PermissionService {
   _getPermissionsForRoles(roleOrRoles) {
     const roles = this._normalizeRoles(roleOrRoles);
     return [...new Set(roles.flatMap((role) => ROLE_PERMISSIONS[role] || []))];
+  }
+
+  async _getUserOrThrow(userId) {
+    return ensureFound(await User.findById(userId), 'User not found');
   }
 
   /**
@@ -110,10 +115,7 @@ class PermissionService {
       throw new ApiError(StatusCodes.BAD_REQUEST, `Invalid permission: ${permission}`);
     }
 
-    const user = await User.findById(userId);
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
+    const user = await this._getUserOrThrow(userId);
 
     if (user.permissions.includes(permission)) {
       throw new ApiError(StatusCodes.CONFLICT, 'Permission already granted');
@@ -135,10 +137,7 @@ class PermissionService {
    * @returns {Promise<any>}
    */
   async revokePermission(userId, permission, adminId) {
-    const user = await User.findById(userId);
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
+    const user = await this._getUserOrThrow(userId);
 
     const permIndex = user.permissions.indexOf(permission);
     if (permIndex === -1) {
@@ -230,10 +229,7 @@ class PermissionService {
    * @returns {Promise<any>}
    */
   async getUserPermissionsSummary(userId) {
-    const user = await User.findByIdWithoutPassword(userId);
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
+    const user = ensureFound(await User.findByIdWithoutPassword(userId), 'User not found');
 
     const effectivePermissions = this.getUserPermissions(user);
     const rolePermissions = this._getPermissionsForRoles(user.roles || user.role);

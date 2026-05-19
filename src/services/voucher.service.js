@@ -1,15 +1,50 @@
 const Voucher = require('../repositories/voucher.repository');
 const VoucherUsage = require('../repositories/voucher-usage.repository');
-const Shop = require('../repositories/shop.repository');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 const { StatusCodes } = require('http-status-codes');
 const { ApiError } = require('../middlewares/errorHandler.middleware');
+const { ensureFound } = require('../utils/serviceAssertions');
+const { getOwnedShopOrThrow } = require('../utils/shopAssertions');
 
 /**
  * Service handling voucher/coupon operations
  * Manages voucher creation, retrieval, validation, and application
  */
 class VoucherService {
+  async _resolveVoucherScope(userId, roles) {
+    if (roles.includes('admin')) {
+      return { shopId: null, scope: 'platform' };
+    }
+
+    const shop = await getOwnedShopOrThrow(userId);
+    return { shopId: shop._id, scope: 'shop' };
+  }
+
+  async _getVoucherOrThrow(voucherId, repositoryMethod = Voucher.findById.bind(Voucher)) {
+    return ensureFound(await repositoryMethod(voucherId), 'Voucher not found');
+  }
+
+  async _ensureVoucherCodeAvailable(code, voucherId = null) {
+    const existingVoucher = voucherId
+      ? await Voucher.findByCodeExcludingId(code, voucherId)
+      : await Voucher.findByCode(code);
+
+    if (existingVoucher) {
+      throw new ApiError(StatusCodes.CONFLICT, 'Voucher code already exists');
+    }
+  }
+
+  async _assertVoucherOwnership(voucher, userId, roles, action) {
+    if (roles.includes('admin') || voucher.scope !== 'shop') {
+      return;
+    }
+
+    const shop = await getOwnedShopOrThrow(userId);
+    if (voucher.shopId.toString() !== shop._id.toString()) {
+      throw new ApiError(StatusCodes.FORBIDDEN, `Unauthorized to ${action} this voucher`);
+    }
+  }
+
   /**
    * Create a new voucher
    * @param {string} userId - Creator's user ID
@@ -18,26 +53,8 @@ class VoucherService {
    * @returns {Promise<Object>} Created voucher
    */
   async createVoucher(userId, roles, voucherData) {
-    const role = roles.includes('admin') ? 'admin' : 'seller';
-
-    let shopId = null;
-    let scope = 'platform';
-
-    if (role === 'seller') {
-      const shop = await Shop.findByOwnerId(userId);
-      if (!shop) {
-        throw new ApiError(StatusCodes.NOT_FOUND, 'Shop not found');
-      }
-
-      shopId = shop._id;
-      scope = 'shop';
-    }
-
-    // Check if code already exists
-    const existingVoucher = await Voucher.findByCode(voucherData.code);
-    if (existingVoucher) {
-      throw new ApiError(StatusCodes.CONFLICT, 'Voucher code already exists');
-    }
+    const { shopId, scope } = await this._resolveVoucherScope(userId, roles);
+    await this._ensureVoucherCodeAvailable(voucherData.code);
 
     const newVoucher = await Voucher.create({
       ...voucherData,
@@ -55,13 +72,7 @@ class VoucherService {
    * @throws {Error} If voucher not found
    */
   async getVoucherById(voucherId) {
-    const voucher = await Voucher.findByIdWithShop(voucherId);
-
-    if (!voucher) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'Voucher not found');
-    }
-
-    return voucher;
+    return this._getVoucherOrThrow(voucherId, Voucher.findByIdWithShop.bind(Voucher));
   }
 
   /**
@@ -95,27 +106,12 @@ class VoucherService {
    * @throws {Error} If voucher not found or unauthorized
    */
   async updateVoucher(voucherId, updateData, userId, roles) {
-    const voucher = await Voucher.findById(voucherId);
-
-    if (!voucher) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'Voucher not found');
-    }
-
-    // Check authorization
-    const isAdmin = roles.includes('admin');
-    if (!isAdmin && voucher.scope === 'shop') {
-      const shop = await Shop.findByOwnerId(userId);
-      if (!shop || voucher.shopId.toString() !== shop._id.toString()) {
-        throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized to update this voucher');
-      }
-    }
+    const voucher = await this._getVoucherOrThrow(voucherId);
+    await this._assertVoucherOwnership(voucher, userId, roles, 'update');
 
     // Check if updating code and it already exists
     if (updateData.code && updateData.code !== voucher.code) {
-      const existingVoucher = await Voucher.findByCodeExcludingId(updateData.code, voucherId);
-      if (existingVoucher) {
-        throw new ApiError(StatusCodes.CONFLICT, 'Voucher code already exists');
-      }
+      await this._ensureVoucherCodeAvailable(updateData.code, voucherId);
     }
 
     // Update voucher
@@ -134,20 +130,8 @@ class VoucherService {
    * @throws {Error} If voucher not found or unauthorized
    */
   async deleteVoucher(voucherId, userId, roles) {
-    const voucher = await Voucher.findById(voucherId);
-
-    if (!voucher) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'Voucher not found');
-    }
-
-    // Check authorization
-    const isAdmin = roles.includes('admin');
-    if (!isAdmin && voucher.scope === 'shop') {
-      const shop = await Shop.findByOwnerId(userId);
-      if (!shop || voucher.shopId.toString() !== shop._id.toString()) {
-        throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized to delete this voucher');
-      }
-    }
+    const voucher = await this._getVoucherOrThrow(voucherId);
+    await this._assertVoucherOwnership(voucher, userId, roles, 'delete');
 
     // Soft delete
     voucher.isActive = false;
@@ -157,16 +141,12 @@ class VoucherService {
   }
 
   /**
-   * Permanently delete voucher (Admin only)
+   * Permanently delete voucher
    * @param {string} voucherId - Voucher ID
    * @returns {Promise<Object>} Deletion result
    */
   async permanentDeleteVoucher(voucherId) {
-    const voucher = await Voucher.deleteById(voucherId);
-
-    if (!voucher) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'Voucher not found');
-    }
+    ensureFound(await Voucher.deleteById(voucherId), 'Voucher not found');
 
     return { message: 'Voucher permanently deleted' };
   }

@@ -1,11 +1,15 @@
 const ShopCategory = require('../repositories/shop-category.repository');
-const Shop = require('../repositories/shop.repository');
 const Product = require('../repositories/product.repository');
 const mongoose = require('mongoose');
 const { StatusCodes } = require('http-status-codes');
 const { ApiError } = require('../middlewares/errorHandler.middleware');
+const { getOwnedShopOrThrow } = require('../utils/shopAssertions');
 
 class ShopCategoryService {
+  async _getOwnedShop(userId) {
+    return getOwnedShopOrThrow(userId);
+  }
+
   /**
    * Create category
    * @param {string} userId
@@ -13,8 +17,7 @@ class ShopCategoryService {
    * @returns {Promise<any>}
    */
   async createCategory(userId, categoryData) {
-    const shop = await Shop.findByOwnerId(userId);
-    if (!shop) throw new ApiError(StatusCodes.NOT_FOUND, 'Shop not found');
+    const shop = await this._getOwnedShop(userId);
 
     const existing = await ShopCategory.findByShopAndName(shop._id, categoryData?.name);
     if (existing) {
@@ -39,8 +42,7 @@ class ShopCategoryService {
    * @returns {Promise<any>}
    */
   async getMyShopCategories(userId) {
-    const shop = await Shop.findByOwnerId(userId);
-    if (!shop) throw new ApiError(StatusCodes.NOT_FOUND, 'Shop not found');
+    const shop = await this._getOwnedShop(userId);
 
     const categories = await ShopCategory.findByShopIdSorted(shop._id);
 
@@ -79,7 +81,7 @@ class ShopCategoryService {
 
     // If no param, try getting from logged in user (Owner viewing their own)
     if (!shopId && userId) {
-      const shop = await Shop.findByOwnerId(userId);
+      const shop = await this._getOwnedShop(userId);
       if (shop) shopId = shop._id;
     }
 
@@ -128,9 +130,7 @@ class ShopCategoryService {
    * @returns {Promise<any>}
    */
   async updateCategory(userId, categoryId, updates) {
-    const shop = await Shop.findByOwnerId(userId);
-
-    if (!shop) throw new ApiError(StatusCodes.NOT_FOUND, 'Shop not found');
+    const shop = await this._getOwnedShop(userId);
 
     if (updates?.description === undefined) delete updates.description;
     if (updates?.image === undefined) delete updates.image;
@@ -150,8 +150,7 @@ class ShopCategoryService {
    * @returns {Promise<any>}
    */
   async deleteCategory(userId, categoryId) {
-    const shop = await Shop.findByOwnerId(userId);
-    if (!shop) throw new ApiError(StatusCodes.NOT_FOUND, 'Shop not found');
+    const shop = await this._getOwnedShop(userId);
 
     const deleted = await ShopCategory.deleteByIdAndShop(categoryId, shop._id);
     if (!deleted) {

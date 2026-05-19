@@ -7,6 +7,7 @@ const {
   verifyOrderOwnership,
 } = require('../middlewares/ownership.middleware');
 const validate = require('../middlewares/validate.middleware');
+const { isRequestUserAdmin } = require('../utils/requestUser');
 const {
   createOrderValidator,
   updateOrderStatusValidator,
@@ -15,7 +16,7 @@ const {
 } = require('../validations/order.validator');
 
 const verifyShopOwnershipForSeller = (req, res, next) => {
-  if (req.user?.role === 'admin') return next();
+  if (isRequestUserAdmin(req.user)) return next();
   return verifyShopOwnership(req, res, next);
 };
 

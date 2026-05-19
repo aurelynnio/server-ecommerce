@@ -2,6 +2,7 @@ const voucherService = require('../services/voucher.service');
 const catchAsync = require('../configs/catchAsync');
 const { sendSuccess } = require('../shared/res/formatResponse');
 const { StatusCodes } = require('http-status-codes');
+const { getRequestUserId, getRequestUserRoles } = require('../utils/requestUser');
 
 const VoucherController = {
   /**
@@ -12,8 +13,8 @@ const VoucherController = {
    */
   createVoucher: catchAsync(async (req, res) => {
     const newVoucher = await voucherService.createVoucher(
-      req.user.userId,
-      req.user.role ? [req.user.role] : ['user'],
+      getRequestUserId(req.user),
+      getRequestUserRoles(req.user),
       req.body,
     );
     return sendSuccess(res, newVoucher, 'Voucher created', StatusCodes.CREATED);
@@ -51,8 +52,8 @@ const VoucherController = {
     const voucher = await voucherService.updateVoucher(
       req.params.id,
       req.body,
-      req.user.userId,
-      req.user.role ? [req.user.role] : ['user'],
+      getRequestUserId(req.user),
+      getRequestUserRoles(req.user),
     );
     return sendSuccess(res, voucher, 'Voucher updated', StatusCodes.OK);
   }),
@@ -66,8 +67,8 @@ const VoucherController = {
   deleteVoucher: catchAsync(async (req, res) => {
     const result = await voucherService.deleteVoucher(
       req.params.id,
-      req.user.userId,
-      req.user.role ? [req.user.role] : ['user'],
+      getRequestUserId(req.user),
+      getRequestUserRoles(req.user),
     );
     return sendSuccess(res, result, 'Voucher deleted', StatusCodes.OK);
   }),
@@ -113,7 +114,7 @@ const VoucherController = {
    */
   getAvailableVouchers: catchAsync(async (req, res) => {
     const { shopId } = req.query;
-    const vouchers = await voucherService.getAvailableVouchers(req.user.userId, shopId);
+    const vouchers = await voucherService.getAvailableVouchers(getRequestUserId(req.user), shopId);
     return sendSuccess(res, vouchers, 'Available vouchers retrieved', StatusCodes.OK);
   }),
 
@@ -125,7 +126,12 @@ const VoucherController = {
    */
   applyVoucher: catchAsync(async (req, res) => {
     const { code, orderValue, shopId } = req.body;
-    const result = await voucherService.applyVoucher(code, req.user.userId, orderValue, shopId);
+    const result = await voucherService.applyVoucher(
+      code,
+      getRequestUserId(req.user),
+      orderValue,
+      shopId,
+    );
     return sendSuccess(res, result, 'Voucher applied', StatusCodes.OK);
   }),
 
