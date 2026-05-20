@@ -45,6 +45,20 @@ class NotificationRepository extends BaseRepository {
     ]);
   }
 
+  aggregateSummaryByUserId(userId) {
+    return this.aggregateByPipeline([
+      { $match: { userId } },
+      {
+        $facet: {
+          total: [{ $count: 'count' }],
+          unread: [{ $match: { isRead: false } }, { $count: 'count' }],
+          system: [{ $match: { type: 'system' } }, { $count: 'count' }],
+          promotion: [{ $match: { type: 'promotion' } }, { $count: 'count' }],
+        },
+      },
+    ]);
+  }
+
   markAllReadByUserId(userId) {
     return this.updateManyByFilter(
       { userId, isRead: false },

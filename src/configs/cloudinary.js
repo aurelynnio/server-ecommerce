@@ -1,6 +1,7 @@
 const cloudinary = require('cloudinary').v2;
 const { StatusCodes } = require('http-status-codes');
 const { ApiError } = require('../middlewares/errorHandler.middleware');
+const path = require('path');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -8,7 +9,15 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const uploadImage = async (fileBuffer, folder = 'avatar') => {
+const uploadAsset = async (
+  fileBuffer,
+  {
+    folder = 'uploads',
+    resourceType = 'auto',
+    originalFilename,
+    format,
+  } = {},
+) => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
@@ -16,6 +25,11 @@ const uploadImage = async (fileBuffer, folder = 'avatar') => {
         folder: folder,
         unique_filename: true,
         overwrite: true,
+        resource_type: resourceType,
+        filename_override: originalFilename
+          ? path.parse(originalFilename).name
+          : undefined,
+        format,
       },
       (err, result) => {
         if (err) return reject(err);
@@ -25,6 +39,9 @@ const uploadImage = async (fileBuffer, folder = 'avatar') => {
     stream.end(fileBuffer);
   });
 };
+
+const uploadImage = async (fileBuffer, folder = 'avatar') =>
+  uploadAsset(fileBuffer, { folder, resourceType: 'image' });
 
 const multiUpload = async (fileBuffers, folder = 'avatar') => {
   if (!Array.isArray(fileBuffers)) {
@@ -37,4 +54,4 @@ const multiUpload = async (fileBuffers, folder = 'avatar') => {
   return results;
 };
 
-module.exports = { uploadImage, multiUpload };
+module.exports = { uploadAsset, uploadImage, multiUpload };

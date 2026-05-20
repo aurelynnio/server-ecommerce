@@ -9,8 +9,22 @@ const messageSchema = new Schema(
       required: true,
     },
     senderId: { type: Types.ObjectId, ref: 'User', required: true },
-    content: { type: String, required: true },
-    attachments: [String], // images/files
+    content: { type: String, default: '' },
+    messageType: {
+      type: String,
+      enum: ['text', 'image', 'file', 'product'],
+      default: 'text',
+    },
+    attachments: [
+      {
+        url: { type: String, required: true },
+        fileName: { type: String, required: true },
+        mimeType: { type: String, default: '' },
+        size: { type: Number, default: 0 },
+        resourceType: { type: String, default: 'raw' },
+      },
+    ],
+    productRef: { type: Types.ObjectId, ref: 'Product', default: null },
     isRead: { type: Boolean, default: false },
   },
   { timestamps: true, collection: 'messages' },
@@ -29,6 +43,20 @@ const conversationSchema = new Schema(
       content: String,
       senderId: { type: Types.ObjectId, ref: 'User' },
       createdAt: Date,
+      messageType: {
+        type: String,
+        enum: ['text', 'image', 'file', 'product'],
+        default: 'text',
+      },
+      attachments: [
+        {
+          url: String,
+          fileName: String,
+          mimeType: String,
+          size: Number,
+          resourceType: String,
+        },
+      ],
     },
     // Optional context: Chatting about a specific product or order
     context: {

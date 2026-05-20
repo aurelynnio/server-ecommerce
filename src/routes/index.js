@@ -23,6 +23,7 @@ const flashSaleRouter = require('./flash-sale.router');
 const recommendationRouter = require('./recommendation.router');
 const permissionRouter = require('./permission.router');
 const settingsRouter = require('./settings.router');
+const newsletterRouter = require('./newsletter.router');
 
 const initRoutes = (app) => {
   app.use('/api/users', userRouter);
@@ -50,6 +51,7 @@ const initRoutes = (app) => {
   app.use('/api/recommendations', recommendationRouter);
   app.use('/api/permissions', permissionRouter);
   app.use('/api/settings', settingsRouter);
+  app.use('/api/newsletter', newsletterRouter);
 };
 
 module.exports = initRoutes;

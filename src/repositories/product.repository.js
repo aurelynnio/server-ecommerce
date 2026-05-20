@@ -155,6 +155,13 @@ class ProductRepository extends BaseRepository {
     return this.countByFilter({ status: 'published' });
   }
 
+  countLowStockPublished(threshold = 10) {
+    return this.countByFilter({
+      status: 'published',
+      stock: { $lte: threshold },
+    });
+  }
+
   findTopSellingProducts(limit = 5) {
     return this.findManyByFilter({ soldCount: { $gt: 0 } })
       .sort({ soldCount: -1 })

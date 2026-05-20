@@ -1,6 +1,6 @@
 const chatService = require('../services/chat.service');
 const catchAsync = require('../configs/catchAsync');
-const { sendSuccess } = require('../shared/res/formatResponse');
+const { sendSuccess, sendFail } = require('../shared/res/formatResponse');
 const { StatusCodes } = require('http-status-codes');
 
 const ChatController = {
@@ -27,6 +27,33 @@ const ChatController = {
   }),
 
   /**
+   * Send message with uploaded media/files
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  sendMediaMessage: catchAsync(async (req, res) => {
+    const files = Array.isArray(req.files) ? req.files : [];
+    const { conversationId, content = '' } = req.body;
+
+    if (!conversationId) {
+      return sendFail(res, 'Conversation ID is required', StatusCodes.BAD_REQUEST);
+    }
+
+    if (files.length === 0) {
+      return sendFail(res, 'No files uploaded', StatusCodes.BAD_REQUEST);
+    }
+
+    const info = await chatService.sendMediaMessage(req.user.userId, {
+      conversationId,
+      content,
+      files,
+    });
+
+    return sendSuccess(res, info, 'Media message sent', StatusCodes.CREATED);
+  }),
+
+  /**
    * Get my conversations
    * @param {Object} req
    * @param {Object} res
@@ -44,7 +71,11 @@ const ChatController = {
    * @returns {Promise<any>}
    */
   getMessages: catchAsync(async (req, res) => {
-    const messages = await chatService.getMessages(req.params.conversationId, req.query);
+    const messages = await chatService.getMessages(
+      req.params.conversationId,
+      req.user.userId,
+      req.query,
+    );
     return sendSuccess(res, messages, 'Get messages success', StatusCodes.OK);
   }),
 

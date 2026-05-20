@@ -39,6 +39,7 @@ const NotificationController = {
       data: result.data,
       pagination: result.pagination,
       unreadCount: result.metadata?.unreadCount || 0,
+      summary: result.summary,
     };
 
     return sendSuccess(res, response, 'Get list notification successfully', StatusCodes.OK);

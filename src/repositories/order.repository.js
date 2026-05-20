@@ -34,6 +34,39 @@ class OrderRepository extends BaseRepository {
     ]);
   }
 
+  countCreatedBetween(startDate, endDate) {
+    return this.countByFilter({
+      createdAt: {
+        $gte: startDate,
+        $lt: endDate,
+      },
+    });
+  }
+
+  countByStatus(status) {
+    return this.countByFilter({ status });
+  }
+
+  aggregatePaidRevenueBetween(startDate, endDate) {
+    return this.aggregateByPipeline([
+      {
+        $match: {
+          paymentStatus: 'paid',
+          createdAt: {
+            $gte: startDate,
+            $lt: endDate,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$totalAmount' },
+        },
+      },
+    ]);
+  }
+
   findRecentWithUser(limit = 5) {
     return this.findManyByFilter()
       .sort({ createdAt: -1 })

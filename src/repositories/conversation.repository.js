@@ -23,7 +23,7 @@ class ConversationRepository extends BaseRepository {
 
   findByMemberWithDetails(userId) {
     return this.findManyByFilter({ members: userId })
-      .populate('shopId', 'name logo')
+      .populate('shopId', 'name logo slug owner')
       .populate('members', 'username avatar')
       .sort({ updatedAt: -1 });
   }
@@ -55,6 +55,24 @@ class MessageRepository extends BaseRepository {
       },
       { $set: { isRead: true } },
     );
+  }
+
+  aggregateUnreadCountsForUserByConversation(userId, conversationIds = []) {
+    return this.aggregateByPipeline([
+      {
+        $match: {
+          conversationId: { $in: conversationIds },
+          senderId: { $ne: userId },
+          isRead: false,
+        },
+      },
+      {
+        $group: {
+          _id: '$conversationId',
+          count: { $sum: 1 },
+        },
+      },
+    ]);
   }
 }
 

@@ -6,6 +6,29 @@ class UserRepository extends BaseRepository {
     super(User);
   }
 
+  buildFilter({ search = '', role, isVerifiedEmail } = {}) {
+    const filter = {};
+    const normalizedSearch = String(search || '').trim();
+
+    if (normalizedSearch) {
+      const escapedSearch = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.$or = [
+        { username: { $regex: escapedSearch, $options: 'i' } },
+        { email: { $regex: escapedSearch, $options: 'i' } },
+      ];
+    }
+
+    if (role && role !== '') {
+      filter.roles = role;
+    }
+
+    if (isVerifiedEmail !== undefined && isVerifiedEmail !== '') {
+      filter.isVerifiedEmail = isVerifiedEmail;
+    }
+
+    return filter;
+  }
+
   findByEmail(email) {
     return this.findOneByFilter({ email });
   }
@@ -64,53 +87,58 @@ class UserRepository extends BaseRepository {
   }
 
   countWithFilters({ search = '', role, isVerifiedEmail } = {}) {
-    const filter = {};
-    const normalizedSearch = String(search || '').trim();
-
-    if (normalizedSearch) {
-      const escapedSearch = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      filter.$or = [
-        { username: { $regex: escapedSearch, $options: 'i' } },
-        { email: { $regex: escapedSearch, $options: 'i' } },
-      ];
-    }
-
-    if (role && role !== '') {
-      filter.roles = role;
-    }
-
-    if (isVerifiedEmail !== undefined && isVerifiedEmail !== '') {
-      filter.isVerifiedEmail = isVerifiedEmail;
-    }
-
-    return this.countByFilter(filter);
+    return this.countByFilter(this.buildFilter({ search, role, isVerifiedEmail }));
   }
 
   findWithFilters({ search = '', role, isVerifiedEmail } = {}, { skip = 0, limit = 10 } = {}) {
-    const filter = {};
-    const normalizedSearch = String(search || '').trim();
-
-    if (normalizedSearch) {
-      const escapedSearch = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      filter.$or = [
-        { username: { $regex: escapedSearch, $options: 'i' } },
-        { email: { $regex: escapedSearch, $options: 'i' } },
-      ];
-    }
-
-    if (role && role !== '') {
-      filter.roles = role;
-    }
-
-    if (isVerifiedEmail !== undefined && isVerifiedEmail !== '') {
-      filter.isVerifiedEmail = isVerifiedEmail;
-    }
+    const filter = this.buildFilter({ search, role, isVerifiedEmail });
 
     return this.findManyByFilter(filter)
       .select('-password')
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 });
+  }
+
+  aggregateStatisticsWithFilters({ search = '', role, isVerifiedEmail } = {}) {
+    const filter = this.buildFilter({ search, role, isVerifiedEmail });
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    return this.aggregateByPipeline([
+      { $match: filter },
+      {
+        $facet: {
+          totalUsers: [{ $count: 'count' }],
+          verifiedUsers: [{ $match: { isVerifiedEmail: true } }, { $count: 'count' }],
+          usersWithAddress: [
+            {
+              $match: {
+                'addresses.0': { $exists: true },
+              },
+            },
+            { $count: 'count' },
+          ],
+          recentUsers: [
+            {
+              $match: {
+                createdAt: { $gte: sevenDaysAgo },
+              },
+            },
+            { $count: 'count' },
+          ],
+        },
+      },
+    ]);
+  }
+
+  countCreatedBetween(startDate, endDate) {
+    return this.countByFilter({
+      createdAt: {
+        $gte: startDate,
+        $lt: endDate,
+      },
+    });
   }
 }
 

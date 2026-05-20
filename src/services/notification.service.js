@@ -275,15 +275,24 @@ class NotificationService {
     const total = await Notification.countByUserId(userId);
     const paginationParams = getPaginationParams(page, limit, total || 0);
 
-    const notifications = await Notification.findByUserIdWithPagination(userId, paginationParams);
-
-    const unreadCount = await Notification.countUnreadByUserId(userId);
+    const [notifications, summaryResult] = await Promise.all([
+      Notification.findByUserIdWithPagination(userId, paginationParams),
+      Notification.aggregateSummaryByUserId(userId),
+    ]);
+    const summaryFacet = summaryResult?.[0] || {};
+    const summary = {
+      total: summaryFacet.total?.[0]?.count || 0,
+      unread: summaryFacet.unread?.[0]?.count || 0,
+      system: summaryFacet.system?.[0]?.count || 0,
+      promotion: summaryFacet.promotion?.[0]?.count || 0,
+    };
 
     return {
       ...buildPaginationResponse(notifications, paginationParams),
       metadata: {
-        unreadCount: unreadCount || 0,
+        unreadCount: summary.unread,
       },
+      summary,
     };
   }
 
