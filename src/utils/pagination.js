@@ -1,4 +1,29 @@
 /**
+ * Parse pagination query params (limit, page) plus remaining filter fields
+ * @param {Object} query - Express req.query object
+ * @param {number} [defaultLimit=10] - Fallback limit when missing/invalid
+ * @returns {{ limit: number, page: number, filter: Object }}
+ */
+const parsePagination = (query = {}, defaultLimit = 10) => {
+  const { limit, page, ...filter } = query;
+  return {
+    limit: parseInt(limit) || defaultLimit,
+    page: parseInt(page) || 1,
+    filter,
+  };
+};
+
+/**
+ * Parse a single `limit` query param with fallback
+ * @param {Object} query - Express req.query object
+ * @param {number} [defaultValue=10] - Fallback when missing/invalid
+ * @returns {number}
+ */
+const parseLimit = (query = {}, defaultValue = 10) => {
+  return parseInt(query?.limit) || defaultValue;
+};
+
+/**
  * Generate pagination parameters for MongoDB queries
  * @param {Number} currentPage - Current page number (starts from 1)
  * @param {Number} pageSize - Number of items per page
@@ -50,6 +75,8 @@ const buildPaginationResponse = (data, params) => {
 };
 
 module.exports = {
+  parsePagination,
+  parseLimit,
   getPaginationParams,
   buildPaginationResponse,
 };

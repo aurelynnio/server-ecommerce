@@ -5,21 +5,30 @@ const tokenService = require('../services/token.service');
 const { getRequestUserId, getRequestUserRoles } = require('../utils/requestUser');
 
 /**
+ * Extract access token from cookie (priority) or Authorization header
+ * @param {Object} req - Express request
+ * @returns {string|null} - Access token or null if not found
+ */
+const extractAccessToken = (req) => {
+  let token = req.cookies?.accessToken;
+
+  if (!token && req.headers.authorization) {
+    const authHeader = req.headers.authorization;
+    if (authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7); // Remove "Bearer " prefix
+    }
+  }
+
+  return token || null;
+};
+
+/**
  * Verify JWT access token from cookie or Authorization header
  * Attaches user info to req.user if valid
  */
 const verifyAccessToken = (req, res, next) => {
   try {
-    // Get token from cookie (priority) or Authorization header
-    let token = req.cookies?.accessToken;
-
-    // If not in cookie, check Authorization header
-    if (!token && req.headers.authorization) {
-      const authHeader = req.headers.authorization;
-      if (authHeader.startsWith('Bearer ')) {
-        token = authHeader.substring(7); // Remove "Bearer " prefix
-      }
-    }
+    const token = extractAccessToken(req);
 
     // No token found
     if (!token) {
@@ -64,14 +73,7 @@ const verifyAccessToken = (req, res, next) => {
  */
 const optionalAuth = async (req, res, next) => {
   try {
-    let token = req.cookies?.accessToken;
-
-    if (!token && req.headers.authorization) {
-      const authHeader = req.headers.authorization;
-      if (authHeader.startsWith('Bearer ')) {
-        token = authHeader.substring(7);
-      }
-    }
+    const token = extractAccessToken(req);
 
     if (!token) {
       req.user = null;

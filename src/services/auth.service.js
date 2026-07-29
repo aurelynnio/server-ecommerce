@@ -60,6 +60,42 @@ class AuthService {
     return userWithoutPassword;
   }
 
+  /**
+   * Throw NOT_FOUND if user is null/undefined
+   * @param {Object|null} user - User object
+   * @throws {ApiError} 404 if user is missing
+   */
+  _requireUser(user) {
+    if (!user) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
+    }
+  }
+
+  /**
+   * Send OTP code via cache + email with rollback on failure
+   * @param {Object} opts
+   * @param {string} opts.cacheKey - Redis key for OTP
+   * @param {string} opts.code - OTP code
+   * @param {string} opts.email - Recipient email
+   * @param {Function} opts.sender - Email sender (email, code) => Promise
+   * @param {number} [opts.ttl=600] - Cache TTL in seconds
+   * @param {string} opts.errorMsg - Error message if send fails
+   * @param {string[]} [opts.extraCleanupKeys=[]] - Additional keys to delete on failure
+   */
+  async _sendOtpCode({ cacheKey, code, email, sender, ttl = 600, errorMsg, extraCleanupKeys = [] }) {
+    await redisService.set(cacheKey, code, ttl);
+    try {
+      await sender(email, code);
+    } catch (error) {
+      logger.error(`[AuthService] ${errorMsg}`, error);
+      await redisService.del(cacheKey);
+      for (const key of extraCleanupKeys) {
+        await redisService.del(key);
+      }
+      throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, errorMsg);
+    }
+  }
+
   async _createAuthenticatedSession(user) {
     const permissions = tokenService.getPermissionsForUser(user);
     const tokens = tokenService.generateTokensWithPermissions(user);
@@ -85,18 +121,14 @@ class AuthService {
     const codeKey = `otp:2fa:login:${user._id}`;
 
     await redisService.set(challengeKey, { userId: user._id.toString() }, 600);
-    await redisService.set(codeKey, verificationCode, 600);
-
-    try {
-      await sendTwoFactorCode(user.email, verificationCode);
-    } catch (_error) {
-      await redisService.del(challengeKey);
-      await redisService.del(codeKey);
-      throw new ApiError(
-        StatusCodes.INTERNAL_SERVER_ERROR,
-        'Failed to send two-factor authentication code. Please try again.',
-      );
-    }
+    await this._sendOtpCode({
+      cacheKey: codeKey,
+      code: verificationCode,
+      email: user.email,
+      sender: sendTwoFactorCode,
+      errorMsg: 'Failed to send two-factor authentication code. Please try again.',
+      extraCleanupKeys: [challengeKey],
+    });
 
     return {
       requiresTwoFactor: true,
@@ -167,12 +199,7 @@ class AuthService {
     }
 
     // Remove sensitive data
-    const userObj = newUser.toObject();
-    delete userObj.password;
-    delete userObj.codeVerifiEmail;
-    delete userObj.codeVerifiPassword;
-
-    return userObj;
+    return this._sanitizeUser(newUser);
   }
 
   /**
@@ -213,9 +240,7 @@ class AuthService {
    */
   async verifyEmail(email, code) {
     const user = await User.findByEmail(email);
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
+    this._requireUser(user);
 
     if (user.isVerifiedEmail) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Email already verified');
@@ -230,13 +255,7 @@ class AuthService {
     await user.save();
     await redisService.del(cacheKey);
 
-    const {
-      password: _password,
-      codeVerifiEmail: _codeVerifiEmail,
-      codeVerifiPassword: _codeVerifiPassword,
-      ...userWithoutPassword
-    } = user.toObject();
-    return { user: userWithoutPassword };
+    return { user: this._sanitizeUser(user) };
   }
 
   /**
@@ -264,13 +283,7 @@ class AuthService {
     user.expiresCodeVerifiEmail = undefined;
     await user.save();
 
-    const {
-      password: _password,
-      codeVerifiEmail: _codeVerifiEmail,
-      codeVerifiPassword: _codeVerifiPassword,
-      ...userWithoutPassword
-    } = user.toObject();
-    return { user: userWithoutPassword };
+    return { user: this._sanitizeUser(user) };
   }
 
   /**
@@ -281,9 +294,7 @@ class AuthService {
    */
   async sendVerificationCode(email) {
     const user = await User.findByEmail(email);
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
+    this._requireUser(user);
 
     if (user.isVerifiedEmail) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Email already verified');
@@ -395,27 +406,19 @@ class AuthService {
    */
   async forgotPassword(email) {
     const user = await User.findByEmail(email);
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
+    this._requireUser(user);
 
     // Generate password reset code
     const resetCode = this._generateVerificationCode();
 
-    // Save to Redis (expire in 1 hour)
-    await redisService.set(`otp:reset-password:${email}`, resetCode, 3600);
-
-    // Send reset code via email
-    try {
-      await sendPasswordResetCode(email, resetCode);
-    } catch (error) {
-      logger.error('Failed to send password reset email:', error);
-      await redisService.del(`otp:reset-password:${email}`);
-      throw new ApiError(
-        StatusCodes.INTERNAL_SERVER_ERROR,
-        'Failed to send password reset email. Please try again.',
-      );
-    }
+    await this._sendOtpCode({
+      cacheKey: `otp:reset-password:${email}`,
+      code: resetCode,
+      email,
+      sender: sendPasswordResetCode,
+      ttl: 3600,
+      errorMsg: 'Failed to send password reset email. Please try again.',
+    });
 
     return { email };
   }
@@ -430,9 +433,7 @@ class AuthService {
    */
   async resetPassword(email, code, newPassword) {
     const user = await User.findByEmail(email);
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
+    this._requireUser(user);
 
     const cacheKey = `otp:reset-password:${email}`;
     await this.ensureValidOtp(cacheKey, code);
@@ -460,9 +461,7 @@ class AuthService {
    */
   async changePassword(userId, currentPassword, newPassword) {
     const user = await User.findById(userId);
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
+    this._requireUser(user);
 
     // Verify current password
     const isMatch = await comparePassword(currentPassword, user.password);
@@ -482,9 +481,7 @@ class AuthService {
 
   async sendTwoFactorManagementCode(userId, action) {
     const user = await User.findById(userId);
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
+    this._requireUser(user);
 
     if (!user.isVerifiedEmail) {
       throw new ApiError(
@@ -503,17 +500,14 @@ class AuthService {
 
     const code = this._generateVerificationCode();
     const cacheKey = `otp:2fa:${action}:${userId}`;
-    await redisService.set(cacheKey, code, 600);
 
-    try {
-      await sendTwoFactorCode(user.email, code);
-    } catch (_error) {
-      await redisService.del(cacheKey);
-      throw new ApiError(
-        StatusCodes.INTERNAL_SERVER_ERROR,
-        'Failed to send two-factor authentication code. Please try again.',
-      );
-    }
+    await this._sendOtpCode({
+      cacheKey,
+      code,
+      email: user.email,
+      sender: sendTwoFactorCode,
+      errorMsg: 'Failed to send two-factor authentication code. Please try again.',
+    });
 
     return {
       action,
@@ -524,9 +518,7 @@ class AuthService {
 
   async confirmTwoFactorManagement(userId, action, code) {
     const user = await User.findById(userId);
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
+    this._requireUser(user);
 
     const cacheKey = `otp:2fa:${action}:${userId}`;
     await this.ensureValidOtp(cacheKey, code);
@@ -547,9 +539,7 @@ class AuthService {
     }
 
     const user = await User.findById(challenge.userId);
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
+    this._requireUser(user);
 
     await this.ensureValidOtp(`otp:2fa:login:${user._id}`, code);
 
@@ -568,23 +558,18 @@ class AuthService {
     }
 
     const user = await User.findById(challenge.userId);
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-    }
+    this._requireUser(user);
 
     const verificationCode = this._generateVerificationCode();
     const codeKey = `otp:2fa:login:${user._id}`;
-    await redisService.set(codeKey, verificationCode, 600);
 
-    try {
-      await sendTwoFactorCode(user.email, verificationCode);
-    } catch (_error) {
-      await redisService.del(codeKey);
-      throw new ApiError(
-        StatusCodes.INTERNAL_SERVER_ERROR,
-        'Failed to send two-factor authentication code. Please try again.',
-      );
-    }
+    await this._sendOtpCode({
+      cacheKey: codeKey,
+      code: verificationCode,
+      email: user.email,
+      sender: sendTwoFactorCode,
+      errorMsg: 'Failed to send two-factor authentication code. Please try again.',
+    });
 
     return {
       email: user.email,

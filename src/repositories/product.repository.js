@@ -258,7 +258,7 @@ class ProductRepository extends BaseRepository {
     }).select('_id');
   }
 
-  countWithCatalogFilters({
+  _buildCatalogQuery({
     status = 'published',
     category,
     brand,
@@ -325,78 +325,16 @@ class ProductRepository extends BaseRepository {
       query.$text = { $search: search };
     }
 
-    return this.countByFilter(query);
+    return query;
   }
 
-  findWithCatalogFilters(
-    {
-      status = 'published',
-      category,
-      brand,
-      shop,
-      shopCategory,
-      minPrice,
-      maxPrice,
-      tags,
-      colors,
-      sizes,
-      rating,
-      search,
-    } = {},
-    { sort = '-createdAt', skip = 0, limit = 10 } = {},
-  ) {
-    const query = status === 'all' ? { status: { $ne: 'deleted' } } : { status };
+  countWithCatalogFilters(filters = {}) {
+    return this.countByFilter(this._buildCatalogQuery(filters));
+  }
 
-    if (category) {
-      query.category = category;
-    }
-    if (brand) {
-      query.brand = brand;
-    }
-    if (shop) {
-      query.shop = shop;
-    }
-    if (shopCategory) {
-      query.shopCategory = shopCategory;
-    }
-
-    if (minPrice || maxPrice) {
-      query['price.currentPrice'] = {};
-      if (minPrice) {
-        query['price.currentPrice'].$gte = Number(minPrice);
-      }
-      if (maxPrice) {
-        query['price.currentPrice'].$lte = Number(maxPrice);
-      }
-    }
-
-    if (tags) {
-      const tagArray = Array.isArray(tags) ? tags : tags.split(',');
-      query.tags = { $in: tagArray };
-    }
-
-    if (colors) {
-      const colorArray = Array.isArray(colors) ? colors : colors.split(',');
-      const colorRegexArray = colorArray.map((c) => new RegExp(`^${c}$`, 'i'));
-      query['variants.color'] = { $in: colorRegexArray };
-    }
-
-    if (sizes) {
-      const sizeArray = Array.isArray(sizes) ? sizes : sizes.split(',');
-      query['variants.size'] = { $in: sizeArray };
-    }
-
-    if (rating) {
-      const ratingArray = Array.isArray(rating) ? rating : rating.split(',').map(Number);
-      const minRating = Math.min(...ratingArray);
-      if (!isNaN(minRating)) {
-        query.averageRating = { $gte: minRating };
-      }
-    }
-
-    if (search) {
-      query.$text = { $search: search };
-    }
+  findWithCatalogFilters(filters = {}, { sort = '-createdAt', skip = 0, limit = 10 } = {}) {
+    const query = this._buildCatalogQuery(filters);
+    const { search } = filters;
 
     let productsQuery = this.findManyByFilter(query)
       .populate('category', 'name slug')

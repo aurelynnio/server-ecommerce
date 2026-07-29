@@ -1,6 +1,7 @@
 const catchAsync = require('../configs/catchAsync');
 const recommendationService = require('../services/recommendation.service');
 const { sendSuccess } = require('../shared/res/formatResponse');
+const { parseLimit } = require('../utils/pagination');
 
 const RecommendationController = {
   /**
@@ -11,17 +12,11 @@ const RecommendationController = {
    */
   getForYou: catchAsync(async (req, res) => {
     const userId = req.user?._id;
-    const { limit } = req.query;
+    const limit = parseLimit(req.query, 20);
 
-    let recommendations;
-    if (userId) {
-      recommendations = await recommendationService.getPersonalizedRecommendations(
-        userId,
-        parseInt(limit) || 20,
-      );
-    } else {
-      recommendations = await recommendationService.getGuestRecommendations(parseInt(limit) || 20);
-    }
+    const recommendations = userId
+      ? await recommendationService.getPersonalizedRecommendations(userId, limit)
+      : await recommendationService.getGuestRecommendations(limit);
 
     return sendSuccess(res, recommendations, 'Recommendations retrieved');
   }),
@@ -34,12 +29,9 @@ const RecommendationController = {
    */
   getFrequentlyBoughtTogether: catchAsync(async (req, res) => {
     const { productId } = req.params;
-    const { limit } = req.query;
+    const limit = parseLimit(req.query, 5);
 
-    const products = await recommendationService.getFrequentlyBoughtTogether(
-      productId,
-      parseInt(limit) || 5,
-    );
+    const products = await recommendationService.getFrequentlyBoughtTogether(productId, limit);
 
     return sendSuccess(res, products, 'FBT products retrieved');
   }),
@@ -52,12 +44,9 @@ const RecommendationController = {
    */
   getSimilar: catchAsync(async (req, res) => {
     const { productId } = req.params;
-    const { limit } = req.query;
+    const limit = parseLimit(req.query, 10);
 
-    const products = await recommendationService.getSimilarProducts(
-      productId,
-      parseInt(limit) || 10,
-    );
+    const products = await recommendationService.getSimilarProducts(productId, limit);
 
     return sendSuccess(res, products, 'Similar products retrieved');
   }),
@@ -70,13 +59,13 @@ const RecommendationController = {
    */
   getRecentlyViewed: catchAsync(async (req, res) => {
     const userId = req.user?._id;
-    const { limit } = req.query;
+    const limit = parseLimit(req.query, 10);
 
     if (!userId) {
       return sendSuccess(res, [], 'No recently viewed products');
     }
 
-    const products = await recommendationService.getRecentlyViewed(userId, parseInt(limit) || 10);
+    const products = await recommendationService.getRecentlyViewed(userId, limit);
 
     return sendSuccess(res, products, 'Recently viewed products retrieved');
   }),
@@ -106,12 +95,9 @@ const RecommendationController = {
    */
   getCategoryRecommendations: catchAsync(async (req, res) => {
     const { categoryId } = req.params;
-    const { limit } = req.query;
+    const limit = parseLimit(req.query, 20);
 
-    const products = await recommendationService.getCategoryRecommendations(
-      categoryId,
-      parseInt(limit) || 20,
-    );
+    const products = await recommendationService.getCategoryRecommendations(categoryId, limit);
 
     return sendSuccess(res, products, 'Category recommendations retrieved');
   }),

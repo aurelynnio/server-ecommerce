@@ -2,6 +2,7 @@ const catchAsync = require('../configs/catchAsync');
 const flashSaleService = require('../services/flash-sale.service');
 const { sendSuccess, sendFail } = require('../shared/res/formatResponse');
 const { StatusCodes } = require('http-status-codes');
+const { parsePagination } = require('../utils/pagination');
 
 const FlashSaleController = {
   /**
@@ -11,12 +12,9 @@ const FlashSaleController = {
    * @returns {Promise<any>}
    */
   getActiveFlashSale: catchAsync(async (req, res) => {
-    const { page, limit } = req.query;
+    const { page, limit } = parsePagination(req.query, 20);
 
-    const result = await flashSaleService.getActiveFlashSale({
-      page: parseInt(page) || 1,
-      limit: parseInt(limit) || 20,
-    });
+    const result = await flashSaleService.getActiveFlashSale({ page, limit });
 
     return sendSuccess(res, result, 'Flash sale products retrieved');
   }),

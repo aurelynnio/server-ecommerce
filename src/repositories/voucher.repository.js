@@ -17,7 +17,7 @@ class VoucherRepository extends BaseRepository {
     });
   }
 
-  countWithFilters({ scope, isActive, search, shopId } = {}) {
+  _buildFilterQuery({ scope, isActive, search, shopId } = {}) {
     const query = {};
     if (scope) {
       query.scope = scope;
@@ -35,30 +35,15 @@ class VoucherRepository extends BaseRepository {
         { description: { $regex: search, $options: 'i' } },
       ];
     }
-
-    return this.countByFilter(query);
+    return query;
   }
 
-  findWithFilters({ scope, isActive, search, shopId } = {}, { skip = 0, limit = 10 } = {}) {
-    const query = {};
-    if (scope) {
-      query.scope = scope;
-    }
-    if (typeof isActive === 'boolean') {
-      query.isActive = isActive;
-    }
-    if (shopId) {
-      query.shopId = shopId;
-    }
-    if (search) {
-      query.$or = [
-        { code: { $regex: search, $options: 'i' } },
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-      ];
-    }
+  countWithFilters(filters = {}) {
+    return this.countByFilter(this._buildFilterQuery(filters));
+  }
 
-    return this.findManyByFilter(query)
+  findWithFilters(filters = {}, { skip = 0, limit = 10 } = {}) {
+    return this.findManyByFilter(this._buildFilterQuery(filters))
       .populate('shopId', 'name logo')
       .sort({ createdAt: -1 })
       .skip(skip)

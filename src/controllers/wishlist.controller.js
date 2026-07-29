@@ -2,6 +2,7 @@ const catchAsync = require('../configs/catchAsync');
 const wishlistService = require('../services/wishlist.service');
 const { sendSuccess, sendFail } = require('../shared/res/formatResponse');
 const { StatusCodes } = require('http-status-codes');
+const { parsePagination } = require('../utils/pagination');
 
 const getAuthenticatedUserId = (req) => req.user?.userId || req.user?._id;
 
@@ -14,12 +15,9 @@ const WishlistController = {
    */
   getWishlist: catchAsync(async (req, res) => {
     const userId = getAuthenticatedUserId(req);
-    const { page, limit } = req.query;
+    const { page, limit } = parsePagination(req.query, 10);
 
-    const result = await wishlistService.getWishlist(userId, {
-      page: parseInt(page) || 1,
-      limit: parseInt(limit) || 10,
-    });
+    const result = await wishlistService.getWishlist(userId, { page, limit });
 
     return sendSuccess(res, result, 'Wishlist retrieved successfully');
   }),

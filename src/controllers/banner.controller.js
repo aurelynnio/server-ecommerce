@@ -2,6 +2,7 @@ const catchAsync = require('../configs/catchAsync');
 const bannerService = require('../services/banner.service');
 const { StatusCodes } = require('http-status-codes');
 const { sendSuccess, sendFail } = require('../shared/res/formatResponse');
+const { parsePagination } = require('../utils/pagination');
 
 const BannerController = {
   /**
@@ -22,10 +23,10 @@ const BannerController = {
    * @returns {Promise<any>}
    */
   getBanners: catchAsync(async (req, res) => {
-    const { limit, page, ...filter } = req.query;
+    const { limit, page, filter } = parsePagination(req.query, 10);
     const result = await bannerService.getBanners({
-      limit: parseInt(limit) || 10,
-      page: parseInt(page) || 1,
+      limit,
+      page,
       filter: { isActive: true, ...filter },
     });
 
@@ -39,12 +40,8 @@ const BannerController = {
    * @returns {Promise<any>}
    */
   getAllBannersAdmin: catchAsync(async (req, res) => {
-    const { limit, page, ...filter } = req.query;
-    const result = await bannerService.getBanners({
-      limit: parseInt(limit) || 20,
-      page: parseInt(page) || 1,
-      filter,
-    });
+    const { limit, page, filter } = parsePagination(req.query, 20);
+    const result = await bannerService.getBanners({ limit, page, filter });
 
     return sendSuccess(res, result, 'Get all banners for admin successfully', StatusCodes.OK);
   }),
