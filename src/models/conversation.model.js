@@ -1,6 +1,5 @@
 const { Schema, model, Types } = require('mongoose');
 
-// Message Schema
 const messageSchema = new Schema(
   {
     conversationId: {
@@ -34,7 +33,6 @@ const messageSchema = new Schema(
 messageSchema.index({ conversationId: 1, createdAt: -1 }); // Loading messages in conversation
 messageSchema.index({ conversationId: 1, isRead: 1 }); // Counting unread messages
 
-// Conversation Schema
 const conversationSchema = new Schema(
   {
     members: [{ type: Types.ObjectId, ref: 'User' }], // [BuyerId, SellerId]

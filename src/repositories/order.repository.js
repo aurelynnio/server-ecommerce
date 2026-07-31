@@ -209,6 +209,7 @@ class OrderRepository extends BaseRepository {
       status: { $ne: 'cancelled' },
     })
       .select('products.productId')
+      .sort({ createdAt: -1 })
       .limit(limit)
       .lean();
   }

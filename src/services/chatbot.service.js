@@ -55,7 +55,6 @@ class ChatbotService {
       logger.info('[Chatbot] Starting RAG stream chat with sessionId:', sessionId);
       logger.info('[Chatbot] User message:', userMessage);
 
-      // Use RAG to retrieve relevant products
       const products = await this.retrieveProducts(userMessage);
 
       logger.info(
@@ -63,10 +62,8 @@ class ChatbotService {
         products.length > 0 ? `Found ${products.length} products` : 'No products found',
       );
 
-      // Build context from retrieved products
       const contextMessage = this.buildContextMessage(userMessage, products);
 
-      // Create chain with message history
       const chainWithHistory = new RunnableWithMessageHistory({
         runnable: this.chain,
         getMessageHistory: (sessionId) => this.getMessageHistory(sessionId),
@@ -74,7 +71,6 @@ class ChatbotService {
         historyMessagesKey: 'chat_history',
       });
 
-      // Stream response
       let fullResponse = '';
       const stream = await chainWithHistory.stream(
         { input: contextMessage },
@@ -90,7 +86,6 @@ class ChatbotService {
 
       logger.info('[Chatbot] Stream completed');
 
-      // Validate response before returning
       const validatedResponse = this.validateResponse(fullResponse, products);
 
       return {
@@ -141,7 +136,6 @@ class ChatbotService {
 
       logger.info('[Chatbot] Response generated successfully');
 
-      // Validate response before returning
       const validatedResponse = this.validateResponse(result, products);
 
       return {
@@ -456,7 +450,6 @@ Còn hàng: ${item.stock > 0 ? 'Có' : 'Hết hàng'}
 Link xem: ${item.productUrl}
 Link mua: ${item.checkoutUrl}`;
         } else if (item.name && item.slug && item.url) {
-          // Category format
           return `- ${item.name}: ${item.url}`;
         }
         return JSON.stringify(item);
@@ -482,7 +475,6 @@ Link mua: ${item.checkoutUrl}`;
         logger.warn(
           '[Chatbot] Potential hallucination detected - prices in response but no products in context',
         );
-        // Return a safe response
         return 'Em xin lỗi, hiện tại em chưa tìm thấy sản phẩm phù hợp với yêu cầu của anh/chị. Anh/chị có thể cho em biết cụ thể hơn muốn tìm loại sản phẩm gì không ạ? Ví dụ: áo, quần, giày, túi xách...';
       }
     }

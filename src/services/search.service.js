@@ -41,10 +41,8 @@ class SearchService {
       };
     });
 
-    // Search categories
     const categories = await Category.findActiveByNameRegex(regex, 5);
 
-    // Search shops
     const shops = await Shop.findActiveByNameRegex(regex, 5);
 
     const result = { products: productsWithImages, categories, shops };
@@ -94,7 +92,6 @@ class SearchService {
 
     const keywords = [...products.map((p) => p.name), ...categories.map((c) => c.name)];
 
-    // Remove duplicates and limit
     const uniqueKeywords = [...new Set(keywords)].slice(0, limit);
 
     await redisService.set(cacheKey, uniqueKeywords, 3600);
@@ -120,7 +117,6 @@ class SearchService {
 
     let categoryIds = [];
 
-    // Category filter
     if (category) {
       const cat = await Category.findBySlug(category);
       if (cat) {

@@ -20,7 +20,6 @@ const voucherSchema = new Schema(
     value: { type: Number, required: true }, // 10000 or 10 (%)
     maxValue: { type: Number }, // Max discount for percentage
 
-    // Scope: Shop or Platform
     scope: {
       type: String,
       enum: ['shop', 'platform'],

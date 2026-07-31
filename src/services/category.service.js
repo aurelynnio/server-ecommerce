@@ -23,7 +23,6 @@ class CategoryService {
    * @throws {Error} If parent category not found
    */
   async createCategory(categoryData) {
-    // Generate slug if not provided
     if (!categoryData.slug) {
       categoryData.slug = slugify(categoryData.name, {
         lower: true,
@@ -32,15 +31,12 @@ class CategoryService {
       });
     }
 
-    // Check if slug already exists
     const existingCategory = await Category.findBySlug(categoryData.slug);
 
     if (existingCategory) {
-      // Add random suffix if slug exists
       categoryData.slug = `${categoryData.slug}-${Math.random().toString(36).substr(2, 6)}`;
     }
 
-    // Validate parent category if provided
     if (categoryData.parentCategory) {
       const parentExists = await Category.findById(categoryData.parentCategory);
       if (!parentExists) {
@@ -69,7 +65,6 @@ class CategoryService {
     const filterArgs = { isActive, parentCategory, search };
     const total = await Category.countWithFilters(filterArgs);
 
-    // Get pagination params with total count
     const paginationParams = getPaginationParams(page, limit, total);
 
     const categoriesWithData = await Category.aggregateWithDetails(filterArgs, paginationParams);
@@ -122,7 +117,6 @@ class CategoryService {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Category not found');
     }
 
-    // Get subcategories
     const subcategories = await Category.findActiveSubcategories(categoryId);
 
     return {
@@ -148,7 +142,6 @@ class CategoryService {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Category not found');
     }
 
-    // If updating name and no slug provided, regenerate slug
     if (updateData.name && !updateData.slug) {
       updateData.slug = slugify(updateData.name, {
         lower: true,
@@ -157,7 +150,6 @@ class CategoryService {
       });
     }
 
-    // Check slug uniqueness if updating slug
     if (updateData.slug && updateData.slug !== category.slug) {
       const existingCategory = await Category.findBySlugExcludingId(updateData.slug, categoryId);
 
@@ -166,9 +158,7 @@ class CategoryService {
       }
     }
 
-    // Validate parent category if updating
     if (updateData.parentCategory) {
-      // Check if parent category exists
       const parentExists = await Category.findById(updateData.parentCategory);
       if (!parentExists) {
         throw new ApiError(StatusCodes.NOT_FOUND, 'Parent category not found');
@@ -185,7 +175,6 @@ class CategoryService {
       }
     }
 
-    // Update category
     Object.assign(category, updateData);
     await category.save();
 
@@ -207,7 +196,6 @@ class CategoryService {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Category not found');
     }
 
-    // Check if category has subcategories
     const hasSubcategories = await Category.existsSubcategories(categoryId);
 
     if (hasSubcategories) {
@@ -217,7 +205,6 @@ class CategoryService {
       );
     }
 
-    // Check if category has products
     const hasProducts = await Product.existsByCategory(categoryId);
 
     if (hasProducts) {
@@ -242,12 +229,10 @@ class CategoryService {
     const cachedTree = await redisService.get(cacheKey);
     if (cachedTree) return cachedTree;
 
-    // Get all root categories (no parent)
     const rootCategories = await Category.findRootActiveForTree();
 
     const allSubcategories = await Category.findAllActiveSubcategoriesForTree();
 
-    // Build tree structure
     const buildTree = (parentId) => {
       return allSubcategories
         .filter((cat) => cat.parentCategory && cat.parentCategory.toString() === parentId)
@@ -255,7 +240,6 @@ class CategoryService {
           const children = buildTree(cat._id.toString());
           const result = { ...cat };
 
-          // Chỉ thêm subcategories nếu thực sự có category con
           if (children && children.length > 0) {
             result.subcategories = children;
           }
@@ -268,7 +252,6 @@ class CategoryService {
       const children = buildTree(cat._id.toString());
       const result = { ...cat };
 
-      // Chỉ thêm subcategories nếu thực sự có category con
       if (children && children.length > 0) {
         result.subcategories = children;
       }

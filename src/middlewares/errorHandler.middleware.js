@@ -40,16 +40,13 @@ const errorStatusMap = {
  * @returns {number} - HTTP status code
  */
 const getStatusCode = (err) => {
-  // If error has statusCode, use it
   if (err.statusCode) return err.statusCode;
 
-  // Map error types to status codes
   if (errorStatusMap[err.name]) return errorStatusMap[err.name];
 
   // MongoDB duplicate key error
   if (err.code === 11000) return StatusCodes.CONFLICT;
 
-  // Default to internal server error
   return StatusCodes.INTERNAL_SERVER_ERROR;
 };
 
@@ -97,7 +94,6 @@ const getErrorMessage = (err) => {
     return err.message;
   }
 
-  // Return original message for operational errors
   if (err.isOperational) {
     return err.message;
   }
@@ -140,7 +136,6 @@ const errorHandler = (err, req, res, _next) => {
     }
   }
 
-  // Send standardized error response
   return sendJson(
     res,
     {

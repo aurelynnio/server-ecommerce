@@ -169,7 +169,6 @@ class ProductService {
     const shopId = await this.ensureShopForUser(userId);
     const productData = { ...data, shop: shopId };
 
-    // Generate slug if not provided
     if (!productData.slug && productData.name) {
       const slugify = require('slugify');
       productData.slug = slugify(productData.name, {
@@ -179,7 +178,6 @@ class ProductService {
       });
     }
 
-    // Clean up and process variants
     if (productData.variants && Array.isArray(productData.variants)) {
       productData.variants = productData.variants.map((variant, index) => {
         const { _id, attributes, ...rest } = variant;
@@ -187,7 +185,6 @@ class ProductService {
         // Extract color from old attributes structure if present
         const color = variant.color || attributes?.color || '';
 
-        // Auto-generate SKU
         const sku = this.generateSku(productData.slug, color, index);
 
         return {
@@ -202,7 +199,6 @@ class ProductService {
       this.syncVariantAggregates(productData);
     }
 
-    // Check if slug already exists
     if (data.slug) {
       const existingProduct = await Product.findBySlug(data.slug);
       if (existingProduct) {
@@ -210,7 +206,6 @@ class ProductService {
       }
     }
 
-    // Handle image files
     if (files && files.length > 0) {
       logger.info(
         '[ProductService] Processing files:',
@@ -256,7 +251,6 @@ class ProductService {
 
         logger.info('[ProductService] Variant image map:', variantImageMap);
 
-        // Assign images to variants
         productData.variants = productData.variants.map((variant, idx) => ({
           ...variant,
           images: [...(variant.images || []), ...(variantImageMap[idx] || [])],
@@ -336,7 +330,6 @@ class ProductService {
         });
       }
 
-      // Handle description images update
       if (updateData.existingDescriptionImages !== undefined || newDescriptionImages.length > 0) {
         const existingImages = updateData.existingDescriptionImages
           ? Array.isArray(updateData.existingDescriptionImages)
@@ -349,7 +342,6 @@ class ProductService {
 
       // Handle variants update - simple structure with attributes
       if (updateData.variants && Array.isArray(updateData.variants)) {
-        // Parse existing variant images if provided
         const existingVariantImagesMap = {};
         if (updateData.existingVariantImages) {
           const mapping =
@@ -729,7 +721,7 @@ class ProductService {
     delete updateData.shop;
     delete updateData.status;
     delete updateData.soldCount;
-    delete updateData.averageRating;
+    delete updateData.ratingAverage;
     delete updateData.reviewCount;
 
     return this.updateProduct(productId, updateData, files);

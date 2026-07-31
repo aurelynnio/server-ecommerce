@@ -226,7 +226,7 @@ class ProductRepository extends BaseRepository {
     return this.findManyByFilter({ shop: shopId }).select('_id');
   }
 
-  aggregateShopCategories(shopId) {
+  aggregateShopCategories(shopId, limit = 50) {
     return this.aggregateByPipeline([
       { $match: { shop: shopId, status: 'published' } },
       { $group: { _id: '$category', count: { $sum: 1 } } },
@@ -248,6 +248,7 @@ class ProductRepository extends BaseRepository {
         },
       },
       { $sort: { productCount: -1 } },
+      { $limit: limit },
     ]);
   }
 
@@ -317,7 +318,7 @@ class ProductRepository extends BaseRepository {
       const ratingArray = Array.isArray(rating) ? rating : rating.split(',').map(Number);
       const minRating = Math.min(...ratingArray);
       if (!isNaN(minRating)) {
-        query.averageRating = { $gte: minRating };
+        query.ratingAverage = { $gte: minRating };
       }
     }
 
@@ -486,6 +487,7 @@ class ProductRepository extends BaseRepository {
       isNewArrival: true,
     })
       .populate('category', 'name slug')
+      .populate('shop', 'name slug logo rating followerCount')
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean();
@@ -509,14 +511,33 @@ class ProductRepository extends BaseRepository {
       .lean();
   }
 
-  searchByKeyword(keyword, limit = 10) {
+  async searchByKeyword(keyword, limit = 10) {
+    // 'category' is an ObjectId ref, so 'category.name' cannot be matched
+    // directly in a query filter. Pre-fetch matching category IDs (uses the
+    // { name: 1, parentCategory: 1 } index) and filter with $in.
+    const Category = require('../models/category.model');
+    const matchingCategories = await Category.find({
+      name: { $regex: keyword, $options: 'i' },
+    })
+      .select('_id')
+      .lean();
+
+    const categoryIdFilter =
+      matchingCategories.length > 0
+        ? { $in: matchingCategories.map((c) => c._id) }
+        : null;
+
+    const orBranches = [
+      { name: { $regex: keyword, $options: 'i' } },
+      { description: { $regex: keyword, $options: 'i' } },
+    ];
+    if (categoryIdFilter) {
+      orBranches.push({ category: categoryIdFilter });
+    }
+
     return this.findManyByFilter({
       status: 'published',
-      $or: [
-        { name: { $regex: keyword, $options: 'i' } },
-        { description: { $regex: keyword, $options: 'i' } },
-        { 'category.name': { $regex: keyword, $options: 'i' } },
-      ],
+      $or: orBranches,
     })
       .select('name slug price category variants')
       .populate('category', 'name slug')
@@ -807,19 +828,25 @@ class ProductRepository extends BaseRepository {
   }
 
   findTopRatedProducts(limit = 5) {
-    return this.findManyByFilter({ totalReviews: { $gt: 0 } })
-      .sort({ averageRating: -1, totalReviews: -1 })
+    return this.findManyByFilter({
+      status: 'published',
+      reviewCount: { $gt: 0 },
+    })
+      .sort({ ratingAverage: -1, reviewCount: -1 })
       .limit(limit)
-      .select('name slug averageRating totalReviews images');
+      .select('name slug ratingAverage reviewCount images')
+      .lean();
   }
 
   findMostReviewedProducts(limit = 5) {
     return this.findManyByFilter({
-      totalReviews: { $gt: 0 },
+      status: 'published',
+      reviewCount: { $gt: 0 },
     })
-      .sort({ totalReviews: -1 })
+      .sort({ reviewCount: -1 })
       .limit(limit)
-      .select('name slug averageRating totalReviews images');
+      .select('name slug ratingAverage reviewCount images')
+      .lean();
   }
 
   existsByCategory(categoryId) {

@@ -79,7 +79,6 @@ class UserService {
 
     const hashedPassword = await hashPassword(password);
 
-    // Create user
     const user = await userModel.create({
       username,
       email,
@@ -90,7 +89,6 @@ class UserService {
       permissions,
     });
 
-    // Remove password from response
     return this._sanitizeUserResponse(user);
   }
 
@@ -176,7 +174,6 @@ class UserService {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Address not found');
     }
 
-    // Update only provided fields
     Object.keys(addressData).forEach((key) => {
       if (addressData[key] !== undefined) {
         address[key] = addressData[key];
@@ -197,7 +194,6 @@ class UserService {
    * @throws {Error} If user not found
    */
   async deleteAddress(userId, addressId) {
-    // Thá»±c hiá»‡n xÃ³a
     const userAfter = await userModel.updateById(
       userId,
       { $pull: { addresses: { _id: addressId } } },
@@ -233,12 +229,10 @@ class UserService {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Address not found');
     }
 
-    // Reset all addresses to non-default
     user.addresses.forEach((addr) => {
       addr.isDefault = false;
     });
 
-    // Set the selected address as default
     address.isDefault = true;
 
     await user.save();
@@ -257,13 +251,11 @@ class UserService {
   async changePassword(userId, oldPassword, newPassword) {
     const user = this._ensureUserFound(await userModel.findById(userId));
 
-    // Verify old password
     const isMatch = await comparePassword(oldPassword, user.password);
     if (!isMatch) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Old password is incorrect');
     }
 
-    // Hash new password
     const hashedPassword = await hashPassword(newPassword);
     user.password = hashedPassword;
     await user.save();
@@ -295,7 +287,6 @@ class UserService {
     };
     const total = await userModel.countWithFilters(filterArgs);
 
-    // Get pagination params with total count
     const paginationParams = getPaginationParams(page, limit, total);
 
     const users = await userModel.findWithFilters(filterArgs, paginationParams);
@@ -333,20 +324,16 @@ class UserService {
    * @throws {Error} If user not found or username/email already exists
    */
   async updateUserById(userId, updateData) {
-    // Check if user exists
     const user = this._ensureUserFound(await userModel.findById(userId));
 
-    // Check if updating username and it already exists
     if (updateData.username && updateData.username !== user.username) {
       await this._ensureUniqueUsername(updateData.username, userId);
     }
 
-    // Check if updating email and it already exists
     if (updateData.email && updateData.email !== user.email) {
       await this._ensureUniqueEmail(updateData.email, userId);
     }
 
-    // Update user
     const updatedUser = await userModel.updateById(userId, updateData, {
       new: true,
       runValidators: true,

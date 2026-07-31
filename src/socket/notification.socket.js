@@ -23,7 +23,6 @@ const notificationSocket = (io, socket) => {
     }
   });
 
-  // Mark all as read
   socket.on('mark_read_all', async () => {
     try {
       await notificationService.markReadAll(userId);
@@ -37,7 +36,6 @@ const notificationSocket = (io, socket) => {
     }
   });
 
-  // Clean all notifications
   socket.on('clean_notifications', async () => {
     try {
       await notificationService.cleanNotification(userId);
@@ -49,7 +47,6 @@ const notificationSocket = (io, socket) => {
     }
   });
 
-  // Get unread count
   socket.on('get_unread_count', async () => {
     try {
       const count = await notificationService.countUnread(userId);

@@ -89,28 +89,23 @@ class ShopCategoryService {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Shop ID required');
     }
 
-    // Convert to ObjectId if string
     const shopObjectId = typeof shopId === 'string' ? new mongoose.Types.ObjectId(shopId) : shopId;
 
     const categories = await ShopCategory.findActiveByShopIdSorted(shopObjectId);
 
-    // Get product counts for each category
     const categoryIds = categories.map((c) => c._id);
     const productCounts = await Product.aggregatePublishedCountsByShopCategories(
       shopObjectId,
       categoryIds,
     );
 
-    // Create count map
     const countMap = {};
     productCounts.forEach((p) => {
       countMap[p._id.toString()] = p.count;
     });
 
-    // Get total products for this shop
     const totalProducts = await Product.countPublishedByShop(shopObjectId);
 
-    // Add productCount to each category
     const categoriesWithCount = categories.map((cat) => ({
       ...cat,
       productCount: countMap[cat._id.toString()] || 0,

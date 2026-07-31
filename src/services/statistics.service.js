@@ -88,7 +88,6 @@ class StatisticsService {
       Order.aggregatePaidRevenueBetween(startOfPreviousMonth, startOfCurrentMonth),
     ]);
 
-    // Extract counts from aggregation result
     const orderAggResult = countsResult[0]?.[0] || {};
     const totalRevenue = orderAggResult.totalRevenue?.[0]?.total || 0;
     const totalOrders = orderAggResult.totalOrders?.[0]?.count || 0;
@@ -115,9 +114,7 @@ class StatisticsService {
 
     // Transform topProducts to match client expected format
     const topProducts = topProductsRaw.map((product) => {
-      // Get first variant image if available
       const image = product.variants?.[0]?.images?.[0] || null;
-      // Calculate revenue: price * soldCount
       const price = product.variants?.[0]?.price || product.price?.currentPrice || 0;
       const sold = product.soldCount || 0;
       const revenue = price * sold;
@@ -147,7 +144,6 @@ class StatisticsService {
       });
     }
 
-    // Map raw data to a lookup object
     const statsMap = {};
     monthlyStatsRaw.forEach((item) => {
       const key = `${item._id.month}/${item._id.year}`;

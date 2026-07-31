@@ -39,7 +39,6 @@ const sanitizeMongoOperators = (str) => {
 const sanitizedString = () => {
   return joi.string().custom((value, _helpers) => {
     if (typeof value !== 'string') return value;
-    // Trim whitespace
     const sanitized = value.trim();
     return sanitized;
   }, 'sanitize');
@@ -52,7 +51,6 @@ const sanitizedString = () => {
 const escapedString = () => {
   return joi.string().custom((value, _helpers) => {
     if (typeof value !== 'string') return value;
-    // Trim and escape HTML
     let sanitized = value.trim();
     sanitized = escapeHtml(sanitized);
     return sanitized;
@@ -66,7 +64,6 @@ const escapedString = () => {
 const searchString = () => {
   return joi.string().custom((value, _helpers) => {
     if (typeof value !== 'string') return value;
-    // Trim and remove MongoDB operators
     let sanitized = value.trim();
     sanitized = sanitizeMongoOperators(sanitized);
     return sanitized;

@@ -43,7 +43,6 @@ const itemSchema = new Schema(
       min: 1,
       default: 1,
     },
-    // Price stored as structured object
     price: {
       type: priceSchema,
       required: false,

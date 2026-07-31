@@ -90,7 +90,6 @@ function createProductTextContent(product) {
     parts.push(`Kích cỡ: ${product.sizes.join(', ')}`);
   }
 
-  // Colors from variants
   const colors = [...new Set(product.variants?.map((v) => v.color).filter(Boolean))];
   /**
    * If
@@ -101,7 +100,6 @@ function createProductTextContent(product) {
     parts.push(`Màu sắc: ${colors.join(', ')}`);
   }
 
-  // Price range
   const price = product.price?.discountPrice || product.price?.currentPrice;
   /**
    * If
@@ -169,10 +167,8 @@ async function embedProduct(product) {
     const textContent = createProductTextContent(product);
     const metadata = createProductMetadata(product);
 
-    // Generate embedding vector
     const [vector] = await embeddings.embedDocuments([textContent]);
 
-    // Upsert into MongoDB
     await collection.updateOne(
       { productId: product._id.toString() },
       {
@@ -212,7 +208,6 @@ async function embedAllProducts({ batchSize = 50, force = false } = {}) {
     const embeddings = getEmbeddingModel();
     const collection = getEmbeddingsCollection();
 
-    // Get all published products
     const products = await Product.findPublishedForEmbedding();
 
     logger.info(`[Embeddings] Starting to embed ${products.length} products...`);
@@ -336,10 +331,8 @@ async function searchSimilarProducts(query, { limit = 5, filter = {} } = {}) {
     const embeddings = getEmbeddingModel();
     const collection = getEmbeddingsCollection();
 
-    // Generate embedding for the query
     const [queryVector] = await embeddings.embedDocuments([query]);
 
-    // Build the aggregation pipeline for vector search
     // Note: This requires MongoDB Atlas Vector Search index to be created
     const pipeline = [
       {
@@ -487,7 +480,6 @@ async function createVectorSearchIndex() {
     const client = mongoose.connection.getClient();
     const db = client.db();
 
-    // Check if index exists
     const indexes = await db.collection('product_embeddings').listSearchIndexes().toArray();
     const existingIndex = indexes.find((idx) => idx.name === 'product_vector_index');
 

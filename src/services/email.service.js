@@ -15,7 +15,6 @@ const { ApiError } = require('../middlewares/errorHandler.middleware');
 
 let transporter = null;
 
-// Email configuration from environment variables
 const EMAIL_CONFIG = {
   host: process.env.EMAIL_HOST,
   port: Number(process.env.EMAIL_PORT),

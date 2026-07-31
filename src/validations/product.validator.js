@@ -105,7 +105,7 @@ const categorySlugParamValidator = Joi.object({
 
 const variantIdsParamValidator = Joi.object({
   id: objectId.required(),
-  variantId: objectId.required(), // Variant ID is typically an ObjectId
+  variantId: objectId.required(),
 });
 
 const paginationQueryValidator = Joi.object(pagination);

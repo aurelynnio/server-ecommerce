@@ -109,12 +109,10 @@ class VoucherService {
     const voucher = await this._getVoucherOrThrow(voucherId);
     await this._assertVoucherOwnership(voucher, userId, roles, 'update');
 
-    // Check if updating code and it already exists
     if (updateData.code && updateData.code !== voucher.code) {
       await this._ensureVoucherCodeAvailable(updateData.code, voucherId);
     }
 
-    // Update voucher
     Object.assign(voucher, updateData);
     await voucher.save();
 
@@ -179,16 +177,13 @@ class VoucherService {
   async getAvailableVouchers(userId, shopId = null) {
     const now = new Date();
 
-    // Get platform vouchers
     const platformVouchers = await Voucher.findAvailablePlatform(now);
 
-    // Get shop vouchers if shopId provided
     let shopVouchers = [];
     if (shopId) {
       shopVouchers = await Voucher.findAvailableShop(shopId, now);
     }
 
-    // Filter out vouchers user has exceeded usage limit
     const filterByUserUsage = async (vouchers) => {
       if (vouchers.length === 0) return vouchers;
       const voucherIds = vouchers.map((v) => v._id);

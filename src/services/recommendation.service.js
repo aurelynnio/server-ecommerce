@@ -21,7 +21,6 @@ class RecommendationService {
     const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
-    // Get user's purchase history
     const orders = await Order.findRecentNonCancelledOrdersByUser(userId, 10);
 
     const purchasedProductIds = orders.flatMap((o) =>
@@ -40,7 +39,6 @@ class RecommendationService {
     // Exclude already purchased and wishlisted products
     const excludeIds = [...new Set([...purchasedProductIds, ...wishlistIds])];
 
-    // Find similar products
     let recommendations = [];
 
     if (categoryIds.length > 0) {
@@ -91,7 +89,6 @@ class RecommendationService {
     const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
-    // Find orders containing this product
     const orders = await Order.findOrdersContainingProduct(productId, 100);
 
     // Count co-occurrence of other products

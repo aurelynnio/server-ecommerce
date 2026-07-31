@@ -199,7 +199,6 @@ class ChatService {
 
     const sellerId = shop.owner;
 
-    // Check existing conversation
     let conversation = await Conversation.findByMembersAndShop(userId, sellerId, shopId);
 
     if (!conversation) {
@@ -345,13 +344,11 @@ class ChatService {
    * @returns {Promise<any>}
    */
   async markAsRead(conversationId, userId) {
-    // Find the conversation by ID
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Conversation not found');
     }
 
-    // Verify user is a member of the conversation
     const isMember = conversation.members.some(
       (memberId) => memberId.toString() === userId.toString(),
     );
@@ -359,7 +356,6 @@ class ChatService {
       throw new ApiError(StatusCodes.FORBIDDEN, 'You are not a member of this conversation');
     }
 
-    // Update all messages where senderId != userId to isRead: true
     const result = await Message.markUnreadAsReadByConversationAndReceiver(conversationId, userId);
 
     return { updatedCount: result.modifiedCount };

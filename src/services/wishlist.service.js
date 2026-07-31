@@ -21,7 +21,6 @@ class WishlistService {
     const total = await wishlistRepository.countByUserId(userId);
     const paginationParams = getPaginationParams(page, limit, total);
 
-    // Get paginated wishlist entries
     const wishlistEntries = await wishlistRepository.findProductIdsByUserId(
       userId,
       paginationParams,
@@ -29,10 +28,8 @@ class WishlistService {
 
     const productIds = wishlistEntries.map((entry) => entry.productId);
 
-    // Fetch products with details
     const products = await productRepository.findPublishedByIdsForWishlist(productIds);
 
-    // Map products to include first variant image
     const productsWithImages = products.map((product) => ({
       ...product,
       image: product.variants?.[0]?.images?.[0] || null,
@@ -48,7 +45,6 @@ class WishlistService {
    * @returns {Promise<Object>} Updated wishlist info
    */
   async addToWishlist(userId, productId) {
-    // Verify product exists
     const product = await productRepository.findById(productId);
     if (!product) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
@@ -57,7 +53,6 @@ class WishlistService {
       throw new ApiError(StatusCodes.CONFLICT, 'Product is not available');
     }
 
-    // Check if already in wishlist
     const existing = await wishlistRepository.findByUserIdAndProductId(userId, productId);
     if (existing) {
       throw new ApiError(StatusCodes.CONFLICT, 'Product already in wishlist');

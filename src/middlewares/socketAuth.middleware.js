@@ -22,10 +22,8 @@ const socketAuthMiddleware = (socket, next) => {
       return next(new Error('Authentication error: Token not found'));
     }
 
-    // 2. Verify token
     const decoded = tokenService.verifyAccessToken(token);
 
-    // 3. Lưu thông tin user vào socket để dùng sau này
     socket.user = {
       id: decoded.userId, // Đảm bảo khớp với payload trong auth.service
       role: decoded.role,

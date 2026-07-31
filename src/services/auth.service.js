@@ -149,22 +149,18 @@ class AuthService {
    * @throws {Error} If email or username already exists
    */
   async register(data) {
-    // Check if email already exists
     const existingUser = await User.findByEmail(data.email);
     if (existingUser) {
       throw new ApiError(StatusCodes.CONFLICT, 'Email already in use');
     }
 
-    // Check if username already exists
     const existingUsername = await User.findByUsername(data.username);
     if (existingUsername) {
       throw new ApiError(StatusCodes.CONFLICT, 'Username already in use');
     }
 
-    // Hash password
     const hashedPassword = await hashPassword(data.password);
 
-    // Create new user (without verification code)
     const newUser = User.build({
       username: data.username,
       email: data.email,
@@ -175,7 +171,6 @@ class AuthService {
 
     await newUser.save();
 
-    // Emit socket event
     try {
       const io = getIO();
       if (io) {
@@ -188,7 +183,6 @@ class AuthService {
       logger.warn('[AuthService] Socket not initialized, skipping emit');
     }
 
-    // Send verification email
     try {
       logger.info(`[AuthService] Attempting to send verification email to ${data.email}`);
       await this.sendVerificationCode(data.email);
@@ -198,7 +192,6 @@ class AuthService {
       // Do not block registration if email fails, user can resend later
     }
 
-    // Remove sensitive data
     return this._sanitizeUser(newUser);
   }
 
@@ -408,7 +401,6 @@ class AuthService {
     const user = await User.findByEmail(email);
     this._requireUser(user);
 
-    // Generate password reset code
     const resetCode = this._generateVerificationCode();
 
     await this._sendOtpCode({
@@ -438,14 +430,11 @@ class AuthService {
     const cacheKey = `otp:reset-password:${email}`;
     await this.ensureValidOtp(cacheKey, code);
 
-    // Hash new password
     const hashedPassword = await hashPassword(newPassword);
 
-    // Update password and clear reset code
     user.password = hashedPassword;
     await user.save();
 
-    // Clear Redis OTP
     await redisService.del(cacheKey);
 
     return { email: user.email };
@@ -463,14 +452,12 @@ class AuthService {
     const user = await User.findById(userId);
     this._requireUser(user);
 
-    // Verify current password
     const isMatch = await comparePassword(currentPassword, user.password);
 
     if (!isMatch) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Current password is incorrect');
     }
 
-    // Hash and update new password
     const hashedPassword = await hashPassword(newPassword);
 
     user.password = hashedPassword;

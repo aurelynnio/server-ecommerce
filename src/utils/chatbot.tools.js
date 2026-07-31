@@ -1,7 +1,7 @@
 const Product = require('../models/product.model');
 const Category = require('../models/category.model');
 const mongoose = require('mongoose');
-const logger = require('./logger'); // Corrected path to logger
+const logger = require('./logger');
 
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 20;
@@ -221,7 +221,6 @@ async function searchProductsByQuery(params = {}) {
   return products.map(mapProductSummary);
 }
 
-// Helper function để tìm product theo ID hoặc slug
 async function findProduct(productId) {
   const isValidId = mongoose.Types.ObjectId.isValid(productId);
 
@@ -230,11 +229,9 @@ async function findProduct(productId) {
     if (product) return product;
   }
 
-  // Tìm theo slug
   return await Product.findOne({ slug: productId }).populate('category', 'name').lean();
 }
 
-// Tool handlers với error handling
 const toolHandlers = {
   async search_products({ keyword, category, minPrice, maxPrice, limit = 5 }) {
     try {

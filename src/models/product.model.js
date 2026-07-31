@@ -1,7 +1,6 @@
 const { Schema, model, Types } = require('mongoose');
 const slugify = require('slugify');
 
-// Price Schema (simplified for embedding)
 const priceSchema = new Schema(
   {
     currentPrice: { type: Number, required: true },
@@ -27,7 +26,6 @@ const variantSchema = new Schema(
   { _id: true },
 );
 
-// Product Attribute for specifications
 const attributeSchema = new Schema(
   {
     name: { type: String, required: true }, // e.g. "Material", "Weight"
@@ -128,9 +126,7 @@ const productSchema = new Schema(
 );
 
 // ==================== VIRTUALS ====================
-// Computed fields - not stored, calculated on read
 
-// Check if product is on sale (derived from price or flashSale)
 productSchema.virtual('onSale').get(function () {
   if (this.flashSale?.isActive) {
     const now = new Date();
@@ -139,12 +135,10 @@ productSchema.virtual('onSale').get(function () {
   return this.price?.discountPrice && this.price.discountPrice < this.price.currentPrice;
 });
 
-// Check if product is active (derived from status)
 productSchema.virtual('isActive').get(function () {
   return this.status === 'published';
 });
 
-// Get effective price (considering flash sale)
 productSchema.virtual('effectivePrice').get(function () {
   if (this.flashSale?.isActive) {
     const now = new Date();
@@ -156,15 +150,18 @@ productSchema.virtual('effectivePrice').get(function () {
 });
 
 // ==================== INDEXES ====================
-// Compound indexes for common queries
+// Compound indexes follow the ESR (Equality → Sort → Range) principle.
+// Reference: .agents/skills/mongodb-query-optimizer/references/core-indexing-principles.md
 productSchema.index({ shop: 1, status: 1 });
 productSchema.index({ category: 1, status: 1 });
-productSchema.index({ shop: 1, shopCategory: 1, status: 1 }); // Optimized for shop category filtering
-productSchema.index({ shopCategory: 1, status: 1 });
-productSchema.index({ status: 1, isFeatured: -1, createdAt: -1 });
-productSchema.index({ status: 1, soldCount: -1 });
-productSchema.index({ status: 1, 'price.currentPrice': 1 });
-productSchema.index({ 'flashSale.isActive': 1, 'flashSale.endTime': 1 });
+productSchema.index({ shop: 1, shopCategory: 1, status: 1 }); // Shop + shopCategory filtering
+productSchema.index({ shopCategory: 1, status: 1 }); // shopCategory filtering without shop (catalog search)
+productSchema.index({ status: 1, isFeatured: -1, createdAt: -1 }); // findFeatured
+productSchema.index({ status: 1, isNewArrival: -1, createdAt: -1 }); // findNewArrival / findHomepageNewArrivals
+productSchema.index({ status: 1, ratingAverage: -1, reviewCount: -1 }); // findTopRatedProducts / findHomepageTopRated
+productSchema.index({ status: 1, soldCount: -1 }); // findTopSellingProducts / findTrendingProducts
+productSchema.index({ status: 1, 'price.currentPrice': 1 }); // Price range filtering
+productSchema.index({ 'flashSale.isActive': 1, 'flashSale.endTime': 1 }); // Active flash sale lookup
 
 // Text search index
 productSchema.index(
@@ -173,7 +170,6 @@ productSchema.index(
 );
 
 // ==================== HOOKS ====================
-// Slug generation
 productSchema.pre('validate', function (next) {
   if (this.name && !this.slug) {
     this.slug = slugify(this.name, {
@@ -185,7 +181,6 @@ productSchema.pre('validate', function (next) {
   next();
 });
 
-// Ensure unique slug
 productSchema.pre('save', async function (next) {
   if (this.isNew || this.isModified('slug')) {
     const existingProduct = await this.constructor.findOne({
@@ -211,7 +206,6 @@ productSchema.pre('save', function (next) {
 });
 
 // ==================== STATIC METHODS ====================
-// Efficient queries for common use cases
 
 productSchema.statics.findPublished = function (filter = {}) {
   return this.find({ ...filter, status: 'published' });

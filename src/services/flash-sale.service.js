@@ -29,7 +29,6 @@ class FlashSaleService {
 
     const products = await Product.findActiveFlashSaleProducts(now, paginationParams);
 
-    // Calculate remaining time and sold percentage
     const enrichedProducts = products.map((p) => ({
       ...p,
       flashSaleInfo: {

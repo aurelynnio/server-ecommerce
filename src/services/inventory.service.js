@@ -28,7 +28,6 @@ class InventoryService {
       const quantity = item.quantity;
 
       if (item.modelId) {
-        // Variant stock check
         const variant = product.variants.find((v) => v._id.toString() === item.modelId.toString());
 
         if (!variant) {
@@ -45,7 +44,6 @@ class InventoryService {
           );
         }
       } else {
-        // Base product stock check
         if (product.stock < quantity) {
           throw new ApiError(StatusCodes.CONFLICT, `Out of stock for ${product.name}`);
         }

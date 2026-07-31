@@ -322,7 +322,6 @@ class OrderService {
         // Temporary storage for created orders to update them later with Platform Discount
         const tempOrders = [];
 
-        // Loop through confirmed shop groups
         for (const [shopId, items] of shopItemsMap.entries()) {
           const orderProducts = [];
           let subtotal = 0;
@@ -448,7 +447,7 @@ class OrderService {
             shippingAddress,
             paymentMethod,
             subtotal,
-            discountShop, // Saved here
+            discountShop,
             discountPlatform: 0,
             totalAmount, // Temporary, will subtract platform discount later
             status: 'pending',
@@ -489,7 +488,6 @@ class OrderService {
                 distributedDiscount += order.discountPlatform;
               }
 
-              // Recalculate Final Total per Order
               order.totalAmount = Math.max(0, order.totalAmount - order.discountPlatform);
             });
           } else {
@@ -508,23 +506,19 @@ class OrderService {
           await VoucherUsage.create([{ voucherId: voucherResult.voucherId, userId }], { session });
         }
 
-        // Save All Orders within transaction
         for (const order of tempOrders) {
           await order.save({ session });
           createdOrders.push(order);
         }
 
         // 5. Cleanup Cart
-        // Filter out checked out items
         cart.items = cart.items.filter((item) => !cartItemIds.includes(item._id.toString()));
         cart.totalAmount = this.calculateTotal(cart.items);
         await cart.save({ session });
 
-        // Commit the transaction
         await session.commitTransaction();
         await this.publishOrderCreatedEvents(createdOrders);
 
-        // Return group details
         return {
           message: 'Orders created successfully',
           orderGroupId,
@@ -650,7 +644,6 @@ class OrderService {
 
     if (newStatus === 'cancelled') {
       order.cancelledAt = new Date();
-      // Restore stock when seller cancels
       await this.restoreOrderStock(order);
     }
 
@@ -861,7 +854,6 @@ class OrderService {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Cannot cancel order in this status');
     }
 
-    // Restore Stock via InventoryService
     await this.restoreOrderStock(order);
 
     const previousStatus = order.status;

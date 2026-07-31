@@ -13,7 +13,6 @@ const settingsSchema = new Schema(
       unique: true,
     },
 
-    // Store settings section
     store: {
       name: { type: String, default: 'My E-commerce Store' },
       email: { type: String, default: '' },
@@ -24,7 +23,6 @@ const settingsSchema = new Schema(
       favicon: { type: String, default: '' },
     },
 
-    // Notification settings
     notifications: {
       newOrders: { type: Boolean, default: true },
       lowStock: { type: Boolean, default: true },
@@ -33,7 +31,6 @@ const settingsSchema = new Schema(
       orderStatusUpdates: { type: Boolean, default: true },
     },
 
-    // Display/appearance settings
     display: {
       darkMode: { type: Boolean, default: false },
       language: { type: String, default: 'vi' },
@@ -42,7 +39,6 @@ const settingsSchema = new Schema(
       itemsPerPage: { type: Number, default: 20 },
     },
 
-    // Business settings
     business: {
       lowStockThreshold: { type: Number, default: 10 },
       orderPrefix: { type: String, default: 'ORD' },
@@ -51,7 +47,6 @@ const settingsSchema = new Schema(
       enableChat: { type: Boolean, default: true },
     },
 
-    // Last updated by
     updatedBy: {
       type: Schema.Types.ObjectId,
       ref: 'User',

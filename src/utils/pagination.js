@@ -31,7 +31,6 @@ const parseLimit = (query = {}, defaultValue = 10) => {
  * @returns {Object} Pagination metadata with skip/limit for MongoDB
  */
 const getPaginationParams = (currentPage = 1, pageSize = 10, totalItems = 0) => {
-  // Validate and sanitize inputs
   const page = Math.max(1, parseInt(currentPage) || 1);
   const limit = Math.max(1, Math.min(100, parseInt(pageSize) || 10)); // Max 100 items per page
 

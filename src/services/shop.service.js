@@ -22,13 +22,11 @@ class ShopService {
   async createShop(userId, shopData) {
     const { name, ...otherDetails } = shopData;
 
-    // Check if user already has a shop
     const existingShop = await Shop.findByOwnerId(userId);
     if (existingShop) {
       throw new ApiError(StatusCodes.CONFLICT, 'User already owns a shop');
     }
 
-    // Check duplicate name
     const existingName = await Shop.findByName(name);
     if (existingName) {
       throw new ApiError(StatusCodes.CONFLICT, 'Shop name already taken');
@@ -130,7 +128,6 @@ class ShopService {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Shop not found');
     }
 
-    // Get product count
     const productCount = await Product.countPublishedByShop(shop._id);
 
     // Get follower count from ShopFollower collection
@@ -215,14 +212,12 @@ class ShopService {
       shopId,
     });
 
-    // Map raw data to lookup object
     const revenueMap = {};
     monthlyRevenueRaw.forEach((item) => {
       const key = `${item._id.month}/${item._id.year}`;
       revenueMap[key] = { revenue: item.revenue, orders: item.orders };
     });
 
-    // Merge with last6Months
     const chartData = last6Months.map((time) => {
       const data = revenueMap[time.key] || { revenue: 0, orders: 0 };
       return {
@@ -232,7 +227,6 @@ class ShopService {
       };
     });
 
-    // Transform top products
     const formattedTopProducts = topProducts.map((product) => {
       const image = product.variants?.[0]?.images?.[0] || null;
       const price = product.variants?.[0]?.price || 0;
@@ -246,7 +240,6 @@ class ShopService {
       };
     });
 
-    // Transform recent orders
     const formattedRecentOrders = recentOrders.map((order) => ({
       _id: order._id,
       customer: order.userId?.username || 'Guest',
@@ -293,7 +286,6 @@ class ShopService {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Shop not found');
     }
 
-    // Check if already following
     const existing = await ShopFollower.findByShopAndUser(shopId, userId);
     if (existing) {
       throw new ApiError(StatusCodes.CONFLICT, 'Already following this shop');

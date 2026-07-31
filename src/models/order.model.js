@@ -25,8 +25,7 @@ const orderSchema = new Schema(
           ref: 'Product',
           required: true,
         },
-        // Variant identification
-        sku: { type: String }, // specific sku code
+        sku: { type: String },
         variantId: { type: Types.ObjectId }, // maps to product.variants._id (color variant)
 
         name: { type: String, required: true },
@@ -60,7 +59,6 @@ const orderSchema = new Schema(
       default: 'unpaid',
     },
 
-    // Financials
     subtotal: { type: Number, required: true, min: 0 },
     shippingFee: { type: Number, default: 0 }, // Calculated via ShippingTemplate
     discountShop: { type: Number, default: 0 }, // Shop voucher
@@ -81,7 +79,6 @@ const orderSchema = new Schema(
       default: 'pending',
     },
 
-    // Tracking
     trackingNumber: { type: String },
     carrier: { type: String },
 
@@ -93,10 +90,13 @@ const orderSchema = new Schema(
 );
 
 // Indexes
-orderSchema.index({ userId: 1, createdAt: -1 }); // User order history
+// Compound indexes follow the ESR (Equality → Sort → Range) principle.
+orderSchema.index({ userId: 1, createdAt: -1 }); // User order history (findRecentNonCancelledOrdersByUser)
 orderSchema.index({ userId: 1, status: 1 }); // User filtering by status
 orderSchema.index({ shopId: 1, status: 1 }); // Seller dashboard filtering
 orderSchema.index({ shopId: 1, createdAt: -1 }); // Seller order history
+orderSchema.index({ shopId: 1, paymentStatus: 1 }); // aggregatePaidRevenueByShopId / countByShopWithFilters
+orderSchema.index({ 'products.productId': 1, status: 1 }); // existsDeliveredOrderForProductByUser / findOrdersContainingProduct
 orderSchema.index({ orderGroupId: 1 }); // User finding their "checkout history"
 orderSchema.index({ status: 1 });
 orderSchema.index({ paymentStatus: 1 });

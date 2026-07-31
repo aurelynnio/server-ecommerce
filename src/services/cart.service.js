@@ -16,18 +16,15 @@ class CartService {
   async getCart(userId) {
     let cart = await Cart.findByUserIdWithItemDetails(userId);
 
-    // Create new cart if doesn't exist
     if (!cart) {
       cart = await Cart.createEmptyCart(userId);
     }
 
-    // Populate variation details for each item
     if (cart && cart.items && cart.items.length > 0) {
       cart.items = cart.items.map((item) => {
         const product = item.productId;
         if (!product) return item;
 
-        // Handle color variants
         if (item.variantId && product.variants && product.variants.length > 0) {
           const variant = product.variants.find(
             (v) => v._id.toString() === item.variantId.toString(),
@@ -41,10 +38,8 @@ class CartService {
               price: variant.price,
               stock: variant.stock,
             };
-            // Override price from variant
             item.price = { currentPrice: variant.price, currency: 'VND' };
 
-            // Build variationInfo string
             const parts = [];
             if (variant.color) parts.push(variant.color);
             if (item.size) parts.push(`Size: ${item.size}`);
@@ -138,12 +133,10 @@ class CartService {
   async addToCart(userId, itemData) {
     const { productId, modelId, size, quantity } = itemData;
 
-    // Validate quantity
     if (!quantity || quantity < 1) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Quantity must be at least 1');
     }
 
-    // Check if product exists and is published
     const product = await Product.findById(productId);
     if (!product) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
@@ -152,7 +145,6 @@ class CartService {
       throw new ApiError(StatusCodes.CONFLICT, 'Product is not available');
     }
 
-    // Validate size selection if product has sizes
     if (product.sizes && product.sizes.length > 0) {
       if (!size) {
         throw new ApiError(StatusCodes.BAD_REQUEST, 'Please select a size');
@@ -162,17 +154,13 @@ class CartService {
       }
     }
 
-    // Get Shop ID
     const shopId = product.shop;
 
-    // Determine Price & Variant
     let price = product.price?.currentPrice || 0;
     let selectedVariantId = null;
 
-    // Handle color variants
     if (product.variants && product.variants.length > 0) {
       if (modelId) {
-        // Find variant by ID
         const variant = product.variants.find((v) => v._id.toString() === modelId);
         if (!variant) {
           throw new ApiError(StatusCodes.NOT_FOUND, 'Variant not found');
@@ -235,7 +223,6 @@ class CartService {
 
     if (existingItemIndex > -1) {
       cart.items[existingItemIndex].quantity += quantity;
-      // Update price if changed
       cart.items[existingItemIndex].price = {
         currentPrice: price,
         currency: 'VND',
@@ -252,11 +239,10 @@ class CartService {
       });
     }
 
-    // Calculate total
     cart.totalAmount = this.calculateTotal(cart.items);
     await cart.save();
 
-    return this.getCart(userId); // Return full populated cart
+    return this.getCart(userId);
   }
 
   /**
@@ -278,12 +264,10 @@ class CartService {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Item not found in cart');
     }
 
-    // If quantity is 0 or less, remove the item
     if (quantity <= 0) {
       return this.removeCartItem(userId, itemId);
     }
 
-    // Check product stock
     const product = await Product.findById(item.productId);
     if (!product || product.status !== 'published') {
       throw new ApiError(StatusCodes.CONFLICT, 'Product is not available');
@@ -293,7 +277,6 @@ class CartService {
     const isIncreasing = quantity > item.quantity;
 
     if (isIncreasing) {
-      // Check variantId first
       if (item.variantId && product.variants && product.variants.length > 0) {
         const variant = product.variants.find(
           (v) => v._id.toString() === item.variantId.toString(),
@@ -323,10 +306,8 @@ class CartService {
       }
     }
 
-    // Update quantity
     item.quantity = quantity;
 
-    // Recalculate total
     cart.totalAmount = this.calculateTotal(cart.items);
 
     await cart.save();
@@ -347,10 +328,8 @@ class CartService {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Cart not found');
     }
 
-    // Remove item using pull
     cart.items.pull(itemId);
 
-    // Recalculate total
     cart.totalAmount = this.calculateTotal(cart.items);
 
     await cart.save();

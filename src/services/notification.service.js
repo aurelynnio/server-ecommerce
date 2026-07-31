@@ -210,7 +210,6 @@ class NotificationService {
         if (batch.length >= BATCH_SIZE) {
           await Notification.bulkWriteNotifications(batch);
 
-          // Emit socket notifications for this batch
           try {
             await emitBatchNotifications(batch);
           } catch (error) {
@@ -304,7 +303,6 @@ class NotificationService {
    */
   async markReadAll(userId) {
     const result = await Notification.markAllReadByUserId(userId);
-    // Update real-time count
     try {
       const { getIO } = require('../socket/index');
       const io = getIO();
@@ -321,7 +319,6 @@ class NotificationService {
   async cleanNotification(userId) {
     const result = await Notification.deleteAllByUserId(userId);
 
-    // Update real-time count
     try {
       const { getIO } = require('../socket/index');
       const io = getIO();

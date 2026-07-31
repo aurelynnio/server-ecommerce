@@ -35,10 +35,8 @@ class ReviewService {
   async createReview(userId, reviewData) {
     const { productId, rating, comment } = reviewData;
 
-    // Check if product exists
     await this._getProductOrThrow(productId);
 
-    // Check if user has purchased this product
     const hasPurchased = await Order.existsDeliveredOrderForProductByUser(userId, productId);
 
     if (!hasPurchased) {
@@ -48,14 +46,12 @@ class ReviewService {
       );
     }
 
-    // Check if user already reviewed this product
     const existingReview = await Review.findByUserAndProduct(userId, productId);
 
     if (existingReview) {
       throw new ApiError(StatusCodes.CONFLICT, 'You have already reviewed this product');
     }
 
-    // Create review
     const review = await Review.create({
       user: userId,
       product: productId,
@@ -63,10 +59,8 @@ class ReviewService {
       comment,
     });
 
-    // Update product average rating
     await this.updateProductRating(productId);
 
-    // Populate user info
     await review.populate('user', 'username email');
 
     return review;
@@ -86,10 +80,8 @@ class ReviewService {
   async getProductReviews(productId, filters = {}) {
     const { page = 1, limit = 10, rating, sort = 'newest' } = filters;
 
-    // Check if product exists
     const productExists = await this._getProductOrThrow(productId);
 
-    // Determine sort order
     let sortOption = {};
     switch (sort) {
       case 'newest':
@@ -108,13 +100,10 @@ class ReviewService {
         sortOption = { createdAt: -1 };
     }
 
-    // Count total items first
     const total = await Review.countByProductWithFilters(productId, { rating });
 
-    // Get pagination params with total count
     const paginationParams = getPaginationParams(page, limit, total);
 
-    // Execute query
     const reviews = await Review.findByProductWithFilters(productId, {
       rating,
       sort: sortOption,
@@ -127,7 +116,6 @@ class ReviewService {
     let distribution = await redisService.get(distributionCacheKey);
 
     if (!distribution) {
-      // Calculate rating distribution
       const ratingDistribution = await Review.aggregateRatingDistributionByProduct(
         productExists._id,
       );
@@ -140,7 +128,6 @@ class ReviewService {
         distribution[item._id] = item.count;
       });
 
-      // Cache for 5 minutes
       await redisService.set(distributionCacheKey, distribution, 300);
     }
 
@@ -148,7 +135,7 @@ class ReviewService {
       ...buildPaginationResponse(reviews, paginationParams),
       metadata: {
         ratingDistribution: distribution,
-        averageRating: productExists.averageRating || 0,
+        averageRating: productExists.ratingAverage || 0,
         totalReviews: total,
       },
     };
@@ -191,13 +178,10 @@ class ReviewService {
   async getUserReviews(userId, filters = {}) {
     const { page = 1, limit = 10 } = filters;
 
-    // Count total items first
     const total = await Review.countByUserId(userId);
 
-    // Get pagination params with total count
     const paginationParams = getPaginationParams(page, limit, total);
 
-    // Execute query
     const reviews = await Review.findByUserIdWithPagination(userId, paginationParams);
 
     return buildPaginationResponse(reviews, paginationParams);
@@ -226,12 +210,10 @@ class ReviewService {
   async updateReview(reviewId, userId, updateData) {
     const review = await this._getReviewOrThrow(reviewId);
 
-    // Check if user owns this review
     if (review.user.toString() !== userId) {
       throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized to update this review');
     }
 
-    // Update review
     if (updateData.rating !== undefined) {
       review.rating = updateData.rating;
     }
@@ -271,7 +253,6 @@ class ReviewService {
 
     await Review.deleteById(reviewId);
 
-    // Update product average rating
     await this.updateProductRating(productId);
 
     return { message: 'Review deleted successfully' };
@@ -280,7 +261,7 @@ class ReviewService {
   /**
    * Update product average rating and total reviews
    * @param {string} productId - Product ID
-   * @returns {Promise<{ averageRating: number, totalReviews: number }>}
+   * @returns {Promise<{ ratingAverage: number, reviewCount: number }>}
    */
   async updateProductRating(productId) {
     const stats = await Review.aggregateProductRatingStats(productId);
@@ -288,16 +269,20 @@ class ReviewService {
     const product = await Product.findById(productId);
     if (product) {
       if (stats.length > 0) {
-        product.averageRating = Math.round(stats[0].averageRating * 10) / 10; // Round to 1 decimal
-        product.totalReviews = stats[0].totalReviews;
+        // stats[0].averageRating / totalReviews are aggregation output aliases;
+        // the product schema fields are ratingAverage / reviewCount.
+        product.ratingAverage = Math.round(stats[0].averageRating * 10) / 10; // Round to 1 decimal
+        product.reviewCount = stats[0].totalReviews;
       } else {
-        product.averageRating = 0;
-        product.totalReviews = 0;
+        product.ratingAverage = 0;
+        product.reviewCount = 0;
       }
       await product.save();
     }
 
-    return stats.length > 0 ? stats[0] : { averageRating: 0, totalReviews: 0 };
+    return stats.length > 0
+      ? { ratingAverage: stats[0].averageRating, reviewCount: stats[0].totalReviews }
+      : { ratingAverage: 0, reviewCount: 0 };
   }
 
   /**
@@ -307,10 +292,8 @@ class ReviewService {
    * @returns {Promise<Object>} Eligibility result
    */
   async canUserReview(userId, productId) {
-    // Check if product exists
     await this._getProductOrThrow(productId);
 
-    // Check if user has purchased and received this product
     const hasPurchased = await Order.existsDeliveredOrderForProductByUser(userId, productId);
 
     if (!hasPurchased) {
@@ -320,7 +303,6 @@ class ReviewService {
       };
     }
 
-    // Check if user already reviewed
     const existingReview = await Review.findByUserAndProduct(userId, productId);
 
     if (existingReview) {
@@ -419,7 +401,6 @@ class ReviewService {
       );
     }
 
-    // Update review with reply
     review.reply = content;
     review.replyAt = new Date();
     await review.save();
@@ -438,10 +419,8 @@ class ReviewService {
 
     const averageRating = await Review.aggregateOverallAverageRating();
 
-    // Top rated products
     const topRatedProducts = await Product.findTopRatedProducts(5);
 
-    // Most reviewed products
     const mostReviewedProducts = await Product.findMostReviewedProducts(5);
 
     return {

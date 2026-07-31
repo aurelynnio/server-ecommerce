@@ -48,7 +48,6 @@ class PaymentService {
    * @throws {Error} If order invalid, unauthorized, or already paid
    */
   async createPaymentUrl(orderId, userId, ipAddress) {
-    // Get order details
     const order = await Order.findById(orderId);
     if (!order) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found');
@@ -69,14 +68,12 @@ class PaymentService {
     // PERFORMANCE FIX: Use singleton VNPay instance
     const vnpay = getVNPayInstance();
 
-    // Generate unique transaction reference
     const transactionId = `${orderId}_${Date.now()}`;
 
     // Generate dates in GMT+7 to avoid timezone issues (especially if server is in UTC)
     const createDate = getDateInGMT7(new Date());
     const expireDate = getDateInGMT7(new Date(Date.now() + 15 * 60 * 1000));
 
-    // Build payment URL
     const paymentUrl = vnpay.buildPaymentUrl({
       vnp_Amount: order.totalAmount, // Library vnpayjs already handles multiplication by 100 internally
       vnp_IpAddr: ipAddress,
@@ -91,7 +88,6 @@ class PaymentService {
       vnp_ExpireDate: dateFormat(expireDate),
     });
 
-    // Save payment record
     const payment = Payment.build({
       orderId: order._id,
       userId: order.userId,
@@ -117,7 +113,6 @@ class PaymentService {
     // PERFORMANCE FIX: Use singleton VNPay instance
     const vnpay = getVNPayInstance();
 
-    // Verify signature
     const isValid = vnpay.verifyReturnUrl(vnpayParams);
     if (!isValid) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid signature');
@@ -127,28 +122,23 @@ class PaymentService {
     const responseCode = vnpayParams.vnp_ResponseCode;
     const transactionStatus = vnpayParams.vnp_TransactionStatus;
 
-    // Find payment record
     const payment = await Payment.findByTransactionId(transactionId);
     if (!payment) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Payment not found');
     }
 
-    // Find order
     const order = await Order.findById(payment.orderId);
     if (!order) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found');
     }
 
-    // Check if payment is successful
     const isSuccess = responseCode === '00' && transactionStatus === '00';
 
-    // Update payment status
     payment.status = isSuccess ? 'completed' : 'failed';
     payment.vnpayData = vnpayParams;
     payment.paymentDate = new Date();
     await payment.save();
 
-    // Update order payment status if successful
     if (isSuccess) {
       const previousStatus = order.status;
       const previousPaymentStatus = order.paymentStatus;
@@ -189,7 +179,6 @@ class PaymentService {
     // PERFORMANCE FIX: Use singleton VNPay instance
     const vnpay = getVNPayInstance();
 
-    // Verify IPN signature
     const isValid = vnpay.verifyIpnCall(vnpayParams);
     if (!isValid) {
       return {
@@ -202,7 +191,6 @@ class PaymentService {
     const responseCode = vnpayParams.vnp_ResponseCode;
     const amount = parseInt(vnpayParams.vnp_Amount) / 100;
 
-    // Find payment record
     const payment = await Payment.findByTransactionId(transactionId);
     if (!payment) {
       return {
@@ -211,7 +199,6 @@ class PaymentService {
       };
     }
 
-    // Check amount
     if (payment.amount !== amount) {
       return {
         RspCode: '04',
@@ -219,7 +206,6 @@ class PaymentService {
       };
     }
 
-    // Check if already processed
     if (payment.status === 'completed') {
       return {
         RspCode: '02',
@@ -227,7 +213,6 @@ class PaymentService {
       };
     }
 
-    // Find order
     const order = await Order.findById(payment.orderId);
     if (!order) {
       return {
@@ -236,7 +221,6 @@ class PaymentService {
       };
     }
 
-    // Process payment
     const isSuccess = responseCode === '00';
 
     payment.status = isSuccess ? 'completed' : 'failed';

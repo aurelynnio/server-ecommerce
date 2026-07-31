@@ -30,15 +30,12 @@ const verifyAccessToken = (req, res, next) => {
   try {
     const token = extractAccessToken(req);
 
-    // No token found
     if (!token) {
       return sendFail(res, 'Access token is required. Please login.', StatusCodes.UNAUTHORIZED);
     }
 
-    // Verify token
     const decoded = tokenService.verifyAccessToken(token);
 
-    // Attach user info to request
     req.user = {
       // Keep both keys for backward compatibility across controllers.
       _id: decoded.userId,
@@ -101,7 +98,6 @@ const requireRole = (...allowedRoles) => {
 
   return async (req, res, next) => {
     try {
-      // Check if user is authenticated first
       if (!req.user) {
         return sendFail(res, 'Authentication required', StatusCodes.UNAUTHORIZED);
       }
@@ -127,7 +123,6 @@ const requireRole = (...allowedRoles) => {
         }
       }
 
-      // Check if user has one of the allowed roles
       const hasRole = flatRoles.some((role) => userRoles.includes(role));
 
       if (!hasRole) {
