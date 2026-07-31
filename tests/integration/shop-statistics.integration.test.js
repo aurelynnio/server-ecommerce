@@ -315,7 +315,6 @@ describe('Shop Statistics Pipeline - Integration Tests', () => {
       const formattedTopProducts = formatTopProducts(topProducts);
       const formattedRecentOrders = formatRecentOrders(recentOrders);
 
-      // Verify assembled result
       expect(stats.totalRevenue).toBe(15000000);
       expect(stats.ordersByStatus.delivered).toBe(50);
       expect(stats.ordersByStatus.pending).toBe(5);

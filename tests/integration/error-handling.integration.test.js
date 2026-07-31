@@ -56,7 +56,6 @@ describe('Error Handling Pipeline - Integration Tests', () => {
       expect(errors[0].statusCode).toBe(404);
       expect(errors[0].message).toBe('Product not found');
 
-      // Now pass to errorHandler
       const errorRes = createMockRes();
       errorHandler(errors[0], req, errorRes, vi.fn());
 

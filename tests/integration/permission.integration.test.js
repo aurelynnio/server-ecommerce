@@ -9,7 +9,6 @@ const permissionMiddleware = await import('../../src/middlewares/permission.midd
 
 const { ROLE_PERMISSIONS, getAllPermissionsList, isValidPermission } = permissionConfig;
 
-// Service methods from instance
 const getUserPermissions = (user) => permissionServiceInstance.getUserPermissions(user);
 const hasPermission = (user, perm) => permissionServiceInstance.hasPermission(user, perm);
 const hasAnyPermission = (user, perms) => permissionServiceInstance.hasAnyPermission(user, perms);

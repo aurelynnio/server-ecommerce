@@ -73,12 +73,10 @@ describe('VoucherService Logic', () => {
       const errors = [];
       const now = new Date();
 
-      // Check if active
       if (!voucher.isActive) {
         errors.push('Voucher is not active');
       }
 
-      // Check dates
       if (voucher.startDate && new Date(voucher.startDate) > now) {
         errors.push('Voucher is not yet active');
       }
@@ -86,22 +84,18 @@ describe('VoucherService Logic', () => {
         errors.push('Voucher has expired');
       }
 
-      // Check usage limit
       if (voucher.usageLimit && voucher.usageCount >= voucher.usageLimit) {
         errors.push('Voucher usage limit reached');
       }
 
-      // Check if user already used
       if (voucher.usedBy && voucher.usedBy.includes(userId)) {
         errors.push('You have already used this voucher');
       }
 
-      // Check minimum order value
       if (voucher.minOrderValue && orderValue < voucher.minOrderValue) {
         errors.push(`Order value must be at least ${voucher.minOrderValue}`);
       }
 
-      // Check shop scope
       if (voucher.scope === 'shop' && shopId) {
         const voucherShopId = voucher.shopId?.toString?.() || voucher.shopId;
         if (voucherShopId !== shopId) {
