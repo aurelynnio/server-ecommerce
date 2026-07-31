@@ -20,7 +20,6 @@ async function main() {
   console.log('');
 
   try {
-    // Connect to MongoDB
     console.log('Connecting to MongoDB...');
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('Connected to MongoDB');
@@ -36,7 +35,6 @@ async function main() {
       console.log('');
     }
 
-    // Generate embeddings for all products
     console.log('Starting embedding generation...');
     console.log('');
 

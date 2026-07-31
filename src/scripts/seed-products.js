@@ -255,7 +255,6 @@ async function seedData() {
         status: 'active',
       });
 
-      // Update user with shopId
       await User.findByIdAndUpdate(user._id, { shop: shop._id });
 
       // C. Create Shop Categories (3-5 per shop)
@@ -301,8 +300,8 @@ async function seedData() {
           slug: slugify(name, { lower: true, strict: true, locale: 'vi' }),
           description: `Description for ${name}. High quality product from ${shopName}.`,
           shop: shop._id,
-          shopCategory: getRandom(shopCategoryIds), // Assign to one of this shop's categories
-          category: getRandom(globalCategories)._id, // Assign to a global category
+          shopCategory: getRandom(shopCategoryIds),
+          category: getRandom(globalCategories)._id,
           brand: name.split(' ')[0],
           price: {
             currentPrice: price,
