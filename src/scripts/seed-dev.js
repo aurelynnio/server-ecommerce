@@ -78,6 +78,126 @@ const unsplash = [
   'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=1200&q=80',
 ];
 
+// Curated image pools per category. Each category has 8-12 stable URLs so
+// every product inside it gets a consistent visual theme instead of random noise.
+// `featured` is the primary hero image; the rest are secondary angles.
+const imagePoolByCategory = {
+  phone: {
+    featured: [
+      'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1556656793-08538906a9f8?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1567581935884-3349723552ca?auto=format&fit=crop&w=1200&q=80',
+    ],
+    secondary: [
+      'https://images.unsplash.com/photo-1601784551446-20c9e07cdbdb?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1574944985070-8f3ebc6b79d2?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1605236453806-6ff36851218e?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1601784551446-20c9e07cdbdb?auto=format&fit=crop&w=1200&q=80',
+    ],
+  },
+  fashion: {
+    featured: [
+      'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1469334031218-e382a71b716b?auto=format&fit=crop&w=1200&q=80',
+    ],
+    secondary: [
+      'https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1485968579580-b6d095142e6e?auto=format&fit=crop&w=1200&q=80',
+    ],
+  },
+  beauty: {
+    featured: [
+      'https://images.unsplash.com/photo-1522335789203-aaa2f6c6f6a3?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1583241800698-9c2e29df8a4d?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1522335789203-aaa2f6c6f6a3?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=1200&q=80',
+    ],
+    secondary: [
+      'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1599733589046-9bbb13c9b8d1?auto=format&fit=crop&w=1200&q=80',
+    ],
+  },
+  home: {
+    featured: [
+      'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1556228453-efd6c1ff04f6?auto=format&fit=crop&w=1200&q=80',
+    ],
+    secondary: [
+      'https://images.unsplash.com/photo-1565182999561-18d7dc61c393?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1554995207-c18c203602cb?auto=format&fit=crop&w=1200&q=80',
+    ],
+  },
+  computer: {
+    featured: [
+      'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1593640408182-31c70c8268f5?auto=format&fit=crop&w=1200&q=80',
+    ],
+    secondary: [
+      'https://images.unsplash.com/photo-1547119957-637f8679db1e?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1603302576837-37561b2e2302?auto=format&fit=crop&w=1200&q=80',
+    ],
+  },
+  sports: {
+    featured: [
+      'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1556906781-9a412961c28c?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=1200&q=80',
+    ],
+    secondary: [
+      'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1530549387789-4c1017266635?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1521804906057-1df8fdb718b7?auto=format&fit=crop&w=1200&q=80',
+    ],
+  },
+  food: {
+    featured: [
+      'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1551782450-a2132b4ba21d?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=1200&q=80',
+    ],
+    secondary: [
+      'https://images.unsplash.com/photo-1473093295043-cdd812d0e601?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1505253758473-96b7015fcd40?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=1200&q=80',
+    ],
+  },
+};
+
+// Map a global category slug to one of the curated pools.
+function pickImagePool(category) {
+  const slug = (category?.slug || '').toLowerCase();
+  if (slug.includes('dien-thoai') || slug.includes('phu-kien')) return imagePoolByCategory.phone;
+  if (slug.includes('thoi-trang')) return imagePoolByCategory.fashion;
+  if (slug.includes('lam-dep')) return imagePoolByCategory.beauty;
+  if (slug.includes('nha-cua')) return imagePoolByCategory.home;
+  if (slug.includes('may-tinh') || slug.includes('thiet-bi')) return imagePoolByCategory.computer;
+  if (slug.includes('the-thao') || slug.includes('du-lich')) return imagePoolByCategory.sports;
+  if (slug.includes('thuc-pham') || slug.includes('do-uong')) return imagePoolByCategory.food;
+  return {
+    featured: unsplash,
+    secondary: unsplash,
+  };
+}
+
 function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -93,24 +213,32 @@ function pickMany(arr, n) {
 }
 
 async function ensureCategories() {
-  const existing = await Category.find({ isActive: true }).select('_id slug');
-  if (existing.length > 0) return existing;
-
+  // Always upsert default categories so they exist regardless of legacy data.
   try {
-    await Category.insertMany(
+    await Category.bulkWrite(
       defaultGlobalCategories.map((c) => ({
-        name: c.name,
-        slug: c.slug,
-        description: '',
-        images: [],
-        isActive: true,
+        updateOne: {
+          filter: { slug: c.slug },
+          update: {
+            $setOnInsert: {
+              name: c.name,
+              slug: c.slug,
+              description: '',
+              images: [],
+              isActive: true,
+            },
+          },
+          upsert: true,
+        },
       })),
       { ordered: false },
     );
   } catch (_e) {
-    // ignore duplicates
+    // ignore duplicate key / race-condition errors
   }
-  return await Category.find({ isActive: true }).select('_id slug');
+  // Return only the curated default slugs so each product gets a known theme.
+  const slugs = defaultGlobalCategories.map((c) => c.slug);
+  return await Category.find({ slug: { $in: slugs }, isActive: true }).select('_id slug name');
 }
 
 async function ensureSettings() {
@@ -331,12 +459,17 @@ async function ensureShopCategories(shops) {
   return all;
 }
 
-function buildVariants({ basePrice }) {
+function buildVariants({ basePrice, pool }) {
   const variantCount = faker.number.int({ min: 1, max: 4 });
   const colors = pickMany(
     ['Đen', 'Trắng', 'Đỏ', 'Xanh', 'Vàng', 'Tím', 'Hồng', 'Xám'],
     variantCount,
   );
+  // All variants share the same hero + secondary images for visual consistency.
+  // We only attach a small color-specific accent image per variant if available.
+  const heroImages = pickMany(pool.featured, Math.min(2, pool.featured.length));
+  const secondaryImages = pickMany(pool.secondary, Math.min(2, pool.secondary.length));
+  const baseImages = [...heroImages, ...secondaryImages];
 
   return colors.map((color, idx) => {
     const priceBump = faker.number.int({ min: -5, max: 10 }) * 10000;
@@ -352,7 +485,10 @@ function buildVariants({ basePrice }) {
         2,
         '0',
       )}`,
-      images: pickMany(unsplash, faker.number.int({ min: 1, max: 3 })),
+      // Per-variant image set: keep hero consistent, swap the last slot
+      // with a secondary from the same category pool so the gallery still
+      // looks like the same product rather than random noise.
+      images: idx === 0 ? baseImages : [...baseImages.slice(0, -1), pick(pool.secondary)],
     };
   });
 }
@@ -382,6 +518,11 @@ async function seedProducts({ shops, shopCategories, categories, productsPerShop
         locale: 'vi',
       });
       const basePrice = faker.number.int({ min: 80, max: 2000 }) * 1000;
+      // Pick a global category first, then derive the image pool from it
+      // so each product gets a consistent visual theme.
+      const productCategory = pick(categories);
+      const pool = pickImagePool(productCategory);
+
       const discountRoll = Math.random() > 0.65;
       const discountPrice = discountRoll
         ? Math.round(basePrice * faker.number.float({ min: 0.7, max: 0.95, precision: 0.01 }))
@@ -395,17 +536,23 @@ async function seedProducts({ shops, shopCategories, categories, productsPerShop
           ? Math.max(1000, Math.round(basePrice * (1 - discountPercent / 100)))
           : null;
 
-      const variants = buildVariants({ basePrice });
+      const variants = buildVariants({ basePrice, pool });
       const stock = variants.reduce((s, v) => s + (v.stock || 0), 0);
       const soldFromVariants = variants.reduce((s, v) => s + (v.sold || 0), 0);
-      const descImages = pickMany(unsplash, faker.number.int({ min: 1, max: 6 }));
+      // descriptionImages are gallery shots from the same category theme.
+      // We reuse the variant hero + a few secondary images so the product page
+      // gallery matches what users see on the product card.
+      const descImages = [
+        ...variants[0].images,
+        ...pickMany(pool.secondary, faker.number.int({ min: 0, max: 2 })),
+      ];
 
       batch.push({
         name,
         slug,
         description: faker.commerce.productDescription(),
         shop: shop._id,
-        category: pick(categories)._id,
+        category: productCategory._id,
         shopCategory: shopCats.length ? pick(shopCats)._id : undefined,
         brand: faker.company.name(),
         tags: pickMany(
