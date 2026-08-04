@@ -4,6 +4,10 @@ const authController = require('../controllers/auth.controller');
 const { verifyAccessToken } = require('../middlewares/auth.middleware');
 const validate = require('../middlewares/validate.middleware');
 const {
+  authRateLimiter,
+  passwordResetRateLimiter,
+} = require('../middlewares/rateLimit.middleware');
+const {
   loginValidator,
   registerValidator,
   sendVerificationCodeValidator,
@@ -21,20 +25,22 @@ const {
  * @desc    Register a new user
  * @access  Public
  */
-router.post('/register', validate(registerValidator), authController.register);
+router.post('/register', authRateLimiter, validate(registerValidator), authController.register);
 
 /**
  * @desc    Login user and return tokens in cookies
  * @access  Public
  */
-router.post('/login', validate(loginValidator), authController.login);
+router.post('/login', authRateLimiter, validate(loginValidator), authController.login);
 router.post(
   '/2fa/verify-login',
+  authRateLimiter,
   validate(verifyLoginTwoFactorValidator),
   authController.verifyLoginTwoFactor,
 );
 router.post(
   '/2fa/resend-login-code',
+  authRateLimiter,
   validate(resendLoginTwoFactorValidator),
   authController.resendLoginTwoFactorCode,
 );
@@ -45,6 +51,7 @@ router.post(
  */
 router.post(
   '/send-verification-code',
+  authRateLimiter,
   validate(sendVerificationCodeValidator),
   authController.sendVerificationCode,
 );
@@ -55,6 +62,7 @@ router.post(
  */
 router.post(
   '/verify-code',
+  authRateLimiter,
   validate(verifyEmailValidator),
   authController.verifyEmail,
 );
@@ -65,6 +73,7 @@ router.post(
  */
 router.post(
   '/forgot-password',
+  passwordResetRateLimiter,
   validate(forgotPasswordValidator),
   authController.forgotPassword,
 );
@@ -75,6 +84,7 @@ router.post(
  */
 router.post(
   '/reset-password',
+  passwordResetRateLimiter,
   validate(resetPasswordValidator),
   authController.resetPassword,
 );

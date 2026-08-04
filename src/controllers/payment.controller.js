@@ -2,6 +2,7 @@ const catchAsync = require('../configs/catchAsync');
 const PaymentService = require('../services/payment.service');
 const { StatusCodes } = require('http-status-codes');
 const { sendSuccess, sendFail, sendJson } = require('../shared/res/formatResponse');
+const { isRequestUserAdmin } = require('../utils/requestUser');
 
 const getClientUrl = () => process.env.FRONTEND_URL || 'http://localhost:3000';
 
@@ -107,7 +108,7 @@ const PaymentController = {
       return sendFail(res, 'Payment not found', StatusCodes.NOT_FOUND);
     }
 
-    if (payment.userId._id.toString() !== userId.toString() && !req.user.isAdmin) {
+    if (payment.userId._id.toString() !== userId.toString() && !isRequestUserAdmin(req.user)) {
       return sendFail(res, 'Unauthorized access', StatusCodes.FORBIDDEN);
     }
 

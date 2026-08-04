@@ -135,7 +135,7 @@ class PaymentService {
     const isSuccess = responseCode === '00' && transactionStatus === '00';
 
     payment.status = isSuccess ? 'completed' : 'failed';
-    payment.vnpayData = vnpayParams;
+    payment.gatewayData = vnpayParams;
     payment.paymentDate = new Date();
     await payment.save();
 
@@ -224,7 +224,7 @@ class PaymentService {
     const isSuccess = responseCode === '00';
 
     payment.status = isSuccess ? 'completed' : 'failed';
-    payment.vnpayData = vnpayParams;
+    payment.gatewayData = vnpayParams;
     payment.paymentDate = new Date();
     await payment.save();
 

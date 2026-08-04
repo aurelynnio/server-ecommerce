@@ -331,8 +331,19 @@ class AuthService {
     const storedCode = await redisService.get(cacheKey);
 
     if (!storedCode || storedCode !== code) {
+      const attemptsKey = `${cacheKey}:attempts`;
+      const attempts = await redisService.increment(attemptsKey, 10 * 60);
+      if (attempts !== null && attempts >= 5) {
+        await Promise.all([redisService.del(cacheKey), redisService.del(attemptsKey)]);
+        throw new ApiError(
+          StatusCodes.TOO_MANY_REQUESTS,
+          'Too many invalid verification attempts. Please request a new code.',
+        );
+      }
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid or expired verification code');
     }
+
+    await redisService.del(`${cacheKey}:attempts`);
   }
 
   /**
@@ -399,7 +410,9 @@ class AuthService {
    */
   async forgotPassword(email) {
     const user = await User.findByEmail(email);
-    this._requireUser(user);
+    if (!user) {
+      return { email };
+    }
 
     const resetCode = this._generateVerificationCode();
 

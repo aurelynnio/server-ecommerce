@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const { sendSuccess, sendFail } = require('../shared/res/formatResponse');
 const { StatusCodes } = require('http-status-codes');
 const logger = require('../utils/logger');
+const { resolveChatSession } = require('../utils/chatSession');
 
 const PRIORITY_TEXT_KEYS = ['content', 'text'];
 
@@ -137,8 +138,7 @@ const ChatbotController = {
       return sendFail(res, 'Message is required', StatusCodes.BAD_REQUEST);
     }
 
-    const chatSessionId =
-      sessionId || `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    const chatSessionId = resolveChatSession(req, res, sessionId);
 
     const response = await chatbotService.chat(chatSessionId, message.trim());
 
@@ -163,8 +163,7 @@ const ChatbotController = {
       return sendFail(res, 'Message is required', StatusCodes.BAD_REQUEST);
     }
 
-    const chatSessionId =
-      sessionId || `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    const chatSessionId = resolveChatSession(req, res, sessionId);
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -196,6 +195,7 @@ const ChatbotController = {
    */
   getHistory: catchAsync(async (req, res) => {
     const { sessionId } = req.params;
+    resolveChatSession(req, res, sessionId);
 
     const collection = mongoose.connection.collection('chatbot_messages');
     const messages = await collection.find({ sessionId }).sort({ _id: 1 }).toArray();
@@ -220,6 +220,7 @@ const ChatbotController = {
    */
   clearSession: catchAsync(async (req, res) => {
     const { sessionId } = req.params;
+    resolveChatSession(req, res, sessionId);
 
     const collection = mongoose.connection.collection('chatbot_messages');
     await collection.deleteMany({ sessionId });

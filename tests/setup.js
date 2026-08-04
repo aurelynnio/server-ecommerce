@@ -18,6 +18,8 @@ vi.mock('../src/configs/redis.config', () => ({
     get: vi.fn().mockResolvedValue(null),
     set: vi.fn().mockResolvedValue('OK'),
     del: vi.fn().mockResolvedValue(1),
+    incr: vi.fn().mockResolvedValue(1),
+    expire: vi.fn().mockResolvedValue(1),
     scan: vi.fn().mockResolvedValue(['0', []]),
   },
 }));

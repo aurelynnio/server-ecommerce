@@ -33,6 +33,19 @@ class RedisService {
     }
   }
 
+  async increment(key, ttl = 3600) {
+    try {
+      const count = await this.redisClient.incr(key);
+      if (count === 1) {
+        await this.redisClient.expire(key, ttl);
+      }
+      return count;
+    } catch (error) {
+      logger.error(`Redis Increment Error [${key}]:`, { error });
+      return null;
+    }
+  }
+
   async delByPattern(pattern) {
     try {
       let cursor = '0';
