@@ -39,25 +39,6 @@ async function fetchSampleIds(db) {
   };
 }
 
-function summarizePlan(stage) {
-  if (!stage) return {};
-  const out = {
-    stage: stage.stage,
-    totalDocsExamined: stage.totalDocsExamined,
-    totalKeysExamined: stage.totalKeysExamined,
-    executionTimeMillis: stage.executionTimeMillis,
-    isIndexed: stage.stage !== 'COLLSCAN',
-  };
-  if (stage.inputStage) {
-    out.inputStage = stage.inputStage.stage;
-    out.indexName = stage.inputStage.indexName;
-  }
-  if (stage.inputStages) {
-    out.inputStages = stage.inputStages.map((s) => s.stage);
-  }
-  return out;
-}
-
 async function runQueryWithTiming(db, name, buildQuery, ids, iters) {
   // Warm-up
   await buildQuery(db, ids).toArray().catch(() => {});
