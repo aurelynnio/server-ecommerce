@@ -1,23 +1,19 @@
-# Server E-commerce Backend
+# E-commerce Backend
 
-Backend cho hệ thống thương mại điện tử, xây bằng Node.js, Express và MongoDB, có hỗ trợ realtime, queue worker, thanh toán VNPay, chatbot gợi ý sản phẩm và monitoring.
+REST API và realtime backend cho ứng dụng thương mại điện tử. Dự án dùng Express, MongoDB, Redis, RabbitMQ và Socket.IO; đồng thời tích hợp VNPay, Cloudinary, email SMTP và chatbot gợi ý sản phẩm dùng Mistral.
 
-## Tổng quan
+## Thành phần chính
 
-Backend này cung cấp REST API cho các nghiệp vụ chính của hệ thống bán hàng:
+- **Node.js + Express 5**: REST API dưới prefix `/api`.
+- **MongoDB + Mongoose**: dữ liệu nghiệp vụ và lịch sử chatbot.
+- **Redis**: OTP, cache và Socket.IO adapter khi chạy nhiều instance.
+- **RabbitMQ**: worker cho notification và order event, có retry/DLX.
+- **Socket.IO**: chat và notification theo thời gian thực.
+- **Cloudinary**: lưu ảnh và file upload.
+- **VNPay**: tạo URL thanh toán, return URL và IPN verification.
+- **Mistral + LangChain**: chatbot/RAG và semantic product search.
 
-- Xác thực người dùng bằng JWT access/refresh token.
-- Quản lý sản phẩm, danh mục, shop, banner, voucher, giỏ hàng, wishlist và đánh giá.
-- Xử lý đơn hàng, thanh toán VNPay, thống kê và cài đặt hệ thống.
-- Thông báo realtime và chat qua Socket.IO.
-- Queue worker với RabbitMQ cho các tác vụ bất đồng bộ.
-- Redis cho cache và mở rộng Socket.IO adapter.
-- Chatbot/RAG dùng Mistral + LangChain để gợi ý sản phẩm.
-- Metrics Prometheus để tích hợp Grafana dashboard.
-
-## Quick Start
-
-### Yêu cầu
+## Yêu cầu
 
 - Node.js 20+
 - npm 10+
@@ -25,334 +21,198 @@ Backend này cung cấp REST API cho các nghiệp vụ chính của hệ thốn
 - Redis
 - RabbitMQ
 
-Cloudinary, SMTP, VNPay và Mistral API là tùy chọn theo tính năng bạn muốn bật.
+Để sử dụng đầy đủ tính năng còn cần Cloudinary, SMTP, VNPay và Mistral API key. Server khởi động các RabbitMQ workers cùng lúc với HTTP server, vì vậy RabbitMQ phải sẵn sàng trước khi chạy ứng dụng.
 
-### Chạy local
-
-1. Cài dependencies:
+## Khởi động nhanh
 
 ```bash
-npm install
+cd server-ecommerce
+npm ci
 ```
 
-2. Tạo file `.env` trong thư mục `server-ecommerce`.
-
-3. Khai báo tối thiểu các biến sau:
+Tạo `.env` từ danh sách biến bên dưới. Ví dụ tối thiểu cho môi trường local:
 
 ```env
 PORT=5000
 NODE_ENV=development
+
 MONGODB_URI=mongodb://localhost:27017/ecommerce
-JWT_ACCESS_SECRET=replace_me
-JWT_REFRESH_SECRET=replace_me
-JWT_ACCESS_EXPIRES_IN=15m
-JWT_REFRESH_EXPIRES_IN=7d
-FRONTEND_URL=http://localhost:3000
 REDIS_HOST=localhost
 REDIS_PORT=6379
 RABBITMQ_URL=amqp://localhost:5672
+
+JWT_ACCESS_SECRET=replace-with-a-long-random-secret
+JWT_REFRESH_SECRET=replace-with-a-different-long-random-secret
+JWT_ACCESS_EXPIRES_IN=30m
+JWT_REFRESH_EXPIRES_IN=16d
+CHAT_SESSION_SECRET=replace-with-a-third-long-random-secret
+
+FRONTEND_URL=http://localhost:3000
+MISTRAL_API_KEY=replace-with-your-key
 ```
 
-4. Chạy development server:
+Chạy server:
 
 ```bash
 npm run dev
 ```
 
-5. Kiểm tra:
+Health check:
 
-- API health: `GET http://localhost:5000/`
-- Metrics: `GET http://localhost:5000/metrics` nếu `METRICS_ENABLED=true`
+```text
+GET http://localhost:5000/
+```
+
+> Server mặc định dùng port `3000` nếu không khai báo `PORT`. Docker Compose trong repository gốc đặt `PORT=5000` và expose `5000:5000`.
 
 ## Chạy bằng Docker Compose
 
-Repo gốc đã có file compose tại `C:\Users\cyhin\project\docker-compose.yaml` để dựng toàn bộ stack:
-
-- `client`
-- `server`
-- `mongodb`
-- `redis`
-- `rabbitmq`
-- `prometheus`
-- `grafana`
-- `elasticsearch`
-- `kibana`
-- `logstash`
-
-Chạy từ thư mục `C:\Users\cyhin\project`:
+Từ thư mục gốc của workspace:
 
 ```bash
 docker compose up -d --build
 ```
 
-Các địa chỉ mặc định:
+Compose dựng backend cùng MongoDB, Redis và RabbitMQ. Service backend chạy seed nhanh trước khi start. Kiểm tra trạng thái bằng:
 
-- Backend API: `http://localhost:5000`
-- Frontend: `http://localhost:3000`
-- Prometheus: `http://localhost:9090`
-- Grafana: `http://localhost:3001`
-- RabbitMQ Management: `http://localhost:15672`
-- Elasticsearch: `http://localhost:9200`
-- Kibana: `http://localhost:5601`
+```bash
+docker compose ps
+docker compose logs -f server
+```
 
-Lưu ý:
+## API modules
 
-- Container backend đang chạy kèm `npm run seed:dev:quick` trước khi start.
-- `ENABLE_CLUSTER=false` được set sẵn trong compose để metrics và process model ổn định hơn khi chạy container.
+Tất cả routes đều có prefix `/api`.
 
-## Tính năng chính
+| Nhóm           | Base path                                                                    | Mục đích                                                                    |
+| -------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Authentication | `/api/auth`                                                                  | Đăng ký, đăng nhập, refresh/logout, email verification, reset password, 2FA |
+| Users          | `/api/users`                                                                 | Profile, address, avatar và quản trị người dùng                             |
+| Catalog        | `/api/products`, `/api/categories`, `/api/banners`                           | Sản phẩm, danh mục và banner                                                |
+| Shops          | `/api/shops`, `/api/shop-categories`, `/api/shipping`                        | Đăng ký shop, seller profile, shop category và shipping template            |
+| Commerce       | `/api/cart`, `/api/orders`, `/api/payment`, `/api/vouchers`, `/api/wishlist` | Giỏ hàng, đơn hàng, VNPay, voucher, wishlist                                |
+| Engagement     | `/api/reviews`, `/api/notifications`, `/api/newsletter`                      | Đánh giá, thông báo và newsletter                                           |
+| Discovery      | `/api/search`, `/api/recommendations`, `/api/flash-sale`                     | Tìm kiếm, gợi ý và flash sale                                               |
+| Operations     | `/api/statistics`, `/api/settings`, `/api/permissions`                       | Dashboard, cấu hình và RBAC/permission                                      |
+| Messaging      | `/api/chat`, `/api/chatbot`                                                  | Chat giữa user/shop và chatbot sản phẩm                                     |
 
-### API nghiệp vụ
+Chi tiết endpoint, method, quyền truy cập và validation nằm tại `src/routes/` và `src/validations/`.
 
-- Auth
-- Users
-- Products
-- Categories
-- Shops
-- Shop categories
-- Cart
-- Orders
-- Payment
-- Reviews
-- Vouchers
-- Wishlist
-- Banners
-- Notifications
-- Statistics
-- Search
-- Settings
-- Shipping
-- Permissions
-- Flash sale
-- Recommendations
-- Chat
-- Chatbot
+## Authentication và bảo mật
 
-Toàn bộ route được mount dưới prefix `/api`.
-
-### Realtime và background jobs
-
-- Socket.IO cho chat và notification.
-- Redis adapter cho Socket.IO khi bật `SOCKET_REDIS_ADAPTER`.
-- RabbitMQ exchange/topic + retry queue + dead-letter queue cho `notification` và `order`.
-- Worker được khởi tạo cùng lúc khi server boot.
-
-### AI và tìm kiếm
-
-- Chatbot dùng Mistral qua LangChain.
-- Lưu lịch sử hội thoại trong MongoDB.
-- Có semantic search/gợi ý sản phẩm qua embedding service.
-- Có script khởi tạo embeddings phục vụ chatbot/tìm kiếm.
-
-### Observability và hardening
-
-- `helmet`, `cors`, sanitize input, validation middleware.
-- Morgan logging ở môi trường development hoặc khi bật bằng env.
-- Prometheus metrics qua endpoint `/metrics`.
-- Graceful shutdown cho HTTP server, Socket.IO, MongoDB, Redis và RabbitMQ.
-- Hỗ trợ cluster trong production qua `WEB_CONCURRENCY`.
-
-## Scripts
-
-| Script | Mục đích |
-| --- | --- |
-| `npm start` | Chạy server production |
-| `npm run dev` | Chạy server với nodemon |
-| `npm test` | Chạy toàn bộ test bằng Vitest |
-| `npm run test:watch` | Chạy test watch mode |
-| `npm run test:coverage` | Chạy test và đo coverage |
-| `npm run lint` | Kiểm tra lint |
-| `npm run lint:fix` | Tự sửa lỗi lint cơ bản |
-| `npm run format` | Format toàn bộ project |
-| `npm run format:check` | Kiểm tra format |
-| `npm run seed:dev` | Seed dữ liệu dev đầy đủ |
-| `npm run seed:dev:quick` | Seed dữ liệu dev nhanh |
-| `npm run seed:dev:reset` | Reset rồi seed lại dữ liệu dev |
+- Access/refresh token được gửi qua cookie `httpOnly`; cookie được bật `secure` trong production và `sameSite=strict`.
+- CORS chỉ nhận các origin trong `FRONTEND_URL`/`FRONTEND_URLS` và allowlist cấu hình sẵn.
+- Auth, OTP, reset password, chatbot và newsletter có rate limit theo IP.
+- OTP bị vô hiệu sau 5 lần nhập sai; reset password trả response trung lập để không lộ email đã đăng ký.
+- Chatbot anonymous dùng UUID + cookie JWT HTTP-only. Không thể đọc hoặc xóa lịch sử bằng session ID không thuộc caller.
+- Request body/query/params được sanitize và các route có schema Joi; upload giới hạn số lượng/kích thước và kiểm tra chữ ký ảnh.
+- Không commit `.env`, credential Cloudinary/VNPay/SMTP/Mistral hoặc JWT secrets.
 
 ## Cấu hình môi trường
 
-### Nhóm bắt buộc để chạy tối thiểu
+### Runtime, HTTP và CORS
 
-| Biến | Mô tả |
-| --- | --- |
-| `PORT` | Cổng chạy backend |
-| `NODE_ENV` | Môi trường chạy (`development`, `production`) |
-| `MONGODB_URI` | Chuỗi kết nối MongoDB |
-| `JWT_ACCESS_SECRET` | Secret ký access token |
-| `JWT_REFRESH_SECRET` | Secret ký refresh token |
-| `JWT_ACCESS_EXPIRES_IN` | Thời gian sống access token |
-| `JWT_REFRESH_EXPIRES_IN` | Thời gian sống refresh token |
-| `FRONTEND_URL` | Origin frontend cho CORS và Socket.IO |
+| Variable                                                            | Mô tả                                                        |
+| ------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `PORT`                                                              | HTTP port, mặc định `3000`                                   |
+| `NODE_ENV`                                                          | `development`, `test` hoặc `production`                      |
+| `FRONTEND_URL`, `FRONTEND_URLS`                                     | Origin frontend, phân tách bằng dấu phẩy nếu có nhiều origin |
+| `TRUST_PROXY`                                                       | Cấu hình Express trust proxy sau reverse proxy/load balancer |
+| `MORGAN_ENABLED`, `MORGAN_FORMAT`                                   | Điều khiển request logging                                   |
+| `KEEP_ALIVE_TIMEOUT_MS`, `HEADERS_TIMEOUT_MS`, `REQUEST_TIMEOUT_MS` | HTTP timeout tuning                                          |
+| `SHUTDOWN_TIMEOUT_MS`                                               | Timeout graceful shutdown                                    |
+| `ENABLE_CLUSTER`, `WEB_CONCURRENCY`                                 | Cluster mode trong production                                |
+| `EXPOSE_ERROR_DETAILS`                                              | Chỉ bật tạm thời khi debug; không bật ở production           |
 
-### MongoDB
+### MongoDB, Redis và RabbitMQ
 
-Bạn có thể dùng `MONGODB_URI` hoặc cấu hình theo từng phần:
+| Nhóm         | Variables                                                                                                                                                                                                    |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| MongoDB      | `MONGODB_URI` hoặc `MONGODB_HOST`, `MONGODB_PORT`, `MONGODB_DATABASE`, `MONGODB_USER`, `MONGODB_PASSWORD`, `MONGODB_AUTH_SOURCE`; pool: `MONGO_MIN_POOL_SIZE`, `MONGO_MAX_POOL_SIZE`, `MONGO_MAX_CONNECTING` |
+| Redis        | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`; Socket adapter: `REDIS_URL`, `SOCKET_REDIS_ADAPTER`                                                                                                            |
+| RabbitMQ     | `RABBITMQ_URL`, `RABBITMQ_EXCHANGE`, `RABBITMQ_DLX`, `RABBITMQ_HEARTBEAT_INTERVAL_IN_SECONDS`, `RABBITMQ_RECONNECT_DELAY_MS`, `RABBITMQ_CONNECT_TIMEOUT_MS`                                                  |
+| Worker retry | `NOTIFICATION_RETRY_DELAY_MS`, `NOTIFICATION_MAX_RETRIES`, `ORDER_RETRY_DELAY_MS`, `ORDER_MAX_RETRIES`                                                                                                       |
 
-- `MONGODB_HOST`
-- `MONGODB_PORT`
-- `MONGODB_DATABASE`
-- `MONGODB_USER`
-- `MONGODB_PASSWORD`
-- `MONGODB_AUTH_SOURCE`
-- `MONGO_MIN_POOL_SIZE`
-- `MONGO_MAX_POOL_SIZE`
-- `MONGO_MAX_CONNECTING`
+### Authentication, media và integrations
 
-### Redis
+| Nhóm              | Variables                                                                                                                                             |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| JWT               | `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_ACCESS_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN`                                                          |
+| Chatbot session   | `CHAT_SESSION_SECRET` (fallback về access secret nếu không khai báo, nhưng nên đặt secret riêng)                                                      |
+| Password          | `BCRYPT_SALT_ROUNDS`                                                                                                                                  |
+| Upload            | `UPLOAD_ALLOWED_MIME`, `UPLOAD_MAX_FILES`, `UPLOAD_MAX_MB`, `CHAT_UPLOAD_MAX_FILES`, `CHAT_UPLOAD_MAX_MB`                                             |
+| Cloudinary        | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`                                                                                |
+| SMTP              | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`, `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_FROM`, `EMAIL_BASE_URL`, `EMAIL_MAX_CONNECTIONS`, `EMAIL_MAX_MESSAGES` |
+| VNPay             | `SERVER_URL`, `VNP_TMNCODE`, `VNP_HASHSECRET`, `VNP_RETURN_URL`                                                                                       |
+| Mistral           | `MISTRAL_API_KEY`                                                                                                                                     |
+| Order transaction | `TXN_MAX_RETRIES`, `TXN_RETRY_DELAY_MS`                                                                                                               |
 
-| Biến | Mô tả |
-| --- | --- |
-| `REDIS_URL` | URL Redis đầy đủ |
-| `REDIS_HOST` | Host Redis nếu không dùng `REDIS_URL` |
-| `REDIS_PORT` | Port Redis |
-| `REDIS_PASSWORD` | Password Redis |
-| `SOCKET_REDIS_ADAPTER` | Bật/tắt Redis adapter cho Socket.IO |
+## Scripts
 
-### RabbitMQ
+| Command                        | Mục đích                                               |
+| ------------------------------ | ------------------------------------------------------ |
+| `npm start`                    | Chạy production server                                 |
+| `npm run dev`                  | Chạy server với nodemon                                |
+| `npm run lint`                 | Lint source code                                       |
+| `npm run lint:fix`             | Tự sửa lỗi lint có thể sửa an toàn                     |
+| `npm run format:check`         | Kiểm tra Prettier                                      |
+| `npm run format`               | Format toàn bộ project                                 |
+| `npm test`                     | Chạy toàn bộ unit và integration test                  |
+| `npm run test:watch`           | Chạy test watch mode                                   |
+| `npm run test:coverage`        | Chạy test với coverage                                 |
+| `npm run seed:dev`             | Seed dữ liệu development đầy đủ                        |
+| `npm run seed:dev:quick`       | Seed nhanh dữ liệu development                         |
+| `npm run seed:dev:reset`       | Reset rồi seed lại; chỉ dùng trên database development |
+| `npm run benchmark:cv`         | Benchmark cache/HTTP/upload                            |
+| `npm run benchmark:autocannon` | Benchmark cache với autocannon                         |
+| `npm run benchmark:rabbitmq`   | Load test RabbitMQ                                     |
 
-| Biến | Mô tả |
-| --- | --- |
-| `RABBITMQ_URL` | URL kết nối RabbitMQ |
-| `RABBITMQ_EXCHANGE` | Exchange chính |
-| `RABBITMQ_DLX` | Dead-letter exchange |
-| `RABBITMQ_HEARTBEAT_INTERVAL_IN_SECONDS` | Heartbeat interval |
-| `RABBITMQ_RECONNECT_DELAY_MS` | Thời gian reconnect |
-| `RABBITMQ_CONNECT_TIMEOUT_MS` | Timeout kết nối |
-| `NOTIFICATION_RETRY_DELAY_MS` | Delay retry queue notification |
-| `NOTIFICATION_MAX_RETRIES` | Số lần retry notification |
-| `ORDER_RETRY_DELAY_MS` | Delay retry queue order |
-| `ORDER_MAX_RETRIES` | Số lần retry order |
+Các script chuyên dụng khác có trong `src/scripts/`, gồm migration schema/index, khởi tạo embedding, seed products và benchmark query. Đọc source trước khi chạy vì một số script kết nối trực tiếp database hoặc thay đổi dữ liệu.
 
-### Upload và media
-
-| Biến | Mô tả |
-| --- | --- |
-| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name |
-| `CLOUDINARY_API_KEY` | Cloudinary API key |
-| `CLOUDINARY_API_SECRET` | Cloudinary API secret |
-| `UPLOAD_ALLOWED_MIME` | Danh sách MIME được phép upload |
-| `UPLOAD_MAX_FILES` | Số file tối đa mỗi request |
-| `UPLOAD_MAX_MB` | Kích thước tối đa mỗi file |
-
-### Email
-
-| Biến | Mô tả |
-| --- | --- |
-| `EMAIL_HOST` | SMTP host |
-| `EMAIL_PORT` | SMTP port |
-| `EMAIL_SECURE` | Bật TLS/SSL |
-| `EMAIL_USER` | SMTP username |
-| `EMAIL_PASS` | SMTP password |
-| `EMAIL_FROM` | Email người gửi |
-| `EMAIL_BASE_URL` | Base URL dùng trong email |
-| `EMAIL_MAX_CONNECTIONS` | Số kết nối SMTP tối đa |
-| `EMAIL_MAX_MESSAGES` | Số message tối đa mỗi connection |
-
-### Thanh toán
-
-| Biến | Mô tả |
-| --- | --- |
-| `SERVER_URL` | Base URL backend |
-| `VNP_TMNCODE` | Mã terminal VNPay |
-| `VNP_HASHSECRET` | Secret VNPay |
-| `VNP_RETURN_URL` | URL callback sau thanh toán |
-
-### AI / Chatbot
-
-| Biến | Mô tả |
-| --- | --- |
-| `MISTRAL_API_KEY` | API key cho chatbot/embedding service |
-
-### Metrics, logging và runtime tuning
-
-| Biến | Mô tả |
-| --- | --- |
-| `METRICS_ENABLED` | Bật endpoint Prometheus |
-| `METRICS_DEFAULTS_ENABLED` | Bật default metrics |
-| `METRICS_PREFIX` | Prefix tên metrics |
-| `MORGAN_ENABLED` | Bật morgan logger |
-| `MORGAN_FORMAT` | Format log của morgan |
-| `EXPOSE_ERROR_DETAILS` | Trả chi tiết lỗi ra response |
-| `TRUST_PROXY` | Cấu hình trust proxy cho Express |
-| `KEEP_ALIVE_TIMEOUT_MS` | HTTP keep-alive timeout |
-| `HEADERS_TIMEOUT_MS` | Header timeout |
-| `REQUEST_TIMEOUT_MS` | Request timeout |
-| `SHUTDOWN_TIMEOUT_MS` | Timeout graceful shutdown |
-| `ENABLE_CLUSTER` | Bật cluster mode trong production |
-| `WEB_CONCURRENCY` | Số worker process |
-| `TXN_MAX_RETRIES` | Retry cho transaction logic |
-| `TXN_RETRY_DELAY_MS` | Delay giữa các lần retry transaction |
-| `BCRYPT_SALT_ROUNDS` | Salt rounds cho bcrypt |
-| `SEED_RESET_OK` | Cho phép reset dữ liệu khi seed |
-
-## Testing
-
-Project dùng Vitest và đã có cả `unit` lẫn `integration` tests trong thư mục `tests/`.
-
-Chạy toàn bộ test:
+## Testing và kiểm tra chất lượng
 
 ```bash
+npm run lint
 npm test
+npm run format:check
 ```
 
-Chạy coverage:
+Test được chia thành:
 
-```bash
-npm run test:coverage
+```text
+tests/
+  unit/          # service, validation, middleware, utility
+  integration/   # middleware và luồng nghiệp vụ tích hợp
 ```
-
-## Monitoring
-
-Khi bật `METRICS_ENABLED=true`, backend expose endpoint:
-
-```bash
-GET /metrics
-```
-
-Monitoring stack trong repo gốc đã cấu hình sẵn Prometheus và Grafana. Grafana mặc định:
-
-- User: `admin`
-- Password: `admin123`
-
-Nên override bằng `GRAFANA_ADMIN_USER` và `GRAFANA_ADMIN_PASSWORD` trước khi dùng ngoài môi trường local/dev.
 
 ## Cấu trúc thư mục
 
 ```text
 src/
-  app.js                # Khởi tạo Express app và middleware
-  server.js             # Boot server, cluster, graceful shutdown
-  configs/              # Cấu hình Cloudinary, Redis, RabbitMQ, upload...
-  controllers/          # Xử lý request/response
-  db/                   # Kết nối MongoDB
-  emails/               # Template email
-  middlewares/          # Auth, validate, error handler, sanitize...
-  models/               # Mongoose models
-  monitoring/           # Prometheus metrics
-  repositories/         # Data access layer
-  routes/               # Định nghĩa route modules
-  scripts/              # Seed, migration, embeddings
-  services/             # Business logic
-  shared/               # Shared helpers/response format
-  socket/               # Socket.IO handlers
-  utils/                # Utility functions
-  validations/          # Joi/schema validations
-  workers/              # RabbitMQ consumers/workers
+  app.js             # Express app, middleware và error handler
+  server.js          # boot, cluster và graceful shutdown
+  configs/           # DB-adjacent config, upload, Redis, RabbitMQ, Cloudinary
+  controllers/       # HTTP request/response layer
+  middlewares/       # auth, ownership, permission, rate limit, validation
+  models/            # Mongoose schemas
+  repositories/      # data-access layer
+  routes/            # REST route modules
+  services/          # business logic và integration services
+  socket/            # Socket.IO authentication và handlers
+  validations/       # Joi schemas và sanitization
+  workers/           # RabbitMQ consumers
+  scripts/           # seed, migration và benchmark
+  utils/             # logger, token/session helpers, shared utilities
 tests/
-  unit/                 # Unit tests
-  integration/          # Integration tests
+  unit/
+  integration/
 ```
 
-## Ghi chú triển khai
+## Production checklist
 
-- Production có thể bật cluster bằng `ENABLE_CLUSTER=true`.
-- Nếu chạy nhiều instance Socket.IO, nên bật Redis adapter.
-- Nếu dùng đầy đủ notification/order queue, cần đảm bảo RabbitMQ sẵn sàng trước khi boot app.
-- Nếu dùng chatbot, cần `MISTRAL_API_KEY` và dữ liệu embeddings phù hợp trong MongoDB.
-
-## Tài liệu liên quan
-
-- Health check: `GET /`
-- Metrics: `GET /metrics`
-- Entry point: `src/server.js`
-- Route registry: `src/routes/index.js`
+- Dùng secret riêng, đủ dài cho JWT và `CHAT_SESSION_SECRET`; xoay vòng khi có nguy cơ lộ lọt.
+- Đặt `NODE_ENV=production`, HTTPS/reverse proxy đúng và `TRUST_PROXY` phù hợp hạ tầng.
+- Cấu hình chính xác `FRONTEND_URL(S)`; không dùng wildcard CORS với credential cookie.
+- Đảm bảo MongoDB, Redis và RabbitMQ có authentication, backup và health monitoring.
+- Đặt Cloudinary, SMTP, VNPay và Mistral credentials qua secret manager/CI variables.
+- Chạy `npm audit --omit=dev`, lint và test trước khi release.
