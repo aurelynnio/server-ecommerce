@@ -8,7 +8,10 @@ const mongoose = require('mongoose');
 const { searchSimilarProducts, getFeaturedProducts } = require('./embedding.service');
 const { toolHandlers } = require('../utils/chatbot.tools');
 const { SYSTEM_PROMPT } = require('../configs/chatbot.config');
+const { redact } = require('../utils/redact');
+const { truncateHistory } = require('../utils/tokenBudget');
 const logger = require('../utils/logger');
+const metrics = require('../monitoring/chatbot.metrics');
 
 class ChatbotService {
   constructor() {
@@ -17,6 +20,12 @@ class ChatbotService {
       apiKey: process.env.MISTRAL_API_KEY,
       temperature: 0.3,
       streaming: true,
+      maxTokens: Number(process.env.MISTRAL_MAX_TOKENS) || 1024,
+      maxRetries: 2,
+      // hard timeout cho mỗi request LLM (ms)
+      ...(process.env.MISTRAL_TIMEOUT_MS
+        ? { timeout: Number(process.env.MISTRAL_TIMEOUT_MS) }
+        : {}),
     });
 
     this.prompt = ChatPromptTemplate.fromMessages([
@@ -37,10 +46,19 @@ class ChatbotService {
     const client = mongoose.connection.getClient();
     const collection = client.db().collection('chatbot_messages');
 
-    return new MongoDBChatMessageHistory({
+    const baseHistory = new MongoDBChatMessageHistory({
       collection,
       sessionId,
     });
+
+    // Wrap để truncate history theo token budget trước khi đưa vào prompt.
+    const originalGetMessages = baseHistory.getMessages.bind(baseHistory);
+    baseHistory.getMessages = async () => {
+      const all = await originalGetMessages();
+      return truncateHistory(all);
+    };
+
+    return baseHistory;
   }
 
   /**
@@ -51,9 +69,14 @@ class ChatbotService {
    * @returns {Promise<{success: boolean, message: string, sessionId: string}>}
    */
   async chatStream(sessionId, userMessage, onToken) {
+    const stopTimer = metrics.chatbotLatencySeconds.startTimer({
+      endpoint: 'stream',
+      stream: 'true',
+    });
     try {
       logger.info('[Chatbot] Starting RAG stream chat with sessionId:', sessionId);
-      logger.info('[Chatbot] User message:', userMessage);
+      logger.info('[Chatbot] User message:', redact(userMessage));
+      metrics.chatbotTokensTotal.inc({ direction: 'in' }, metrics.estimateTokens(userMessage));
 
       const products = await this.retrieveProducts(userMessage);
 
@@ -87,7 +110,15 @@ class ChatbotService {
       logger.info('[Chatbot] Stream completed');
 
       const validatedResponse = this.validateResponse(fullResponse, products);
+      if (validatedResponse !== fullResponse) {
+        metrics.chatbotHallucinationTotal.inc({ kind: 'replaced' });
+      }
+      metrics.chatbotTokensTotal.inc(
+        { direction: 'out' },
+        metrics.estimateTokens(fullResponse),
+      );
 
+      stopTimer({ status: 'success' });
       return {
         success: true,
         message: validatedResponse,
@@ -95,6 +126,8 @@ class ChatbotService {
       };
     } catch (error) {
       logger.error('[Chatbot] Stream error:', error.message);
+      metrics.chatbotErrorsTotal.inc({ stage: 'stream' });
+      stopTimer({ status: 'error' });
       return {
         success: false,
         message: 'Xin lỗi, hệ thống đang bận. Anh/chị vui lòng thử lại sau nhé!',
@@ -108,9 +141,11 @@ class ChatbotService {
    * Non-streaming chat (fallback)
    */
   async chat(sessionId, userMessage) {
+    const stopTimer = metrics.chatbotLatencySeconds.startTimer({ endpoint: 'message', stream: 'false' });
     try {
       logger.info('[Chatbot] Starting RAG chat with sessionId:', sessionId);
-      logger.info('[Chatbot] User message:', userMessage);
+      logger.info('[Chatbot] User message:', redact(userMessage));
+      metrics.chatbotTokensTotal.inc({ direction: 'in' }, metrics.estimateTokens(userMessage));
 
       // Use RAG to retrieve relevant products
       const products = await this.retrieveProducts(userMessage);
@@ -137,7 +172,12 @@ class ChatbotService {
       logger.info('[Chatbot] Response generated successfully');
 
       const validatedResponse = this.validateResponse(result, products);
+      if (validatedResponse !== result) {
+        metrics.chatbotHallucinationTotal.inc({ kind: 'replaced' });
+      }
+      metrics.chatbotTokensTotal.inc({ direction: 'out' }, metrics.estimateTokens(result));
 
+      stopTimer({ status: 'success' });
       return {
         success: true,
         message: validatedResponse,
@@ -145,6 +185,8 @@ class ChatbotService {
       };
     } catch (error) {
       logger.error('[Chatbot] Error:', error.message);
+      metrics.chatbotErrorsTotal.inc({ stage: 'message' });
+      stopTimer({ status: 'error' });
       return {
         success: false,
         message: 'Xin lỗi, hệ thống đang bận. Anh/chị vui lòng thử lại sau nhé!',
@@ -459,28 +501,52 @@ Link mua: ${item.checkoutUrl}`;
 
   /**
    * Validate LLM response to prevent hallucination
-   * Check if mentioned products actually exist in the context
+   * Check if mentioned links actually exist in the context
    * @param {string} response - LLM response
    * @param {Array} products - Products from RAG
    * @returns {string} - Validated/corrected response
    */
   validateResponse(response, products) {
-    // If no products were provided, add a warning if the response mentions specific products
-    if (!products || products.length === 0) {
-      // Check if response contains price patterns (potential hallucination)
-      const pricePattern = /\d{2,3}[.,]?\d{3}[.,]?\d{0,3}\s*đ/g;
-      const hasPrices = pricePattern.test(response);
+    if (!response) return response;
 
-      if (hasPrices) {
+    // Nếu không có product trong context, cảnh báo nếu response chứa giá cụ thể
+    if (!products || products.length === 0) {
+      const pricePattern = /\d{2,3}[.,]?\d{3}[.,]?\d{0,3}\s*đ/g;
+      if (pricePattern.test(response)) {
         logger.warn(
           '[Chatbot] Potential hallucination detected - prices in response but no products in context',
         );
         return 'Em xin lỗi, hiện tại em chưa tìm thấy sản phẩm phù hợp với yêu cầu của anh/chị. Anh/chị có thể cho em biết cụ thể hơn muốn tìm loại sản phẩm gì không ạ? Ví dụ: áo, quần, giày, túi xách...';
       }
+      return response;
     }
 
-    // For now, return the response as-is
-    // More sophisticated validation can be added here
+    // Grounding check: mọi link internal trong response phải nằm trong whitelist
+    const allowedUrls = new Set();
+    for (const p of products) {
+      if (p.productUrl) allowedUrls.add(p.productUrl);
+      if (p.checkoutUrl) allowedUrls.add(p.checkoutUrl);
+    }
+
+    const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
+    let match;
+    let hallucinated = false;
+    while ((match = linkPattern.exec(response)) !== null) {
+      const url = match[2];
+      if (url.startsWith('/') && !allowedUrls.has(url)) {
+        logger.warn('[Chatbot] Hallucinated link detected', {
+          url,
+          allowedSample: Array.from(allowedUrls).slice(0, 3),
+        });
+        hallucinated = true;
+        break;
+      }
+    }
+
+    if (hallucinated) {
+      return 'Xin lỗi, em không thể truy cập sản phẩm này. Anh/chị có thể thử từ khoá khác không ạ?';
+    }
+
     return response;
   }
 

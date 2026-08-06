@@ -38,6 +38,7 @@ const setChatSessionCookie = (res, sessionId) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
+    path: '/',
     maxAge: TOKEN_MAX_AGE_MS,
   });
 };

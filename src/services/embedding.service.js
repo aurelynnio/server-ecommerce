@@ -21,6 +21,10 @@ function getEmbeddingModel() {
     embeddingModel = new MistralAIEmbeddings({
       apiKey: process.env.MISTRAL_API_KEY,
       model: 'mistral-embed', // Mistral's embedding model
+      maxRetries: 2,
+      ...(process.env.MISTRAL_TIMEOUT_MS
+        ? { timeout: Number(process.env.MISTRAL_TIMEOUT_MS) }
+        : {}),
     });
   }
   return embeddingModel;

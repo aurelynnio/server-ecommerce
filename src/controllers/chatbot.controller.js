@@ -5,6 +5,21 @@ const { sendSuccess, sendFail } = require('../shared/res/formatResponse');
 const { StatusCodes } = require('http-status-codes');
 const logger = require('../utils/logger');
 const { resolveChatSession } = require('../utils/chatSession');
+const metrics = require('../monitoring/chatbot.metrics');
+
+// Theo dõi trạng thái shutdown để tránh nhận request LLM mới khi đang tắt.
+let isShuttingDown = false;
+const SHUTDOWN_GRACE_MS = 15_000;
+process.once('SIGTERM', () => {
+  logger.warn('[Chatbot] SIGTERM received, marking shutting down');
+  isShuttingDown = true;
+  setTimeout(() => process.exit(0), SHUTDOWN_GRACE_MS).unref();
+});
+process.once('SIGINT', () => {
+  logger.warn('[Chatbot] SIGINT received, marking shutting down');
+  isShuttingDown = true;
+  setTimeout(() => process.exit(0), SHUTDOWN_GRACE_MS).unref();
+});
 
 const PRIORITY_TEXT_KEYS = ['content', 'text'];
 
@@ -141,6 +156,10 @@ const ChatbotController = {
     const chatSessionId = resolveChatSession(req, res, sessionId);
 
     const response = await chatbotService.chat(chatSessionId, message.trim());
+    metrics.chatbotRequestsTotal.inc({
+      endpoint: 'message',
+      status: response.success ? 'success' : 'error',
+    });
 
     return sendSuccess(
       res,
@@ -163,6 +182,14 @@ const ChatbotController = {
       return sendFail(res, 'Message is required', StatusCodes.BAD_REQUEST);
     }
 
+    if (isShuttingDown) {
+      return sendFail(
+        res,
+        'Server đang bảo trì, vui lòng thử lại sau ít phút',
+        StatusCodes.SERVICE_UNAVAILABLE,
+      );
+    }
+
     const chatSessionId = resolveChatSession(req, res, sessionId);
 
     res.setHeader('Content-Type', 'text/event-stream');
@@ -173,16 +200,35 @@ const ChatbotController = {
 
     res.write(`data: ${JSON.stringify({ type: 'session', sessionId: chatSessionId })}\n\n`);
 
+    let aborted = false;
+    req.on('close', () => {
+      aborted = true;
+      logger.info('[Chatbot] Client disconnected before stream completed', {
+        sessionId: chatSessionId,
+      });
+    });
+
     try {
       const response = await chatbotService.chatStream(chatSessionId, message.trim(), (token) => {
+        if (aborted || res.writableEnded) return;
         res.write(`data: ${JSON.stringify({ type: 'token', content: token })}\n\n`);
       });
+      metrics.chatbotRequestsTotal.inc({
+        endpoint: 'stream',
+        status: response.success ? 'success' : 'error',
+      });
 
-      res.write(`data: ${JSON.stringify({ type: 'done', success: response.success })}\n\n`);
+      if (!aborted) {
+        res.write(`data: ${JSON.stringify({ type: 'done', success: response.success })}\n\n`);
+      }
       res.end();
     } catch (error) {
       logger.error('[Chatbot] Stream error:', { error });
-      res.write(`data: ${JSON.stringify({ type: 'error', message: 'Có lỗi xảy ra' })}\n\n`);
+      metrics.chatbotErrorsTotal.inc({ stage: 'stream_controller' });
+      metrics.chatbotRequestsTotal.inc({ endpoint: 'stream', status: 'error' });
+      if (!aborted) {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: 'Có lỗi xảy ra' })}\n\n`);
+      }
       res.end();
     }
   }),
@@ -312,6 +358,31 @@ const ChatbotController = {
         },
       },
       'Chat sessions retrieved successfully',
+      StatusCodes.OK,
+    );
+  }),
+
+  /**
+   * Admin: xoá toàn bộ message của 1 session (GDPR / cleanup)
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  adminDeleteSession: catchAsync(async (req, res) => {
+    const { sessionId } = req.params;
+    const collection = mongoose.connection.collection('chatbot_messages');
+    const result = await collection.deleteMany({ sessionId });
+
+    logger.warn('[Chatbot] Admin deleted session', {
+      sessionId,
+      deletedCount: result.deletedCount,
+      actorId: req.user?._id,
+    });
+
+    return sendSuccess(
+      res,
+      { sessionId, deletedCount: result.deletedCount },
+      'Session deleted by admin',
       StatusCodes.OK,
     );
   }),

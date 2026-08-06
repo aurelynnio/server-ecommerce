@@ -8,6 +8,7 @@ const { errorHandler, notFoundHandler } = require('./middlewares/errorHandler.mi
 const corsMiddleware = require('./middlewares/cors.middleware');
 const { sanitizeMiddleware } = require('./validations/sanitize');
 const { sendJson } = require('./shared/res/formatResponse');
+const chatbotMetrics = require('./monitoring/chatbot.metrics');
 const app = ex();
 
 const server = http.createServer(app);
@@ -46,6 +47,17 @@ initRoutes(app);
 
 app.get('/', (req, res) => {
   return sendJson(res, { status: 'API OK' }, 200);
+});
+
+// Prometheus scrape endpoint. Public để Prometheus pull được; nên giới hạn
+// ở network level (chỉ expose nội bộ / qua reverse proxy có IP allowlist).
+app.get('/metrics', async (req, res) => {
+  try {
+    res.set('Content-Type', chatbotMetrics.register.contentType);
+    res.end(await chatbotMetrics.register.metrics());
+  } catch (err) {
+    res.status(500).end(err.message);
+  }
 });
 
 // 404 handler for undefined routes
