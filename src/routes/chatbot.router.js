@@ -44,6 +44,12 @@ router.delete(
 router.get('/suggestions', chatbotController.getSuggestions);
 
 /**
+ * @desc    Get chatbot status (feature flag cho client canary)
+ * @access  Public
+ */
+router.get('/status', chatbotController.getStatus);
+
+/**
  * Admin Routes
  */
 /**
@@ -56,6 +62,13 @@ router.get(
   requireRole('admin'),
   chatbotController.getAllSessions,
 );
+
+/**
+ * @desc    Lưu feedback cho 1 message chatbot
+ * @access  Public
+ * @body    { sessionId, messageId, rating: 'up'|'down', comment? }
+ */
+router.post('/feedback', chatbotRateLimiter, chatbotController.feedback);
 
 /**
  * @desc    GDPR: xoá toàn bộ message của 1 session (Admin)

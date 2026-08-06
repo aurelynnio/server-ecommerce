@@ -7,6 +7,13 @@ const logger = require('../utils/logger');
 const { resolveChatSession } = require('../utils/chatSession');
 const metrics = require('../monitoring/chatbot.metrics');
 
+// Feature flag: cho phép tắt chatbot hoàn toàn (kill switch / canary rollout).
+// Mặc định: bật. Tắt bằng cách set CHATBOT_ENABLED=false.
+const CHATBOT_ENABLED = String(process.env.CHATBOT_ENABLED || 'true').toLowerCase() !== 'false';
+
+// Code dùng cho client phân biệt "tắt cố ý" với lỗi khác.
+const DISABLED_CODE = 'CHATBOT_DISABLED';
+
 // Theo dõi trạng thái shutdown để tránh nhận request LLM mới khi đang tắt.
 let isShuttingDown = false;
 const SHUTDOWN_GRACE_MS = 15_000;
@@ -149,6 +156,14 @@ const ChatbotController = {
     const { message, sessionId } = req.body;
     const _userId = req.user?._id || null;
 
+    if (!CHATBOT_ENABLED) {
+      return res.status(StatusCodes.SERVICE_UNAVAILABLE).json({
+        status: 'fail',
+        code: DISABLED_CODE,
+        message: 'Chatbot hiện đang tạm tắt. Vui lòng thử lại sau.',
+      });
+    }
+
     if (!message || !message.trim()) {
       return sendFail(res, 'Message is required', StatusCodes.BAD_REQUEST);
     }
@@ -177,6 +192,14 @@ const ChatbotController = {
    */
   streamMessage: catchAsync(async (req, res) => {
     const { message, sessionId } = req.body;
+
+    if (!CHATBOT_ENABLED) {
+      return res.status(StatusCodes.SERVICE_UNAVAILABLE).json({
+        status: 'fail',
+        code: DISABLED_CODE,
+        message: 'Chatbot hiện đang tạm tắt. Vui lòng thử lại sau.',
+      });
+    }
 
     if (!message || !message.trim()) {
       return sendFail(res, 'Message is required', StatusCodes.BAD_REQUEST);
@@ -209,6 +232,29 @@ const ChatbotController = {
     });
 
     try {
+      // Nếu bật CHATBOT_USE_AGENT=true thì dùng tool-calling thật (LangChain Agent).
+      // Ngược lại dùng RAG chain hiện tại (đã có grounding check + cache).
+      if (chatbotService.isAgentMode()) {
+        const agent = chatbotService.getAgent();
+        for await (const event of agent.stream(chatSessionId, message.trim())) {
+          if (aborted || res.writableEnded) break;
+          if (event.type === 'token') {
+            res.write(`data: ${JSON.stringify({ type: 'token', content: event.content })}\n\n`);
+          } else if (event.type === 'tool_call') {
+            logger.info('[Chatbot] Agent tool call', { name: event.name });
+            res.write(
+              `data: ${JSON.stringify({ type: 'tool', name: event.name })}\n\n`,
+            );
+          }
+        }
+        if (!aborted) {
+          res.write(`data: ${JSON.stringify({ type: 'done', success: true })}\n\n`);
+        }
+        res.end();
+        metrics.chatbotRequestsTotal.inc({ endpoint: 'stream', status: 'success' });
+        return;
+      }
+
       const response = await chatbotService.chatStream(chatSessionId, message.trim(), (token) => {
         if (aborted || res.writableEnded) return;
         res.write(`data: ${JSON.stringify({ type: 'token', content: token })}\n\n`);
@@ -275,8 +321,26 @@ const ChatbotController = {
   }),
 
   /**
+   * Lấy trạng thái chatbot (cho client check feature flag khi mount).
+   * @param {Object} _req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  getStatus: catchAsync(async (_req, res) => {
+    return sendSuccess(
+      res,
+      {
+        enabled: CHATBOT_ENABLED,
+        agentMode: chatbotService.isAgentMode?.() ?? false,
+      },
+      'Chatbot status',
+      StatusCodes.OK,
+    );
+  }),
+
+  /**
    * Get suggestions
-   * @param {any} _req
+   * @param {Object} _req
    * @param {Object} res
    * @returns {Promise<any>}
    */
@@ -360,6 +424,56 @@ const ChatbotController = {
       'Chat sessions retrieved successfully',
       StatusCodes.OK,
     );
+  }),
+
+  /**
+   * Lưu feedback (👍/👎) cho 1 message chatbot.
+   * Body: { sessionId, messageId, rating: 'up'|'down', comment?: string }
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  feedback: catchAsync(async (req, res) => {
+    const { sessionId, messageId, rating, comment } = req.body || {};
+    if (!sessionId || !messageId || !['up', 'down'].includes(rating)) {
+      return sendFail(
+        res,
+        'sessionId, messageId và rating (up|down) là bắt buộc',
+        StatusCodes.BAD_REQUEST,
+      );
+    }
+
+    if (typeof comment === 'string' && comment.length > 500) {
+      return sendFail(res, 'Comment quá dài (tối đa 500 ký tự)', StatusCodes.BAD_REQUEST);
+    }
+
+    const collection = mongoose.connection.collection('chatbot_feedback');
+    const doc = {
+      sessionId,
+      messageId,
+      rating,
+      comment: comment ? String(comment).slice(0, 500) : null,
+      userId: req.user?._id || null,
+      createdAt: new Date(),
+    };
+
+    // Upsert theo (sessionId, messageId, userId|noid) - 1 user chỉ rate 1 lần.
+    const filter = { sessionId, messageId, userId: doc.userId };
+    await collection.updateOne(
+      filter,
+      { $set: doc },
+      { upsert: true },
+    );
+
+    metrics.chatbotRequestsTotal.inc({ endpoint: 'feedback', status: 'success' });
+    logger.info('[Chatbot] Feedback saved', {
+      sessionId,
+      messageId,
+      rating,
+      hasComment: !!comment,
+    });
+
+    return sendSuccess(res, { saved: true }, 'Feedback saved', StatusCodes.OK);
   }),
 
   /**

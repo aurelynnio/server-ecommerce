@@ -10,8 +10,12 @@ const { toolHandlers } = require('../utils/chatbot.tools');
 const { SYSTEM_PROMPT } = require('../configs/chatbot.config');
 const { redact } = require('../utils/redact');
 const { truncateHistory } = require('../utils/tokenBudget');
+const { getCachedResponse, setCachedResponse } = require('../utils/responseCache');
+const ChatbotAgent = require('../utils/chatAgent');
 const logger = require('../utils/logger');
 const metrics = require('../monitoring/chatbot.metrics');
+
+const USE_AGENT = String(process.env.CHATBOT_USE_AGENT || '').toLowerCase() === 'true';
 
 class ChatbotService {
   constructor() {
@@ -62,6 +66,38 @@ class ChatbotService {
   }
 
   /**
+   * Check if agent mode (tool-calling thật) is enabled.
+   */
+  isAgentMode() {
+    return USE_AGENT;
+  }
+
+  /**
+   * Lazy init + return ChatbotAgent (tool-calling thật với LangChain createAgent).
+   * Được controller gọi khi CHATBOT_USE_AGENT=true.
+   */
+  getAgent() {
+    if (!this.agent) {
+      this.agent = new ChatbotAgent(this.model, (sid) => this.getMessageHistory(sid));
+    }
+    return this.agent;
+  }
+
+  /**
+   * Tool-calling agent (opt-in via CHATBOT_USE_AGENT=true).
+   * Dùng khi user hỏi phức tạp: so sánh, lọc nhiều tiêu chí, lookup cụ thể...
+   * @param {string} sessionId
+   * @param {string} userMessage
+   * @returns {Promise<{success:boolean, message:string, sessionId:string, toolCalls?:Array}>}
+   */
+  async chatAgent(sessionId, userMessage) {
+    if (!this.agent) {
+      this.agent = new ChatbotAgent(this.model, (sid) => this.getMessageHistory(sid));
+    }
+    return await this.agent.invoke(sessionId, userMessage);
+  }
+
+  /**
    * Stream chat response using RAG
    * @param {string} sessionId
    * @param {string} userMessage
@@ -74,6 +110,18 @@ class ChatbotService {
       stream: 'true',
     });
     try {
+      // Check cache trước (greeting/FAQ, không phải followup)
+      const cached = await getCachedResponse(userMessage);
+      if (cached) {
+        // Stream từ cache để UX mượt
+        for (const word of cached.message.split(/(\s+)/)) {
+          if (word) onToken?.(word);
+        }
+        stopTimer({ status: 'cache_hit' });
+        metrics.chatbotRequestsTotal.inc({ endpoint: 'stream', status: 'cache_hit' });
+        return { ...cached, sessionId };
+      }
+
       logger.info('[Chatbot] Starting RAG stream chat with sessionId:', sessionId);
       logger.info('[Chatbot] User message:', redact(userMessage));
       metrics.chatbotTokensTotal.inc({ direction: 'in' }, metrics.estimateTokens(userMessage));
@@ -143,6 +191,13 @@ class ChatbotService {
   async chat(sessionId, userMessage) {
     const stopTimer = metrics.chatbotLatencySeconds.startTimer({ endpoint: 'message', stream: 'false' });
     try {
+      const cached = await getCachedResponse(userMessage);
+      if (cached) {
+        stopTimer({ status: 'cache_hit' });
+        metrics.chatbotRequestsTotal.inc({ endpoint: 'message', status: 'cache_hit' });
+        return { ...cached, sessionId };
+      }
+
       logger.info('[Chatbot] Starting RAG chat with sessionId:', sessionId);
       logger.info('[Chatbot] User message:', redact(userMessage));
       metrics.chatbotTokensTotal.inc({ direction: 'in' }, metrics.estimateTokens(userMessage));
@@ -178,11 +233,13 @@ class ChatbotService {
       metrics.chatbotTokensTotal.inc({ direction: 'out' }, metrics.estimateTokens(result));
 
       stopTimer({ status: 'success' });
-      return {
+      const final = {
         success: true,
         message: validatedResponse,
         sessionId,
       };
+      await setCachedResponse(userMessage, final);
+      return final;
     } catch (error) {
       logger.error('[Chatbot] Error:', error.message);
       metrics.chatbotErrorsTotal.inc({ stage: 'message' });

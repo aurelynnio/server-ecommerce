@@ -11,6 +11,8 @@ process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
 process.env.JWT_ACCESS_EXPIRES_IN = '30m';
 process.env.JWT_REFRESH_EXPIRES_IN = '16d';
 process.env.BCRYPT_SALT_ROUNDS = '4';
+// Mistral: dummy key để pass constructor check (test không gọi API thật)
+process.env.MISTRAL_API_KEY = 'test-mistral-key';
 
 // Mock Redis
 vi.mock('../src/configs/redis.config', () => ({

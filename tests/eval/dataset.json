@@ -1,0 +1,123 @@
+[
+  {
+    "id": "greeting_001",
+    "input": "Xin chào",
+    "expect": {
+      "intent": "greeting",
+      "noProductRequired": true,
+      "minProducts": 0
+    }
+  },
+  {
+    "id": "greeting_002",
+    "input": "Hello bạn",
+    "expect": {
+      "intent": "greeting",
+      "noProductRequired": true,
+      "minProducts": 0
+    }
+  },
+  {
+    "id": "search_budget_001",
+    "input": "Tìm áo thun nam giá dưới 300k",
+    "expect": {
+      "intent": "search_with_budget",
+      "minProducts": 1,
+      "hasProductUrl": true,
+      "maxPriceUnder": 400000
+    }
+  },
+  {
+    "id": "search_range_001",
+    "input": "Giày thể thao từ 500k đến 1 triệu",
+    "expect": {
+      "intent": "search_with_range",
+      "minProducts": 0,
+      "signalsExtracted": {
+        "minPrice": 500000,
+        "maxPrice": 1000000
+      }
+    }
+  },
+  {
+    "id": "search_sale_001",
+    "input": "Có sản phẩm nào đang giảm giá không?",
+    "expect": {
+      "intent": "discounted",
+      "signals": { "onlyDiscounted": true }
+    }
+  },
+  {
+    "id": "search_bestseller_001",
+    "input": "Gợi ý sản phẩm bán chạy nhất",
+    "expect": {
+      "intent": "bestseller",
+      "signals": { "intent": "bestseller" }
+    }
+  },
+  {
+    "id": "search_new_001",
+    "input": "Sản phẩm mới về",
+    "expect": {
+      "intent": "new_arrival"
+    }
+  },
+  {
+    "id": "search_brand_001",
+    "input": "Áo thun thương hiệu Nike",
+    "expect": {
+      "intent": "search_advanced",
+      "signals": { "brand": "Nike" }
+    }
+  },
+  {
+    "id": "search_featured_001",
+    "input": "Gợi ý cho tôi sản phẩm hot nhất",
+    "expect": {
+      "intent": "featured",
+      "minProducts": 0
+    }
+  },
+  {
+    "id": "followup_001",
+    "input": "Cái đó còn hàng không?",
+    "expect": {
+      "isFollowup": true
+    }
+  },
+  {
+    "id": "followup_002",
+    "input": "Ở trên giá bao nhiêu vậy?",
+    "expect": {
+      "isFollowup": true
+    }
+  },
+  {
+    "id": "category_001",
+    "input": "Cho tôi xem danh mục áo",
+    "expect": {
+      "intent": "category_listing"
+    }
+  },
+  {
+    "id": "empty_001",
+    "input": "",
+    "expect": {
+      "isFollowup": true
+    }
+  },
+  {
+    "id": "pii_email_001",
+    "input": "Liên hệ tôi qua email test@example.com nhé",
+    "expect": {
+      "redacted": "[REDACTED_EMAIL]"
+    }
+  },
+  {
+    "id": "pii_phone_001",
+    "input": "Số điện thoại của tôi là 0987654321",
+    "expect": {
+      "redacted": "[REDACTED_PHONE]"
+    }
+  }
+]
