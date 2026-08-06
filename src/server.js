@@ -24,8 +24,14 @@ const startServer = async () => {
     await connectDB();
     logger.info('Database connected successfully');
 
-    await startQueueWorkers();
-    logger.info('Queue workers started successfully');
+    // Fire-and-forget: không block server start khi RabbitMQ/Redis chưa sẵn sàng
+    startQueueWorkers()
+      .then(() => logger.info('Queue workers started successfully'))
+      .catch((workerError) => {
+        logger.warn('Queue workers failed to start (non-critical):', {
+          error: workerError.message,
+        });
+      });
 
     server.listen(PORT, () => {
       logger.info(`Server is running on port ${PORT}`);
