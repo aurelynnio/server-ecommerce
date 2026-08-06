@@ -11,6 +11,7 @@ const { SYSTEM_PROMPT } = require('../configs/chatbot.config');
 const { redact } = require('../utils/redact');
 const { truncateHistory } = require('../utils/tokenBudget');
 const { getCachedResponse, setCachedResponse } = require('../utils/responseCache');
+const { extractConversationMessages } = require('../utils/chatbotParser');
 const ChatbotAgent = require('../utils/chatAgent');
 const logger = require('../utils/logger');
 const metrics = require('../monitoring/chatbot.metrics');
@@ -95,6 +96,152 @@ class ChatbotService {
       this.agent = new ChatbotAgent(this.model, (sid) => this.getMessageHistory(sid));
     }
     return await this.agent.invoke(sessionId, userMessage);
+  }
+
+  /**
+   * Lấy collection chatbot_messages (reusable helper)
+   */
+  _getCollection() {
+    return mongoose.connection.collection('chatbot_messages');
+  }
+
+  /**
+   * Lấy lịch sử chat của 1 session
+   * @param {string} sessionId
+   * @returns {Promise<{sessionId: string, messages: Array}>}
+   */
+  async getHistory(sessionId) {
+    const collection = this._getCollection();
+    const messages = await collection.find({ sessionId }).sort({ _id: 1 }).toArray();
+
+    const formattedMessages = messages.flatMap((msg) =>
+      extractConversationMessages(msg, msg._id.getTimestamp()),
+    );
+
+    return { sessionId, messages: formattedMessages };
+  }
+
+  /**
+   * Xoá toàn bộ message của 1 session
+   * @param {string} sessionId
+   * @returns {Promise<{sessionId: string, deletedCount: number}>}
+   */
+  async clearSession(sessionId) {
+    const collection = this._getCollection();
+    const result = await collection.deleteMany({ sessionId });
+    return { sessionId, deletedCount: result.deletedCount };
+  }
+
+  /**
+   * Lấy danh sách tất cả session (admin dashboard)
+   * @param {number} page
+   * @param {number} limit
+   * @returns {Promise<{data: Array, pagination: Object}>}
+   */
+  async getAllSessions(page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
+    const collection = this._getCollection();
+
+    const sessions = await collection
+      .aggregate([
+        { $sort: { _id: 1 } },
+        {
+          $group: {
+            _id: '$sessionId',
+            lastMessageAt: { $max: '$_id' },
+            docs: { $push: '$$ROOT' },
+          },
+        },
+        { $sort: { lastMessageAt: -1 } },
+        {
+          $facet: {
+            metadata: [{ $count: 'total' }],
+            data: [{ $skip: skip }, { $limit: limit }],
+          },
+        },
+      ])
+      .toArray();
+
+    const result = sessions[0];
+    const total = result.metadata[0]?.total || 0;
+    const sessionData = result.data.map((s) => {
+      const flattenedMessages = s.docs.flatMap((doc) =>
+        extractConversationMessages(doc, doc._id.getTimestamp()),
+      );
+      const firstMessage = flattenedMessages[0] || null;
+      const lastMessage = flattenedMessages[flattenedMessages.length - 1] || null;
+
+      return {
+        sessionId: s._id,
+        lastMessage: lastMessage?.content || '[Không đọc được nội dung tin nhắn]',
+        messageCount: flattenedMessages.length,
+        createdAt: (firstMessage?.timestamp || s.lastMessageAt.getTimestamp()).toISOString(),
+        updatedAt: (lastMessage?.timestamp || s.lastMessageAt.getTimestamp()).toISOString(),
+      };
+    });
+
+    return {
+      data: sessionData,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Lưu feedback (👍/👎) cho 1 message chatbot
+   * @param {string} sessionId
+   * @param {string} messageId
+   * @param {'up'|'down'} rating
+   * @param {string|null} comment
+   * @param {string|null} userId
+   * @returns {Promise<{saved: boolean}>}
+   */
+  async saveFeedback(sessionId, messageId, rating, comment, userId) {
+    const collection = mongoose.connection.collection('chatbot_feedback');
+    const doc = {
+      sessionId,
+      messageId,
+      rating,
+      comment: comment ? String(comment).slice(0, 500) : null,
+      userId: userId || null,
+      createdAt: new Date(),
+    };
+
+    const filter = { sessionId, messageId, userId: doc.userId };
+    await collection.updateOne(filter, { $set: doc }, { upsert: true });
+
+    metrics.chatbotRequestsTotal.inc({ endpoint: 'feedback', status: 'success' });
+    logger.info('[Chatbot] Feedback saved', {
+      sessionId,
+      messageId,
+      rating,
+      hasComment: !!comment,
+    });
+
+    return { saved: true };
+  }
+
+  /**
+   * Admin: xoá toàn bộ message của 1 session (GDPR / cleanup)
+   * @param {string} sessionId
+   * @param {string|null} actorId
+   * @returns {Promise<{sessionId: string, deletedCount: number}>}
+   */
+  async adminDeleteSession(sessionId, actorId) {
+    const collection = this._getCollection();
+    const result = await collection.deleteMany({ sessionId });
+
+    logger.warn('[Chatbot] Admin deleted session', {
+      sessionId,
+      deletedCount: result.deletedCount,
+      actorId,
+    });
+
+    return { sessionId, deletedCount: result.deletedCount };
   }
 
   /**
