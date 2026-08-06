@@ -6,6 +6,7 @@ const Review = require('../repositories/review.repository');
 const ShopFollower = require('../repositories/shop-follower.repository');
 const notificationService = require('./notification.service');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
+const { uploadImage } = require('../configs/cloudinary');
 const logger = require('../utils/logger');
 
 const slugify = require('slugify');
@@ -415,6 +416,31 @@ class ShopService {
     const categories = await Product.aggregateShopCategories(shopId);
 
     return categories;
+  }
+
+  /**
+   * Upload shop image (logo hoặc banner) lên Cloudinary
+   * @param {Buffer} fileBuffer - File buffer từ multer
+   * @param {'logo'|'banner'} type - Loại ảnh
+   * @returns {Promise<Object>} { secure_url: string }
+   */
+  async uploadShopImage(fileBuffer, type) {
+    if (!fileBuffer) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'No file uploaded');
+    }
+
+    if (!['logo', 'banner'].includes(type)) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid image type. Must be 'logo' or 'banner'");
+    }
+
+    const folder = type === 'logo' ? 'shop-logos' : 'shop-banners';
+    const result = await uploadImage(fileBuffer, folder);
+
+    if (!result) {
+      throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Image upload failed');
+    }
+
+    return { [type]: result.secure_url };
   }
 }
 

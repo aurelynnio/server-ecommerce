@@ -1,8 +1,7 @@
 const catchAsync = require('../configs/catchAsync');
 const PaymentService = require('../services/payment.service');
 const { StatusCodes } = require('http-status-codes');
-const { sendSuccess, sendFail, sendJson } = require('../shared/res/formatResponse');
-const { isRequestUserAdmin } = require('../utils/requestUser');
+const { sendSuccess, sendJson } = require('../shared/res/formatResponse');
 
 const getClientUrl = () => process.env.FRONTEND_URL || 'http://localhost:3000';
 
@@ -101,17 +100,9 @@ const PaymentController = {
   getPaymentByOrder: catchAsync(async (req, res) => {
     const { orderId } = req.params;
     const userId = req.user.userId;
+    const isAdmin = req.user?.roles === 'admin';
 
-    const payment = await PaymentService.getPaymentByOrderId(orderId);
-
-    if (!payment) {
-      return sendFail(res, 'Payment not found', StatusCodes.NOT_FOUND);
-    }
-
-    if (payment.userId._id.toString() !== userId.toString() && !isRequestUserAdmin(req.user)) {
-      return sendFail(res, 'Unauthorized access', StatusCodes.FORBIDDEN);
-    }
-
+    const payment = await PaymentService.getPaymentByOrderId(orderId, userId, isAdmin);
     return sendSuccess(res, payment, 'Get payment details successfully');
   }),
 };

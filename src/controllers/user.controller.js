@@ -1,5 +1,4 @@
 const catchAsync = require('../configs/catchAsync');
-const { uploadImage } = require('../configs/cloudinary');
 const userService = require('../services/user.service');
 const { sendFail, sendSuccess } = require('../shared/res/formatResponse');
 const { StatusCodes } = require('http-status-codes');
@@ -48,12 +47,7 @@ const UserController = {
       return sendFail(res, 'No file uploaded', StatusCodes.BAD_REQUEST);
     }
 
-    const result = await uploadImage(file.buffer, 'avatar');
-    if (!result) {
-      return sendFail(res, 'Image upload failed', StatusCodes.INTERNAL_SERVER_ERROR);
-    }
-
-    const user = await userService.uploadAvatar(userId, result.secure_url);
+    const user = await userService.uploadAvatarImage(userId, file.buffer);
     return sendSuccess(res, user, 'Avatar uploaded successfully', StatusCodes.OK);
   }),
 

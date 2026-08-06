@@ -2,6 +2,7 @@ const userModel = require('../repositories/user.repository');
 const hashPassword = require('../utils/hashPasword');
 const comparePassword = require('../utils/comparePassword');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
+const { uploadImage } = require('../configs/cloudinary');
 
 const { StatusCodes } = require('http-status-codes');
 const { ApiError } = require('../middlewares/errorHandler.middleware');
@@ -107,6 +108,22 @@ class UserService {
     );
 
     return this._ensureUserFound(user);
+  }
+
+  /**
+   * Upload avatar image to Cloudinary and update user profile
+   * @param {string} userId - User ID
+   * @param {Buffer} fileBuffer - Image file buffer
+   * @returns {Promise<Object>} Updated user object
+   * @throws {Error} If upload fails or user not found
+   */
+  async uploadAvatarImage(userId, fileBuffer) {
+    const result = await uploadImage(fileBuffer, 'avatar');
+    if (!result) {
+      throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Image upload failed');
+    }
+
+    return this.uploadAvatar(userId, result.secure_url);
   }
 
   /**

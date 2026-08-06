@@ -248,10 +248,25 @@ class PaymentService {
   /**
    * Get payment by order ID
    * @param {string} orderId - Order ID
+   * @param {string} [userId] - Current user ID for authorization check
+   * @param {boolean} [isAdmin=false] - Whether current user is admin
    * @returns {Object} Payment record
+   * @throws {Error} If unauthorized access
    */
-  async getPaymentByOrderId(orderId) {
+  async getPaymentByOrderId(orderId, userId, isAdmin = false) {
     const payment = await Payment.findByOrderIdWithOrderAndUser(orderId);
+
+    if (!payment) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Payment not found');
+    }
+
+    if (userId && !isAdmin) {
+      const paymentUserId = payment.userId?._id?.toString() || payment.userId?.toString();
+      if (paymentUserId !== userId.toString()) {
+        throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized access');
+      }
+    }
+
     return payment;
   }
 

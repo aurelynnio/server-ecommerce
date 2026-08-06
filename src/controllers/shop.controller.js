@@ -1,31 +1,7 @@
 const shopService = require('../services/shop.service');
 const catchAsync = require('../configs/catchAsync');
-const { uploadImage } = require('../configs/cloudinary');
 const { sendSuccess, sendFail } = require('../shared/res/formatResponse');
 const { StatusCodes } = require('http-status-codes');
-
-const handleUploadShopImage = async (req, res, type) => {
-  const file = req.file;
-
-  if (!file) {
-    return sendFail(res, 'No file uploaded', StatusCodes.BAD_REQUEST);
-  }
-
-  if (!type || !['logo', 'banner'].includes(type)) {
-    return sendFail(res, "Invalid image type. Must be 'logo' or 'banner'", StatusCodes.BAD_REQUEST);
-  }
-
-  const folder = type === 'logo' ? 'shop-logos' : 'shop-banners';
-  const result = await uploadImage(file.buffer, folder);
-
-  if (!result) {
-    return sendFail(res, 'Image upload failed', StatusCodes.INTERNAL_SERVER_ERROR);
-  }
-
-  const payload = type === 'logo' ? { logo: result.secure_url } : { banner: result.secure_url };
-
-  return sendSuccess(res, payload, 'Image uploaded successfully', StatusCodes.OK);
-};
 
 const ShopController = {
   /**
@@ -177,14 +153,20 @@ const ShopController = {
   }),
 
   /**
-   * Upload image
+   * Upload image (logo hoặc banner)
    * @param {Object} req
    * @param {Object} res
    * @returns {Promise<any>}
    */
   uploadImage: catchAsync(async (req, res) => {
     const { type } = req.body;
-    return handleUploadShopImage(req, res, type);
+
+    if (!req.file) {
+      return sendFail(res, 'No file uploaded', StatusCodes.BAD_REQUEST);
+    }
+
+    const result = await shopService.uploadShopImage(req.file.buffer, type);
+    return sendSuccess(res, result, 'Image uploaded successfully', StatusCodes.OK);
   }),
 
   /**
@@ -194,7 +176,12 @@ const ShopController = {
    * @returns {Promise<any>}
    */
   uploadLogo: catchAsync(async (req, res) => {
-    return handleUploadShopImage(req, res, 'logo');
+    if (!req.file) {
+      return sendFail(res, 'No file uploaded', StatusCodes.BAD_REQUEST);
+    }
+
+    const result = await shopService.uploadShopImage(req.file.buffer, 'logo');
+    return sendSuccess(res, result, 'Logo uploaded successfully', StatusCodes.OK);
   }),
 
   /**
@@ -204,7 +191,12 @@ const ShopController = {
    * @returns {Promise<any>}
    */
   uploadBanner: catchAsync(async (req, res) => {
-    return handleUploadShopImage(req, res, 'banner');
+    if (!req.file) {
+      return sendFail(res, 'No file uploaded', StatusCodes.BAD_REQUEST);
+    }
+
+    const result = await shopService.uploadShopImage(req.file.buffer, 'banner');
+    return sendSuccess(res, result, 'Banner uploaded successfully', StatusCodes.OK);
   }),
 };
 

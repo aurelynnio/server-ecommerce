@@ -5,26 +5,28 @@ const parseDurationMs = require('../utils/parseDurationMs');
 
 const { StatusCodes } = require('http-status-codes');
 
+const getCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict',
+});
+
 const setAuthCookies = (res, accessToken, refreshToken) => {
-  const refreshTtlMs = parseDurationMs(
-    process.env.JWT_REFRESH_EXPIRES_IN,
-    16 * 24 * 60 * 60 * 1000,
-  );
   const accessTtlMs = parseDurationMs(process.env.JWT_ACCESS_EXPIRES_IN, 30 * 60 * 1000);
+  res.cookie('accessToken', accessToken, { ...getCookieOptions(), maxAge: accessTtlMs });
 
-  res.cookie('refreshToken', refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: refreshTtlMs,
-  });
+  if (refreshToken) {
+    const refreshTtlMs = parseDurationMs(
+      process.env.JWT_REFRESH_EXPIRES_IN,
+      16 * 24 * 60 * 60 * 1000,
+    );
+    res.cookie('refreshToken', refreshToken, { ...getCookieOptions(), maxAge: refreshTtlMs });
+  }
+};
 
-  res.cookie('accessToken', accessToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: accessTtlMs,
-  });
+const clearAuthCookies = (res) => {
+  res.clearCookie('accessToken', getCookieOptions());
+  res.clearCookie('refreshToken', getCookieOptions());
 };
 
 const AuthController = {
@@ -142,35 +144,14 @@ const AuthController = {
    * @returns {Promise<any>}
    */
   refreshToken: catchAsync(async (req, res) => {
-    const refreshToken = req.cookies?.refreshToken;
+    const refreshTokenCookie = req.cookies?.refreshToken;
 
-    if (!refreshToken) {
+    if (!refreshTokenCookie) {
       return sendFail(res, 'Refresh token is required', StatusCodes.BAD_REQUEST);
     }
 
-    const result = await authService.refreshAccessToken(refreshToken);
-
-    const accessTtlMs = parseDurationMs(process.env.JWT_ACCESS_EXPIRES_IN, 30 * 60 * 1000);
-    const refreshTtlMs = parseDurationMs(
-      process.env.JWT_REFRESH_EXPIRES_IN,
-      16 * 24 * 60 * 60 * 1000,
-    );
-
-    res.cookie('accessToken', result.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: accessTtlMs,
-    });
-
-    if (result.refreshToken) {
-      res.cookie('refreshToken', result.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: refreshTtlMs,
-      });
-    }
+    const result = await authService.refreshAccessToken(refreshTokenCookie);
+    setAuthCookies(res, result.accessToken, result.refreshToken);
 
     return sendSuccess(
       res,
@@ -187,23 +168,12 @@ const AuthController = {
    * @returns {Promise<any>}
    */
   logout: catchAsync(async (req, res) => {
-    const refreshToken = req.cookies?.refreshToken;
-    if (refreshToken) {
-      await authService.revokeRefreshToken(refreshToken);
+    const refreshTokenCookie = req.cookies?.refreshToken;
+    if (refreshTokenCookie) {
+      await authService.revokeRefreshToken(refreshTokenCookie);
     }
 
-    res.clearCookie('accessToken', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-    });
-
-    res.clearCookie('refreshToken', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-    });
-
+    clearAuthCookies(res);
     return sendSuccess(res, null, 'Logged out successfully', StatusCodes.OK);
   }),
 
