@@ -1,5 +1,6 @@
 const Voucher = require('../repositories/voucher.repository');
 const VoucherUsage = require('../repositories/voucher-usage.repository');
+const mongoose = require('mongoose');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 const { StatusCodes } = require('http-status-codes');
 const { ApiError } = require('../middlewares/errorHandler.middleware');
@@ -187,7 +188,6 @@ class VoucherService {
     const filterByUserUsage = async (vouchers) => {
       if (vouchers.length === 0) return vouchers;
       const voucherIds = vouchers.map((v) => v._id);
-      const mongoose = require('mongoose');
       const usages = await VoucherUsage.aggregateUsageByVoucherIdsAndUser(
         voucherIds,
         new mongoose.Types.ObjectId(userId),

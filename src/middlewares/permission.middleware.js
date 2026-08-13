@@ -16,17 +16,24 @@ const requirePermission = (requiredPermissions, options = { mode: 'all' }) => {
     : [requiredPermissions];
   const mode = options?.mode === 'any' ? 'any' : 'all';
 
-  return (req, res, next) => {
+  return async (req, res, next) => {
     try {
       if (!req.user) {
         return sendFail(res, 'Authentication required', StatusCodes.UNAUTHORIZED);
       }
 
+      const userId = req.user?._id || req.user?.userId;
+
+      // Fetch fresh permissions from DB (cached briefly) instead of trusting
+      // the possibly-stale permissions embedded in the JWT.
+      const freshPermissions = await permissionService.getEffectivePermissionsByUserId(userId);
+      const userWithFreshPermissions = { ...req.user, permissions: freshPermissions };
+
       let hasPermission;
       if (mode === 'any') {
-        hasPermission = permissionService.hasAnyPermission(req.user, permissions);
+        hasPermission = permissionService.hasAnyPermission(userWithFreshPermissions, permissions);
       } else {
-        hasPermission = permissionService.hasAllPermissions(req.user, permissions);
+        hasPermission = permissionService.hasAllPermissions(userWithFreshPermissions, permissions);
       }
 
       if (!hasPermission) {

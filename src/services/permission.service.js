@@ -11,6 +11,7 @@ const { StatusCodes } = require('http-status-codes');
 const { ApiError } = require('../middlewares/errorHandler.middleware');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 const { ensureFound } = require('../utils/serviceAssertions');
+const redisService = require('./redis.service');
 
 class PermissionService {
   _normalizeRoles(roleOrRoles) {
@@ -124,6 +125,7 @@ class PermissionService {
     user.permissions.push(permission);
     await user.save();
 
+    await redisService.del(`perm:${userId}`);
     await this.logAudit('grant', adminId, userId, permission);
 
     return user;
@@ -147,6 +149,7 @@ class PermissionService {
     user.permissions.splice(permIndex, 1);
     await user.save();
 
+    await redisService.del(`perm:${userId}`);
     await this.logAudit('revoke', adminId, userId, permission);
 
     return user;
@@ -175,6 +178,7 @@ class PermissionService {
       throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
     }
 
+    await redisService.del(`perm:${userId}`);
     await this.logBulkUpdate(adminId, userId, permissions);
 
     return user;
@@ -221,6 +225,31 @@ class PermissionService {
         error: error.message,
       });
     }
+  }
+
+  /**
+   * Get fresh effective permissions for a user from the database.
+   * Cached briefly in Redis to avoid a DB hit on every authorized request,
+   * while still reflecting permission grants/revocations within the cache TTL
+   * (previously permissions were trusted from the JWT and could be stale).
+   * @param {string} userId
+   * @param {number} [ttlSeconds=30]
+   * @returns {Promise<any>}
+   */
+  async getEffectivePermissionsByUserId(userId, ttlSeconds = 30) {
+    if (!userId) return [];
+
+    const cacheKey = `perm:${userId}`;
+    const cached = await redisService.get(cacheKey);
+    if (cached) return cached;
+
+    const user = await User.findByIdWithoutPassword(userId);
+    if (!user) return [];
+
+    const permissions = this.getUserPermissions(user);
+    await redisService.set(cacheKey, permissions, ttlSeconds);
+
+    return permissions;
   }
 
   /**

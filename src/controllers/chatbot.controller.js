@@ -1,12 +1,3 @@
-/**
- * Chatbot Controller — chỉ xử lý HTTP concerns.
- *
- * Logic nghiệp vụ (parsing, DB queries, feature flag) đã được chuyển sang:
- *  - chatbot.service.js        (DB queries, RAG, agent)
- *  - utils/chatbotParser.js    (parse message format)
- *  - utils/gracefulShutdown.js (SIGTERM/SIGINT handler)
- */
-
 const catchAsync = require('../configs/catchAsync');
 const chatbotService = require('../services/chatbot.service');
 const { sendSuccess, sendFail } = require('../shared/res/formatResponse');

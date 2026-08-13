@@ -7,7 +7,7 @@ const socketAuthMiddleware = require('../middlewares/socketAuth.middleware');
 const logger = require('../utils/logger');
 const { StatusCodes } = require('http-status-codes');
 const { ApiError } = require('../middlewares/errorHandler.middleware');
-const { getAllowedOrigins } = require('../configs/clientOrigins.config');
+const { isAllowedOrigin } = require('../middlewares/cors.middleware');
 
 let io = null;
 let redisPubClient = null;
@@ -55,7 +55,10 @@ const setupRedisAdapter = async () => {
 const initSocket = (httpServer) => {
   io = new Server(httpServer, {
     cors: {
-      origin: getAllowedOrigins(),
+      origin(origin, callback) {
+        if (isAllowedOrigin(origin)) return callback(null, true);
+        return callback(new Error('Not allowed by CORS'));
+      },
       methods: ['GET', 'POST'],
       credentials: true,
     },

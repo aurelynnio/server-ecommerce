@@ -42,10 +42,10 @@ const errorStatusMap = {
 const getStatusCode = (err) => {
   if (err.statusCode) return err.statusCode;
 
-  if (errorStatusMap[err.name]) return errorStatusMap[err.name];
-
-  // MongoDB duplicate key error
+  // MongoDB duplicate key error (must be checked before the generic MongoServerError mapping)
   if (err.code === 11000) return StatusCodes.CONFLICT;
+
+  if (errorStatusMap[err.name]) return errorStatusMap[err.name];
 
   return StatusCodes.INTERNAL_SERVER_ERROR;
 };

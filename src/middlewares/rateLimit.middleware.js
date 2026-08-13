@@ -2,8 +2,6 @@ const rateLimit = require('express-rate-limit');
 const { RedisStore } = require('rate-limit-redis');
 const redisClient = require('../configs/redis.config');
 
-const redisReady = () => redisClient.isReady?.() === true;
-
 const createRateLimiter = ({ windowMs, limit, message }) =>
   rateLimit({
     windowMs,
@@ -18,6 +16,9 @@ const createRateLimiter = ({ windowMs, limit, message }) =>
   });
 
 const createRedisRateLimiter = ({ windowMs, limit, message, keyPrefix = 'rl' }) => {
+  // Always use the Redis store. ioredis queues commands until the connection is
+  // established, so the limiter stays Redis-backed (and cluster-scalable) instead
+  // of silently falling back to a per-process MemoryStore at module-load time.
   const limiter = rateLimit({
     windowMs,
     limit,
@@ -28,13 +29,10 @@ const createRedisRateLimiter = ({ windowMs, limit, message, keyPrefix = 'rl' }) 
       code: 429,
       message,
     },
-    // Fall back to IP nếu Redis chưa sẵn sàng (giảm 1 lớp storage)
-    store: redisReady()
-      ? new RedisStore({
-          sendCommand: (...args) => redisClient.call(...args),
-          prefix: `${keyPrefix}:`,
-        })
-      : undefined,
+    store: new RedisStore({
+      sendCommand: (...args) => redisClient.call(...args),
+      prefix: `${keyPrefix}:`,
+    }),
   });
 
   return limiter;
