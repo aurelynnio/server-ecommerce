@@ -88,6 +88,8 @@ const objectId = () => {
  * @param {object} obj - Object to sanitize
  * @returns {object} - Sanitized object
  */
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 const sanitizeObject = (obj) => {
   if (obj === null || obj === undefined) return obj;
   if (typeof obj === 'string') return obj.trim();
@@ -95,8 +97,9 @@ const sanitizeObject = (obj) => {
   if (typeof obj === 'object') {
     const sanitized = {};
     for (const [key, value] of Object.entries(obj)) {
-      // Skip keys starting with $ (MongoDB operators)
-      if (key.startsWith('$')) continue;
+      // Skip keys starting with $ (MongoDB operators) and keys that could
+      // trigger prototype pollution (__proto__, constructor, prototype).
+      if (key.startsWith('$') || DANGEROUS_KEYS.has(key)) continue;
       sanitized[key] = sanitizeObject(value);
     }
     return sanitized;

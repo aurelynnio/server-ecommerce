@@ -2,19 +2,6 @@ const rateLimit = require('express-rate-limit');
 const { RedisStore } = require('rate-limit-redis');
 const redisClient = require('../configs/redis.config');
 
-const createRateLimiter = ({ windowMs, limit, message }) =>
-  rateLimit({
-    windowMs,
-    limit,
-    standardHeaders: 'draft-8',
-    legacyHeaders: false,
-    message: {
-      status: 'fail',
-      code: 429,
-      message,
-    },
-  });
-
 const createRedisRateLimiter = ({ windowMs, limit, message, keyPrefix = 'rl' }) => {
   // Always use the Redis store. ioredis queues commands until the connection is
   // established, so the limiter stays Redis-backed (and cluster-scalable) instead
@@ -44,13 +31,13 @@ const userKeyGenerator = (req) => {
   return `ip:${req.ip}`;
 };
 
-const authRateLimiter = createRateLimiter({
+const authRateLimiter = createRedisRateLimiter({
   windowMs: 15 * 60 * 1000,
   limit: 10,
   message: 'Too many authentication attempts. Please try again later.',
 });
 
-const passwordResetRateLimiter = createRateLimiter({
+const passwordResetRateLimiter = createRedisRateLimiter({
   windowMs: 60 * 60 * 1000,
   limit: 5,
   message: 'Too many password reset requests. Please try again later.',
@@ -70,7 +57,7 @@ chatbotRateLimiter.keyGenerator = (req) => {
   return key;
 };
 
-const newsletterRateLimiter = createRateLimiter({
+const newsletterRateLimiter = createRedisRateLimiter({
   windowMs: 60 * 60 * 1000,
   limit: 5,
   message: 'Too many newsletter requests. Please try again later.',
