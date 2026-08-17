@@ -41,7 +41,8 @@ class PermissionAuditRepository extends BaseRepository {
       .skip(skip)
       .limit(limit)
       .populate('adminId', 'username email')
-      .populate('targetUserId', 'username email');
+      .populate('targetUserId', 'username email')
+      .lean();
   }
 }
 

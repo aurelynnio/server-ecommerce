@@ -6,7 +6,7 @@ class ShippingTemplateRepository {
   }
 
   findByShopId(shopId) {
-    return ShippingTemplate.find({ shop: shopId });
+    return ShippingTemplate.find({ shop: shopId }).lean();
   }
 
   findByIdAndShopIdAndUpdate(templateId, shopId, updates) {

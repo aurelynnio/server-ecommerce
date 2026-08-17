@@ -26,10 +26,8 @@ class SearchService {
     const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
-    const regex = new RegExp(keyword, 'i');
-
     // Search products - Note: images are in variants[].images, not root level
-    const products = await Product.findPublishedAutocomplete(regex, limit);
+    const products = await Product.findPublishedAutocomplete(keyword, limit);
 
     // Map products to include first variant image for display in 'images' array
     const productsWithImages = products.map((product) => {
@@ -41,9 +39,9 @@ class SearchService {
       };
     });
 
-    const categories = await Category.findActiveByNameRegex(regex, 5);
+    const categories = await Category.findActiveByNameRegex(keyword, 5);
 
-    const shops = await Shop.findActiveByNameRegex(regex, 5);
+    const shops = await Shop.findActiveByNameRegex(keyword, 5);
 
     const result = { products: productsWithImages, categories, shops };
     // PERFORMANCE FIX: Cache for 5 minutes

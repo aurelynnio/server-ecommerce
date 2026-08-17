@@ -1,5 +1,6 @@
 const User = require('../models/user.model');
 const BaseRepository = require('./base.repository');
+const { createLiteralRegex } = require('../utils/query.utils');
 
 class UserRepository extends BaseRepository {
   constructor() {
@@ -8,14 +9,10 @@ class UserRepository extends BaseRepository {
 
   buildFilter({ search = '', role, isVerifiedEmail } = {}) {
     const filter = {};
-    const normalizedSearch = String(search || '').trim();
+    const searchRegex = createLiteralRegex(search);
 
-    if (normalizedSearch) {
-      const escapedSearch = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      filter.$or = [
-        { username: { $regex: escapedSearch, $options: 'i' } },
-        { email: { $regex: escapedSearch, $options: 'i' } },
-      ];
+    if (searchRegex) {
+      filter.$or = [{ username: searchRegex }, { email: searchRegex }];
     }
 
     if (role && role !== '') {
@@ -46,10 +43,15 @@ class UserRepository extends BaseRepository {
   }
 
   clearRefreshToken(userId) {
-    return this.updateById(userId, {
-      refreshTokenHash: null,
-      refreshTokenExpiresAt: null,
-    });
+    return this.updateOneByFilter(
+      { _id: userId },
+      {
+        $set: {
+          refreshTokenHash: null,
+          refreshTokenExpiresAt: null,
+        },
+      },
+    );
   }
 
   streamAllUserIds() {
@@ -97,7 +99,8 @@ class UserRepository extends BaseRepository {
       .select('-password')
       .skip(skip)
       .limit(limit)
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
   }
 
   aggregateStatisticsWithFilters({ search = '', role, isVerifiedEmail } = {}) {
@@ -108,25 +111,35 @@ class UserRepository extends BaseRepository {
     return this.aggregateByPipeline([
       { $match: filter },
       {
-        $facet: {
-          totalUsers: [{ $count: 'count' }],
-          verifiedUsers: [{ $match: { isVerifiedEmail: true } }, { $count: 'count' }],
-          usersWithAddress: [
-            {
-              $match: {
-                'addresses.0': { $exists: true },
-              },
+        $group: {
+          _id: null,
+          totalUsersCount: { $sum: 1 },
+          verifiedUsersCount: {
+            $sum: { $cond: [{ $eq: ['$isVerifiedEmail', true] }, 1, 0] },
+          },
+          usersWithAddressCount: {
+            $sum: {
+              $cond: [{ $gt: [{ $size: { $ifNull: ['$addresses', []] } }, 0] }, 1, 0],
             },
-            { $count: 'count' },
-          ],
-          recentUsers: [
-            {
-              $match: {
-                createdAt: { $gte: sevenDaysAgo },
-              },
-            },
-            { $count: 'count' },
-          ],
+          },
+          recentUsersCount: {
+            $sum: { $cond: [{ $gte: ['$createdAt', sevenDaysAgo] }, 1, 0] },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          totalUsers: [{ count: '$totalUsersCount' }],
+          verifiedUsers: {
+            $cond: ['$verifiedUsersCount', [{ count: '$verifiedUsersCount' }], []],
+          },
+          usersWithAddress: {
+            $cond: ['$usersWithAddressCount', [{ count: '$usersWithAddressCount' }], []],
+          },
+          recentUsers: {
+            $cond: ['$recentUsersCount', [{ count: '$recentUsersCount' }], []],
+          },
         },
       },
     ]);

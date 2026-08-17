@@ -11,13 +11,17 @@ class PaymentRepository extends BaseRepository {
   }
 
   findByOrderIdWithOrderAndUser(orderId) {
-    return this.findOneByFilter({ orderId }).populate('orderId').populate('userId', 'email name');
+    return this.findOneByFilter({ orderId })
+      .populate('orderId')
+      .populate('userId', 'email name')
+      .lean();
   }
 
   findByTransactionIdWithOrderAndUser(transactionId) {
     return this.findOneByFilter({ transactionId })
       .populate('orderId')
-      .populate('userId', 'email name');
+      .populate('userId', 'email name')
+      .lean();
   }
 }
 

@@ -1,4 +1,5 @@
 const Banner = require('../models/banner.model');
+const { createLiteralRegex } = require('../utils/query.utils');
 
 class BannerRepository {
   create(payload) {
@@ -10,7 +11,7 @@ class BannerRepository {
   }
 
   findWithPagination(query, { skip, limit }) {
-    return Banner.find(query).sort({ order: 1, createdAt: -1 }).skip(skip).limit(limit);
+    return Banner.find(query).sort({ order: 1, createdAt: -1 }).skip(skip).limit(limit).lean();
   }
 
   findById(id) {
@@ -27,12 +28,10 @@ class BannerRepository {
 
   _buildFilterQuery({ search, ...otherFilters } = {}) {
     const query = { ...otherFilters };
+    const searchRegex = createLiteralRegex(search);
 
-    if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { subtitle: { $regex: search, $options: 'i' } },
-      ];
+    if (searchRegex) {
+      query.$or = [{ title: searchRegex }, { subtitle: searchRegex }];
     }
 
     return query;
@@ -46,7 +45,7 @@ class BannerRepository {
   findByFilters(filter = {}, { skip, limit }) {
     const query = this._buildFilterQuery(filter);
 
-    return Banner.find(query).sort({ order: 1, createdAt: -1 }).skip(skip).limit(limit);
+    return Banner.find(query).sort({ order: 1, createdAt: -1 }).skip(skip).limit(limit).lean();
   }
 }
 

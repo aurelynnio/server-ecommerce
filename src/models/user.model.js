@@ -96,5 +96,6 @@ const userSchema = new Schema(
 // Indexes
 userSchema.index({ roles: 1 });
 userSchema.index({ isVerifiedEmail: 1 });
+userSchema.index({ createdAt: -1 });
 
 module.exports = model('User', userSchema);

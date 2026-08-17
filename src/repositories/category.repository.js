@@ -1,5 +1,6 @@
 const Category = require('../models/category.model');
 const BaseRepository = require('./base.repository');
+const { createLiteralRegex } = require('../utils/query.utils');
 
 class CategoryRepository extends BaseRepository {
   constructor() {
@@ -33,14 +34,16 @@ class CategoryRepository extends BaseRepository {
     return this.findManyByFilter({
       parentCategory: parentCategoryId,
       isActive: true,
-    }).select('name slug images');
+    })
+      .select('name slug images')
+      .lean();
   }
 
   existsSubcategories(parentCategoryId) {
     return this.existsByFilter({ parentCategory: parentCategoryId });
   }
 
-  countWithFilters({ isActive, parentCategory, search } = {}) {
+  _buildFilterQuery({ isActive, parentCategory, search } = {}) {
     const query = {};
 
     if (typeof isActive === 'boolean') {
@@ -55,37 +58,20 @@ class CategoryRepository extends BaseRepository {
       }
     }
 
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-      ];
+    const searchRegex = createLiteralRegex(search);
+    if (searchRegex) {
+      query.$or = [{ name: searchRegex }, { description: searchRegex }];
     }
 
-    return this.countByFilter(query);
+    return query;
   }
 
-  aggregateWithDetails({ isActive, parentCategory, search } = {}, { skip = 0, limit = 10 } = {}) {
-    const query = {};
+  countWithFilters(filters = {}) {
+    return this.countByFilter(this._buildFilterQuery(filters));
+  }
 
-    if (typeof isActive === 'boolean') {
-      query.isActive = isActive;
-    }
-
-    if (parentCategory !== undefined) {
-      if (parentCategory === 'null' || parentCategory === null) {
-        query.parentCategory = null;
-      } else {
-        query.parentCategory = parentCategory;
-      }
-    }
-
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-      ];
-    }
+  aggregateWithDetails(filters = {}, { skip = 0, limit = 10 } = {}) {
+    const query = this._buildFilterQuery(filters);
 
     return this.aggregateByPipeline([
       { $match: query },
@@ -104,43 +90,24 @@ class CategoryRepository extends BaseRepository {
       {
         $lookup: {
           from: 'products',
-          let: { categoryId: '$_id' },
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $and: [{ $eq: ['$category', '$$categoryId'] }, { $eq: ['$isActive', true] }],
-                },
-              },
-            },
-            { $count: 'count' },
-          ],
+          localField: '_id',
+          foreignField: 'category',
+          pipeline: [{ $match: { status: 'published' } }, { $count: 'count' }],
           as: 'productCountData',
         },
       },
       {
         $lookup: {
           from: 'categories',
-          let: { parentId: '$_id' },
+          localField: '_id',
+          foreignField: 'parentCategory',
           pipeline: [
-            { $match: { $expr: { $eq: ['$parentCategory', '$$parentId'] } } },
             {
               $lookup: {
                 from: 'products',
-                let: { subCategoryId: '$_id' },
-                pipeline: [
-                  {
-                    $match: {
-                      $expr: {
-                        $and: [
-                          { $eq: ['$category', '$$subCategoryId'] },
-                          { $eq: ['$isActive', true] },
-                        ],
-                      },
-                    },
-                  },
-                  { $count: 'count' },
-                ],
+                localField: '_id',
+                foreignField: 'category',
+                pipeline: [{ $match: { status: 'published' } }, { $count: 'count' }],
                 as: 'subProductCount',
               },
             },
@@ -223,14 +190,15 @@ class CategoryRepository extends BaseRepository {
           from: 'products',
           localField: '_id',
           foreignField: 'category',
-          as: 'products',
+          pipeline: [{ $count: 'count' }],
+          as: 'productCountData',
         },
       },
       {
         $project: {
           name: 1,
           slug: 1,
-          productCount: { $size: '$products' },
+          productCount: { $ifNull: [{ $arrayElemAt: ['$productCountData.count', 0] }, 0] },
         },
       },
       { $sort: { productCount: -1 } },
@@ -238,10 +206,11 @@ class CategoryRepository extends BaseRepository {
     ]);
   }
 
-  findActiveByNameRegex(regex, limit = 5) {
+  findActiveByNameRegex(search, limit = 5) {
+    const searchRegex = createLiteralRegex(search);
     return this.findManyByFilter({
       isActive: true,
-      name: regex,
+      ...(searchRegex && { name: searchRegex }),
     })
       .select('name slug images')
       .limit(limit)
@@ -253,15 +222,16 @@ class CategoryRepository extends BaseRepository {
   }
 
   findSubcategoryIds(parentCategoryId) {
-    return this.findManyByFilter({ parentCategory: parentCategoryId }).select('_id');
+    return this.findManyByFilter({ parentCategory: parentCategoryId }).select('_id').lean();
   }
 
   countAllCategories() {
     return this.countByFilter();
   }
 
-  findByNameRegex(nameRegex) {
-    return this.findOneByFilter({ name: { $regex: nameRegex, $options: 'i' } });
+  findByNameRegex(name) {
+    const nameRegex = createLiteralRegex(name);
+    return this.findOneByFilter(nameRegex ? { name: nameRegex } : { _id: null });
   }
 }
 

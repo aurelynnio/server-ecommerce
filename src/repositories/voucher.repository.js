@@ -1,5 +1,6 @@
 const Voucher = require('../models/voucher.model');
 const BaseRepository = require('./base.repository');
+const { createLiteralRegex } = require('../utils/query.utils');
 
 class VoucherRepository extends BaseRepository {
   constructor() {
@@ -28,12 +29,9 @@ class VoucherRepository extends BaseRepository {
     if (shopId) {
       query.shopId = shopId;
     }
-    if (search) {
-      query.$or = [
-        { code: { $regex: search, $options: 'i' } },
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-      ];
+    const searchRegex = createLiteralRegex(search);
+    if (searchRegex) {
+      query.$or = [{ code: searchRegex }, { name: searchRegex }, { description: searchRegex }];
     }
     return query;
   }

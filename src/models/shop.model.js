@@ -63,5 +63,6 @@ const shopSchema = new Schema(
 
 // Indexes
 shopSchema.index({ name: 'text' });
+shopSchema.index({ status: 1, createdAt: -1 });
 
 module.exports = model('Shop', shopSchema);

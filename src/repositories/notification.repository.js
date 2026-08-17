@@ -17,7 +17,8 @@ class NotificationRepository extends BaseRepository {
       .limit(limit)
       .populate('orderId', 'totalAmount status')
       .populate('actorUserId', 'username avatar')
-      .populate('shopId', 'name slug logo');
+      .populate('shopId', 'name slug logo')
+      .lean();
   }
 
   countByUserId(userId) {
@@ -49,11 +50,21 @@ class NotificationRepository extends BaseRepository {
     return this.aggregateByPipeline([
       { $match: { userId } },
       {
-        $facet: {
-          total: [{ $count: 'count' }],
-          unread: [{ $match: { isRead: false } }, { $count: 'count' }],
-          system: [{ $match: { type: 'system' } }, { $count: 'count' }],
-          promotion: [{ $match: { type: 'promotion' } }, { $count: 'count' }],
+        $group: {
+          _id: null,
+          totalCount: { $sum: 1 },
+          unreadCount: { $sum: { $cond: [{ $eq: ['$isRead', false] }, 1, 0] } },
+          systemCount: { $sum: { $cond: [{ $eq: ['$type', 'system'] }, 1, 0] } },
+          promotionCount: { $sum: { $cond: [{ $eq: ['$type', 'promotion'] }, 1, 0] } },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          total: [{ count: '$totalCount' }],
+          unread: { $cond: ['$unreadCount', [{ count: '$unreadCount' }], []] },
+          system: { $cond: ['$systemCount', [{ count: '$systemCount' }], []] },
+          promotion: { $cond: ['$promotionCount', [{ count: '$promotionCount' }], []] },
         },
       },
     ]);
@@ -79,7 +90,8 @@ class NotificationRepository extends BaseRepository {
     return this.findOneByFilter({ _id: id, userId })
       .populate('orderId')
       .populate('actorUserId', 'username avatar')
-      .populate('shopId', 'name slug logo');
+      .populate('shopId', 'name slug logo')
+      .lean();
   }
 
   updateByIdAndUserId(id, userId, update) {

@@ -1,5 +1,6 @@
 const Product = require('../models/product.model');
 const BaseRepository = require('./base.repository');
+const { createLiteralRegex } = require('../utils/query.utils');
 
 class ProductRepository extends BaseRepository {
   constructor() {
@@ -163,7 +164,7 @@ class ProductRepository extends BaseRepository {
   }
 
   findTopSellingProducts(limit = 5) {
-    return this.findManyByFilter({ soldCount: { $gt: 0 } })
+    return this.findManyByFilter({ status: 'published', soldCount: { $gt: 0 } })
       .sort({ soldCount: -1 })
       .limit(limit)
       .select('name price soldCount variants slug')
@@ -215,7 +216,7 @@ class ProductRepository extends BaseRepository {
   }
 
   findTopSellingByShop(shopId, limit = 5) {
-    return this.findManyByFilter({ shop: shopId, soldCount: { $gt: 0 } })
+    return this.findManyByFilter({ shop: shopId, status: 'published', soldCount: { $gt: 0 } })
       .sort({ soldCount: -1 })
       .limit(limit)
       .select('name soldCount price variants slug')
@@ -223,7 +224,7 @@ class ProductRepository extends BaseRepository {
   }
 
   findByShopIdSelectIds(shopId) {
-    return this.findManyByFilter({ shop: shopId }).select('_id');
+    return this.findManyByFilter({ shop: shopId }).select('_id').lean();
   }
 
   aggregateShopCategories(shopId, limit = 50) {
@@ -256,7 +257,9 @@ class ProductRepository extends BaseRepository {
     return this.findManyByFilter({
       shop: shopId,
       status: 'published',
-    }).select('_id');
+    })
+      .select('_id')
+      .lean();
   }
 
   _buildCatalogQuery({
@@ -305,7 +308,9 @@ class ProductRepository extends BaseRepository {
 
     if (colors) {
       const colorArray = Array.isArray(colors) ? colors : colors.split(',');
-      const colorRegexArray = colorArray.map((c) => new RegExp(`^${c}$`, 'i'));
+      const colorRegexArray = colorArray
+        .map((color) => createLiteralRegex(color, { match: 'exact' }))
+        .filter(Boolean);
       query['variants.color'] = { $in: colorRegexArray };
     }
 
@@ -516,21 +521,20 @@ class ProductRepository extends BaseRepository {
     // directly in a query filter. Pre-fetch matching category IDs (uses the
     // { name: 1, parentCategory: 1 } index) and filter with $in.
     const Category = require('../models/category.model');
+    const keywordRegex = createLiteralRegex(keyword);
+    if (!keywordRegex) return [];
+
     const matchingCategories = await Category.find({
-      name: { $regex: keyword, $options: 'i' },
+      name: keywordRegex,
     })
       .select('_id')
+      .limit(100)
       .lean();
 
     const categoryIdFilter =
-      matchingCategories.length > 0
-        ? { $in: matchingCategories.map((c) => c._id) }
-        : null;
+      matchingCategories.length > 0 ? { $in: matchingCategories.map((c) => c._id) } : null;
 
-    const orBranches = [
-      { name: { $regex: keyword, $options: 'i' } },
-      { description: { $regex: keyword, $options: 'i' } },
-    ];
+    const orBranches = [{ name: keywordRegex }, { description: keywordRegex }];
     if (categoryIdFilter) {
       orBranches.push({ category: categoryIdFilter });
     }
@@ -558,10 +562,11 @@ class ProductRepository extends BaseRepository {
       .lean();
   }
 
-  findPublishedAutocomplete(regex, limit = 10) {
+  findPublishedAutocomplete(search, limit = 10) {
+    const searchRegex = createLiteralRegex(search);
     return this.findManyByFilter({
       status: 'published',
-      $or: [{ name: regex }, { tags: regex }],
+      ...(searchRegex && { $or: [{ name: searchRegex }, { tags: searchRegex }] }),
     })
       .select('name slug price variants')
       .limit(limit)
@@ -657,7 +662,9 @@ class ProductRepository extends BaseRepository {
   findByIdsSelectCategory(productIds) {
     return this.findManyByFilter({
       _id: { $in: productIds },
-    }).select('category');
+    })
+      .select('category')
+      .lean();
   }
 
   findPersonalizedByCategory(categoryIds, excludeIds, limit = 20) {
@@ -802,13 +809,16 @@ class ProductRepository extends BaseRepository {
   }
 
   findFallbackTextSearch(queryText, { isFeatured, categoryId, limit = 5 } = {}) {
+    const queryRegex = createLiteralRegex(queryText);
+    if (!queryRegex) return Promise.resolve([]);
+
     const query = {
       status: 'published',
       $or: [
-        { name: { $regex: queryText, $options: 'i' } },
-        { description: { $regex: queryText, $options: 'i' } },
-        { brand: { $regex: queryText, $options: 'i' } },
-        { tags: { $elemMatch: { $regex: queryText, $options: 'i' } } },
+        { name: queryRegex },
+        { description: queryRegex },
+        { brand: queryRegex },
+        { tags: { $elemMatch: queryRegex } },
       ],
     };
 

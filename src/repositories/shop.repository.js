@@ -1,5 +1,6 @@
 const Shop = require('../models/shop.model');
 const BaseRepository = require('./base.repository');
+const { createLiteralRegex } = require('../utils/query.utils');
 
 class ShopRepository extends BaseRepository {
   constructor() {
@@ -28,32 +29,25 @@ class ShopRepository extends BaseRepository {
     return this.findOneAndUpdateByFilter({ owner: ownerId }, updates, { new: true });
   }
 
-  countWithFilters({ status, search } = {}) {
+  _buildFilterQuery({ status, search } = {}) {
     const query = {};
     if (status) {
       query.status = status;
     }
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-      ];
+    const searchRegex = createLiteralRegex(search);
+    if (searchRegex) {
+      query.$or = [{ name: searchRegex }, { description: searchRegex }];
     }
 
-    return this.countByFilter(query);
+    return query;
   }
 
-  findWithFilters({ status, search } = {}, { sort = '-createdAt', skip = 0, limit = 10 } = {}) {
-    const query = {};
-    if (status) {
-      query.status = status;
-    }
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-      ];
-    }
+  countWithFilters(filters = {}) {
+    return this.countByFilter(this._buildFilterQuery(filters));
+  }
+
+  findWithFilters(filters = {}, { sort = '-createdAt', skip = 0, limit = 10 } = {}) {
+    const query = this._buildFilterQuery(filters);
 
     return this.findManyByFilter(query)
       .populate('owner', 'username email')
@@ -76,10 +70,11 @@ class ShopRepository extends BaseRepository {
       .lean();
   }
 
-  findActiveByNameRegex(regex, limit = 5) {
+  findActiveByNameRegex(search, limit = 5) {
+    const searchRegex = createLiteralRegex(search);
     return this.findManyByFilter({
       status: 'active',
-      name: regex,
+      ...(searchRegex && { name: searchRegex }),
     })
       .select('name slug logo')
       .limit(limit)

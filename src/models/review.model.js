@@ -17,5 +17,6 @@ reviewSchema.index({ product: 1 });
 reviewSchema.index({ user: 1 });
 reviewSchema.index({ product: 1, createdAt: -1 });
 reviewSchema.index({ product: 1, rating: -1 });
+reviewSchema.index({ user: 1, createdAt: -1 });
 
 module.exports = model('Review', reviewSchema);

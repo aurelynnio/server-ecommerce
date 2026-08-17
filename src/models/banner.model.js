@@ -19,5 +19,6 @@ const bannerSchema = new Schema(
 // Indexes
 bannerSchema.index({ isActive: 1 });
 bannerSchema.index({ order: 1 });
+bannerSchema.index({ isActive: 1, order: 1, createdAt: -1 });
 
 module.exports = model('Banner', bannerSchema);

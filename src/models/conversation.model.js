@@ -66,6 +66,7 @@ const conversationSchema = new Schema(
 );
 
 conversationSchema.index({ members: 1 });
+conversationSchema.index({ members: 1, updatedAt: -1 });
 conversationSchema.index({ shopId: 1 });
 
 const Conversation = model('Conversation', conversationSchema);

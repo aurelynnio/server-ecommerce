@@ -1,5 +1,6 @@
 const Review = require('../models/review.model');
 const BaseRepository = require('./base.repository');
+const { createLiteralRegex } = require('../utils/query.utils');
 
 class ReviewRepository extends BaseRepository {
   constructor() {
@@ -8,7 +9,7 @@ class ReviewRepository extends BaseRepository {
 
   aggregateShopRatingsByProductIds(productIds) {
     return this.aggregateByPipeline([
-      { $match: { productId: { $in: productIds } } },
+      { $match: { product: { $in: productIds } } },
       {
         $group: {
           _id: null,
@@ -52,7 +53,8 @@ class ReviewRepository extends BaseRepository {
       .populate('user', 'username email')
       .sort(sort)
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
   }
 
   aggregateRatingDistributionByProduct(productId) {
@@ -73,8 +75,9 @@ class ReviewRepository extends BaseRepository {
     if (rating) {
       query.rating = rating;
     }
-    if (search) {
-      query.comment = { $regex: search, $options: 'i' };
+    const searchRegex = createLiteralRegex(search);
+    if (searchRegex) {
+      query.comment = searchRegex;
     }
     return this.countByFilter(query);
   }
@@ -87,8 +90,9 @@ class ReviewRepository extends BaseRepository {
     if (rating) {
       query.rating = rating;
     }
-    if (search) {
-      query.comment = { $regex: search, $options: 'i' };
+    const searchRegex = createLiteralRegex(search);
+    if (searchRegex) {
+      query.comment = searchRegex;
     }
 
     return this.findManyByFilter(query)
@@ -96,7 +100,8 @@ class ReviewRepository extends BaseRepository {
       .populate('product', 'name slug images')
       .sort(sort)
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
   }
 
   countByUserId(userId) {
@@ -108,7 +113,8 @@ class ReviewRepository extends BaseRepository {
       .populate('product', 'name slug images')
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
   }
 
   findByIdWithUserAndProduct(reviewId) {
@@ -144,8 +150,9 @@ class ReviewRepository extends BaseRepository {
     } else if (replyStatus === 'unreplied') {
       query.reply = '';
     }
-    if (search) {
-      query.comment = { $regex: search, $options: 'i' };
+    const searchRegex = createLiteralRegex(search);
+    if (searchRegex) {
+      query.comment = searchRegex;
     }
 
     return this.countByFilter(query);
@@ -165,8 +172,9 @@ class ReviewRepository extends BaseRepository {
     } else if (replyStatus === 'unreplied') {
       query.reply = '';
     }
-    if (search) {
-      query.comment = { $regex: search, $options: 'i' };
+    const searchRegex = createLiteralRegex(search);
+    if (searchRegex) {
+      query.comment = searchRegex;
     }
 
     return this.findManyByFilter(query)
@@ -174,7 +182,8 @@ class ReviewRepository extends BaseRepository {
       .populate('product', 'name slug images')
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
   }
 
   aggregateOverallRatingDistribution() {

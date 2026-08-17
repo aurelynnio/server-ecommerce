@@ -23,12 +23,26 @@ class OrderRepository extends BaseRepository {
   aggregateRevenueAndOrderCount() {
     return this.aggregateByPipeline([
       {
-        $facet: {
-          totalRevenue: [
-            { $match: { paymentStatus: 'paid' } },
-            { $group: { _id: null, total: { $sum: '$totalAmount' } } },
-          ],
-          totalOrders: [{ $count: 'count' }],
+        $group: {
+          _id: null,
+          totalOrdersCount: { $sum: 1 },
+          paidOrdersCount: {
+            $sum: { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, 1, 0] },
+          },
+          paidRevenue: {
+            $sum: {
+              $cond: [{ $eq: ['$paymentStatus', 'paid'] }, '$totalAmount', 0],
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          totalRevenue: {
+            $cond: ['$paidOrdersCount', [{ _id: { $literal: null }, total: '$paidRevenue' }], []],
+          },
+          totalOrders: [{ count: '$totalOrdersCount' }],
         },
       },
     ]);
@@ -309,11 +323,25 @@ class OrderRepository extends BaseRepository {
     return this.aggregateByPipeline([
       { $match: { shopId } },
       {
-        $facet: {
-          total: [{ $count: 'count' }],
-          pending: [{ $match: { status: 'pending' } }, { $count: 'count' }],
-          completed: [{ $match: { status: 'delivered' } }, { $count: 'count' }],
-          cancelled: [{ $match: { status: 'cancelled' } }, { $count: 'count' }],
+        $group: {
+          _id: null,
+          totalCount: { $sum: 1 },
+          pendingCount: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } },
+          completedCount: {
+            $sum: { $cond: [{ $eq: ['$status', 'delivered'] }, 1, 0] },
+          },
+          cancelledCount: {
+            $sum: { $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0] },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          total: [{ count: '$totalCount' }],
+          pending: { $cond: ['$pendingCount', [{ count: '$pendingCount' }], []] },
+          completed: { $cond: ['$completedCount', [{ count: '$completedCount' }], []] },
+          cancelled: { $cond: ['$cancelledCount', [{ count: '$cancelledCount' }], []] },
         },
       },
     ]);
@@ -494,11 +522,25 @@ class OrderRepository extends BaseRepository {
     return this.aggregateByPipeline([
       { $match: dateFilter },
       {
-        $facet: {
-          total: [{ $count: 'count' }],
-          pending: [{ $match: { status: 'pending' } }, { $count: 'count' }],
-          completed: [{ $match: { status: 'delivered' } }, { $count: 'count' }],
-          cancelled: [{ $match: { status: 'cancelled' } }, { $count: 'count' }],
+        $group: {
+          _id: null,
+          totalCount: { $sum: 1 },
+          pendingCount: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } },
+          completedCount: {
+            $sum: { $cond: [{ $eq: ['$status', 'delivered'] }, 1, 0] },
+          },
+          cancelledCount: {
+            $sum: { $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0] },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          total: [{ count: '$totalCount' }],
+          pending: { $cond: ['$pendingCount', [{ count: '$pendingCount' }], []] },
+          completed: { $cond: ['$completedCount', [{ count: '$completedCount' }], []] },
+          cancelled: { $cond: ['$cancelledCount', [{ count: '$cancelledCount' }], []] },
         },
       },
     ]);

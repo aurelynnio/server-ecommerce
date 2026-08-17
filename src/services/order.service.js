@@ -205,10 +205,7 @@ class OrderService {
   async publishOrderCreatedEvents(orders) {
     await Promise.all(
       orders.map((order) =>
-        this.publishOrderEvent(
-          ORDER_EVENT_TYPES.CREATED,
-          this.buildOrderEventPayload(order),
-        ),
+        this.publishOrderEvent(ORDER_EVENT_TYPES.CREATED, this.buildOrderEventPayload(order)),
       ),
     );
   }
@@ -705,7 +702,7 @@ class OrderService {
     // 4. Top selling products
     const topProducts = await Order.aggregateSellerTopProducts(shopObjectId, 10);
 
-    // 7. Summary counts - PERFORMANCE FIX: Use single aggregation with $facet
+    // 7. Summary counts - compute all counters in one aggregation pass
     const summaryCounts = await Order.aggregateSellerSummaryCounts(shopObjectId);
 
     const counts = summaryCounts[0] || {};
@@ -743,15 +740,7 @@ class OrderService {
    * @returns {Promise<Object>} All orders with pagination
    */
   async getAllOrders(filters = {}) {
-    const {
-      shop,
-      status,
-      paymentStatus,
-      paymentMethod,
-      userId,
-      page = 1,
-      limit = 20,
-    } = filters;
+    const { shop, status, paymentStatus, paymentMethod, userId, page = 1, limit = 20 } = filters;
 
     const filterArgs = { shop, status, paymentStatus, paymentMethod, userId };
     const total = await Order.countAllWithFilters(filterArgs);
@@ -936,7 +925,7 @@ class OrderService {
     // 6. Orders by shop (for multi-vendor)
     const ordersByShop = await Order.aggregateAdminOrdersByShopInRange(startDate, endDate, 10);
 
-    // 7. Summary counts - PERFORMANCE FIX: Use single aggregation with $facet
+    // 7. Summary counts - compute all counters in one aggregation pass
     const adminSummaryCounts = await Order.aggregateAdminSummaryCountsInRange(startDate, endDate);
 
     const adminCounts = adminSummaryCounts[0] || {};

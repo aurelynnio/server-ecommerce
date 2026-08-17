@@ -95,6 +95,7 @@ orderSchema.index({ userId: 1, createdAt: -1 }); // User order history (findRece
 orderSchema.index({ userId: 1, status: 1 }); // User filtering by status
 orderSchema.index({ shopId: 1, status: 1 }); // Seller dashboard filtering
 orderSchema.index({ shopId: 1, createdAt: -1 }); // Seller order history
+orderSchema.index({ shopId: 1, status: 1, createdAt: -1 }); // Status-filtered seller history
 orderSchema.index({ shopId: 1, paymentStatus: 1 }); // aggregatePaidRevenueByShopId / countByShopWithFilters
 orderSchema.index({ 'products.productId': 1, status: 1 }); // existsDeliveredOrderForProductByUser / findOrdersContainingProduct
 orderSchema.index({ orderGroupId: 1 }); // User finding their "checkout history"

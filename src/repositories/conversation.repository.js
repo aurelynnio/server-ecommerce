@@ -25,7 +25,8 @@ class ConversationRepository extends BaseRepository {
     return this.findManyByFilter({ members: userId })
       .populate('shopId', 'name logo slug owner')
       .populate('members', 'username avatar')
-      .sort({ updatedAt: -1 });
+      .sort({ updatedAt: -1 })
+      .lean();
   }
 }
 
