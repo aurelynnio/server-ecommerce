@@ -41,11 +41,12 @@ function extractPriceRange(message) {
     /(?:từ|khoảng|trong khoảng)\s*([\d.,]+)\s*(k|nghìn|ngan|triệu|tr|m)?\s*(?:đến|-|tới|~)\s*([\d.,]+)\s*(k|nghìn|ngan|triệu|tr|m)?/i,
   );
   if (rangeMatch) {
-    // If only one side declares a unit, apply it to both sides
-    // (e.g. "từ 100 đến 200 nghìn" → both in nghìn).
-    const unit = rangeMatch[2] || rangeMatch[4];
-    const min = parseMoneyValue(rangeMatch[1], unit);
-    const max = parseMoneyValue(rangeMatch[3], unit);
+    // Mỗi vế dùng unit riêng của nó. Nếu một vế thiếu unit, fallback về unit của vế
+    // kia để bao phủ trường hợp "từ 100 đến 200 nghìn" (cả hai tính theo nghìn).
+    const minUnit = rangeMatch[2] || rangeMatch[4];
+    const maxUnit = rangeMatch[4] || rangeMatch[2];
+    const min = parseMoneyValue(rangeMatch[1], minUnit);
+    const max = parseMoneyValue(rangeMatch[3], maxUnit);
     return {
       minPrice: min !== null && max !== null ? Math.min(min, max) : min,
       maxPrice: min !== null && max !== null ? Math.max(min, max) : max,

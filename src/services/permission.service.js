@@ -239,17 +239,28 @@ class PermissionService {
   async getEffectivePermissionsByUserId(userId, ttlSeconds = 30) {
     if (!userId) return [];
 
-    const cacheKey = `perm:${userId}`;
-    const cached = await redisService.get(cacheKey);
-    if (cached) return cached;
+    try {
+      const cacheKey = `perm:${userId}`;
+      const cached = await redisService.get(cacheKey);
+      if (cached) return cached;
 
-    const user = await User.findByIdWithoutPassword(userId);
-    if (!user) return [];
+      const user = await User.findByIdWithoutPassword(userId);
+      if (!user) return [];
 
-    const permissions = this.getUserPermissions(user);
-    await redisService.set(cacheKey, permissions, ttlSeconds);
+      const permissions = this.getUserPermissions(user);
+      await redisService.set(cacheKey, permissions, ttlSeconds);
 
-    return permissions;
+      return permissions;
+    } catch (error) {
+      // Không làm sập toàn bộ request khi Redis/DB lỗi. Trả về null để middleware
+      // fallback về quyền resolve từ JWT (defense-in-depth, fail-validation-not-fail-open).
+      logger.error('getEffectivePermissionsByUserId failed', {
+        userId: String(userId).slice(0, 24),
+        name: error.name,
+        message: error.message,
+      });
+      return null;
+    }
   }
 
   /**

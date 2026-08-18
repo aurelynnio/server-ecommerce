@@ -216,7 +216,7 @@ describe('Permission System - Integration Tests', () => {
   });
 
   describe('Integration Test 4: Role-Based Access Control', () => {
-    it('requireAdminAccess should only allow admin users', () => {
+    it('requireAdminAccess should only allow admin users', async () => {
       const createMockReqRes = (user) => ({
         req: { user },
         res: {
@@ -228,21 +228,21 @@ describe('Permission System - Integration Tests', () => {
 
       // Admin should pass
       const adminSetup = createMockReqRes({ roles: 'admin', permissions: [] });
-      requireAdminAccess(adminSetup.req, adminSetup.res, adminSetup.next);
+      await requireAdminAccess(adminSetup.req, adminSetup.res, adminSetup.next);
       expect(adminSetup.next).toHaveBeenCalled();
 
       // Seller should fail
       const sellerSetup = createMockReqRes({ roles: 'seller', permissions: [] });
-      requireAdminAccess(sellerSetup.req, sellerSetup.res, sellerSetup.next);
+      await requireAdminAccess(sellerSetup.req, sellerSetup.res, sellerSetup.next);
       expect(sellerSetup.res.status).toHaveBeenCalledWith(403);
 
       // User should fail
       const userSetup = createMockReqRes({ roles: 'user', permissions: [] });
-      requireAdminAccess(userSetup.req, userSetup.res, userSetup.next);
+      await requireAdminAccess(userSetup.req, userSetup.res, userSetup.next);
       expect(userSetup.res.status).toHaveBeenCalledWith(403);
     });
 
-    it('requireSellerAccess should allow seller and admin users', () => {
+    it('requireSellerAccess should allow seller and admin users', async () => {
       const createMockReqRes = (user) => ({
         req: { user },
         res: {
@@ -254,17 +254,17 @@ describe('Permission System - Integration Tests', () => {
 
       // Admin should pass
       const adminSetup = createMockReqRes({ roles: 'admin', permissions: [] });
-      requireSellerAccess(adminSetup.req, adminSetup.res, adminSetup.next);
+      await requireSellerAccess(adminSetup.req, adminSetup.res, adminSetup.next);
       expect(adminSetup.next).toHaveBeenCalled();
 
       // Seller should pass
       const sellerSetup = createMockReqRes({ roles: 'seller', permissions: [] });
-      requireSellerAccess(sellerSetup.req, sellerSetup.res, sellerSetup.next);
+      await requireSellerAccess(sellerSetup.req, sellerSetup.res, sellerSetup.next);
       expect(sellerSetup.next).toHaveBeenCalled();
 
       // User should fail
       const userSetup = createMockReqRes({ roles: 'user', permissions: [] });
-      requireSellerAccess(userSetup.req, userSetup.res, userSetup.next);
+      await requireSellerAccess(userSetup.req, userSetup.res, userSetup.next);
       expect(userSetup.res.status).toHaveBeenCalledWith(403);
     });
   });
