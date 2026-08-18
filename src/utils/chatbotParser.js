@@ -76,11 +76,11 @@ const normalizeTimestamp = (value, fallbackTimestamp) => {
   return fallbackTimestamp;
 };
 
-const extractConversationMessages = (payload, fallbackTimestamp = new Date()) => {
+const extractConversationMessages = (payload, fallbackTimestamp = new Date(), messageId = null) => {
   if (!payload) return [];
 
   if (Array.isArray(payload)) {
-    return payload.flatMap((item) => extractConversationMessages(item, fallbackTimestamp));
+    return payload.flatMap((item) => extractConversationMessages(item, fallbackTimestamp, messageId));
   }
 
   if (typeof payload !== 'object') return [];
@@ -94,6 +94,7 @@ const extractConversationMessages = (payload, fallbackTimestamp = new Date()) =>
   if (detectedRole) {
     return [
       {
+        messageId,
         role: detectedRole,
         content: extractMessageContent(payload),
         timestamp: normalizeTimestamp(
@@ -115,7 +116,7 @@ const extractConversationMessages = (payload, fallbackTimestamp = new Date()) =>
   ].filter(Boolean);
 
   for (const source of nestedSources) {
-    const nestedMessages = extractConversationMessages(source, fallbackTimestamp);
+    const nestedMessages = extractConversationMessages(source, fallbackTimestamp, messageId);
     if (nestedMessages.length > 0) return nestedMessages;
   }
 

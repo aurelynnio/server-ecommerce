@@ -114,6 +114,19 @@ class ChatbotService {
   }
 
   /**
+   * Lấy _id đã lưu của tin nhắn assistant mới nhất trong 1 session.
+   * Dùng để gửi messageId trong event 'done' của stream, giúp client
+   * gửi feedback khớp đúng tin nhắn thật (không còn dùng id ngẫu nhiên).
+   * @param {string} sessionId
+   * @returns {Promise<string|null>}
+   */
+  async getLatestAssistantMessageId(sessionId) {
+    const collection = this._getCollection();
+    const doc = await collection.find({ sessionId }).sort({ _id: -1 }).limit(1).toArray();
+    return doc[0]?._id ? doc[0]._id.toString() : null;
+  }
+
+  /**
    * Lấy lịch sử chat của 1 session
    * @param {string} sessionId
    * @returns {Promise<{sessionId: string, messages: Array}>}
@@ -123,7 +136,7 @@ class ChatbotService {
     const messages = await collection.find({ sessionId }).sort({ _id: 1 }).toArray();
 
     const formattedMessages = messages.flatMap((msg) =>
-      extractConversationMessages(msg, msg._id.getTimestamp()),
+      extractConversationMessages(msg, msg._id.getTimestamp(), msg._id.toString()),
     );
 
     return { sessionId, messages: formattedMessages };
@@ -334,6 +347,7 @@ class ChatbotService {
         success: true,
         message: validatedResponse,
         sessionId,
+        messageId: await this.getLatestAssistantMessageId(sessionId),
       };
     } catch (error) {
       logger.error('[Chatbot] Stream error:', error.message);

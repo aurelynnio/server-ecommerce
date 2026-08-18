@@ -105,7 +105,8 @@ const ChatbotController = {
           }
         }
         if (!aborted) {
-          res.write(`data: ${JSON.stringify({ type: 'done', success: true })}\n\n`);
+          const messageId = await chatbotService.getLatestAssistantMessageId(chatSessionId);
+          res.write(`data: ${JSON.stringify({ type: 'done', success: true, messageId })}\n\n`);
         }
         res.end();
         metrics.chatbotRequestsTotal.inc({ endpoint: 'stream', status: 'success' });
@@ -124,7 +125,9 @@ const ChatbotController = {
       });
 
       if (!aborted) {
-        res.write(`data: ${JSON.stringify({ type: 'done', success: response.success })}\n\n`);
+        res.write(
+          `data: ${JSON.stringify({ type: 'done', success: response.success, messageId: response.messageId ?? null })}\n\n`,
+        );
       }
       res.end();
     } catch (error) {
