@@ -5,6 +5,8 @@ const voucherUsageSchema = new Schema(
     voucherId: { type: Types.ObjectId, ref: 'Voucher', required: true },
     userId: { type: Types.ObjectId, ref: 'User', required: true },
     orderId: { type: Types.ObjectId, ref: 'Order' },
+    // Voucher platform dùng chung cho cả order group (1 checkout nhiều shop)
+    orderGroupId: { type: Types.ObjectId },
   },
   {
     timestamps: true,
@@ -18,5 +20,7 @@ voucherUsageSchema.index({ voucherId: 1, userId: 1 });
 voucherUsageSchema.index({ voucherId: 1, createdAt: -1 });
 // Query: lich su voucher cua user
 voucherUsageSchema.index({ userId: 1, createdAt: -1 });
+// Query: tim usage theo order group khi rollback voucher platform
+voucherUsageSchema.index({ voucherId: 1, userId: 1, orderGroupId: 1 });
 
 module.exports = model('VoucherUsage', voucherUsageSchema);

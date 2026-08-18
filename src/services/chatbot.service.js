@@ -82,7 +82,7 @@ class ChatbotService {
   }
 
   /**
-   * Lazy init + return ChatbotAgent (tool-calling thật với LangChain createAgent).
+   * Lazy init + return ChatbotAgent (tool-calling thật qua bindTools loop).
    * Được controller gọi khi CHATBOT_USE_AGENT=true.
    */
   getAgent() {

@@ -10,6 +10,20 @@ class VoucherUsageRepository extends BaseRepository {
     return this.countByFilter({ voucherId, userId });
   }
 
+  /**
+   * Xóa usage record gắn với 1 đơn cụ thể (voucher shop) khi rollback
+   */
+  deleteByVoucherUserAndOrder(voucherId, userId, orderId) {
+    return this.deleteOneByFilter({ voucherId, userId, orderId });
+  }
+
+  /**
+   * Xóa usage record gắn với cả order group (voucher platform) khi rollback
+   */
+  deleteByVoucherUserAndOrderGroup(voucherId, userId, orderGroupId) {
+    return this.deleteOneByFilter({ voucherId, userId, orderGroupId });
+  }
+
   aggregateUsageByVoucherIdsAndUser(voucherIds, userObjectId) {
     return this.aggregateByPipeline([
       { $match: { voucherId: { $in: voucherIds }, userId: userObjectId } },

@@ -94,6 +94,18 @@ class VoucherRepository extends BaseRepository {
     return this.findOneByFilter({ code, isActive: true });
   }
 
+  /**
+   * Giảm usageCount khi rollback voucher do hủy đơn.
+   * Guard usageCount > 0 để không bị âm khi rollback lặp.
+   */
+  rollbackUsage(voucherId, options = {}) {
+    return this.updateOneByFilter(
+      { _id: voucherId, usageCount: { $gt: 0 } },
+      { $inc: { usageCount: -1 } },
+      options,
+    );
+  }
+
   countExpired(now = new Date()) {
     return this.countByFilter({ endDate: { $lt: now } });
   }

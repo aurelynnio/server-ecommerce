@@ -207,6 +207,42 @@ class VoucherService {
   }
 
   /**
+   * Rollback 1 lượt dùng voucher khi hủy đơn: xóa bản ghi VoucherUsage
+   * (khôi phục lại limit cho user) và giảm usageCount trên Voucher.
+   *
+   * Xóa usage record TRƯỚC rồi mới giảm usageCount, và chỉ giảm khi xóa
+   * thành công (deletedCount === 1). Nhờ đó:
+   * - Idempotent: chạy 2 lần chỉ có tác dụng lần đầu
+   * - Concurrency-safe: 2 request hủy chạy đồng thời, deleteOne atomic
+   *   chỉ match 1 lần → usageCount không bao giờ bị giảm 2 lần
+   * @param {string} voucherId - Voucher ID
+   * @param {string} userId - User ID đã dùng voucher
+   * @param {Object} scope - Định vị usage record
+   * @param {string} [scope.orderId] - Order ID (voucher shop: usage gắn 1:1 với đơn)
+   * @param {string} [scope.orderGroupId] - Order group ID (voucher platform: usage dùng chung cả group)
+   */
+  async rollbackVoucherUsage(voucherId, userId, { orderId = null, orderGroupId = null } = {}) {
+    let deletedCount = 0;
+
+    if (orderId) {
+      const result = await VoucherUsage.deleteByVoucherUserAndOrder(voucherId, userId, orderId);
+      deletedCount = result?.deletedCount || 0;
+    } else if (orderGroupId) {
+      const result = await VoucherUsage.deleteByVoucherUserAndOrderGroup(
+        voucherId,
+        userId,
+        orderGroupId,
+      );
+      deletedCount = result?.deletedCount || 0;
+    }
+
+    // Chỉ giảm usageCount khi đã xóa được usage record — đảm bảo exactly-once
+    if (deletedCount === 1) {
+      await Voucher.rollbackUsage(voucherId);
+    }
+  }
+
+  /**
    * Validate and apply voucher to order
    * @param {string} code - Voucher code
    * @param {string} userId - User ID

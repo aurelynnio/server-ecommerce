@@ -408,6 +408,8 @@ class OrderService {
 
           // --- APPLY SHOP VOUCHER ---
           let discountShop = 0;
+          const appliedVouchers = [];
+          let shopVoucherResult = null;
           const shopVoucherEntry = shopVouchers.find((v) => v.shopId === shopId);
           if (shopVoucherEntry) {
             const voucherResult = await voucherService.applyVoucher(
@@ -421,15 +423,21 @@ class OrderService {
               `Invalid shop voucher discount for shop ${shopId}`,
             );
 
-            // Increment usage count and record in VoucherUsage collection
+            // Snapshot voucher áp dụng để rollback usage khi hủy đơn
+            appliedVouchers.push({
+              voucherId: voucherResult.voucherId,
+              code: voucherResult.code,
+              scope: 'shop',
+              discountAmount: discountShop,
+            });
+            shopVoucherResult = voucherResult;
+
+            // Increment usage count
             await Voucher.updateById(
               voucherResult.voucherId,
               { $inc: { usageCount: 1 } },
               { session },
             );
-            await VoucherUsage.create([{ voucherId: voucherResult.voucherId, userId }], {
-              session,
-            });
           }
 
           const totalAmount = Math.max(0, subtotal - discountShop);
@@ -446,9 +454,18 @@ class OrderService {
             subtotal,
             discountShop,
             discountPlatform: 0,
+            appliedVouchers,
             totalAmount, // Temporary, will subtract platform discount later
             status: 'pending',
           });
+
+          // Record shop voucher usage gắn với orderId để rollback chính xác khi hủy đơn
+          if (shopVoucherResult) {
+            await VoucherUsage.create(
+              [{ voucherId: shopVoucherResult.voucherId, userId, orderId: newOrder._id }],
+              { session },
+            );
+          }
 
           tempOrders.push(newOrder);
         }
@@ -494,13 +511,26 @@ class OrderService {
             });
           }
 
-          // Increment usage count and record in VoucherUsage collection
+          // Snapshot platform voucher lên từng đơn trong group để rollback khi hủy
+          tempOrders.forEach((order) => {
+            order.appliedVouchers.push({
+              voucherId: voucherResult.voucherId,
+              code: voucherResult.code,
+              scope: 'platform',
+              discountAmount: order.discountPlatform,
+            });
+          });
+
+          // Increment usage count; usage record gắn orderGroupId vì voucher dùng chung cả group
           await Voucher.updateById(
             voucherResult.voucherId,
             { $inc: { usageCount: 1 } },
             { session },
           );
-          await VoucherUsage.create([{ voucherId: voucherResult.voucherId, userId }], { session });
+          await VoucherUsage.create(
+            [{ voucherId: voucherResult.voucherId, userId, orderGroupId }],
+            { session },
+          );
         }
 
         for (const order of tempOrders) {
@@ -623,6 +653,20 @@ class OrderService {
    * @throws {Error} If invalid status transition
    */
   async updateOrderStatusBySeller(orderId, shopId, newStatus) {
+    // Hủy đơn: chạy atomic (transaction) vì phải hoàn stock + rollback voucher
+    if (newStatus === 'cancelled') {
+      return this._cancelOrderAtomically(async (session) => {
+        const order = await Order.findByIdAndShop(orderId, shopId).session(session);
+        if (!order) {
+          throw new ApiError(
+            StatusCodes.NOT_FOUND,
+            "Order not found or doesn't belong to your shop",
+          );
+        }
+        return order;
+      }, ORDER_ACTORS.SELLER);
+    }
+
     const order = await Order.findByIdAndShop(orderId, shopId);
 
     if (!order) {
@@ -638,11 +682,6 @@ class OrderService {
 
     const previousStatus = order.status;
     order.status = newStatus;
-
-    if (newStatus === 'cancelled') {
-      order.cancelledAt = new Date();
-      await this.restoreOrderStock(order);
-    }
 
     if (newStatus === 'delivered') {
       order.deliveredAt = new Date();
@@ -660,15 +699,132 @@ class OrderService {
   /**
    * Restore stock when order is cancelled
    * @param {Object} order - Order object
+   * @param {Object} [session] - Mongoose session (đảm bảo atomic với việc đổi trạng thái đơn)
    */
-  async restoreOrderStock(order) {
+  async restoreOrderStock(order, session = null) {
     const inventoryItems = order.products.map((item) => ({
       productId: item.productId,
       modelId: item.variantId,
       quantity: item.quantity,
     }));
 
-    await inventoryService.restoreStock(inventoryItems);
+    await inventoryService.restoreStock(inventoryItems, session);
+  }
+
+  /**
+   * Hủy đơn atomically trong 1 MongoDB transaction: hoàn stock + set trạng thái
+   * cancelled + commit cùng nhau. Write conflict của transaction đảm bảo 2 request
+   * hủy concurrent cùng 1 đơn không hoàn stock 2 lần (request thua bị abort/retry
+   * và thấy đơn đã hủy rồi).
+   *
+   * Voucher rollback + event publish chạy SAU commit: rollback usage là idempotent
+   * (delete-first), còn RabbitMQ publish thì không rollback được nếu nằm trong tx.
+   *
+   * @param {(session: Object) => Promise<Object>} loadOrder - Load order kèm
+   *        authorization check riêng cho từng actor (user/seller/admin).
+   *        Throw ApiError nếu không hợp lệ.
+   * @param {string} actor - ORDER_ACTORS.USER | SELLER | ADMIN
+   * @returns {Promise<Object>} Order đã hủy
+   */
+  async _cancelOrderAtomically(loadOrder, actor) {
+    let committed = null;
+
+    for (let attempt = 0; attempt <= MAX_TX_RETRIES; attempt++) {
+      const session = await mongoose.startSession();
+      try {
+        session.startTransaction();
+
+        const order = await loadOrder(session);
+        const previousStatus = order.status;
+
+        if (!canTransition(order.status, 'cancelled', actor)) {
+          throw new ApiError(
+            StatusCodes.BAD_REQUEST,
+            `Cannot change status from "${order.status}" to "cancelled"`,
+          );
+        }
+
+        await this.restoreOrderStock(order, session);
+        order.status = 'cancelled';
+        order.cancelledAt = new Date();
+        await order.save({ session });
+
+        await session.commitTransaction();
+        committed = { order, previousStatus };
+        break;
+      } catch (error) {
+        try {
+          await session.abortTransaction();
+        } catch {
+          // no-op
+        }
+
+        const canRetry =
+          isRetryableTransactionError(error) || isUnknownCommitResult(error);
+        if (canRetry && attempt < MAX_TX_RETRIES) {
+          await sleep(TX_RETRY_DELAY_MS * (attempt + 1));
+          continue;
+        }
+        throw error;
+      } finally {
+        session.endSession();
+      }
+    }
+
+    if (!committed) {
+      throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to cancel order after retries');
+    }
+
+    const { order, previousStatus } = committed;
+
+    // Đơn đã thanh toán online bị hủy → không có flow refund tự động,
+    // log để ops xử lý hoàn tiền thủ công (payment record vẫn 'completed')
+    if (order.paymentStatus === 'paid') {
+      logger.warn('[Order] Cancelled order was already paid online — manual refund required', {
+        orderId: order._id.toString(),
+        actor,
+        previousStatus,
+      });
+    }
+
+    // Post-commit: rollback voucher usage (idempotent) + notify
+    await this.rollbackOrderVouchers(order);
+    await this.publishOrderStatusChangedEvent(order, previousStatus, actor);
+    return order;
+  }
+
+  /**
+   * Rollback usage các voucher đã áp dụng khi hủy đơn:
+   * - Voucher shop: usage gắn 1:1 với đơn → rollback ngay
+   * - Voucher platform: dùng chung cho cả order group → chỉ rollback khi
+   *   TẤT CẢ đơn trong group đã bị hủy (còn đơn nào alive thì giữ usage)
+   * - Đơn tạo trước khi có appliedVouchers → no-op (tương thích dữ liệu cũ)
+   * @param {Object} order - Order document đang được hủy
+   */
+  async rollbackOrderVouchers(order) {
+    const applied = order.appliedVouchers || [];
+    if (applied.length === 0) return;
+
+    for (const appliedVoucher of applied) {
+      if (appliedVoucher.scope === 'platform') {
+        // Thiếu orderGroupId → không định vị được usage record, skip để tránh rollback sai
+        if (!order.orderGroupId) continue;
+
+        const remainingOrders = await Order.countActiveOrdersInGroupExcluding(
+          order.orderGroupId,
+          order._id,
+        );
+        if (remainingOrders > 0) continue;
+
+        await voucherService.rollbackVoucherUsage(appliedVoucher.voucherId, order.userId, {
+          orderGroupId: order.orderGroupId,
+        });
+      } else {
+        await voucherService.rollbackVoucherUsage(appliedVoucher.voucherId, order.userId, {
+          orderId: order._id,
+        });
+      }
+    }
   }
 
   /**
@@ -785,6 +941,30 @@ class OrderService {
    * @throws {Error} If order not found, unauthorized, or invalid status transition
    */
   async updateOrderStatus(orderId, status, userId, isAdmin = false, shopId = null) {
+    const actor = isAdmin ? ORDER_ACTORS.ADMIN : ORDER_ACTORS.SELLER;
+
+    // Hủy đơn: chạy atomic (transaction) vì phải hoàn stock + rollback voucher
+    if (status === 'cancelled') {
+      return this._cancelOrderAtomically(async (session) => {
+        const order = await Order.findById(orderId).session(session);
+        if (!order) {
+          throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found');
+        }
+
+        // Authorization check (giống nhánh không hủy)
+        if (!isAdmin) {
+          if (shopId && order.shopId.toString() !== shopId.toString()) {
+            throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized to update this order');
+          }
+          if (!shopId) {
+            throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized to update order status');
+          }
+        }
+
+        return order;
+      }, actor);
+    }
+
     const order = await Order.findById(orderId);
 
     if (!order) {
@@ -803,7 +983,6 @@ class OrderService {
       }
     }
 
-    const actor = isAdmin ? ORDER_ACTORS.ADMIN : ORDER_ACTORS.SELLER;
     if (!canTransition(order.status, status, actor)) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
@@ -813,9 +992,6 @@ class OrderService {
 
     const previousStatus = order.status;
     order.status = status;
-    if (status === 'cancelled') {
-      order.cancelledAt = new Date();
-    }
     if (status === 'delivered') {
       order.deliveredAt = new Date();
     }
@@ -826,31 +1002,32 @@ class OrderService {
   }
 
   /**
-   * Cancel an order and restore stock
-   * PERFORMANCE FIX: Batch fetch and update products to avoid N+1 queries
+   * Cancel an order and restore stock (user path)
+   * Stock restore + status change chạy trong 1 transaction (chống hoàn stock
+   * 2 lần khi 2 request cancel concurrent, hoặc stock phình nếu save fail).
    * @param {string} orderId - Order ID
    * @param {string} userId - User ID (for ownership verification)
    * @returns {Promise<Object>} Cancelled order
    * @throws {Error} If order not found, access denied, or cannot be cancelled
    */
   async cancelOrder(orderId, userId) {
-    const order = await Order.findByIdAndUser(orderId, userId);
-    if (!order) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found or access denied');
-    }
+    return this._cancelOrderAtomically(async (session) => {
+      const order = await Order.findByIdAndUser(orderId, userId).session(session);
+      if (!order) {
+        throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found or access denied');
+      }
 
-    if (!canTransition(order.status, 'cancelled', ORDER_ACTORS.USER)) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, 'Cannot cancel order in this status');
-    }
+      // Đơn đã thanh toán online: không cho user tự hủy vì chưa có flow refund
+      // tự động — hướng dẫn liên hệ hỗ trợ để hoàn tiền
+      if (order.paymentStatus === 'paid') {
+        throw new ApiError(
+          StatusCodes.CONFLICT,
+          'Đơn hàng đã được thanh toán online. Vui lòng liên hệ hỗ trợ để hủy đơn và hoàn tiền.',
+        );
+      }
 
-    await this.restoreOrderStock(order);
-
-    const previousStatus = order.status;
-    order.status = 'cancelled';
-    order.cancelledAt = new Date();
-    await order.save();
-    await this.publishOrderStatusChangedEvent(order, previousStatus, ORDER_ACTORS.USER);
-    return order;
+      return order;
+    }, ORDER_ACTORS.USER);
   }
 
   /**

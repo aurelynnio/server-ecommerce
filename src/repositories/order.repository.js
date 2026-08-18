@@ -149,6 +149,19 @@ class OrderRepository extends BaseRepository {
     return this.findManyByFilter({ orderGroupId }).lean();
   }
 
+  /**
+   * Đếm các đơn CHƯA hủy trong 1 order group (không tính đơn đang được hủy).
+   * Dùng để quyết định rollback voucher platform khi hủy đơn: chỉ rollback
+   * khi toàn bộ đơn trong group đã hủy (voucher dùng chung cho cả group).
+   */
+  countActiveOrdersInGroupExcluding(orderGroupId, excludeOrderId) {
+    return this.countByFilter({
+      orderGroupId,
+      _id: { $ne: excludeOrderId },
+      status: { $ne: 'cancelled' },
+    });
+  }
+
   findByUserIdWithShopAndProducts(userId) {
     return this.findManyByFilter({ userId })
       .populate('shopId', 'name logo')

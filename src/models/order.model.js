@@ -65,6 +65,20 @@ const orderSchema = new Schema(
     discountPlatform: { type: Number, default: 0 }, // Platform voucher
     totalAmount: { type: Number, required: true, min: 0 },
 
+    // Snapshot các voucher đã áp dụng để rollback usage khi hủy đơn
+    appliedVouchers: [
+      {
+        voucherId: {
+          type: Types.ObjectId,
+          ref: 'Voucher',
+          required: true,
+        },
+        code: { type: String, required: true },
+        scope: { type: String, enum: ['platform', 'shop'], required: true },
+        discountAmount: { type: Number, default: 0 },
+      },
+    ],
+
     status: {
       type: String,
       enum: [

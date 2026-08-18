@@ -1,29 +1,25 @@
 /**
- * ChatbotAgent - LangChain ReAct agent với tool-calling thật.
- *
- * LangChain v1.x đã đổi API: `createToolCallingAgent` + `AgentExecutor`
- * được thay bằng `createAgent` (ReAct + middleware).
+ * ChatbotAgent - Agent tool-calling thật (bindTools + loop thủ công).
  *
  * Bật qua env: CHATBOT_USE_AGENT=true
  *
  * Flow:
- * 1. LLM nhận message + history + tools → quyết định gọi tool hoặc trả lời
- * 2. Nếu gọi tool → thực thi → trả kết quả cho LLM
- * 3. LLM sinh câu trả lời cuối (có thể stream)
- * 4. Lưu message vào history
+ * 1. Load history từ MongoDB (getMessages đã được wrap truncate theo token budget)
+ *    làm context multi-turn
+ * 2. LLM nhận [system, ...history, human] + tools → quyết định gọi tool hoặc trả lời
+ * 3. Nếu gọi tool → thực thi → trả kết quả ToolMessage cho LLM
+ * 4. LLM sinh câu trả lời cuối (stream từng word)
+ * 5. Persist human + assistant message vào history để lượt chat sau có context
+ *    (và messageId trong event 'done' khớp tin nhắn thật cho feature feedback)
  */
 
 const {
-  ChatPromptTemplate,
-  MessagesPlaceholder,
-} = require('@langchain/core/prompts');
-const {
+  AIMessage,
   HumanMessage,
   SystemMessage,
   ToolMessage,
 } = require('@langchain/core/messages');
 const { DynamicTool } = require('@langchain/core/tools');
-const { createAgent } = require('langchain');
 
 const { toolHandlers } = require('./chatbot.tools');
 const { toolDefinitions, SYSTEM_PROMPT } = require('../configs/chatbot.config');
@@ -32,6 +28,8 @@ const metrics = require('../monitoring/chatbot.metrics');
 
 const MAX_ITERATIONS = Number(process.env.CHATBOT_AGENT_MAX_ITERATIONS) || 4;
 const MAX_OUTPUT_CHARS = Number(process.env.CHATBOT_AGENT_MAX_TOOL_OUTPUT) || 4000;
+const MAX_ITERATIONS_FALLBACK =
+  'Xin lỗi, em chưa thể xử lý yêu cầu phức tạp này. Anh/chị vui lòng thử lại nhé!';
 
 const buildTools = () =>
   toolDefinitions.map((td) => {
@@ -76,23 +74,88 @@ const buildTools = () =>
   });
 
 class ChatbotAgent {
-  constructor(model, _getMessageHistory) {
+  /**
+   * @param {Object} model - Chat model (ChatMistralAI)
+   * @param {(sessionId: string) => Object} getMessageHistory - callback trả về
+   *        MongoDBChatMessageHistory cho sessionId (getMessages đã truncate
+   *        theo token budget, addMessage persist thẳng vào DB)
+   */
+  constructor(model, getMessageHistory) {
     this.model = model;
     this.tools = buildTools();
+    this.getMessageHistory = getMessageHistory;
+  }
 
-    this.prompt = ChatPromptTemplate.fromMessages([
-      ['system', SYSTEM_PROMPT],
-      new MessagesPlaceholder('chat_history'),
-      ['human', '{input}'],
-      new MessagesPlaceholder('agent_scratchpad'),
-    ]);
+  /**
+   * Build context đầu vào cho LLM: system prompt + history + user message.
+   * History từ getMessages() là plain object {role, content} (đã qua
+   * truncateHistory) → convert lại BaseMessage cho ChatMistralAI.
+   * @returns {Promise<{history: Object, messages: Array}>}
+   */
+  async _buildContext(sessionId, userMessage) {
+    const history = this.getMessageHistory(sessionId);
+    const rawHistory = await history.getMessages();
 
-    // LangChain v1.x: createAgent thay thế createToolCallingAgent + AgentExecutor
-    this.agent = createAgent({
-      llm: this.model,
-      tools: this.tools,
-      prompt: this.prompt,
+    const historyMessages = (rawHistory || []).map((m) => {
+      const content = typeof m.content === 'string' ? m.content : '';
+      const role = m.role || m.type;
+      return role === 'ai' || role === 'assistant'
+        ? new AIMessage(content)
+        : new HumanMessage(content);
     });
+
+    return {
+      history,
+      messages: [
+        new SystemMessage(SYSTEM_PROMPT),
+        ...historyMessages,
+        new HumanMessage(userMessage),
+      ],
+    };
+  }
+
+  /**
+   * Persist lượt chat (user + assistant) vào history.
+   * Lỗi lưu history KHÔNG được làm gãy phản hồi đã stream cho user —
+   * chỉ log + tăng metrics.
+   */
+  async _saveTurnToHistory(history, userMessage, assistantContent) {
+    try {
+      await history.addMessage(new HumanMessage(userMessage));
+      await history.addMessage(new AIMessage(assistantContent));
+    } catch (err) {
+      logger.error('[Agent] Failed to persist messages to history:', err.message);
+      metrics.chatbotErrorsTotal.inc({ stage: 'agent_history_save' });
+    }
+  }
+
+  /**
+   * Thực thi tool calls của 1 lượt LLM, push ToolMessage vào messages.
+   * Yield event tool_call/tool_result để phía SSE hiển thị tiến trình.
+   * @param {Array} messages - Message list đang build (mutate in-place)
+   * @param {Array} calls - Tool calls từ response của LLM
+   */
+  async *_runToolCalls(messages, calls) {
+    for (const call of calls) {
+      yield { type: 'tool_call', name: call.name, args: call.args };
+
+      const tool = this.tools.find((t) => t.name === call.name);
+      let result;
+      try {
+        result = await tool.func(JSON.stringify(call.args));
+      } catch (e) {
+        result = JSON.stringify({ error: e.message });
+        metrics.chatbotErrorsTotal.inc({ stage: `tool_error:${call.name}` });
+      }
+
+      yield { type: 'tool_result', name: call.name };
+      messages.push(
+        new ToolMessage({
+          content: typeof result === 'string' ? result : JSON.stringify(result),
+          tool_call_id: call.id,
+        }),
+      );
+    }
   }
 
   /**
@@ -112,20 +175,32 @@ class ChatbotAgent {
         metrics.estimateTokens(userMessage),
       );
 
-      // createAgent v1.x: truyền messages array
-      const result = await this.agent.invoke({
-        messages: [{ role: 'user', content: userMessage }],
-      });
+      const { history, messages } = await this._buildContext(sessionId, userMessage);
 
-      // Extract final AI message
-      const messages = result?.messages || [];
-      const lastAi = [...messages].reverse().find((m) => m?.type === 'ai' || m?._getType?.() === 'ai');
-      const output = (lastAi?.content || '').toString().trim();
+      let output = '';
+      const toolCalls = [];
 
-      // Track tool calls từ messages
-      const toolCalls = messages
-        .filter((m) => m?.tool_calls?.length)
-        .flatMap((m) => m.tool_calls.map((tc) => tc.name || tc.function?.name).filter(Boolean));
+      for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+        const response = await this.model.bindTools(this.tools).invoke(messages);
+        const calls = response.tool_calls || [];
+
+        if (calls.length === 0) {
+          output = String(response.content || '').trim();
+          break;
+        }
+
+        messages.push(response);
+        for await (const event of this._runToolCalls(messages, calls)) {
+          if (event.type === 'tool_call') toolCalls.push(event.name);
+        }
+      }
+
+      // Vượt max iterations mà chưa có final answer → fallback
+      if (!output) {
+        output = MAX_ITERATIONS_FALLBACK;
+      }
+
+      await this._saveTurnToHistory(history, userMessage, output);
 
       if (toolCalls.length > 0) {
         metrics.chatbotRequestsTotal.inc({ endpoint: 'agent_tool', status: 'success' });
@@ -160,6 +235,9 @@ class ChatbotAgent {
    * Streaming agent: yield { type, content } events.
    *
    * Dùng bindTools + loop thủ công để có control tốt hơn cho SSE.
+   * Cuối stream persist lượt chat vào history (nhờ đó câu hỏi follow-up
+   * như "cái đầu tiên bao nhiêu tiền?" có context, và messageId trả về
+   * trong event 'done' khớp với tin nhắn thật trong DB).
    */
   async *stream(sessionId, userMessage) {
     metrics.chatbotTokensTotal.inc(
@@ -167,54 +245,40 @@ class ChatbotAgent {
       metrics.estimateTokens(userMessage),
     );
 
-    const messages = [new SystemMessage(SYSTEM_PROMPT), new HumanMessage(userMessage)];
+    const { history, messages } = await this._buildContext(sessionId, userMessage);
 
-    let iteration = 0;
-    while (iteration < MAX_ITERATIONS) {
-      iteration++;
+    let finalContent = '';
+
+    for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
       const response = await this.model.bindTools(this.tools).invoke(messages);
       const toolCalls = response.tool_calls || [];
 
       if (toolCalls.length === 0) {
         // Final answer — yield từng word cho UX mượt
-        const content = response.content || '';
-        for (const word of String(content).split(/(\s+)/)) {
+        finalContent = String(response.content || '');
+        for (const word of finalContent.split(/(\s+)/)) {
           if (word) yield { type: 'token', content: word };
         }
-        metrics.chatbotTokensTotal.inc(
-          { direction: 'out' },
-          metrics.estimateTokens(content),
-        );
-        return;
+        break;
       }
 
       // Có tool call → thêm AI message + execute tools
       messages.push(response);
-      for (const call of toolCalls) {
-        yield { type: 'tool_call', name: call.name, args: call.args };
-        const tool = this.tools.find((t) => t.name === call.name);
-        let result;
-        try {
-          result = await tool.func(JSON.stringify(call.args));
-        } catch (e) {
-          result = JSON.stringify({ error: e.message });
-          metrics.chatbotErrorsTotal.inc({ stage: `tool_error:${call.name}` });
-        }
-        yield { type: 'tool_result', name: call.name };
-        messages.push(
-          new ToolMessage({
-            content: typeof result === 'string' ? result : JSON.stringify(result),
-            tool_call_id: call.id,
-          }),
-        );
-      }
+      yield* this._runToolCalls(messages, toolCalls);
     }
 
     // Vượt max iterations → fallback
-    yield {
-      type: 'token',
-      content: 'Xin lỗi, em chưa thể xử lý yêu cầu phức tạp này. Anh/chị vui lòng thử lại nhé!',
-    };
+    if (!finalContent) {
+      finalContent = MAX_ITERATIONS_FALLBACK;
+      yield { type: 'token', content: finalContent };
+    }
+
+    metrics.chatbotTokensTotal.inc(
+      { direction: 'out' },
+      metrics.estimateTokens(finalContent),
+    );
+
+    await this._saveTurnToHistory(history, userMessage, finalContent);
   }
 }
 

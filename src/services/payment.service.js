@@ -26,7 +26,9 @@ const getVNPayInstance = () => {
     vnpayInstance = new VNPay({
       tmnCode: process.env.VNP_TMNCODE,
       secureSecret: process.env.VNP_HASHSECRET,
-      vnpayHost: 'https://sandbox.vnpayment.vn',
+      // Production phải set VNPAY_HOST=https://payment.vnpay.vn (mặc định sandbox
+      // để giữ hành vi cũ khi chưa cấu hình)
+      vnpayHost: process.env.VNPAY_HOST || 'https://sandbox.vnpayment.vn',
       testMode: process.env.NODE_ENV !== 'production',
       hashAlgorithm: 'SHA512',
     });
@@ -104,6 +106,62 @@ class PaymentService {
   }
 
   /**
+   * Áp dụng kết quả thanh toán thành công lên order một cách an toàn:
+   * - KHÔNG "hồi sinh" đơn đã bị hủy (stock của đơn hủy đã được hoàn lại,
+   *   nếu set confirmed lại sẽ dẫn đến oversell)
+   * - Dùng atomic update (compare-and-swap) để chống race với cancel/confirm
+   *   chạy đồng thời tại thời điểm IPN/return URL về
+   * @param {Object} order - Order document vừa load từ DB
+   * @returns {Promise<{order: Object, cancelled: boolean}>}
+   */
+  async _applySuccessfulPayment(order) {
+    // Case thường gặp: pending + unpaid → paid + confirmed (atomic)
+    let updated = await Order.findOneAndUpdate(
+      { _id: order._id, status: 'pending', paymentStatus: 'unpaid' },
+      { $set: { paymentStatus: 'paid', status: 'confirmed' } },
+      { new: true },
+    );
+
+    if (updated) {
+      await orderService.publishOrderStatusChangedEvent(updated, 'pending', 'system');
+      return { order: updated, cancelled: false };
+    }
+
+    // Không match → có state change đồng thời, load lại state mới nhất
+    const fresh = await Order.findById(order._id);
+    if (!fresh) {
+      return { order, cancelled: false };
+    }
+
+    // Đơn đã bị hủy trong lúc thanh toán: giữ nguyên trạng thái hủy,
+    // payment vẫn ghi nhận completed để ops xử lý hoàn tiền.
+    if (fresh.status === 'cancelled') {
+      logger.error('[Payment] Successful payment arrived for cancelled order — refund required', {
+        orderId: fresh._id?.toString(),
+        paymentStatus: fresh.paymentStatus,
+      });
+      return { order: fresh, cancelled: true };
+    }
+
+    // Đơn đã được confirm trước đó (vd: seller confirm) → chỉ đánh dấu đã thanh toán,
+    // không đổi status. Vẫn CAS để tránh ghi đè nếu đơn vừa bị hủy.
+    if (fresh.paymentStatus !== 'paid') {
+      updated = await Order.findOneAndUpdate(
+        { _id: fresh._id, status: { $ne: 'cancelled' }, paymentStatus: { $ne: 'paid' } },
+        { $set: { paymentStatus: 'paid' } },
+        { new: true },
+      );
+      if (updated) {
+        await orderService.publishOrderStatusChangedEvent(updated, updated.status, 'system');
+      }
+      return { order: updated || fresh, cancelled: false };
+    }
+
+    // Đã paid từ trước (vd: IPN xử lý trước return URL) — idempotent
+    return { order: fresh, cancelled: false };
+  }
+
+  /**
    * Verify VNPay return URL callback
    * @param {Object} vnpayParams - VNPay callback parameters
    * @returns {Promise<Object>} Verification result
@@ -127,6 +185,13 @@ class PaymentService {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Payment not found');
     }
 
+    // Defense-in-depth: xác nhận số tiền từ gateway khớp với payment record
+    // (giống handleIPN) — chống amount tampering qua return URL
+    const amount = parseInt(vnpayParams.vnp_Amount, 10) / 100;
+    if (payment.amount !== amount) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid amount');
+    }
+
     const order = await Order.findById(payment.orderId);
     if (!order) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found');
@@ -134,28 +199,34 @@ class PaymentService {
 
     const isSuccess = responseCode === '00' && transactionStatus === '00';
 
-    payment.status = isSuccess ? 'completed' : 'failed';
-    payment.gatewayData = vnpayParams;
-    payment.paymentDate = new Date();
-    await payment.save();
+    // Idempotency: IPN có thể đã xử lý xong trước khi return URL về — không lưu lại payment
+    if (payment.status === 'pending') {
+      payment.status = isSuccess ? 'completed' : 'failed';
+      payment.gatewayData = vnpayParams;
+      payment.paymentDate = new Date();
+      await payment.save();
+    }
 
-    if (isSuccess) {
-      const previousStatus = order.status;
-      const previousPaymentStatus = order.paymentStatus;
-      order.paymentStatus = 'paid';
-      order.status = 'confirmed';
-      await order.save();
-      if (previousStatus !== order.status || previousPaymentStatus !== order.paymentStatus) {
-        await orderService.publishOrderStatusChangedEvent(order, previousStatus, 'system');
-      }
+    let finalOrder = order;
+    let cancelled = false;
 
+    // Áp dụng lên order khi gateway báo thành công VÀ payment record là completed.
+    // _applySuccessfulPayment idempotent (CAS) nên gọi lại vẫn an toàn — kể cả khi
+    // IPN đã xử lý trước nhưng crash trước khi kịp update order.
+    if (isSuccess && payment.status === 'completed') {
+      const result = await this._applySuccessfulPayment(order);
+      finalOrder = result.order;
+      cancelled = result.cancelled;
+    }
+
+    if (isSuccess && !cancelled) {
       // Emit socket event to update dashboard
       try {
         const io = getIO();
         io.emit('new_order', {
-          orderId: order._id,
-          totalAmount: order.totalAmount,
-          createdAt: order.createdAt,
+          orderId: finalOrder._id,
+          totalAmount: finalOrder.totalAmount,
+          createdAt: finalOrder.createdAt,
         });
       } catch (error) {
         logger.error('Socket emit error:', { error: error.message });
@@ -163,10 +234,14 @@ class PaymentService {
     }
 
     return {
-      success: isSuccess,
+      success: isSuccess && !cancelled,
       payment,
-      order,
-      message: isSuccess ? 'Payment successful' : 'Payment failed',
+      order: finalOrder,
+      message: cancelled
+        ? 'Order was cancelled before payment completed. The transaction will be reviewed for refund.'
+        : isSuccess
+          ? 'Payment successful'
+          : 'Payment failed',
     };
   }
 
@@ -229,14 +304,8 @@ class PaymentService {
     await payment.save();
 
     if (isSuccess) {
-      const previousStatus = order.status;
-      const previousPaymentStatus = order.paymentStatus;
-      order.paymentStatus = 'paid';
-      order.status = 'confirmed';
-      await order.save();
-      if (previousStatus !== order.status || previousPaymentStatus !== order.paymentStatus) {
-        await orderService.publishOrderStatusChangedEvent(order, previousStatus, 'system');
-      }
+      // Guard: không đổi trạng thái đơn đã hủy (chống oversell do stock đã hoàn)
+      await this._applySuccessfulPayment(order);
     }
 
     return {
