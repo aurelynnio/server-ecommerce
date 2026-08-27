@@ -18,3 +18,4 @@ module.exports = {
   ...chatbotPaths,
   ...ecommercePaths,
 };
+

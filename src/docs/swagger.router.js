@@ -38,3 +38,4 @@ router.get('/json', (req, res) => {
 router.use('/', swaggerUi.serve, swaggerUi.setup(openapiSpec, customOptions));
 
 module.exports = router;
+
