@@ -44,7 +44,7 @@ class TokenService {
    * @returns {string}
    */
   verifyRefreshToken(token) {
-    return jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+    return jwt.verify(token, process.env.JWT_REFRESH_SECRET, { algorithms: ['HS256'] });
   }
 
   /**
@@ -53,7 +53,7 @@ class TokenService {
    * @returns {string}
    */
   verifyAccessToken(token) {
-    return jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+    return jwt.verify(token, process.env.JWT_ACCESS_SECRET, { algorithms: ['HS256'] });
   }
 
   /**

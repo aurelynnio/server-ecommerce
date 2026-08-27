@@ -7,7 +7,7 @@
  * Dùng SHUTDOWN_GRACE_MS để cho phép các request đang chạy hoàn tất.
  */
 
-const logger = require('./logger');
+const logger = require('../utils/logger');
 
 const SHUTDOWN_GRACE_MS = Number(process.env.CHATBOT_SHUTDOWN_GRACE_MS) || 15_000;
 

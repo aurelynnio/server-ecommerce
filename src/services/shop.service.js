@@ -11,7 +11,7 @@ const logger = require('../utils/logger');
 
 const slugify = require('slugify');
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 
 class ShopService {
   /**

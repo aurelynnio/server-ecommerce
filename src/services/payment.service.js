@@ -5,7 +5,7 @@ const orderService = require('./order.service');
 const { getIO } = require('../socket/index');
 const logger = require('../utils/logger');
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 
 /**
  * PERFORMANCE FIX: Singleton VNPay instance - reuse across requests

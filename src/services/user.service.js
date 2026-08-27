@@ -1,11 +1,10 @@
 const userModel = require('../repositories/user.repository');
-const hashPassword = require('../utils/hashPasword');
-const comparePassword = require('../utils/comparePassword');
+const { hashPassword, comparePassword } = require('../utils/password.util');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 const { uploadImage } = require('../configs/cloudinary');
 
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 const { ensureFound } = require('../utils/serviceAssertions');
 
 /**

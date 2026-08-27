@@ -6,16 +6,15 @@ const chatbotController = require('../controllers/chatbot.controller');
 
 const { verifyAccessToken, requireRole } = require('../middlewares/auth.middleware');
 const validate = require('../middlewares/validate.middleware');
-const chatSanitize = require('../middlewares/chatSanitize.middleware');
 const { chatbotRateLimiter } = require('../middlewares/rateLimit.middleware');
 const {
   chatMessageValidator,
   sessionIdParamValidator,
 } = require('../validations/chatbot.validator');
 
-router.post('/message', chatbotRateLimiter, chatSanitize, validate(chatMessageValidator), chatbotController.sendMessage);
+router.post('/message', chatbotRateLimiter, validate(chatMessageValidator), chatbotController.sendMessage);
 
-router.post('/stream', chatbotRateLimiter, chatSanitize, validate(chatMessageValidator), chatbotController.streamMessage);
+router.post('/stream', chatbotRateLimiter, validate(chatMessageValidator), chatbotController.streamMessage);
 
 /**
  * @desc    Get chat history by session ID

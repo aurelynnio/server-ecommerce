@@ -6,7 +6,7 @@ const chatSocket = require('./chat.socket');
 const socketAuthMiddleware = require('../middlewares/socketAuth.middleware');
 const logger = require('../utils/logger');
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 const { isAllowedOrigin } = require('../middlewares/cors.middleware');
 
 let io = null;

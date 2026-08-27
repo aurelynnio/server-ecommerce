@@ -8,7 +8,10 @@ const { StatusCodes } = require('http-status-codes');
 const getCookieOptions = () => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict',
+  // 'lax' allows cookies on top-level navigations (e.g. payment provider
+  // redirects back from VNPay) while still protecting against CSRF on
+  // cross-site sub-requests. 'strict' would log users out after redirect.
+  sameSite: 'lax',
 });
 
 const setAuthCookies = (res, accessToken, refreshToken) => {

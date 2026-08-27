@@ -1,7 +1,7 @@
 const Cart = require('../repositories/cart.repository');
 const Product = require('../repositories/product.repository');
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 
 /**
  * Service handling shopping cart operations

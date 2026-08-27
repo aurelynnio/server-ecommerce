@@ -6,7 +6,8 @@
 const express = require('express');
 const router = express.Router();
 const permissionController = require('../controllers/permission.controller');
-const { verifyAccessToken, requireRole } = require('../middlewares/auth.middleware');
+const { verifyAccessToken } = require('../middlewares/auth.middleware');
+const { requireAdminAccess } = require('../middlewares/permission.middleware');
 
 const validate = require('../middlewares/validate.middleware');
 
@@ -52,7 +53,7 @@ router.get('/me', verifyAccessToken, permissionController.getMyPermissions);
 router.get(
   '/audit',
   verifyAccessToken,
-  requireRole('admin'),
+  requireAdminAccess,
   validate({ query: auditLogsQueryValidator }),
   permissionController.getAuditLogs,
 );
@@ -65,7 +66,7 @@ router.get(
 router.get(
   '/user/:userId',
   verifyAccessToken,
-  requireRole('admin'),
+  requireAdminAccess,
   validate({ params: userIdParamValidator }),
   permissionController.getUserPermissions,
 );
@@ -79,7 +80,7 @@ router.get(
 router.put(
   '/user/:userId',
   verifyAccessToken,
-  requireRole('admin'),
+  requireAdminAccess,
   validate({ params: userIdParamValidator, body: updatePermissionsValidator }),
   permissionController.updateUserPermissions,
 );
@@ -93,7 +94,7 @@ router.put(
 router.post(
   '/user/:userId/grant',
   verifyAccessToken,
-  requireRole('admin'),
+  requireAdminAccess,
   validate({
     params: userIdParamValidator,
     body: grantRevokePermissionValidator,
@@ -110,7 +111,7 @@ router.post(
 router.post(
   '/user/:userId/revoke',
   verifyAccessToken,
-  requireRole('admin'),
+  requireAdminAccess,
   validate({
     params: userIdParamValidator,
     body: grantRevokePermissionValidator,

@@ -2,7 +2,7 @@ const catchAsync = require('../configs/catchAsync');
 const userService = require('../services/user.service');
 const { sendFail, sendSuccess } = require('../shared/res/formatResponse');
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 
 const UserController = {
   /**

@@ -1,5 +1,5 @@
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('./ApiError');
 
 const ensureFound = (value, message = 'Resource not found') => {
   if (!value) {

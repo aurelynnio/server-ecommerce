@@ -23,7 +23,7 @@ const {
 router.get(
   '/my',
   verifyAccessToken,
-  requireRole('seller'),
+  requireRole('seller', 'admin'),
   shopCategoryController.getMyShopCategories,
 );
 
@@ -35,7 +35,7 @@ router.get(
 router.post(
   '/',
   verifyAccessToken,
-  requireRole('seller'),
+  requireRole('seller', 'admin'),
   validate(createShopCategoryValidator),
   shopCategoryController.createCategory,
 );
@@ -49,7 +49,7 @@ router.post(
 router.put(
   '/:categoryId',
   verifyAccessToken,
-  requireRole('seller'),
+  requireRole('seller', 'admin'),
   validate(updateShopCategoryValidator),
   shopCategoryController.updateCategory,
 );
@@ -62,7 +62,7 @@ router.put(
 router.delete(
   '/:categoryId',
   verifyAccessToken,
-  requireRole('seller'),
+  requireRole('seller', 'admin'),
   shopCategoryController.deleteCategory,
 );
 

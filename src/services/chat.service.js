@@ -2,7 +2,7 @@ const { Conversation, Message } = require('../repositories/conversation.reposito
 const Shop = require('../repositories/shop.repository');
 const { getIO } = require('../socket/index');
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 const { uploadAsset } = require('../configs/cloudinary');
 

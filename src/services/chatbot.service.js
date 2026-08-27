@@ -6,12 +6,12 @@ const { StringOutputParser } = require('@langchain/core/output_parsers');
 const mongoose = require('mongoose');
 
 const { searchSimilarProducts, getFeaturedProducts } = require('./embedding.service');
-const { toolHandlers } = require('../utils/chatbot.tools');
+const { toolHandlers } = require('../chatbot/chatbot.tools');
 const { SYSTEM_PROMPT } = require('../configs/chatbot.config');
 const { redact } = require('../utils/redact');
-const { truncateHistory } = require('../utils/tokenBudget');
-const { getCachedResponse, setCachedResponse } = require('../utils/responseCache');
-const { extractConversationMessages } = require('../utils/chatbotParser');
+const { truncateHistory } = require('../chatbot/tokenBudget');
+const { getCachedResponse, setCachedResponse } = require('../chatbot/responseCache');
+const { extractConversationMessages } = require('../chatbot/chatbotParser');
 const {
   parseMoneyValue,
   extractPriceRange,
@@ -19,8 +19,8 @@ const {
   escapePromptText,
   normalizePriceInText,
   formatProducts,
-} = require('../utils/chatbotHelpers');
-const ChatbotAgent = require('../utils/chatAgent');
+} = require('../chatbot/chatbotHelpers');
+const ChatbotAgent = require('../chatbot/chatAgent');
 const logger = require('../utils/logger');
 const metrics = require('../monitoring/chatbot.metrics');
 
@@ -243,7 +243,6 @@ class ChatbotService {
     const filter = { sessionId, messageId };
     await collection.updateOne(filter, { $set: doc }, { upsert: true });
 
-    metrics.chatbotRequestsTotal.inc({ endpoint: 'feedback', status: 'success' });
     logger.info('[Chatbot] Feedback saved', {
       sessionId,
       messageId,
@@ -281,10 +280,6 @@ class ChatbotService {
    * @returns {Promise<{success: boolean, message: string, sessionId: string}>}
    */
   async chatStream(sessionId, userMessage, onToken) {
-    const stopTimer = metrics.chatbotLatencySeconds.startTimer({
-      endpoint: 'stream',
-      stream: 'true',
-    });
     try {
       // Check cache trước (greeting/FAQ, không phải followup)
       const cached = await getCachedResponse(userMessage);
@@ -293,9 +288,7 @@ class ChatbotService {
         for (const word of cached.message.split(/(\s+)/)) {
           if (word) onToken?.(word);
         }
-        stopTimer({ status: 'cache_hit' });
-        metrics.chatbotRequestsTotal.inc({ endpoint: 'stream', status: 'cache_hit' });
-        return { ...cached, sessionId };
+        return { ...cached, sessionId, isCacheHit: true };
       }
 
       logger.info('[Chatbot] Starting RAG stream chat with sessionId:', sessionId);
@@ -342,7 +335,6 @@ class ChatbotService {
         metrics.estimateTokens(fullResponse),
       );
 
-      stopTimer({ status: 'success' });
       return {
         success: true,
         message: validatedResponse,
@@ -352,7 +344,6 @@ class ChatbotService {
     } catch (error) {
       logger.error('[Chatbot] Stream error:', error.message);
       metrics.chatbotErrorsTotal.inc({ stage: 'stream' });
-      stopTimer({ status: 'error' });
       return {
         success: false,
         message: 'Xin lỗi, hệ thống đang bận. Anh/chị vui lòng thử lại sau nhé!',
@@ -370,8 +361,7 @@ class ChatbotService {
       const cached = await getCachedResponse(userMessage);
       if (cached) {
         stopTimer({ status: 'cache_hit' });
-        metrics.chatbotRequestsTotal.inc({ endpoint: 'message', status: 'cache_hit' });
-        return { ...cached, sessionId };
+        return { ...cached, sessionId, isCacheHit: true };
       }
 
       logger.info('[Chatbot] Starting RAG chat with sessionId:', sessionId);
@@ -427,6 +417,7 @@ class ChatbotService {
       };
     }
   }
+
 
   parseMoneyValue(rawValue, unit = '') {
     return parseMoneyValue(rawValue, unit);

@@ -4,8 +4,8 @@ import crypto from 'crypto';
 const {
   COOKIE_NAME,
   verifyChatSession,
-} = require('../../src/utils/chatSessionToken');
-const { resolveChatSession } = require('../../src/utils/chatSession');
+  resolveChatSession,
+} = require('../../src/chatbot/chatSession');
 
 describe('Chatbot anonymous session ownership', () => {
   it('creates an opaque session and stores its signed ownership token in an HTTP-only cookie', () => {

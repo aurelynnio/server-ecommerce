@@ -12,9 +12,8 @@ const {
   createTemplateValidator,
   updateTemplateValidator,
 } = require('../validations/shipping.validator');
-// All routes require seller role
-
-router.use(verifyAccessToken, requireRole('seller'));
+// All routes require seller or admin role
+router.use(verifyAccessToken, requireRole('seller', 'admin'));
 
 /**
  * @desc    Create a new shipping template

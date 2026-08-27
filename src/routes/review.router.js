@@ -50,26 +50,8 @@ router.get(
 );
 
 /**
- * @desc    Get a single review by ID
- * @access  Public
- * @param   reviewId - Review ID
- */
-router.get(
-  '/:reviewId',
-  validate({ params: reviewIdParamValidator }),
-  reviewController.getReviewById,
-);
-
-/**
  * User Routes (Authenticated)
  */
-/**
- * @desc    Create a new review for a product
- * @access  Private (Authenticated users - must have purchased product)
- * @body    { productId, rating, comment, images? }
- */
-router.post('/', verifyAccessToken, validate(createReviewValidator), reviewController.createReview);
-
 /**
  * @desc    Get current user's reviews
  * @access  Private (Authenticated users)
@@ -95,32 +77,11 @@ router.get(
 );
 
 /**
- * @desc    Update an existing review
- * @access  Private (Authenticated users - own review only)
- * @param   reviewId - Review ID to update
- * @body    { rating?, comment?, images? }
+ * @desc    Create a new review for a product
+ * @access  Private (Authenticated users - must have purchased product)
+ * @body    { productId, rating, comment, images? }
  */
-router.put(
-  '/:reviewId',
-  verifyAccessToken,
-  validate({
-    params: reviewIdParamValidator,
-    body: updateReviewValidator,
-  }),
-  reviewController.updateReview,
-);
-
-/**
- * @desc    Delete a review
- * @access  Private (Owner or Admin)
- * @param   reviewId - Review ID to delete
- */
-router.delete(
-  '/:reviewId',
-  verifyAccessToken,
-  validate({ params: reviewIdParamValidator }),
-  reviewController.deleteReview,
-);
+router.post('/', verifyAccessToken, validate(createReviewValidator), reviewController.createReview);
 
 /**
  * Seller Routes
@@ -153,6 +114,17 @@ router.post(
  * Admin Routes
  */
 /**
+ * @desc    Get review statistics overview
+ * @access  Private (Admin only)
+ */
+router.get(
+  '/statistics/overview',
+  verifyAccessToken,
+  requireRole('admin'),
+  reviewController.getReviewStatistics,
+);
+
+/**
  * @desc    Get all reviews (Admin)
  * @access  Private (Admin)
  */
@@ -165,14 +137,45 @@ router.get(
 );
 
 /**
- * @desc    Get review statistics overview
- * @access  Private (Admin only)
+ * Review by ID Routes (Generic param routes defined last)
+ */
+/**
+ * @desc    Get a single review by ID
+ * @access  Public
+ * @param   reviewId - Review ID
  */
 router.get(
-  '/statistics/overview',
+  '/:reviewId',
+  validate({ params: reviewIdParamValidator }),
+  reviewController.getReviewById,
+);
+
+/**
+ * @desc    Update an existing review
+ * @access  Private (Authenticated users - own review only)
+ * @param   reviewId - Review ID to update
+ * @body    { rating?, comment?, images? }
+ */
+router.put(
+  '/:reviewId',
   verifyAccessToken,
-  requireRole('admin'),
-  reviewController.getReviewStatistics,
+  validate({
+    params: reviewIdParamValidator,
+    body: updateReviewValidator,
+  }),
+  reviewController.updateReview,
+);
+
+/**
+ * @desc    Delete a review
+ * @access  Private (Owner or Admin)
+ * @param   reviewId - Review ID to delete
+ */
+router.delete(
+  '/:reviewId',
+  verifyAccessToken,
+  validate({ params: reviewIdParamValidator }),
+  reviewController.deleteReview,
 );
 
 module.exports = router;

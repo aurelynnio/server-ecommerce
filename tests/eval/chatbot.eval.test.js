@@ -85,9 +85,9 @@ let { hash: _hash } = {};
 beforeAll(async () => {
   ChatbotService = (await import('../../src/services/chatbot.service')).default;
   ({ redact } = await import('../../src/utils/redact'));
-  ({ isFollowup } = await import('../../src/utils/responseCache'));
-  ({ truncateHistory } = await import('../../src/utils/tokenBudget'));
-  chatSession = await import('../../src/utils/chatSession');
+  ({ isFollowup } = await import('../../src/chatbot/responseCache'));
+  ({ truncateHistory } = await import('../../src/chatbot/tokenBudget'));
+  chatSession = await import('../../src/chatbot/chatSession');
 });
 
 const getCase = (id) => {

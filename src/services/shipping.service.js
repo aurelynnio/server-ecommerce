@@ -1,6 +1,6 @@
 const shippingTemplateRepository = require('../repositories/shipping-template.repository');
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 const { getOwnedShopOrThrow } = require('../utils/shopAssertions');
 
 class ShippingService {

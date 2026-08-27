@@ -1,12 +1,14 @@
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('./errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 const permissionService = require('../services/permission.service');
 const logger = require('../utils/logger');
 const { sendFail } = require('../shared/res/formatResponse');
 
 // Giới hạn thời gian chờ bước lookup quyền tươi từ DB/Redis. Nếu Redis/DB chậm hoặc treo,
 // không thể chặn toàn bộ request authorization — sau khoảng này ta fallback về quyền JWT.
-const FRESHNESS_TIMEOUT_MS = Number(process.env.PERMISSION_LOOKUP_TIMEOUT_MS) || 1200;
+const FRESHNESS_TIMEOUT_MS =
+  Number(process.env.PERMISSION_LOOKUP_TIMEOUT_MS) ||
+  (process.env.NODE_ENV === 'test' ? 50 : 1200);
 
 /**
  * Race một promise với timeout. setInterval được clear khi có kết quả; Promise.race đã gắn

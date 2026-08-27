@@ -1,10 +1,9 @@
 const crypto = require('crypto');
 const User = require('../repositories/user.repository');
-const comparePassword = require('../utils/comparePassword');
-const hashPassword = require('../utils/hashPasword');
+const { comparePassword, hashPassword } = require('../utils/password.util');
 const { getIO } = require('../socket/index');
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 const {
   sendEmailVerificationCode,
   sendPasswordResetCode,
@@ -226,6 +225,8 @@ class AuthService {
 
   /**
    * Verify email using a code tied to the email address
+   * Anti-enumeration: email không tồn tại trả cùng lỗi "invalid code" như code sai
+   * (OTP chỉ nằm trong inbox của chủ email nên attacker không thể vượt qua check)
    * @param {string} email - User email
    * @param {string} code - Verification code
    * @returns {Promise<{ user: Object }>} Verified user data
@@ -233,14 +234,17 @@ class AuthService {
    */
   async verifyEmail(email, code) {
     const user = await User.findByEmail(email);
-    this._requireUser(user);
 
-    if (user.isVerifiedEmail) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, 'Email already verified');
+    if (!user) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid or expired verification code');
     }
 
     const cacheKey = `otp:email:${email}`;
     await this.ensureValidOtp(cacheKey, code);
+
+    if (user.isVerifiedEmail) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Email already verified');
+    }
 
     user.isVerifiedEmail = true;
     user.codeVerifiEmail = undefined;
@@ -281,16 +285,22 @@ class AuthService {
 
   /**
    * Send verification code to email (new or resend)
+   * Anti-enumeration: email chưa đăng ký hoặc đã verified vẫn nhận response
+   * thành công giống hệt (không gửi code) — attacker không dò được email nào
+   * có tài khoản trên hệ thống qua endpoint này. Rate limit đã chặn dò hàng loạt.
    * @param {string} email - User email
    * @returns {Promise<{ email: string, message: string, expiresIn: string }>}
-   * @throws {Error} If user not found, already verified, or email sending fails
+   * @throws {Error} If email sending fails
    */
   async sendVerificationCode(email) {
     const user = await User.findByEmail(email);
-    this._requireUser(user);
 
-    if (user.isVerifiedEmail) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, 'Email already verified');
+    if (!user || user.isVerifiedEmail) {
+      return {
+        email,
+        message: 'Verification code sent successfully',
+        expiresIn: '10 minutes',
+      };
     }
 
     const verificationCode = this._generateVerificationCode();
@@ -430,6 +440,7 @@ class AuthService {
 
   /**
    * Reset password using verification code
+   * Anti-enumeration: email không tồn tại trả cùng lỗi "invalid code" như code sai
    * @param {string} email - User email
    * @param {string} code - Reset code
    * @param {string} newPassword - New password
@@ -438,7 +449,10 @@ class AuthService {
    */
   async resetPassword(email, code, newPassword) {
     const user = await User.findByEmail(email);
-    this._requireUser(user);
+
+    if (!user) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid or expired verification code');
+    }
 
     const cacheKey = `otp:reset-password:${email}`;
     await this.ensureValidOtp(cacheKey, code);

@@ -1,5 +1,5 @@
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 const newsletterRepository = require('../repositories/newsletter.repository');
 
 class NewsletterService {

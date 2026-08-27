@@ -2,7 +2,7 @@ const ShopCategory = require('../repositories/shop-category.repository');
 const Product = require('../repositories/product.repository');
 const mongoose = require('mongoose');
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 const { getOwnedShopOrThrow } = require('../utils/shopAssertions');
 
 class ShopCategoryService {

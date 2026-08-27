@@ -44,6 +44,31 @@ const sanitizedString = () => {
   }, 'sanitize');
 };
 
+// Strip control chars except newline + tab, collapse blank lines, trim.
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\u0000-\u0008\u000B-\u001F\u007F]/g;
+const MULTI_NEWLINE = /\n{3,}/g;
+
+/**
+ * Clean control characters, collapse newlines, and trim text
+ * @param {string} str - Input chat string
+ * @returns {string} - Cleaned string
+ */
+const sanitizeChatText = (str) => {
+  if (typeof str !== 'string') return str;
+  return str.replace(CONTROL_CHARS, '').replace(MULTI_NEWLINE, '\n\n').trim();
+};
+
+/**
+ * Custom Joi extension for chat messages
+ */
+const chatSanitizedString = () => {
+  return joi.string().custom((value, _helpers) => {
+    if (typeof value !== 'string') return value;
+    return sanitizeChatText(value);
+  }, 'chatSanitize');
+};
+
 /**
  * Custom Joi extension for HTML-escaped strings
  * Use for user-generated content that will be displayed
@@ -128,6 +153,8 @@ module.exports = {
   sanitizeMongoOperators,
   sanitizedString,
   escapedString,
+  sanitizeChatText,
+  chatSanitizedString,
   searchString,
   objectId,
   sanitizeObject,

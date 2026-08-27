@@ -3,7 +3,7 @@ const VoucherUsage = require('../repositories/voucher-usage.repository');
 const mongoose = require('mongoose');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 const { ensureFound } = require('../utils/serviceAssertions');
 const { getOwnedShopOrThrow } = require('../utils/shopAssertions');
 

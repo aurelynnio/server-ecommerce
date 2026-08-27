@@ -11,7 +11,7 @@ const { render } = require('@react-email/render');
 const VerificationEmail = require('../emails/VerificationEmail').default;
 const logger = require('../utils/logger');
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 
 let transporter = null;
 

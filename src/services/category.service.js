@@ -4,7 +4,7 @@ const slugify = require('slugify');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 const redisService = require('./redis.service');
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 
 /**
  * Service handling category operations
@@ -272,7 +272,13 @@ class CategoryService {
    * @returns {Promise<Object>} Categories with pagination
    */
   async getActiveCategories(filters = {}) {
-    const { page = 1, limit = 10, parentCategory } = filters;
+    // When no parentCategory is given, default to root categories only so the
+    // products-page tab bar shows top-level categories, not every subcategory.
+    const { page = 1, limit = 10 } = filters;
+    const parentCategory =
+      filters.parentCategory === undefined || filters.parentCategory === null || filters.parentCategory === ''
+        ? null
+        : filters.parentCategory;
 
     const total = await Category.countActiveWithParent(parentCategory);
     const paginationParams = getPaginationParams(page, limit, total);

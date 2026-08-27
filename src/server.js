@@ -93,6 +93,30 @@ if (cluster.isPrimary && clusterEnabled) {
     `Primary ${process.pid} is running in production mode. Forking ${workerCount} workers...`,
   );
 
+  const client = require('prom-client');
+  const aggregatorRegistry = new client.AggregatorRegistry();
+
+  // Listen for metric aggregation requests from workers
+  cluster.on('message', async (worker, message) => {
+    if (message && message.type === 'GET_CLUSTER_METRICS') {
+      try {
+        const aggregatedMetrics = await aggregatorRegistry.clusterMetrics();
+        worker.send({
+          type: 'CLUSTER_METRICS_RESPONSE',
+          requestId: message.requestId,
+          metrics: aggregatedMetrics,
+          contentType: aggregatorRegistry.contentType,
+        });
+      } catch (err) {
+        worker.send({
+          type: 'CLUSTER_METRICS_RESPONSE',
+          requestId: message.requestId,
+          error: err.message,
+        });
+      }
+    }
+  });
+
   for (let i = 0; i < workerCount; i++) {
     cluster.fork();
   }
@@ -111,6 +135,7 @@ if (cluster.isPrimary && clusterEnabled) {
     cluster.disconnect(() => process.exit(0));
   });
 } else {
+
   if (cluster.isPrimary) {
     logger.info(`Server starting in ${process.env.NODE_ENV} mode...`);
   }

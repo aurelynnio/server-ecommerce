@@ -8,7 +8,7 @@
 
 const crypto = require('crypto');
 const redisClient = require('../configs/redis.config');
-const logger = require('./logger');
+const logger = require('../utils/logger');
 
 const KEY_PREFIX = 'chatbot:resp:';
 const DEFAULT_TTL_SECONDS = Number(process.env.CHATBOT_CACHE_TTL) || 3600;

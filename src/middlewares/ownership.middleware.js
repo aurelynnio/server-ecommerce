@@ -1,5 +1,5 @@
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('./errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 const Shop = require('../models/shop.model');
 const Product = require('../models/product.model');
 const Order = require('../models/order.model');

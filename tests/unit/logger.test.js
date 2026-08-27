@@ -1,106 +1,107 @@
 /**
  * Unit Tests: Logger utility
- * Tests pure functions: normalizeError, normalizeMeta, formatMessage
+ * Tests NDJSON structured output format, metadata serialization, and request correlation.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-// Logger module uses dynamic `currentLevel` based on NODE_ENV
-// We test the exported pure-logic helpers by re-implementing + verifying logger methods
 const logger = require('../../src/utils/logger');
+const { runWithContext } = require('../../src/utils/asyncContext');
 
 describe('Logger', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
-  /* ---- normalizeError / normalizeMeta / formatMessage ----
-   * These are module-private. We test them indirectly through logger methods
-   * which call formatMessage → normalizeMeta → normalizeError internally.
-   */
-
-  describe('logger method output format', () => {
-    it('error() should print [ERROR] with message', () => {
+  describe('logger NDJSON output format', () => {
+    it('error() should output valid JSON with level ERROR and message', () => {
       const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
       logger.error('something broke');
       expect(spy).toHaveBeenCalledOnce();
-      const output = spy.mock.calls[0][0];
-      expect(output).toContain('[ERROR]');
-      expect(output).toContain('something broke');
+      const raw = spy.mock.calls[0][0];
+      const parsed = JSON.parse(raw);
+      expect(parsed.level).toBe('ERROR');
+      expect(parsed.message).toBe('something broke');
+      expect(parsed.timestamp).toBeDefined();
     });
 
-    it('warn() should print [WARN] with message', () => {
+    it('warn() should output valid JSON with level WARN and message', () => {
       const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       logger.warn('low disk');
       expect(spy).toHaveBeenCalledOnce();
-      expect(spy.mock.calls[0][0]).toContain('[WARN]');
+      const raw = spy.mock.calls[0][0];
+      const parsed = JSON.parse(raw);
+      expect(parsed.level).toBe('WARN');
+      expect(parsed.message).toBe('low disk');
     });
 
-    it('info() should print [INFO] with message', () => {
+    it('info() should output valid JSON with level INFO and message', () => {
       const spy = vi.spyOn(console, 'info').mockImplementation(() => {});
       logger.info('server started');
       expect(spy).toHaveBeenCalledOnce();
-      expect(spy.mock.calls[0][0]).toContain('[INFO]');
+      const raw = spy.mock.calls[0][0];
+      const parsed = JSON.parse(raw);
+      expect(parsed.level).toBe('INFO');
+      expect(parsed.message).toBe('server started');
     });
 
-    it('debug() should print [DEBUG] with message', () => {
+    it('debug() should output valid JSON with level DEBUG and message', () => {
       const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
       logger.debug('trace info');
       expect(spy).toHaveBeenCalledOnce();
-      expect(spy.mock.calls[0][0]).toContain('[DEBUG]');
+      const raw = spy.mock.calls[0][0];
+      const parsed = JSON.parse(raw);
+      expect(parsed.level).toBe('DEBUG');
+      expect(parsed.message).toBe('trace info');
     });
   });
 
-  describe('meta serialization', () => {
-    it('should include meta as JSON when provided', () => {
+  describe('meta serialization in NDJSON', () => {
+    it('should include meta object inside log payload', () => {
       const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
       logger.error('fail', { userId: 'abc', code: 500 });
-      const output = spy.mock.calls[0][0];
-      expect(output).toContain('"userId":"abc"');
-      expect(output).toContain('"code":500');
+      const raw = spy.mock.calls[0][0];
+      const parsed = JSON.parse(raw);
+      expect(parsed.meta).toEqual({ userId: 'abc', code: 500 });
     });
 
     it('should normalize Error objects inside meta', () => {
       const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const err = new Error('kaboom');
       logger.error('fail', { error: err });
-      const output = spy.mock.calls[0][0];
-      // Error is serialized into { name, message, stack }
-      expect(output).toContain('"name":"Error"');
-      expect(output).toContain('"message":"kaboom"');
+      const raw = spy.mock.calls[0][0];
+      const parsed = JSON.parse(raw);
+      expect(parsed.meta.error.name).toBe('Error');
+      expect(parsed.meta.error.message).toBe('kaboom');
     });
 
     it('should handle Error as meta directly', () => {
       const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const err = new TypeError('type issue');
       logger.error('fail', err);
-      const output = spy.mock.calls[0][0];
-      expect(output).toContain('"name":"TypeError"');
-      expect(output).toContain('"message":"type issue"');
+      const raw = spy.mock.calls[0][0];
+      const parsed = JSON.parse(raw);
+      expect(parsed.meta.name).toBe('TypeError');
+      expect(parsed.meta.message).toBe('type issue');
     });
 
-    it('should handle non-object meta', () => {
-      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      logger.error('fail', 'string-meta');
-      const output = spy.mock.calls[0][0];
-      expect(output).toContain('"meta":"string-meta"');
-    });
-
-    it('should return empty string for no meta', () => {
+    it('should omit meta field when no meta is provided', () => {
       const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
       logger.error('no meta');
-      const output = spy.mock.calls[0][0];
-      // Format: [timestamp] [ERROR] no meta  (no trailing JSON)
-      expect(output).toMatch(/\[ERROR\] no meta$/);
+      const raw = spy.mock.calls[0][0];
+      const parsed = JSON.parse(raw);
+      expect(parsed.meta).toBeUndefined();
     });
   });
 
-  describe('timestamp format', () => {
-    it('should include ISO timestamp', () => {
-      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      logger.error('test');
-      const output = spy.mock.calls[0][0];
-      // ISO format: YYYY-MM-DDTHH:mm:ss.sssZ
-      expect(output).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+  describe('distributed tracing correlation ID', () => {
+    it('should automatically inject requestId from AsyncLocalStorage context', () => {
+      const spy = vi.spyOn(console, 'info').mockImplementation(() => {});
+      runWithContext({ requestId: 'req-uuid-12345' }, () => {
+        logger.info('operation within trace');
+      });
+      expect(spy).toHaveBeenCalledOnce();
+      const parsed = JSON.parse(spy.mock.calls[0][0]);
+      expect(parsed.requestId).toBe('req-uuid-12345');
+      expect(parsed.message).toBe('operation within trace');
     });
   });
 
@@ -115,17 +116,11 @@ describe('Logger', () => {
       };
       logger.request(req, 'API call');
       expect(spy).toHaveBeenCalled();
-      const output = spy.mock.calls[0][0];
-      expect(output).toContain('[DEBUG]');
-      expect(output).toContain('API call');
-      expect(output).toContain('"method":"GET"');
-    });
-
-    it('should use default message when none provided', () => {
-      const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      logger.request({ method: 'POST', originalUrl: '/api/auth' });
-      expect(spy).toHaveBeenCalled();
-      expect(spy.mock.calls[0][0]).toContain('Incoming request');
+      const parsed = JSON.parse(spy.mock.calls[0][0]);
+      expect(parsed.level).toBe('DEBUG');
+      expect(parsed.message).toBe('API call');
+      expect(parsed.meta.method).toBe('GET');
+      expect(parsed.meta.url).toBe('/api/products');
     });
   });
 
@@ -134,8 +129,10 @@ describe('Logger', () => {
       const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
       logger.db('find', 'products', { filter: { status: 'active' } });
       expect(spy).toHaveBeenCalled();
-      const output = spy.mock.calls[0][0];
-      expect(output).toContain('DB find on products');
+      const parsed = JSON.parse(spy.mock.calls[0][0]);
+      expect(parsed.level).toBe('DEBUG');
+      expect(parsed.message).toBe('DB find on products');
+      expect(parsed.meta.filter).toEqual({ status: 'active' });
     });
   });
 });

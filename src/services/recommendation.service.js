@@ -3,7 +3,7 @@ const Order = require('../repositories/order.repository');
 const Wishlist = require('../repositories/wishlist.repository');
 const redisService = require('./redis.service');
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 
 /**
  * Service handling product recommendations

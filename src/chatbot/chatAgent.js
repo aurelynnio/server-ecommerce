@@ -23,7 +23,7 @@ const { DynamicTool } = require('@langchain/core/tools');
 
 const { toolHandlers } = require('./chatbot.tools');
 const { toolDefinitions, SYSTEM_PROMPT } = require('../configs/chatbot.config');
-const logger = require('./logger');
+const logger = require('../utils/logger');
 const metrics = require('../monitoring/chatbot.metrics');
 
 const MAX_ITERATIONS = Number(process.env.CHATBOT_AGENT_MAX_ITERATIONS) || 4;
@@ -202,19 +202,15 @@ class ChatbotAgent {
 
       await this._saveTurnToHistory(history, userMessage, output);
 
-      if (toolCalls.length > 0) {
-        metrics.chatbotRequestsTotal.inc({ endpoint: 'agent_tool', status: 'success' });
-      }
-
       metrics.chatbotTokensTotal.inc(
         { direction: 'out' },
         metrics.estimateTokens(output),
       );
       stopTimer({ status: 'success' });
+
       return {
         success: true,
         message: output,
-        sessionId,
         toolCalls,
       };
     } catch (err) {
@@ -283,3 +279,4 @@ class ChatbotAgent {
 }
 
 module.exports = ChatbotAgent;
+

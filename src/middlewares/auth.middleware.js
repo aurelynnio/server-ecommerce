@@ -1,6 +1,5 @@
 const { StatusCodes } = require('http-status-codes');
 const { sendFail } = require('../shared/res/formatResponse');
-const User = require('../models/user.model');
 const tokenService = require('../services/token.service');
 const { getRequestUserId, getRequestUserRoles } = require('../utils/requestUser');
 
@@ -68,7 +67,7 @@ const verifyAccessToken = (req, res, next) => {
  * Optional authentication - doesn't fail if no token
  * Useful for routes that work for both guests and logged-in users
  */
-const optionalAuth = async (req, res, next) => {
+const optionalAuth = (req, res, next) => {
   try {
     const token = extractAccessToken(req);
 
@@ -79,8 +78,14 @@ const optionalAuth = async (req, res, next) => {
 
     const decoded = tokenService.verifyAccessToken(token);
 
-    const user = await User.findById(decoded.userId).select('-password');
-    req.user = user || null;
+    req.user = {
+      _id: decoded.userId,
+      userId: decoded.userId,
+      username: decoded.username,
+      email: decoded.email,
+      role: decoded.role,
+      permissions: decoded.permissions || [],
+    };
     next();
   } catch (_error) {
     req.user = null;

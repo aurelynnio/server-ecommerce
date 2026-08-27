@@ -1,7 +1,7 @@
 const Product = require('../models/product.model');
 const Category = require('../models/category.model');
 const mongoose = require('mongoose');
-const logger = require('./logger');
+const logger = require('../utils/logger');
 
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 20;

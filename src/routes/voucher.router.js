@@ -43,7 +43,7 @@ router.post('/apply', verifyAccessToken, voucherController.applyVoucher);
  * @desc    Get all vouchers (Admin)
  * @access  Private (Admin)
  */
-router.get('/', verifyAccessToken, requireRole(['admin']), voucherController.getAllVouchers);
+router.get('/', verifyAccessToken, requireRole('admin'), voucherController.getAllVouchers);
 
 /**
  * @desc    Get voucher statistics (Admin)
@@ -52,7 +52,7 @@ router.get('/', verifyAccessToken, requireRole(['admin']), voucherController.get
 router.get(
   '/statistics',
   verifyAccessToken,
-  requireRole(['admin']),
+  requireRole('admin'),
   voucherController.getVoucherStatistics,
 );
 
@@ -70,35 +70,38 @@ router.get(
 
 /**
  * @desc    Create voucher
- * @access  Private
+ * @access  Private (Seller/Admin)
  */
 router.post(
   '/',
   verifyAccessToken,
+  requireRole('seller', 'admin'),
   validate(createVoucherValidator),
   voucherController.createVoucher,
 );
 
 /**
  * @desc    Update voucher
- * @access  Private
+ * @access  Private (Seller/Admin)
  * @param   id - Voucher ID
  */
 router.put(
   '/:id',
   verifyAccessToken,
+  requireRole('seller', 'admin'),
   validate({ params: voucherIdParamValidator, body: updateVoucherValidator }),
   voucherController.updateVoucher,
 );
 
 /**
  * @desc    Delete voucher (soft delete)
- * @access  Private
+ * @access  Private (Seller/Admin)
  * @param   id - Voucher ID
  */
 router.delete(
   '/:id',
   verifyAccessToken,
+  requireRole('seller', 'admin'),
   validate({ params: voucherIdParamValidator }),
   voucherController.deleteVoucher,
 );
@@ -111,7 +114,7 @@ router.delete(
 router.delete(
   '/:id/permanent',
   verifyAccessToken,
-  requireRole(['admin']),
+  requireRole('admin'),
   validate({ params: voucherIdParamValidator }),
   voucherController.permanentDeleteVoucher,
 );

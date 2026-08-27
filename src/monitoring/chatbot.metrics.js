@@ -1,7 +1,4 @@
-const client = require('prom-client');
-
-const register = new client.Registry();
-client.collectDefaultMetrics({ register });
+const { client, register, getAggregatedMetrics } = require('./metrics.registry');
 
 const chatbotRequestsTotal = new client.Counter({
   name: 'chatbot_requests_total',
@@ -44,7 +41,9 @@ const CHARS_PER_TOKEN = 3;
 const estimateTokens = (text = '') => Math.ceil(String(text).length / CHARS_PER_TOKEN);
 
 const metrics = {
+  client,
   register,
+  getAggregatedMetrics,
   chatbotRequestsTotal,
   chatbotLatencySeconds,
   chatbotTokensTotal,

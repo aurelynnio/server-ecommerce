@@ -4,8 +4,9 @@
  */
 import { describe, it, expect } from 'vitest';
 
-const hashPassword = require('../../src/utils/hashPasword');
-const comparePassword = require('../../src/utils/comparePassword');
+const { hashPassword, comparePassword } = require('../../src/utils/password.util');
+const legacyHashPassword = require('../../src/utils/hashPassword');
+const legacyComparePassword = require('../../src/utils/comparePassword');
 
 describe('Password Utilities', () => {
   describe('hashPassword', () => {

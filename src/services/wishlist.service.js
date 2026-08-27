@@ -1,7 +1,7 @@
 const wishlistRepository = require('../repositories/wishlist.repository');
 const productRepository = require('../repositories/product.repository');
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 
 /**

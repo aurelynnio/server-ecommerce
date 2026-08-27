@@ -32,7 +32,7 @@ router.get('/', shopController.getPublicShops);
  * @desc    Get all shops with pagination (Admin)
  * @access  Private (Admin)
  */
-router.get('/admin/all', verifyAccessToken, requireRole(['admin']), shopController.getAllShops);
+router.get('/admin/all', verifyAccessToken, requireRole('admin'), shopController.getAllShops);
 
 /**
  * @desc    Update shop status (Admin)
@@ -41,7 +41,7 @@ router.get('/admin/all', verifyAccessToken, requireRole(['admin']), shopControll
 router.put(
   '/admin/:shopId/status',
   verifyAccessToken,
-  requireRole(['admin']),
+  requireRole('admin'),
   shopController.updateShopStatus,
 );
 
@@ -149,6 +149,7 @@ router.post(
 router.post(
   '/upload-logo',
   verifyAccessToken,
+  requireRole('seller', 'admin'),
   upload.fields([
     { name: 'image', maxCount: 1 },
     { name: 'file', maxCount: 1 },
@@ -165,6 +166,7 @@ router.post(
 router.post(
   '/upload-banner',
   verifyAccessToken,
+  requireRole('seller', 'admin'),
   upload.fields([
     { name: 'image', maxCount: 1 },
     { name: 'file', maxCount: 1 },

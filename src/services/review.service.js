@@ -4,7 +4,7 @@ const Order = require('../repositories/order.repository');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 const redisService = require('./redis.service');
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 const { ensureFound } = require('../utils/serviceAssertions');
 const { getOwnedShopOrThrow } = require('../utils/shopAssertions');
 

@@ -1,6 +1,6 @@
 const cloudinary = require('cloudinary').v2;
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 const path = require('path');
 
 cloudinary.config({

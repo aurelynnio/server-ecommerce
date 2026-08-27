@@ -1,5 +1,5 @@
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('./errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 
 /**
  * Middleware to parse JSON string fields from multipart/form-data

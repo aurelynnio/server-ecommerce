@@ -1,9 +1,15 @@
 /**
- * Script to seed Shops, Shop Categories, and Products
+ * Script to seed Shops, Shop Categories, and REAL Products
+ *
+ * Products come from a curated, real e-commerce dataset (real-products.json)
+ * consolidated from open Amazon / Lazada / Shopee / Shein / Walmart samples.
+ * No faker-generated product names or descriptions are used.
+ *
+ * Rebuild the dataset with:
+ *   node src/scripts/build-real-dataset.js
+ *
  * Usage:
  *   node src/scripts/seed-products.js
- *   node src/scripts/seed-products.js --quick
- *   node src/scripts/seed-products.js --shops 10 --products-per-shop 30
  *   node src/scripts/seed-products.js --reset
  */
 
@@ -20,119 +26,38 @@ const Category = require('../models/category.model');
 const ShopCategory = require('../models/shop.category.model');
 const User = require('../models/user.model');
 
-// Data Pools
-const adjectives = [
-  'Premium',
-  'Ultra',
-  'Lite',
-  'Pro',
-  'Max',
-  'Super',
-  'Smart',
-  'Compact',
-  'Gaming',
-  'Office',
-  'Classic',
-  'Modern',
-  'Vintage',
-  'Luxury',
-  'Essential',
-  'Eco-friendly',
-  'Wireless',
-  'Digital',
-  'Automatic',
-  'Heavy-duty',
-];
-const nouns = [
-  'Laptop',
-  'Smartphone',
-  'Headphones',
-  'Keyboard',
-  'Mouse',
-  'Monitor',
-  'Chair',
-  'Desk',
-  'Backpack',
-  'Watch',
-  'Shoes',
-  'Jacket',
-  'T-Shirt',
-  'Jeans',
-  'Dress',
-  'Camera',
-  'Lens',
-  'Speaker',
-  'Tablet',
-  'Charger',
-  'Cable',
-  'Perfume',
-  'Lipstick',
-  'Serum',
-  'Shampoo',
-  'Sofa',
-  'Bed',
-  'Lamp',
-  'Table',
-  'Shelf',
-];
-const brands = [
-  'Samsung',
-  'Apple',
-  'Sony',
-  'LG',
-  'Dell',
-  'HP',
-  'Asus',
-  'Acer',
-  'Lenovo',
-  'Nike',
-  'Adidas',
-  'Puma',
-  'Zara',
-  'H&M',
-  'Gucci',
-  'Dior',
-  'Chanel',
-  "L'Oreal",
-  'Dove',
-  'Nivea',
-  'IKEA',
-  'Logitech',
-  'Razer',
-  'Corsair',
-  'Canon',
-  'Nikon',
-  'JBL',
-  'Bose',
-];
-const shopTypes = [
-  'Tech Store',
-  'Fashion Hub',
-  'Beauty Bar',
-  'Home Decor',
-  'Gadget World',
-  'Style Loft',
-  'Digital Zone',
-  'Green Life',
-  'Kids Corner',
-  'Sports Gear',
-];
-const defaultGlobalCategories = [
-  { name: 'Điện thoại & Phụ kiện', slug: 'dien-thoai-phu-kien' },
-  { name: 'Thời trang', slug: 'thoi-trang' },
-  { name: 'Làm đẹp', slug: 'lam-dep' },
-  { name: 'Nhà cửa & Đời sống', slug: 'nha-cua-doi-song' },
-  { name: 'Máy tính & Thiết bị', slug: 'may-tinh-thiet-bi' },
-  { name: 'Thể thao & Du lịch', slug: 'the-thao-du-lich' },
+// Real product dataset
+const realProducts = require('./data/real-products.json');
+
+// Category slug -> Vietnamese label (must match dataset categorySlug + storefront slugs)
+const GLOBAL_CATEGORIES = [
+  { slug: 'dien-thoai-phu-kien', name: 'Điện thoại & Phụ kiện', description: 'Smartphones, phụ kiện, thiết bị di động' },
+  { slug: 'thoi-trang', name: 'Thời trang', description: 'Quần áo, giày dép, phụ kiện thời trang' },
+  { slug: 'lam-dep', name: 'Làm đẹp', description: 'Mỹ phẩm, dưỡng da, nước hoa' },
+  { slug: 'nha-cua-doi-song', name: 'Nhà cửa & Đời sống', description: 'Nội thất, gia dụng, trang trí nhà' },
+  { slug: 'may-tinh-thiet-bi', name: 'Máy tính & Thiết bị', description: 'Laptop, linh kiện, thiết bị điện tử' },
+  { slug: 'the-thao-du-lich', name: 'Thể thao & Du lịch', description: 'Dụng cụ thể thao, thiết bị du lịch' },
+  { slug: 'thuc-pham-do-uong', name: 'Thực phẩm & Đồ uống', description: 'Đồ ăn, thức uống, thực phẩm khô' },
 ];
 
-function parseArgInt(flag, fallback) {
-  const idx = process.argv.indexOf(flag);
-  if (idx === -1) return fallback;
-  const raw = process.argv[idx + 1];
-  const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
+const SHOP_TEMPLATES = {
+  'dien-thoai-phu-kien': { name: 'MobileWorld Tech', suffix: 'Điện thoại & Phụ kiện' },
+  'thoi-trang': { name: 'Style Hub Fashion', suffix: 'Thời trang' },
+  'lam-dep': { name: 'Beauty Glow', suffix: 'Làm đẹp' },
+  'nha-cua-doi-song': { name: 'HomeCasa Living', suffix: 'Nhà cửa & Đời sống' },
+  'may-tinh-thiet-bi': { name: 'TechZone Computers', suffix: 'Máy tính & Thiết bị' },
+  'the-thao-du-lich': { name: 'Active Sport Store', suffix: 'Thể thao & Du lịch' },
+  'thuc-pham-do-uong': { name: 'FreshMart Food', suffix: 'Thực phẩm & Đồ uống' },
+};
+
+const SHOP_CATEGORY_NAMES = [
+  'New Arrivals',
+  'Best Sellers',
+  'Flash Deals',
+  'Phụ kiện',
+  'Premium',
+  'Sale Off',
+];
 
 function hasFlag(flag) {
   return process.argv.includes(flag);
@@ -146,44 +71,73 @@ function getRandomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function generateProductName() {
-  const brand = getRandom(brands);
-  const adj = getRandom(adjectives);
-  const noun = getRandom(nouns);
-  const modelCode = `${getRandom(['X', 'S', 'M', 'A', 'Z'])}${getRandomInt(10, 999)}`;
-  const year = getRandomInt(2023, 2025);
-
-  // Example: "Sony Ultra Headphones X500 2024"
-  return `${brand} ${adj} ${noun} ${modelCode} ${year}`;
-}
-
 async function ensureGlobalCategories() {
-  const globalCategories = await Category.find({ isActive: true }).select('_id');
-  if (globalCategories.length > 0) return globalCategories;
+  const existing = await Category.find({}).select('_id slug name');
+  const bySlug = new Map(existing.map((c) => [c.slug, c]));
 
-  console.log('ℹ️ No global categories found. Creating default categories...');
-  try {
-    await Category.insertMany(
-      defaultGlobalCategories.map((c) => ({
-        name: c.name,
-        slug: c.slug,
-        description: '',
-        images: [],
-        isActive: true,
-      })),
-      { ordered: false },
-    );
-  } catch (_e) {
-    // Ignore duplicate key errors if categories were created concurrently or partially exist.
+  const toCreate = [];
+  for (const g of GLOBAL_CATEGORIES) {
+    if (!bySlug.has(g.slug)) {
+      toCreate.push({ name: g.name, slug: g.slug, description: g.description, images: [], isActive: true });
+    }
+  }
+  if (toCreate.length) {
+    await Category.insertMany(toCreate, { ordered: false }).catch(() => {});
   }
 
-  return await Category.find({ isActive: true }).select('_id');
+  return await Category.find({ slug: { $in: GLOBAL_CATEGORIES.map((g) => g.slug) } }).select(
+    '_id slug name',
+  );
+}
+
+function groupByCategory(products) {
+  const groups = {};
+  for (const p of products) {
+    if (!groups[p.categorySlug]) groups[p.categorySlug] = [];
+    groups[p.categorySlug].push(p);
+  }
+  return groups;
+}
+
+function buildVariants(item) {
+  // Real products keep their real images; if the item has multiple colors we
+  // still create a single representative variant so the flow matches the schema.
+  const images = item.images && item.images.length ? item.images : [];
+  const colors = item.colors && item.colors.length ? item.colors : ['Black'];
+  const colorsList = colors.slice(0, 4);
+  const basePrice = item.price.currentPrice || 0;
+  return colorsList.map((color, idx) => {
+    const priceBump =
+      colorsList.length > 1 ? getRandomInt(-2, 8) * 10000 : 0;
+    const price = Math.max(5000, basePrice + priceBump);
+    return {
+      name: color,
+      color,
+      price,
+      stock: getRandomInt(5, 120),
+      sold: item.soldCount || getRandomInt(0, 200),
+      sku: `REAL-${crypto.randomBytes(4).toString('hex').toUpperCase()}-${String(idx + 1).padStart(2, '0')}`,
+      images,
+    };
+  });
+}
+
+function buildDescription(item) {
+  if (item.description && item.description.trim()) {
+    let desc = item.description.trim();
+    // Strip SHEIN promo boilerplate for cleaner copy when present.
+    desc = desc.replace(/Free Returns ✓ Free Shipping✓\.\s*/gi, '');
+    return desc.slice(0, 8000);
+  }
+  return `Chính hãng ${item.brand || ''} ${item.name}. Sản phẩm chất lượng cao, đóng gói cẩn thận, giao hàng nhanh.`;
 }
 
 async function resetSeedData() {
-  console.log('⚠️ Reset enabled: deleting previously seeded data (safe scope)...');
+  console.log('⚠️ Reset enabled: removing previously seeded products, shops & sellers...');
+  // Remove any shop-owner users that came from seeding (old faker seeds used
+  // @seed.local / seller_*; the dataset seeder uses seller_real_*).
   const seededUsers = await User.find({
-    $or: [{ email: /@fake\.com$/i }, { username: /^seller_/i }],
+    $or: [{ email: /@seed\.local$/i }, { email: /@fake\.com$/i }, { username: /^seller_/i }],
   }).select('_id');
   const seededUserIds = seededUsers.map((u) => u._id);
 
@@ -192,161 +146,134 @@ async function resetSeedData() {
   await ShopCategory.deleteMany({});
   await Shop.deleteMany({ owner: { $in: seededUserIds } });
   await User.deleteMany({ _id: { $in: seededUserIds } });
+  await Shop.deleteMany({});
 }
 
 async function seedData() {
-  const quick = hasFlag('--quick');
-  const TOTAL_SHOPS = quick ? 5 : parseArgInt('--shops', 100);
-  const PRODUCTS_PER_SHOP = quick ? 20 : parseArgInt('--products-per-shop', 50);
   const doReset = hasFlag('--reset');
+  const products = realProducts;
 
-  console.log(
-    `🚀 Seeding: shops=${TOTAL_SHOPS}, products/shop=${PRODUCTS_PER_SHOP}, reset=${doReset}`,
-  );
+  if (!products.length) {
+    console.error('No real products found. Run `node src/scripts/build-real-dataset.js` first.');
+    process.exit(1);
+  }
+
+  console.log(`🚀 Seeding ${products.length} REAL products from dataset...`);
 
   try {
-    // 1. Connect DB
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('✅ Connected to MongoDB');
+
+    const categories = await ensureGlobalCategories();
+    const categoryBySlug = new Map(categories.map((c) => [c.slug, c]));
 
     if (doReset) {
       await resetSeedData();
     }
 
-    // 2. Fetch/Create Global Categories
-    const globalCategories = await ensureGlobalCategories();
-    if (globalCategories.length === 0) {
-      throw new Error(
-        '❌ Failed to create global categories. Check unique constraints / DB permissions.',
-      );
-    }
-
-    // 3. Pre-calculate password hash for speed
     const passwordHash = await bcrypt.hash('123456', 10);
+    const groups = groupByCategory(products);
+    let totalProducts = 0;
+    let shopIndex = 0;
 
-    let totalProductsCreated = 0;
+    for (const [slug, groupProducts] of Object.entries(groups)) {
+      const catDoc = categoryBySlug.get(slug);
+      if (!catDoc) {
+        console.warn(`  ! skip products with unknown category slug: ${slug}`);
+        continue;
+      }
 
-    console.log(`ℹ️ Creating ${TOTAL_SHOPS} Shops with ${PRODUCTS_PER_SHOP} products each...`);
-
-    // Loop to create Shop + Owner + Categories + Products
-    for (let i = 1; i <= TOTAL_SHOPS; i++) {
+      shopIndex++;
+      const tpl = SHOP_TEMPLATES[slug] || { name: 'Store', suffix: slug };
       const timestamp = Date.now();
+      const ownerEmail = `seller_real_${shopIndex}_${timestamp}@fake.com`;
+      const username = `seller_real_${shopIndex}_${timestamp}`;
 
-      // A. Create Fake User (Shop Owner)
-      const userEmail = `seller_${i}_${timestamp}@fake.com`;
-      const username = `seller_${i}_${timestamp}`;
-
-      const user = await User.create({
-        username: username,
-        email: userEmail,
+      const owner = await User.create({
+        username,
+        email: ownerEmail,
         password: passwordHash,
-        roles: 'seller', // Schema uses 'roles'
-        isVerifiedEmail: true, // Schema uses 'isVerifiedEmail'
+        roles: 'seller',
+        isVerifiedEmail: true,
         provider: 'local',
       });
 
-      // B. Create Shop
-      const shopName = `${getRandom(shopTypes)} #${i} - ${crypto.randomBytes(2).toString('hex')}`;
+      const shopName = `${tpl.name} - ${tpl.suffix}`;
       const shop = await Shop.create({
         name: shopName,
         slug: slugify(shopName, { lower: true, strict: true, locale: 'vi' }),
-        description: `Official store for ${shopName}`,
-        owner: user._id,
+        description: `Cửa hàng chính hãng chuyên ${tpl.suffix}.`,
+        owner: owner._id,
         status: 'active',
       });
+      await User.findByIdAndUpdate(owner._id, { shop: shop._id });
 
-      await User.findByIdAndUpdate(user._id, { shop: shop._id });
-
-      // C. Create Shop Categories (3-5 per shop)
-      const numCats = getRandomInt(3, 5);
       const shopCategoryIds = [];
-      const catNames = [
-        'New Arrivals',
-        'Best Sellers',
-        'Sale Off',
-        'Premium Collection',
-        'Accessories',
-        'Summer vibes',
-        'Winter Collection',
-      ];
-
-      for (let j = 0; j < numCats; j++) {
-        const catName = catNames[j] || `Collection ${j + 1}`;
-        const shopCat = await ShopCategory.create({
+      for (let j = 0; j < Math.min(SHOP_CATEGORY_NAMES.length, 6); j++) {
+        const sc = await ShopCategory.create({
           shopId: shop._id,
-          name: catName,
+          name: SHOP_CATEGORY_NAMES[j],
           isActive: true,
           displayOrder: j,
         });
-        shopCategoryIds.push(shopCat._id);
+        shopCategoryIds.push(sc._id);
       }
 
-      // D. Create Products for this Shop
-      const productsToInsert = [];
+      const toInsert = groupProducts.map((item, idx) => {
+        const variants = buildVariants(item);
+        const stock = variants.reduce((s, v) => s + v.stock, 0);
+        const soldFromVariants = variants.reduce((s, v) => s + v.sold, 0);
+        const images = item.images && item.images.length ? item.images : [];
 
-      for (let p = 0; p < PRODUCTS_PER_SHOP; p++) {
-        const name = generateProductName() + ` [${i}-${p}]`; // Ensure absolute uniqueness
-        const price = getRandomInt(100, 20000) * 1000;
-        const now = new Date();
-        const flashSaleEnabled = Math.random() > 0.9;
-        const discountPercent = flashSaleEnabled ? getRandomInt(5, 30) : null;
-        const salePrice =
-          flashSaleEnabled && discountPercent
-            ? Math.max(1000, Math.round(price * (1 - discountPercent / 100)))
-            : null;
-
-        productsToInsert.push({
-          name: name,
-          slug: slugify(name, { lower: true, strict: true, locale: 'vi' }),
-          description: `Description for ${name}. High quality product from ${shopName}.`,
+        return {
+          name: item.name,
+          slug: slugify(`${item.name}-${crypto.randomBytes(2).toString('hex')}`, {
+            lower: true,
+            strict: true,
+            locale: 'vi',
+          }),
+          description: buildDescription(item),
           shop: shop._id,
           shopCategory: getRandom(shopCategoryIds),
-          category: getRandom(globalCategories)._id,
-          brand: name.split(' ')[0],
+          category: catDoc._id,
+          brand: item.brand || '',
           price: {
-            currentPrice: price,
-            discountPrice: Math.random() > 0.5 ? Math.round(price * 0.9) : null,
+            currentPrice: item.price.currentPrice,
+            discountPrice: null,
             currency: 'VND',
           },
-          stock: getRandomInt(5, 200),
-          soldCount: getRandomInt(0, 500),
+          stock,
+          soldCount: soldFromVariants,
           status: 'published',
           isFeatured: Math.random() > 0.8,
-          flashSale: flashSaleEnabled
-            ? {
-                isActive: true,
-                salePrice,
-                discountPercent,
-                stock: getRandomInt(5, 50),
-                soldCount: getRandomInt(0, 30),
-                startTime: new Date(now.getTime() - 60 * 60 * 1000),
-                endTime: new Date(now.getTime() + 6 * 60 * 60 * 1000),
-              }
-            : { isActive: false },
-          variants: [
-            {
-              name: 'Standard',
-              color: 'Black',
-              price: price,
-              stock: getRandomInt(5, 100),
-              sku: `SKU-${shop._id.toString().slice(-4)}-${p}`,
-            },
+          isNewArrival: Math.random() > 0.85,
+          flashSale: { isActive: false },
+          variants,
+          descriptionImages: images.slice(0, 10),
+          sizes: item.sizes || [],
+          weight: getRandomInt(100, 3000),
+          dimensions: {
+            height: getRandomInt(5, 60),
+            width: getRandomInt(5, 60),
+            length: getRandomInt(5, 60),
+          },
+          attributes: [
+            { name: 'Thương hiệu', value: item.brand || 'Khác' },
+            { name: 'Xuất xứ', value: item.origin ? 'Quốc tế' : 'Chính hãng' },
           ],
-          createdAt: new Date(),
+          ratingAverage: item.ratingAverage || 0,
+          reviewCount: item.reviewCount || 0,
+          createdAt: new Date(Date.now() - (shopIndex * 1000000 + idx) * 1000),
           updatedAt: new Date(),
-        });
-      }
+        };
+      });
 
-      await Product.insertMany(productsToInsert);
-      totalProductsCreated += productsToInsert.length;
-
-      process.stdout.write(
-        `\r✅ Shop ${i}/${TOTAL_SHOPS} created (${productsToInsert.length} products)`,
-      );
+      await Product.insertMany(toInsert);
+      totalProducts += toInsert.length;
+      console.log(`✅ Shop ${shopName}: ${toInsert.length} real products`);
     }
 
-    console.log('\n');
-    console.log(`🎉 DONE! Created ${TOTAL_SHOPS} Shops and ${totalProductsCreated} Products.`);
+    console.log(`\n🎉 DONE! Created ${totalProducts} REAL products across ${shopIndex} shops.`);
   } catch (error) {
     console.error('\n❌ Error seeding:', error);
   } finally {

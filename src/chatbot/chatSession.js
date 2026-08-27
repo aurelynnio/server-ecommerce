@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 
 const COOKIE_NAME = 'chatSessionToken';
 const TOKEN_PURPOSE = 'chat-session';
@@ -23,7 +23,7 @@ const signChatSession = (sessionId) =>
 
 const verifyChatSession = (token) => {
   try {
-    const payload = jwt.verify(token, getSecret());
+    const payload = jwt.verify(token, getSecret(), { algorithms: ['HS256'] });
     if (payload.purpose !== TOKEN_PURPOSE || !payload.sessionId) {
       throw new Error('Invalid chat session');
     }
@@ -43,9 +43,32 @@ const setChatSessionCookie = (res, sessionId) => {
   });
 };
 
+const resolveChatSession = (req, res, requestedSessionId) => {
+  const token = req.cookies?.[COOKIE_NAME];
+
+  if (!token) {
+    if (requestedSessionId) {
+      throw new ApiError(StatusCodes.FORBIDDEN, 'Chat session ownership could not be verified');
+    }
+
+    const sessionId = createSessionId();
+    setChatSessionCookie(res, sessionId);
+    return sessionId;
+  }
+
+  const sessionId = verifyChatSession(token);
+  if (requestedSessionId && requestedSessionId !== sessionId) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'Chat session ownership could not be verified');
+  }
+  return sessionId;
+};
+
 module.exports = {
   COOKIE_NAME,
   createSessionId,
+  signChatSession,
   verifyChatSession,
   setChatSessionCookie,
+  resolveChatSession,
 };
+

@@ -3,13 +3,19 @@ const chatbotService = require('../services/chatbot.service');
 const { sendSuccess, sendFail } = require('../shared/res/formatResponse');
 const { StatusCodes } = require('http-status-codes');
 const logger = require('../utils/logger');
-const { resolveChatSession } = require('../utils/chatSession');
-const { isShuttingDown } = require('../utils/gracefulShutdown');
+const { resolveChatSession } = require('../chatbot/chatSession');
+const { isShuttingDown } = require('../chatbot/gracefulShutdown');
 const metrics = require('../monitoring/chatbot.metrics');
 
 // Feature flag: cho phép tắt chatbot hoàn toàn (kill switch / canary rollout).
 const CHATBOT_ENABLED = String(process.env.CHATBOT_ENABLED || 'true').toLowerCase() !== 'false';
 const DISABLED_CODE = 'CHATBOT_DISABLED';
+
+// Timeout tổng cho 1 lần stream (backstop: mỗi LLM call đã có MISTRAL_TIMEOUT_MS
+// riêng, nhưng agent loop nhiều iteration + tool call có thể kéo dài vô hạn).
+// Client frontend timeout 45s — backstop server nên lớn hơn để client tự abort trước.
+const STREAM_TIMEOUT_MS = Number(process.env.CHATBOT_STREAM_TIMEOUT_MS) || 90 * 1000;
+const STREAM_TIMEOUT_MESSAGE = 'Hết thời gian chờ phản hồi. Vui lòng thử lại sau.';
 
 const ChatbotController = {
   /**
@@ -30,12 +36,44 @@ const ChatbotController = {
       return sendFail(res, 'Message is required', StatusCodes.BAD_REQUEST);
     }
 
+    if (isShuttingDown) {
+      return sendFail(
+        res,
+        'Server đang bảo trì, vui lòng thử lại sau ít phút',
+        StatusCodes.SERVICE_UNAVAILABLE,
+      );
+    }
+
     const chatSessionId = resolveChatSession(req, res, sessionId);
+
+    // Agent mode (tool-calling) cho cả path non-stream — trước đây chỉ /stream dùng agent
+    if (chatbotService.isAgentMode()) {
+      const response = await chatbotService.chatAgent(chatSessionId, message.trim());
+      const status = response.success ? 'success' : 'error';
+
+      metrics.chatbotRequestsTotal.inc({
+        endpoint: 'message',
+        status,
+      });
+
+      return sendSuccess(
+        res,
+        { ...response, sessionId: chatSessionId },
+        response.success ? 'Message sent successfully' : 'Failed to process message',
+        response.success ? StatusCodes.OK : StatusCodes.INTERNAL_SERVER_ERROR,
+      );
+    }
+
     const response = await chatbotService.chat(chatSessionId, message.trim());
+    const status = response.isCacheHit
+      ? 'cache_hit'
+      : response.success
+        ? 'success'
+        : 'error';
 
     metrics.chatbotRequestsTotal.inc({
       endpoint: 'message',
-      status: response.success ? 'success' : 'error',
+      status,
     });
 
     return sendSuccess(
@@ -74,6 +112,12 @@ const ChatbotController = {
 
     const chatSessionId = resolveChatSession(req, res, sessionId);
 
+    // Start end-to-end stream latency timer
+    const stopTimer = metrics.chatbotLatencySeconds.startTimer({
+      endpoint: 'stream',
+      stream: 'true',
+    });
+
     // SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -84,19 +128,37 @@ const ChatbotController = {
     res.write(`data: ${JSON.stringify({ type: 'session', sessionId: chatSessionId })}\n\n`);
 
     let aborted = false;
+    let timedOut = false;
     req.on('close', () => {
-      aborted = true;
-      logger.info('[Chatbot] Client disconnected before stream completed', {
-        sessionId: chatSessionId,
-      });
+      if (!res.writableEnded) {
+        aborted = true;
+        stopTimer({ status: 'aborted' });
+        metrics.chatbotRequestsTotal.inc({ endpoint: 'stream', status: 'aborted' });
+        logger.info('[Chatbot] Client disconnected before stream completed', {
+          sessionId: chatSessionId,
+        });
+      }
     });
+
+    // Backstop timeout: đóng connection nếu stream kéo dài quá STREAM_TIMEOUT_MS
+    // (LLM call có thể treo giữa các iteration; per-request timeout không cover tổng thời gian)
+    const streamTimeoutTimer = setTimeout(() => {
+      timedOut = true;
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: STREAM_TIMEOUT_MESSAGE })}\n\n`);
+        res.end();
+      }
+      stopTimer({ status: 'timeout' });
+      metrics.chatbotRequestsTotal.inc({ endpoint: 'stream', status: 'timeout' });
+      logger.warn('[Chatbot] Stream timed out', { sessionId: chatSessionId });
+    }, STREAM_TIMEOUT_MS);
 
     try {
       // Agent mode (tool-calling thật) hoặc RAG chain
       if (chatbotService.isAgentMode()) {
         const agent = chatbotService.getAgent();
         for await (const event of agent.stream(chatSessionId, message.trim())) {
-          if (aborted || res.writableEnded) break;
+          if (aborted || timedOut || res.writableEnded) break;
           if (event.type === 'token') {
             res.write(`data: ${JSON.stringify({ type: 'token', content: event.content })}\n\n`);
           } else if (event.type === 'tool_call') {
@@ -104,24 +166,38 @@ const ChatbotController = {
             res.write(`data: ${JSON.stringify({ type: 'tool', name: event.name })}\n\n`);
           }
         }
-        if (!aborted) {
+        if (!aborted && !timedOut) {
           const messageId = await chatbotService.getLatestAssistantMessageId(chatSessionId);
           res.write(`data: ${JSON.stringify({ type: 'done', success: true, messageId })}\n\n`);
+          stopTimer({ status: 'success' });
+          metrics.chatbotRequestsTotal.inc({ endpoint: 'stream', status: 'success' });
         }
-        res.end();
-        metrics.chatbotRequestsTotal.inc({ endpoint: 'stream', status: 'success' });
+        if (!res.writableEnded) {
+          res.end();
+        }
         return;
       }
 
       // RAG chain
       const response = await chatbotService.chatStream(chatSessionId, message.trim(), (token) => {
+        // Throw để hủy chain khi quá hạn — chatStream catch lỗi nội bộ và trả failure
+        if (timedOut) throw new Error('STREAM_TIMEOUT');
         if (aborted || res.writableEnded) return;
         res.write(`data: ${JSON.stringify({ type: 'token', content: token })}\n\n`);
       });
 
+      if (timedOut || aborted) return;
+
+      const status = response.isCacheHit
+        ? 'cache_hit'
+        : response.success
+          ? 'success'
+          : 'error';
+
+      stopTimer({ status });
       metrics.chatbotRequestsTotal.inc({
         endpoint: 'stream',
-        status: response.success ? 'success' : 'error',
+        status,
       });
 
       if (!aborted) {
@@ -133,13 +209,21 @@ const ChatbotController = {
     } catch (error) {
       logger.error('[Chatbot] Stream error:', { error });
       metrics.chatbotErrorsTotal.inc({ stage: 'stream_controller' });
-      metrics.chatbotRequestsTotal.inc({ endpoint: 'stream', status: 'error' });
-      if (!aborted) {
+      if (!timedOut && !aborted) {
+        stopTimer({ status: 'error' });
+        metrics.chatbotRequestsTotal.inc({ endpoint: 'stream', status: 'error' });
+      }
+      if (!aborted && !timedOut && !res.writableEnded) {
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'Có lỗi xảy ra' })}\n\n`);
       }
-      res.end();
+      if (!res.writableEnded) {
+        res.end();
+      }
+    } finally {
+      clearTimeout(streamTimeoutTimer);
     }
   }),
+
 
   /**
    * Get chat history
@@ -227,6 +311,8 @@ const ChatbotController = {
       comment,
       req.user?._id || null,
     );
+
+    metrics.chatbotRequestsTotal.inc({ endpoint: 'feedback', status: 'success' });
 
     return sendSuccess(res, result, 'Feedback saved', StatusCodes.OK);
   }),

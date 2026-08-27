@@ -247,9 +247,16 @@ async function closeRabbitMQConnections() {
   }
 }
 
+const isRabbitMQConnected = () => {
+  return Boolean(rabbitConnectionManager && rabbitConnectionManager.isConnected());
+};
+
 module.exports = {
   closeRabbitMQConnections,
   connectRabbitMQ,
   config_rabbitMQ,
   setupQueueTopology,
+  getRabbitMQConnectionManager,
+  isRabbitMQConnected,
 };
+

@@ -6,21 +6,9 @@
 const { StatusCodes } = require('http-status-codes');
 const logger = require('../utils/logger');
 const { sendJson } = require('../shared/res/formatResponse');
+const ApiError = require('../utils/ApiError');
 
 const shouldExposeErrorDetails = () => process.env.EXPOSE_ERROR_DETAILS === 'true';
-
-/**
- * Custom API Error class for consistent error handling
- */
-class ApiError extends Error {
-  constructor(statusCode, message, isOperational = true) {
-    super(message);
-    this.statusCode = statusCode;
-    this.isOperational = isOperational;
-    this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
-    Error.captureStackTrace(this, this.constructor);
-  }
-}
 
 /**
  * Error type to status code mapping

@@ -1,4 +1,4 @@
-const { ApiError } = require('./errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 const { StatusCodes } = require('http-status-codes');
 
 /**

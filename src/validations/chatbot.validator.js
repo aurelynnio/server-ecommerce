@@ -1,10 +1,10 @@
 const Joi = require('joi');
-const { sanitizedString } = require('./sanitize');
+const { chatSanitizedString } = require('./sanitize');
 
 const sessionId = Joi.string().uuid({ version: ['uuidv4'] });
 
 const chatMessageValidator = Joi.object({
-  message: sanitizedString().min(1).max(2000).required(),
+  message: chatSanitizedString().min(1).max(2000).required(),
   sessionId,
 });
 

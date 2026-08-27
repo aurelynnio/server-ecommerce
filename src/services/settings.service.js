@@ -1,6 +1,6 @@
 const settingsRepository = require('../repositories/settings.repository');
 const { StatusCodes } = require('http-status-codes');
-const { ApiError } = require('../middlewares/errorHandler.middleware');
+const ApiError = require('../utils/ApiError');
 
 class SettingsService {
   /**
