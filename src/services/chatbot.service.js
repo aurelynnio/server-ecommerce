@@ -29,7 +29,7 @@ const USE_AGENT = String(process.env.CHATBOT_USE_AGENT || '').toLowerCase() === 
 class ChatbotService {
   constructor() {
     this.model = new ChatMistralAI({
-      model: 'mistral-large-latest',
+      model: process.env.MISTRAL_MODEL || 'mistral-small-latest',
       apiKey: process.env.MISTRAL_API_KEY,
       temperature: 0.3,
       streaming: true,

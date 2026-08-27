@@ -818,7 +818,7 @@ class ProductRepository extends BaseRepository {
         { name: queryRegex },
         { description: queryRegex },
         { brand: queryRegex },
-        { tags: { $elemMatch: queryRegex } },
+        { tags: queryRegex },
       ],
     };
 

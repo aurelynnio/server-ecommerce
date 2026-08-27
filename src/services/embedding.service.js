@@ -39,6 +39,44 @@ function getEmbeddingsCollection() {
   return client.db().collection('product_embeddings');
 }
 
+function getVietnameseKeywords(product) {
+  const combined = `${product.name || ''} ${product.brand || ''} ${product.category?.name || ''} ${(product.tags || []).join(' ')}`.toLowerCase();
+  const synonyms = [];
+
+  if (/shirt|tee|polo|top|tank/i.test(combined)) {
+    synonyms.push('áo thun, áo phông, áo polo, áo ngắn tay, áo sơ mi, áo thể thao nam nữ');
+  }
+  if (/short|pant|trouser|legging|jean|jogger/i.test(combined)) {
+    synonyms.push('quần short, quần đùi, quần thun, quần dài, quần legging, quần thể thao');
+  }
+  if (/swim|beach|trunk|bikini|bathing|wetsuit/i.test(combined)) {
+    synonyms.push('đồ bơi, áo tắm, bikini, đồ đi biển, quần bơi, váy bơi, lặn biển');
+  }
+  if (/dress|skirt/i.test(combined)) {
+    synonyms.push('váy, đầm, chân váy, đầm liền');
+  }
+  if (/shoe|sneaker|boot|sandal|slipper|footwear/i.test(combined)) {
+    synonyms.push('giày thể thao, giày chạy bộ, giày sneaker, dép, giày da');
+  }
+  if (/glove/i.test(combined)) {
+    synonyms.push('găng tay, bao tay, găng tay xe máy, găng tay thể thao');
+  }
+  if (/scarf|hat|cap|beanie/i.test(combined)) {
+    synonyms.push('khăn quàng, khăn rằn, mũ, nón');
+  }
+  if (/bag|backpack|handbag|wallet/i.test(combined)) {
+    synonyms.push('balo, túi xách, ví, túi đeo chéo');
+  }
+  if (/watch/i.test(combined)) {
+    synonyms.push('đồng hồ');
+  }
+  if (/glass|sunglass/i.test(combined)) {
+    synonyms.push('kính mát, kính râm, kính thời trang, mắt kính');
+  }
+
+  return synonyms.join('. ');
+}
+
 /**
  * Create text content for embedding from product data
  * Combines name, description, brand, category, tags for rich semantic representation
@@ -49,13 +87,13 @@ function createProductTextContent(product) {
   const parts = [];
 
   // Product name is most important
-  /**
-   * If
-   * @param {any} product.name
-   * @returns {any}
-   */
   if (product.name) {
     parts.push(`Tên sản phẩm: ${product.name}`);
+  }
+
+  const viKeywords = getVietnameseKeywords(product);
+  if (viKeywords) {
+    parts.push(`Từ khóa tiếng Việt: ${viKeywords}`);
   }
 
   /**
@@ -337,20 +375,22 @@ async function searchSimilarProducts(query, { limit = 5, filter = {} } = {}) {
 
     const [queryVector] = await embeddings.embedDocuments([query]);
 
-    // Note: This requires MongoDB Atlas Vector Search index to be created
+    // Note: Atlas Vector Search index 'product_vector_index'
+    const vectorSearchStage = {
+      index: 'product_vector_index',
+      path: 'embedding',
+      queryVector: queryVector,
+      numCandidates: limit * 10,
+      limit: limit,
+    };
+
+    if (filter && Object.keys(filter).length > 0) {
+      vectorSearchStage.filter = filter;
+    }
+
     const pipeline = [
       {
-        $vectorSearch: {
-          index: 'product_vector_index', // Name of the Atlas Vector Search index
-          path: 'embedding',
-          queryVector: queryVector,
-          numCandidates: limit * 10, // Consider more candidates for better results
-          limit: limit,
-          filter: {
-            'metadata.status': 'published',
-            ...filter,
-          },
-        },
+        $vectorSearch: vectorSearchStage,
       },
       {
         $project: {
@@ -366,22 +406,24 @@ async function searchSimilarProducts(query, { limit = 5, filter = {} } = {}) {
     const results = await collection.aggregate(pipeline).toArray();
 
     // Format results for chatbot consumption
-    return results.map((r) => ({
-      id: r.metadata.productId,
-      name: r.metadata.name,
-      slug: r.metadata.slug,
-      price: r.metadata.price,
-      originalPrice: r.metadata.originalPrice,
-      hasDiscount: r.metadata.hasDiscount,
-      brand: r.metadata.brand,
-      category: r.metadata.category,
-      image: r.metadata.image,
-      productUrl: r.metadata.productUrl,
-      checkoutUrl: r.metadata.checkoutUrl,
-      stock: r.metadata.stock,
-      isFeatured: r.metadata.isFeatured,
-      score: r.score,
-    }));
+    return results
+      .filter((r) => !r.metadata?.status || r.metadata?.status === 'published')
+      .map((r) => ({
+        id: r.metadata?.productId || r.productId,
+        name: r.metadata?.name,
+        slug: r.metadata?.slug,
+        price: r.metadata?.price,
+        originalPrice: r.metadata?.originalPrice,
+        hasDiscount: r.metadata?.hasDiscount,
+        brand: r.metadata?.brand,
+        category: r.metadata?.category,
+        image: r.metadata?.image,
+        productUrl: r.metadata?.productUrl,
+        checkoutUrl: r.metadata?.checkoutUrl,
+        stock: r.metadata?.stock,
+        isFeatured: r.metadata?.isFeatured,
+        score: r.score,
+      }));
   } catch (error) {
     logger.error('[Embeddings] Vector search error:', error.message);
 
