@@ -58,6 +58,12 @@ describe('Swagger & OpenAPI 3.0 Documentation Suite', () => {
       expect(paths['/api/products/slug/{slug}']).toBeDefined();
       expect(paths['/api/products/{id}']).toBeDefined();
 
+      // Category & Shop endpoints
+      expect(paths['/api/categories']).toBeDefined();
+      expect(paths['/api/categories/tree']).toBeDefined();
+      expect(paths['/api/shops']).toBeDefined();
+      expect(paths['/api/shops/register']).toBeDefined();
+
       // Cart & Order endpoints
       expect(paths['/api/cart']).toBeDefined();
       expect(paths['/api/cart/items']).toBeDefined();
@@ -71,6 +77,23 @@ describe('Swagger & OpenAPI 3.0 Documentation Suite', () => {
       expect(paths['/api/payment/vnpay-ipn']).toBeDefined();
       expect(paths['/api/vouchers']).toBeDefined();
       expect(paths['/api/vouchers/apply']).toBeDefined();
+
+      // Engagement endpoints
+      expect(paths['/api/reviews/product/{productId}']).toBeDefined();
+      expect(paths['/api/wishlist']).toBeDefined();
+      expect(paths['/api/notifications']).toBeDefined();
+      expect(paths['/api/newsletter/subscribe']).toBeDefined();
+
+      // Search & Flash Sale
+      expect(paths['/api/search']).toBeDefined();
+      expect(paths['/api/recommendations/for-you']).toBeDefined();
+      expect(paths['/api/flash-sale']).toBeDefined();
+
+      // Operations & Admin
+      expect(paths['/api/statistics/dashboard']).toBeDefined();
+      expect(paths['/api/settings']).toBeDefined();
+      expect(paths['/api/permissions']).toBeDefined();
+      expect(paths['/api/chat/start']).toBeDefined();
 
       // Chatbot AI assistant endpoints
       expect(paths['/api/chatbot/message']).toBeDefined();
@@ -87,7 +110,7 @@ describe('Swagger & OpenAPI 3.0 Documentation Suite', () => {
 
     it('should have valid HTTP operations with tags and responses', () => {
       const endpoints = Object.entries(paths);
-      expect(endpoints.length).toBeGreaterThan(30);
+      expect(endpoints.length).toBeGreaterThan(100);
 
       for (const [pathKey, methods] of endpoints) {
         for (const [method, operation] of Object.entries(methods)) {
@@ -101,4 +124,3 @@ describe('Swagger & OpenAPI 3.0 Documentation Suite', () => {
     });
   });
 });
-

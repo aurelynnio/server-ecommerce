@@ -251,12 +251,73 @@ const isRabbitMQConnected = () => {
   return Boolean(rabbitConnectionManager && rabbitConnectionManager.isConnected());
 };
 
+/**
+ * Generic helper to publish a persistent JSON or binary message to a RabbitMQ queue with confirm channel
+ * @param {Object} options
+ * @param {string} options.serviceName - Service queue config namespace (e.g. 'order', 'notification')
+ * @param {string} [options.clientName='publisher'] - Client key identifier
+ * @param {string} options.queueName - Queue destination
+ * @param {any} options.content - Object or Buffer to serialize and publish
+ * @param {Object} [options.headers={}] - Message headers
+ * @param {string} [options.bufferWarningMessage] - Warning if socket is full
+ * @param {string} [options.confirmErrorMessage] - Error message on failure
+ * @param {string} [options.successMessage] - Log message on success
+ * @param {Object} [options.successMeta={}] - Additional log metadata
+ * @returns {Promise<{published: boolean, queue: string}>}
+ */
+async function publishToQueue({
+  serviceName,
+  clientName = 'publisher',
+  queueName,
+  content,
+  headers = {},
+  bufferWarningMessage = 'RabbitMQ socket buffer full',
+  confirmErrorMessage = 'Failed to publish message to RabbitMQ',
+  successMessage = 'Message published to RabbitMQ',
+  successMeta = {},
+}) {
+  const { channel } = await connectRabbitMQ(serviceName, { confirm: true, clientName });
+  const queueContent = Buffer.isBuffer(content) ? content : Buffer.from(JSON.stringify(content));
+
+  let isBuffered;
+  try {
+    isBuffered = await channel.sendToQueue(queueName, queueContent, {
+      persistent: true,
+      contentType: 'application/json',
+      headers,
+    });
+  } catch (error) {
+    logger.error(confirmErrorMessage, {
+      error: error.message,
+      queue: queueName,
+      ...successMeta,
+    });
+    throw error;
+  }
+
+  if (!isBuffered) {
+    logger.warn(bufferWarningMessage, { queue: queueName });
+  }
+
+  logger.info(successMessage, {
+    queue: queueName,
+    ...successMeta,
+  });
+
+  return {
+    published: true,
+    queue: queueName,
+  };
+}
+
 module.exports = {
   closeRabbitMQConnections,
   connectRabbitMQ,
+  publishToQueue,
   config_rabbitMQ,
   setupQueueTopology,
   getRabbitMQConnectionManager,
   isRabbitMQConnected,
 };
+
 

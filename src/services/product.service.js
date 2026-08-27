@@ -9,23 +9,37 @@ const { buildHashedCacheKey } = require('../utils/cacheKey');
 const { embedProduct, deleteProductEmbedding } = require('./embedding.service');
 const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../utils/ApiError');
+const { isValidObjectId } = require('../utils/query.utils');
+
+/**
+ * Walk up category parent hierarchy to find root top-level category
+ * @param {Object} categoryDoc
+ * @returns {Promise<Object>}
+ */
+async function resolveRootCategory(categoryDoc) {
+  let current = categoryDoc;
+  let guard = 0;
+  while (current && current.parentCategory && guard++ < 10) {
+    const parentId = String(current.parentCategory);
+    const parent = await Category.findById(parentId).lean();
+    if (!parent) break;
+    current = parent;
+  }
+  return current;
+}
+
 // Resolve a category filter that may be a Mongo ObjectId OR a slug.
 async function resolveCategoryFilter(category) {
   if (!category) return category;
-  const str = String(category);
-  const isObjectId = /^[0-9a-fA-F]{24}$/.test(str);
-  if (isObjectId) return str;
-  // Treat as slug -> resolve to top-level root _id by walking up the parent chain.
-  // Products are assigned to the 7 root categories; legacy/mapped subcategories
-  // are nested under them, so filtering by any slug returns the root's products.
-  let cat = await Category.findOneByFilter({ slug: str.toLowerCase() }).select('_id parentCategory');
+  if (isValidObjectId(category)) return String(category);
+
+  const cat = await Category.findOneByFilter({ slug: String(category).toLowerCase() }).lean();
   if (!cat) return undefined;
-  let guard = 0;
-  while (cat && cat.parentCategory && guard++ < 10) {
-    cat = await Category.findById(cat.parentCategory).select('_id parentCategory');
-  }
-  return cat ? cat._id : undefined;
+  const root = await resolveRootCategory(cat);
+  return root ? root._id : undefined;
 }
+
+
 
 class ProductService {
   syncVariantAggregates(payload) {
@@ -583,15 +597,9 @@ class ProductService {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Category not found');
     }
 
-    // Walk up to the top-level root so legacy/mapped subcategories return the
-    // root's products (products are assigned to the 7 root categories).
-    let guard = 0;
-    while (category && category.parentCategory && guard++ < 10) {
-      const parentId = String(category.parentCategory);
-      const parent = await Category.findById(parentId).lean();
-      if (!parent) break;
-      category = parent;
-    }
+    // Walk up to the top-level root so legacy/mapped subcategories return the root's products
+    category = await resolveRootCategory(category);
+
 
     const childCategories = await Category.findSubcategoryIds(category._id);
 

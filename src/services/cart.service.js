@@ -25,33 +25,10 @@ class CartService {
         const product = item.productId;
         if (!product) return item;
 
-        if (item.variantId && product.variants && product.variants.length > 0) {
+        const targetVariantId = item.variantId || item.modelId;
+        if (targetVariantId && product.variants && product.variants.length > 0) {
           const variant = product.variants.find(
-            (v) => v._id.toString() === item.variantId.toString(),
-          );
-          if (variant) {
-            item.variant = {
-              _id: variant._id,
-              name: variant.name,
-              color: variant.color,
-              images: variant.images,
-              price: variant.price,
-              stock: variant.stock,
-            };
-            item.price = { currentPrice: variant.price, currency: 'VND' };
-
-            const parts = [];
-            if (variant.color) parts.push(variant.color);
-            if (item.size) parts.push(`Size: ${item.size}`);
-            if (parts.length > 0) {
-              item.variationInfo = parts.join(', ');
-            }
-          }
-        }
-        // Backward compatibility: Check modelId for variants
-        else if (item.modelId && product.variants && product.variants.length > 0) {
-          const variant = product.variants.find(
-            (v) => v._id.toString() === item.modelId.toString(),
+            (v) => v._id.toString() === targetVariantId.toString(),
           );
           if (variant) {
             item.variant = {
@@ -73,6 +50,7 @@ class CartService {
             }
           }
         }
+
         // Handle legacy Tier Variations (SKU)
         else if (item.modelId && product.models) {
           const model = product.models.find((m) => m._id.toString() === item.modelId.toString());

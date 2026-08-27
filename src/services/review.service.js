@@ -8,9 +8,17 @@ const ApiError = require('../utils/ApiError');
 const { ensureFound } = require('../utils/serviceAssertions');
 const { getOwnedShopOrThrow } = require('../utils/shopAssertions');
 
+const REVIEW_SORT_MAP = {
+  newest: { createdAt: -1 },
+  oldest: { createdAt: 1 },
+  highest: { rating: -1, createdAt: -1 },
+  lowest: { rating: 1, createdAt: -1 },
+};
+
+const getReviewSortOption = (sort = 'newest') => REVIEW_SORT_MAP[sort] || REVIEW_SORT_MAP.newest;
+
 /**
  * Service handling product reviews
-
  * Manages review creation and retrieval
  */
 class ReviewService {
@@ -81,27 +89,9 @@ class ReviewService {
     const { page = 1, limit = 10, rating, sort = 'newest' } = filters;
 
     const productExists = await this._getProductOrThrow(productId);
-
-    let sortOption = {};
-    switch (sort) {
-      case 'newest':
-        sortOption = { createdAt: -1 };
-        break;
-      case 'oldest':
-        sortOption = { createdAt: 1 };
-        break;
-      case 'highest':
-        sortOption = { rating: -1, createdAt: -1 };
-        break;
-      case 'lowest':
-        sortOption = { rating: 1, createdAt: -1 };
-        break;
-      default:
-        sortOption = { createdAt: -1 };
-    }
+    const sortOption = getReviewSortOption(sort);
 
     const total = await Review.countByProductWithFilters(productId, { rating });
-
     const paginationParams = getPaginationParams(page, limit, total);
 
     const reviews = await Review.findByProductWithFilters(productId, {
@@ -146,11 +136,7 @@ class ReviewService {
    */
   async getAllReviews(filters = {}) {
     const { page = 1, limit = 10, rating, sort = 'newest', search } = filters;
-
-    let sortOption = { createdAt: -1 };
-    if (sort === 'oldest') sortOption = { createdAt: 1 };
-    if (sort === 'highest') sortOption = { rating: -1 };
-    if (sort === 'lowest') sortOption = { rating: 1 };
+    const sortOption = getReviewSortOption(sort);
 
     const total = await Review.countWithFilters({ rating, search });
     const paginationParams = getPaginationParams(page, limit, total);
@@ -163,6 +149,7 @@ class ReviewService {
         limit: paginationParams.limit,
       },
     );
+
 
     return buildPaginationResponse(reviews, paginationParams);
   }

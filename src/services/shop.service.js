@@ -12,6 +12,11 @@ const logger = require('../utils/logger');
 const slugify = require('slugify');
 const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../utils/ApiError');
+const { getOwnedShopOrThrow } = require('../utils/shopAssertions');
+const { buildMonthlyChartData } = require('../utils/query.utils');
+
+
+
 
 class ShopService {
   /**
@@ -169,12 +174,9 @@ class ShopService {
    * @returns {Promise<Object>} Shop statistics
    */
   async getShopStatistics(userId) {
-    const shop = await Shop.findByOwnerId(userId);
-    if (!shop) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'Shop not found');
-    }
-
+    const shop = await getOwnedShopOrThrow(userId);
     const shopId = shop._id;
+
     const [totalProducts, totalOrders, orderStatusCounts, revenueData, topProducts, recentOrders] =
       await Promise.all([
         Product.countPublishedByShop(shopId),
@@ -198,35 +200,13 @@ class ShopService {
         ordersByStatus[item._id] = item.count;
       }
     });
-    const today = new Date();
-    const last6Months = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      last6Months.push({
-        month: d.getMonth() + 1,
-        year: d.getFullYear(),
-        key: `${d.getMonth() + 1}/${d.getFullYear()}`,
-      });
-    }
 
     const monthlyRevenueRaw = await Order.aggregateMonthlyStatsLastMonths(6, {
       shopId,
     });
 
-    const revenueMap = {};
-    monthlyRevenueRaw.forEach((item) => {
-      const key = `${item._id.month}/${item._id.year}`;
-      revenueMap[key] = { revenue: item.revenue, orders: item.orders };
-    });
+    const chartData = buildMonthlyChartData(monthlyRevenueRaw, 6);
 
-    const chartData = last6Months.map((time) => {
-      const data = revenueMap[time.key] || { revenue: 0, orders: 0 };
-      return {
-        month: `T${time.month}`,
-        revenue: data.revenue,
-        orders: data.orders,
-      };
-    });
 
     const formattedTopProducts = topProducts.map((product) => {
       const image = product.variants?.[0]?.images?.[0] || null;

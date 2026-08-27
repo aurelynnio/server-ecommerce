@@ -1,6 +1,8 @@
 const Order = require('../repositories/order.repository');
 const User = require('../repositories/user.repository');
 const Product = require('../repositories/product.repository');
+const { buildMonthlyChartData } = require('../utils/query.utils');
+
 
 class StatisticsService {
   _getPeriodBounds() {
@@ -131,34 +133,8 @@ class StatisticsService {
     });
 
     // 4. Monthly Revenue & Orders (Last 6 months) for Chart
-    const today = new Date();
+    const chartData = buildMonthlyChartData(monthlyStatsRaw, 6);
 
-    // Create an array of the last 6 months (keys: "M/Y")
-    const last6Months = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      last6Months.push({
-        month: d.getMonth() + 1,
-        year: d.getFullYear(),
-        key: `${d.getMonth() + 1}/${d.getFullYear()}`,
-      });
-    }
-
-    const statsMap = {};
-    monthlyStatsRaw.forEach((item) => {
-      const key = `${item._id.month}/${item._id.year}`;
-      statsMap[key] = { revenue: item.revenue, orders: item.orders };
-    });
-
-    // Merge with last6Months to ensure full data
-    const chartData = last6Months.map((time) => {
-      const data = statsMap[time.key] || { revenue: 0, orders: 0 };
-      return {
-        month: `T${time.month}`,
-        revenue: data.revenue,
-        orders: data.orders,
-      };
-    });
 
     const revenueGrowth = this._calculateGrowth(currentMonthRevenue, previousMonthRevenue);
     const orderGrowth = this._calculateGrowth(currentMonthOrders, previousMonthOrders);

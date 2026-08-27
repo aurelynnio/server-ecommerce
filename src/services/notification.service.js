@@ -5,7 +5,7 @@ const logger = require('../utils/logger');
 const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../utils/ApiError');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
-const { connectRabbitMQ, config_rabbitMQ } = require('../configs/rabbitMQ.config');
+const { connectRabbitMQ, publishToQueue, config_rabbitMQ } = require('../configs/rabbitMQ.config');
 const { buildNotificationUpdatePayload } = require('../utils/notification-update.util');
 
 /**
@@ -17,50 +17,10 @@ class NotificationService {
     return connectRabbitMQ('notification', { confirm: true, clientName });
   }
 
-  async publishToQueue({
-    clientName,
-    queueName,
-    content,
-    headers = {},
-    bufferWarningMessage,
-    confirmErrorMessage,
-    successMessage,
-    successMeta = {},
-  }) {
-    const { channel } = await this.initRabbitMQ(clientName);
-    const queueContent = Buffer.isBuffer(content) ? content : Buffer.from(JSON.stringify(content));
-
-    let isBuffered;
-    try {
-      isBuffered = await channel.sendToQueue(queueName, queueContent, {
-        persistent: true,
-        contentType: 'application/json',
-        headers,
-      });
-    } catch (error) {
-      logger.error(confirmErrorMessage, {
-        error: error.message,
-        queue: queueName,
-        ...successMeta,
-      });
-      throw error;
-    }
-
-    if (!isBuffered) {
-      logger.warn(bufferWarningMessage, { queue: queueName });
-    }
-
-    logger.info(successMessage, {
-      queue: queueName,
-      ...successMeta,
-    });
-
-    return {
-      published: true,
-      queue: queueName,
-      ...successMeta,
-    };
+  async publishToQueue(opts) {
+    return publishToQueue({ serviceName: 'notification', ...opts });
   }
+
 
   async publishNotification(payload, routingKey) {
     const { channel, queue } = await this.initRabbitMQ('publisher');

@@ -21,6 +21,15 @@ const extractAccessToken = (req) => {
   return token || null;
 };
 
+const mapUserPayload = (decoded) => ({
+  _id: decoded.userId,
+  userId: decoded.userId,
+  username: decoded.username,
+  email: decoded.email,
+  role: decoded.role,
+  permissions: decoded.permissions || [],
+});
+
 /**
  * Verify JWT access token from cookie or Authorization header
  * Attaches user info to req.user if valid
@@ -34,17 +43,7 @@ const verifyAccessToken = (req, res, next) => {
     }
 
     const decoded = tokenService.verifyAccessToken(token);
-
-    req.user = {
-      // Keep both keys for backward compatibility across controllers.
-      _id: decoded.userId,
-      userId: decoded.userId,
-      username: decoded.username,
-      email: decoded.email,
-      role: decoded.role,
-      permissions: decoded.permissions || [],
-    };
-
+    req.user = mapUserPayload(decoded);
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
@@ -77,21 +76,14 @@ const optionalAuth = (req, res, next) => {
     }
 
     const decoded = tokenService.verifyAccessToken(token);
-
-    req.user = {
-      _id: decoded.userId,
-      userId: decoded.userId,
-      username: decoded.username,
-      email: decoded.email,
-      role: decoded.role,
-      permissions: decoded.permissions || [],
-    };
+    req.user = mapUserPayload(decoded);
     next();
   } catch (_error) {
     req.user = null;
     next();
   }
 };
+
 
 /**
  * Check if user has required role

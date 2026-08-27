@@ -13,7 +13,9 @@ const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../utils/ApiError');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 const { ORDER_ACTORS, canTransition } = require('../shared/order/orderState');
-const { config_rabbitMQ, connectRabbitMQ } = require('../configs/rabbitMQ.config');
+const { config_rabbitMQ, connectRabbitMQ, publishToQueue } = require('../configs/rabbitMQ.config');
+const { toFiniteNumber } = require('../utils/query.utils');
+
 
 const MAX_TX_RETRIES = Number(process.env.TXN_MAX_RETRIES) || 3;
 const TX_RETRY_DELAY_MS = Number(process.env.TXN_RETRY_DELAY_MS) || 50;
@@ -26,10 +28,6 @@ const SYSTEM_ORDER_ACTOR = 'system';
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const toObjectIdString = (value) => (value ? value.toString() : null);
 const getOrderCode = (order) => order.orderNumber || order._id.toString().slice(-6).toUpperCase();
-const toFiniteNumber = (value) => {
-  const parsed = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-};
 const requireFiniteNumber = (value, message) => {
   const parsed = toFiniteNumber(value);
   if (parsed === null) {
@@ -83,43 +81,12 @@ class OrderService {
     return connectRabbitMQ('order', { confirm: true, clientName: clientName });
   }
 
-  async publishToQueue({
-    clientName,
-    queueName,
-    content,
-    headers = {},
-    bufferWarningMessage,
-    confirmErrorMessage,
-    successMessage,
-    successMeta = {},
-  }) {
-    const { channel } = await this.initRabbitMQ(clientName);
-    const queueContent = Buffer.isBuffer(content) ? content : Buffer.from(JSON.stringify(content));
-    let isBuffered;
-    try {
-      isBuffered = await channel.sendToQueue(queueName, queueContent, {
-        persistent: true,
-        contentType: 'application/json',
-        headers,
-      });
-    } catch (error) {
-      logger.error(confirmErrorMessage, { error: error.message, queue: queueName, ...successMeta });
-      throw error;
-    }
-    if (!isBuffered) {
-      logger.warn(bufferWarningMessage, {
-        queue: queueName,
-      });
-    }
-    logger.info(successMessage, { queue: queueName, ...successMeta });
-    return {
-      published: isBuffered,
-      queue: queueName,
-      ...successMeta,
-    };
+  async publishToQueue(opts) {
+    return publishToQueue({ serviceName: 'order', ...opts });
   }
 
   async publishOrder(payload, routingKey) {
+
     const { channel } = await this.initRabbitMQ('publisher');
     const content = Buffer.from(JSON.stringify(payload));
     const exchange = config_rabbitMQ.exchange.name;
