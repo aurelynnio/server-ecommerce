@@ -45,6 +45,9 @@ const buildShippingAddressSnapshot = (address, note = '') => {
     district: sanitizeAddressField(address?.district),
     ward: sanitizeAddressField(address?.ward),
     note: sanitizeAddressField(note),
+    postalCode: sanitizeAddressField(address?.postalCode) || sanitizeAddressField(address?.postal_code),
+    countryCode: sanitizeAddressField(address?.countryCode) || sanitizeAddressField(address?.country_code),
+    email: sanitizeAddressField(address?.email),
   };
 
   if (
@@ -410,6 +413,9 @@ class OrderService {
           const totalAmount = Math.max(0, subtotal - discountShop);
           totalPlatformOrderValue += totalAmount; // Platform discount applies on total after shop discount
 
+          // shippingFee stays 0 until a shipping-fee provider is implemented
+          const shippingFee = 0;
+
           // 4. Create Order Object (Not save yet)
           const newOrder = Order.build({
             orderGroupId,
@@ -419,10 +425,11 @@ class OrderService {
             shippingAddress,
             paymentMethod,
             subtotal,
+            shippingFee,
             discountShop,
             discountPlatform: 0,
             appliedVouchers,
-            totalAmount, // Temporary, will subtract platform discount later
+            totalAmount: Math.max(0, subtotal - discountShop + shippingFee), // Temporary, will subtract platform discount later
             status: 'pending',
           });
 
@@ -959,6 +966,7 @@ class OrderService {
 
     const previousStatus = order.status;
     order.status = status;
+
     if (status === 'delivered') {
       order.deliveredAt = new Date();
     }

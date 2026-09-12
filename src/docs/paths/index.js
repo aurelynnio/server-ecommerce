@@ -9,7 +9,6 @@ const productPaths = require('./product.paths');
 const categoryPaths = require('./category.paths');
 const bannerPaths = require('./banner.paths');
 const shopPaths = require('./shop.paths');
-const shippingPaths = require('./shipping.paths');
 const cartPaths = require('./order.paths'); // contains /api/cart & /api/orders
 const paymentPaths = require('./payment.paths');
 const voucherPaths = require('./voucher.paths');
@@ -33,7 +32,6 @@ module.exports = {
   ...categoryPaths,
   ...bannerPaths,
   ...shopPaths,
-  ...shippingPaths,
   ...cartPaths,
   ...paymentPaths,
   ...voucherPaths,

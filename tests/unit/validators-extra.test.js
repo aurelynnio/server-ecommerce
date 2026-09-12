@@ -28,10 +28,6 @@ const {
   updateShopValidator,
 } = require('../../src/validations/shop.validator');
 
-const {
-  createTemplateValidator,
-  updateTemplateValidator,
-} = require('../../src/validations/shipping.validator');
 
 const {
   createBannerValidator,
@@ -392,62 +388,6 @@ describe('Shop Validators', () => {
   });
 });
 
-/* ===========================
- * SHIPPING VALIDATORS
- * =========================== */
-describe('Shipping Validators', () => {
-  const validTemplate = {
-    name: 'Standard Shipping',
-    rules: [{ name: 'Default', type: 'fixed', baseFee: 30000 }],
-  };
-
-  describe('createTemplateValidator', () => {
-    it('should accept valid template', () => {
-      const { error } = createTemplateValidator.validate(validTemplate);
-      expect(error).toBeUndefined();
-    });
-
-    it('should accept weight_based type', () => {
-      const { error } = createTemplateValidator.validate({
-        name: 'Weight',
-        rules: [
-          {
-            name: 'Per KG',
-            type: 'weight_based',
-            baseFee: 15000,
-            stepUnit: 1,
-            stepFee: 5000,
-          },
-        ],
-      });
-      expect(error).toBeUndefined();
-    });
-
-    it('should reject invalid rule type', () => {
-      const { error } = createTemplateValidator.validate({
-        name: 'Bad',
-        rules: [{ name: 'X', type: 'invalid_type', baseFee: 0 }],
-      });
-      expect(error).toBeDefined();
-    });
-
-    it('should reject missing rules entirely', () => {
-      const { error } = createTemplateValidator.validate({
-        name: 'No rules',
-      });
-      expect(error).toBeDefined();
-    });
-  });
-
-  describe('updateTemplateValidator', () => {
-    it('should accept partial update', () => {
-      const { error } = updateTemplateValidator.validate({
-        isDefault: true,
-      });
-      expect(error).toBeUndefined();
-    });
-  });
-});
 
 /* ===========================
  * BANNER VALIDATORS

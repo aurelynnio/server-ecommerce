@@ -73,8 +73,7 @@ const productSchema = new Schema(
       validate: [(arr) => arr.length <= 100, 'Maximum 100 variants allowed'],
     },
 
-    // Shipping
-    shippingTemplate: { type: Types.ObjectId, ref: 'ShippingTemplate' },
+    // Shipping metadata
     weight: { type: Number, default: 0, min: 0 }, // grams
     dimensions: {
       height: { type: Number, min: 0 }, // cm

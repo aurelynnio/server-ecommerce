@@ -21,15 +21,38 @@ const ensureIndexes = async () => {
   const existing = await collection.indexes();
   logger.info('[Chatbot-TTL] Existing indexes:', existing.map((i) => i.name));
 
-  // TTL trên _id: Mongo sẽ xoá document khi _id.getTimestamp() + expireAfterSeconds < now
+  // Drop old broken TTL index on _id if it exists (TTL on ObjectId never fires)
+  const oldTtl = existing.find((i) => i.name === 'chatbot_messages_ttl');
+  if (oldTtl) {
+    logger.info('[Chatbot-TTL] Dropping broken TTL index on _id');
+    await collection.dropIndex('chatbot_messages_ttl');
+  }
+
+  // TTL index on createdAt field (Date type) — MongoDB will auto-delete expired docs
   await collection.createIndex(
-    { _id: 1 },
+    { createdAt: 1 },
     {
-      name: 'chatbot_messages_ttl',
+      name: 'chatbot_messages_ttl_v2',
       expireAfterSeconds: TTL_SECONDS,
     },
   );
-  logger.info(`[Chatbot-TTL] TTL index created (expireAfterSeconds=${TTL_SECONDS}s = ${TTL_DAYS}d)`);
+  logger.info(`[Chatbot-TTL] TTL index created on createdAt (expireAfterSeconds=${TTL_SECONDS}s = ${TTL_DAYS}d)`);
+
+  // Index on sessionId for fast lookups (getHistory, clearSession, etc.)
+  await collection.createIndex(
+    { sessionId: 1 },
+    { name: 'chatbot_messages_sessionId' },
+  );
+  logger.info('[Chatbot-TTL] sessionId index created');
+
+  // Backfill: set createdAt from ObjectId timestamp for existing docs without it
+  const backfillResult = await collection.updateMany(
+    { createdAt: { $exists: false } },
+    [{ $set: { createdAt: { $toDate: '$_id' } } }],
+  );
+  if (backfillResult.modifiedCount > 0) {
+    logger.info(`[Chatbot-TTL] Backfilled createdAt for ${backfillResult.modifiedCount} existing documents`);
+  }
 };
 
 (async () => {

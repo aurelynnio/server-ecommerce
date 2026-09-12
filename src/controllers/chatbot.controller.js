@@ -6,6 +6,7 @@ const logger = require('../utils/logger');
 const { resolveChatSession } = require('../chatbot/chatSession');
 const { isShuttingDown } = require('../chatbot/gracefulShutdown');
 const metrics = require('../monitoring/chatbot.metrics');
+const redisClient = require('../configs/redis.config');
 
 // Feature flag: cho phép tắt chatbot hoàn toàn (kill switch / canary rollout).
 const CHATBOT_ENABLED = String(process.env.CHATBOT_ENABLED || 'true').toLowerCase() !== 'false';
@@ -16,6 +17,19 @@ const DISABLED_CODE = 'CHATBOT_DISABLED';
 // Client frontend timeout 45s — backstop server nên lớn hơn để client tự abort trước.
 const STREAM_TIMEOUT_MS = Number(process.env.CHATBOT_STREAM_TIMEOUT_MS) || 90 * 1000;
 const STREAM_TIMEOUT_MESSAGE = 'Hết thời gian chờ phản hồi. Vui lòng thử lại sau.';
+
+// Per-session concurrency lock: chặn user gửi nhiều message cùng lúc cho cùng session.
+const LOCK_TTL_SECONDS = 120;
+const acquireSessionLock = async (sessionId) => {
+  if (!redisClient?.isReady?.()) return true; // degrade gracefully
+  const key = `chatbot:lock:${sessionId}`;
+  const result = await redisClient.set(key, '1', { NX: true, EX: LOCK_TTL_SECONDS });
+  return result === 'OK';
+};
+const releaseSessionLock = async (sessionId) => {
+  if (!redisClient?.isReady?.()) return;
+  await redisClient.del(`chatbot:lock:${sessionId}`);
+};
 
 const ChatbotController = {
   /**
@@ -46,6 +60,15 @@ const ChatbotController = {
 
     const chatSessionId = resolveChatSession(req, res, sessionId);
 
+    if (!(await acquireSessionLock(chatSessionId))) {
+      return sendFail(
+        res,
+        'Đang xử lý tin nhắn trước đó, vui lòng đợi giây lát',
+        StatusCodes.TOO_MANY_REQUESTS,
+      );
+    }
+    try {
+
     // Agent mode (tool-calling) cho cả path non-stream — trước đây chỉ /stream dùng agent
     if (chatbotService.isAgentMode()) {
       const response = await chatbotService.chatAgent(chatSessionId, message.trim());
@@ -56,11 +79,19 @@ const ChatbotController = {
         status,
       });
 
+      if (!response.success) {
+        return sendFail(
+          res,
+          response.message || 'Failed to process message',
+          StatusCodes.INTERNAL_SERVER_ERROR,
+        );
+      }
+
       return sendSuccess(
         res,
         { ...response, sessionId: chatSessionId },
-        response.success ? 'Message sent successfully' : 'Failed to process message',
-        response.success ? StatusCodes.OK : StatusCodes.INTERNAL_SERVER_ERROR,
+        'Message sent successfully',
+        StatusCodes.OK,
       );
     }
 
@@ -76,12 +107,23 @@ const ChatbotController = {
       status,
     });
 
+    if (!response.success) {
+      return sendFail(
+        res,
+        response.message || 'Failed to process message',
+        StatusCodes.INTERNAL_SERVER_ERROR,
+      );
+    }
+
     return sendSuccess(
       res,
       { ...response, sessionId: chatSessionId },
-      response.success ? 'Message sent successfully' : 'Failed to process message',
-      response.success ? StatusCodes.OK : StatusCodes.INTERNAL_SERVER_ERROR,
+      'Message sent successfully',
+      StatusCodes.OK,
     );
+    } finally {
+      await releaseSessionLock(chatSessionId).catch(() => {});
+    }
   }),
 
   /**
@@ -111,6 +153,14 @@ const ChatbotController = {
     }
 
     const chatSessionId = resolveChatSession(req, res, sessionId);
+
+    if (!(await acquireSessionLock(chatSessionId))) {
+      return sendFail(
+        res,
+        'Đang xử lý tin nhắn trước đó, vui lòng đợi giây lát',
+        StatusCodes.TOO_MANY_REQUESTS,
+      );
+    }
 
     // Start end-to-end stream latency timer
     const stopTimer = metrics.chatbotLatencySeconds.startTimer({
@@ -164,6 +214,8 @@ const ChatbotController = {
           } else if (event.type === 'tool_call') {
             logger.info('[Chatbot] Agent tool call', { name: event.name });
             res.write(`data: ${JSON.stringify({ type: 'tool', name: event.name })}\n\n`);
+          } else if (event.type === 'correction') {
+            res.write(`data: ${JSON.stringify({ type: 'correction', content: event.content })}\n\n`);
           }
         }
         if (!aborted && !timedOut) {
@@ -201,6 +253,11 @@ const ChatbotController = {
       });
 
       if (!aborted) {
+        if (response.correctedMessage) {
+          res.write(
+            `data: ${JSON.stringify({ type: 'correction', content: response.correctedMessage })}\n\n`,
+          );
+        }
         res.write(
           `data: ${JSON.stringify({ type: 'done', success: response.success, messageId: response.messageId ?? null })}\n\n`,
         );
@@ -221,6 +278,7 @@ const ChatbotController = {
       }
     } finally {
       clearTimeout(streamTimeoutTimer);
+      await releaseSessionLock(chatSessionId).catch(() => {});
     }
   }),
 
@@ -291,6 +349,11 @@ const ChatbotController = {
    */
   feedback: catchAsync(async (req, res) => {
     const { sessionId, messageId, rating, comment } = req.body || {};
+
+    // Verify session ownership — caller must own this session
+    if (sessionId) {
+      resolveChatSession(req, res, sessionId);
+    }
 
     if (!sessionId || !messageId || !['up', 'down'].includes(rating)) {
       return sendFail(

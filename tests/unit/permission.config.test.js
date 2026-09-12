@@ -26,8 +26,8 @@ describe('Permission Config', () => {
   });
 
   describe('RESOURCES & ACTIONS', () => {
-    it('should have 17 resources', () => {
-      expect(Object.keys(RESOURCES)).toHaveLength(17);
+    it('should have 16 resources', () => {
+      expect(Object.keys(RESOURCES)).toHaveLength(16);
     });
 
     it('should have 5 actions', () => {
@@ -36,8 +36,8 @@ describe('Permission Config', () => {
   });
 
   describe('PERMISSIONS', () => {
-    it('should generate 17*5 + 2 special permissions', () => {
-      expect(Object.keys(PERMISSIONS).length).toBe(17 * 5 + 2);
+    it('should generate 16*5 + 2 special permissions', () => {
+      expect(Object.keys(PERMISSIONS).length).toBe(16 * 5 + 2);
     });
 
     it('should have all resource/action combos', () => {

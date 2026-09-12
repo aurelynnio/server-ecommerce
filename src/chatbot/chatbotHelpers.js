@@ -185,6 +185,94 @@ Link mua: ${item.checkoutUrl}`;
     .join('\n\n');
 }
 
+/**
+ * Validate LLM response to prevent hallucination
+ * Check if mentioned links actually exist in the context, and verify price grounding.
+ * @param {string} response - LLM response
+ * @param {Array} products - Products from RAG or tool calls
+ * @param {Object} [logger] - Optional logger instance
+ * @returns {string} - Validated/corrected response
+ */
+function validateResponse(response, products, logger = null) {
+  if (!response) return response;
+
+  // Nếu không có product trong context, cảnh báo nếu response chứa giá cụ thể
+  if (!products || products.length === 0) {
+    const pricePattern = /\d{2,3}[.,]?\d{3}[.,]?\d{0,3}\s*đ/g;
+    if (pricePattern.test(response)) {
+      if (logger?.warn) {
+        logger.warn(
+          '[Chatbot] Potential hallucination detected - prices in response but no products in context',
+        );
+      }
+      return 'Em xin lỗi, hiện tại em chưa tìm thấy sản phẩm phù hợp với yêu cầu của anh/chị. Anh/chị có thể cho em biết cụ thể hơn muốn tìm loại sản phẩm gì không ạ? Ví dụ: áo, quần, giày, túi xách...';
+    }
+    return response;
+  }
+
+  // Grounding check: mọi link internal trong response phải nằm trong whitelist
+  const allowedUrls = new Set();
+  for (const p of products) {
+    if (p.productUrl) allowedUrls.add(p.productUrl);
+    if (p.checkoutUrl) allowedUrls.add(p.checkoutUrl);
+  }
+
+  const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
+  let match;
+  let hallucinated = false;
+  while ((match = linkPattern.exec(response)) !== null) {
+    const url = match[2];
+    // Chặn cả link tuyệt đối ngoài whitelist lẫn link nội bộ không hợp lệ
+    const isInternal = url.startsWith('/');
+    const isAllowedAbsolute = /^https?:\/\//i.test(url) && allowedUrls.has(url);
+    if (isInternal && !allowedUrls.has(url)) {
+      if (logger?.warn) {
+        logger.warn('[Chatbot] Hallucinated link detected', {
+          url,
+          allowedSample: Array.from(allowedUrls).slice(0, 3),
+        });
+      }
+      hallucinated = true;
+      break;
+    }
+    if (/^https?:\/\//i.test(url) && !isAllowedAbsolute) {
+      if (logger?.warn) {
+        logger.warn('[Chatbot] Hallucinated absolute link detected', { url });
+      }
+      hallucinated = true;
+      break;
+    }
+  }
+
+  if (hallucinated) {
+    return 'Xin lỗi, em không thể truy cập sản phẩm này. Anh/chị có thể thử từ khoá khác không ạ?';
+  }
+
+  // Grounding check: mọi mức giá xuất hiện phải khớp với dữ liệu thực
+  const allowedPrices = new Set();
+  for (const p of products) {
+    if (typeof p.price === 'number') allowedPrices.add(p.price);
+    if (typeof p.originalPrice === 'number') allowedPrices.add(p.originalPrice);
+  }
+  const priceInTextPattern = /(\d{1,3}(?:[.,]\d{3})+|[1-9]\d{0,4})\s*đ/g;
+  let priceMatch;
+  while ((priceMatch = priceInTextPattern.exec(response)) !== null) {
+    const raw = priceMatch[1];
+    const parsed = normalizePriceInText(raw);
+    if (parsed !== null && allowedPrices.size > 0 && !allowedPrices.has(parsed)) {
+      if (logger?.warn) {
+        logger.warn('[Chatbot] Hallucinated price detected', {
+          parsed,
+          allowedSample: Array.from(allowedPrices).slice(0, 5),
+        });
+      }
+      return 'Xin lỗi, hiện tại em chưa thể xác nhận mức giá đó. Anh/chị có thể thử lại với sản phẩm khác không ạ?';
+    }
+  }
+
+  return response;
+}
+
 module.exports = {
   parseMoneyValue,
   extractPriceRange,
@@ -192,4 +280,5 @@ module.exports = {
   escapePromptText,
   normalizePriceInText,
   formatProducts,
+  validateResponse,
 };

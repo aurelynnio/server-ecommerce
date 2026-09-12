@@ -71,6 +71,19 @@ class ChatbotService {
       return truncateHistory(all);
     };
 
+    // Inject createdAt cho messages mới (cần cho TTL index hoạt động đúng).
+    const originalAddMessage = baseHistory.addMessage.bind(baseHistory);
+    baseHistory.addMessage = async (message) => {
+      await originalAddMessage(message);
+      // Set createdAt cho document vừa insert (LangChain không tự set)
+      try {
+        await collection.updateMany(
+          { sessionId, createdAt: { $exists: false } },
+          { $set: { createdAt: new Date() } },
+        );
+      } catch (_e) { /* best-effort — TTL fallback qua backfill script */ }
+    };
+
     return baseHistory;
   }
 
@@ -327,8 +340,10 @@ class ChatbotService {
       logger.info('[Chatbot] Stream completed');
 
       const validatedResponse = this.validateResponse(fullResponse, products);
-      if (validatedResponse !== fullResponse) {
+      const wasHallucinated = validatedResponse !== fullResponse;
+      if (wasHallucinated) {
         metrics.chatbotHallucinationTotal.inc({ kind: 'replaced' });
+        logger.warn('[Chatbot] Stream response corrected by grounding check');
       }
       metrics.chatbotTokensTotal.inc(
         { direction: 'out' },
@@ -340,6 +355,9 @@ class ChatbotService {
         message: validatedResponse,
         sessionId,
         messageId: await this.getLatestAssistantMessageId(sessionId),
+        // Nếu validation đã thay thế response → gửi correctedMessage
+        // để controller stream correction event cho frontend
+        ...(wasHallucinated ? { correctedMessage: validatedResponse } : {}),
       };
     } catch (error) {
       logger.error('[Chatbot] Stream error:', error.message);

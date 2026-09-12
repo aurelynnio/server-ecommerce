@@ -12,7 +12,6 @@ const bannerRouter = require('./banner.router');
 const chatbotRouter = require('./chatbot.router');
 
 const shopRouter = require('./shop.router');
-const shippingRouter = require('./shipping.router');
 const voucherRouter = require('./voucher.router');
 const chatRouter = require('./chat.router');
 const shopCategoryRouter = require('./shop.category.router');
@@ -40,7 +39,6 @@ const initRoutes = (app) => {
   app.use('/api/chatbot', chatbotRouter);
 
   app.use('/api/shops', shopRouter);
-  app.use('/api/shipping', shippingRouter);
   app.use('/api/vouchers', voucherRouter);
   app.use('/api/chat', chatRouter);
   app.use('/api/shop-categories', shopCategoryRouter);

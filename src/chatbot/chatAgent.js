@@ -23,6 +23,7 @@ const { DynamicTool } = require('@langchain/core/tools');
 
 const { toolHandlers } = require('./chatbot.tools');
 const { toolDefinitions, SYSTEM_PROMPT } = require('../configs/chatbot.config');
+const { validateResponse } = require('./chatbotHelpers');
 const logger = require('../utils/logger');
 const metrics = require('../monitoring/chatbot.metrics');
 
@@ -132,10 +133,12 @@ class ChatbotAgent {
   /**
    * Thực thi tool calls của 1 lượt LLM, push ToolMessage vào messages.
    * Yield event tool_call/tool_result để phía SSE hiển thị tiến trình.
+   * Đồng thời thu thập các products từ tool results để dùng cho grounding check.
    * @param {Array} messages - Message list đang build (mutate in-place)
    * @param {Array} calls - Tool calls từ response của LLM
+   * @param {Array} [collectedProducts=[]] - Mảng tích lũy sản phẩm để validate
    */
-  async *_runToolCalls(messages, calls) {
+  async *_runToolCalls(messages, calls, collectedProducts = []) {
     for (const call of calls) {
       yield { type: 'tool_call', name: call.name, args: call.args };
 
@@ -146,6 +149,18 @@ class ChatbotAgent {
       } catch (e) {
         result = JSON.stringify({ error: e.message });
         metrics.chatbotErrorsTotal.inc({ stage: `tool_error:${call.name}` });
+      }
+
+      // Thu thập sản phẩm cho grounding check
+      if (typeof result === 'string') {
+        try {
+          const parsed = JSON.parse(result);
+          if (Array.isArray(parsed)) {
+            collectedProducts.push(...parsed);
+          } else if (parsed && typeof parsed === 'object' && !parsed.error) {
+            collectedProducts.push(parsed);
+          }
+        } catch (_e) {}
       }
 
       yield { type: 'tool_result', name: call.name };
@@ -179,6 +194,7 @@ class ChatbotAgent {
 
       let output = '';
       const toolCalls = [];
+      const collectedProducts = [];
 
       for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
         const response = await this.model.bindTools(this.tools).invoke(messages);
@@ -190,7 +206,7 @@ class ChatbotAgent {
         }
 
         messages.push(response);
-        for await (const event of this._runToolCalls(messages, calls)) {
+        for await (const event of this._runToolCalls(messages, calls, collectedProducts)) {
           if (event.type === 'tool_call') toolCalls.push(event.name);
         }
       }
@@ -198,6 +214,13 @@ class ChatbotAgent {
       // Vượt max iterations mà chưa có final answer → fallback
       if (!output) {
         output = MAX_ITERATIONS_FALLBACK;
+      }
+
+      // Grounding validation cho agent mode
+      const validated = validateResponse(output, collectedProducts, logger);
+      if (validated !== output) {
+        metrics.chatbotHallucinationTotal.inc({ kind: 'replaced_agent' });
+        output = validated;
       }
 
       await this._saveTurnToHistory(history, userMessage, output);
@@ -231,6 +254,9 @@ class ChatbotAgent {
    * Streaming agent: yield { type, content } events.
    *
    * Dùng bindTools + loop thủ công để có control tốt hơn cho SSE.
+   * - Intermediate iterations (tool-calling): dùng invoke() để detect tool_calls
+   * - Final answer (no tool calls): stream tokens mượt mà cho client
+   * - Grounding check: phát hiện hallucination và yield 'correction' event nếu cần
    * Cuối stream persist lượt chat vào history (nhờ đó câu hỏi follow-up
    * như "cái đầu tiên bao nhiêu tiền?" có context, và messageId trả về
    * trong event 'done' khớp với tin nhắn thật trong DB).
@@ -244,14 +270,15 @@ class ChatbotAgent {
     const { history, messages } = await this._buildContext(sessionId, userMessage);
 
     let finalContent = '';
+    const boundModel = this.model.bindTools(this.tools);
+    const collectedProducts = [];
 
     for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-      const response = await this.model.bindTools(this.tools).invoke(messages);
+      const response = await boundModel.invoke(messages);
       const toolCalls = response.tool_calls || [];
 
       if (toolCalls.length === 0) {
-        // Final answer — yield từng word cho UX mượt
-        finalContent = String(response.content || '');
+        finalContent = typeof response?.content === 'string' ? response.content : '';
         for (const word of finalContent.split(/(\s+)/)) {
           if (word) yield { type: 'token', content: word };
         }
@@ -260,13 +287,21 @@ class ChatbotAgent {
 
       // Có tool call → thêm AI message + execute tools
       messages.push(response);
-      yield* this._runToolCalls(messages, toolCalls);
+      yield* this._runToolCalls(messages, toolCalls, collectedProducts);
     }
 
     // Vượt max iterations → fallback
     if (!finalContent) {
       finalContent = MAX_ITERATIONS_FALLBACK;
       yield { type: 'token', content: finalContent };
+    }
+
+    // Grounding check cho Agent mode: kiểm tra giá và link
+    const validated = validateResponse(finalContent, collectedProducts, logger);
+    if (validated !== finalContent) {
+      metrics.chatbotHallucinationTotal.inc({ kind: 'replaced_agent' });
+      yield { type: 'correction', content: validated };
+      finalContent = validated;
     }
 
     metrics.chatbotTokensTotal.inc(

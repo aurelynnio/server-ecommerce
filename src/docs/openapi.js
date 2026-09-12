@@ -48,7 +48,6 @@ Comprehensive API documentation for the E-Commerce platform and AI Shopping Assi
     { name: 'Categories', description: 'Product categories and catalog hierarchy' },
     { name: 'Banners', description: 'Hero promotional banners' },
     { name: 'Shops', description: 'Multi-vendor shop registration, seller profiles, and settings' },
-    { name: 'Shipping', description: 'Shipping rates, carriers, and delivery templates' },
     { name: 'Cart', description: 'Shopping cart and line item operations' },
     { name: 'Orders', description: 'Order checkout, status fulfillment, and seller/admin listing' },
     { name: 'Payment', description: 'VNPay payment gateway integration, return URL, and IPN callbacks' },
@@ -92,4 +91,3 @@ Comprehensive API documentation for the E-Commerce platform and AI Shopping Assi
 };
 
 module.exports = openapi;
-

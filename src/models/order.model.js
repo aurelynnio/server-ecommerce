@@ -45,6 +45,10 @@ const orderSchema = new Schema(
       district: { type: String },
       ward: { type: String },
       note: { type: String },
+      // Optional fields that fall back to defaults at booking time
+      postalCode: { type: String },
+      countryCode: { type: String },
+      email: { type: String },
     },
 
     paymentMethod: {
@@ -60,7 +64,7 @@ const orderSchema = new Schema(
     },
 
     subtotal: { type: Number, required: true, min: 0 },
-    shippingFee: { type: Number, default: 0 }, // Calculated via ShippingTemplate
+    shippingFee: { type: Number, default: 0 },
     discountShop: { type: Number, default: 0 }, // Shop voucher
     discountPlatform: { type: Number, default: 0 }, // Platform voucher
     totalAmount: { type: Number, required: true, min: 0 },

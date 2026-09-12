@@ -3,57 +3,18 @@
  * Tests pure logic: buildContextMessage, formatProducts, validateResponse
  */
 import { describe, it, expect } from 'vitest';
+import { formatProducts, normalizePriceInText, validateResponse } from '../../src/chatbot/chatbotHelpers';
 
 // Can't import the full service (LangChain constructor runs), so test logic directly
 describe('ChatbotService Logic', () => {
-  // Re-implement pure functions from chatbot.service.js for testing
-  const formatProducts = (products) => {
-    if (!Array.isArray(products) || products.length === 0) {
-      return 'Không có sản phẩm.';
-    }
-
-    return products
-      .map((item, index) => {
-        if (item.name && item.price !== undefined) {
-          const discount =
-            item.originalPrice && item.originalPrice > item.price
-              ? ` (gốc ${item.originalPrice.toLocaleString('vi-VN')}đ, giảm ${Math.round((1 - item.price / item.originalPrice) * 100)}%)`
-              : '';
-          const similarity = item.score ? ` [Độ phù hợp: ${(item.score * 100).toFixed(0)}%]` : '';
-
-          return `[SẢN PHẨM ${index + 1}]${similarity}
-Tên: ${item.name}
-Giá: ${item.price?.toLocaleString('vi-VN')}đ${discount}
-Thương hiệu: ${item.brand || 'N/A'}
-Danh mục: ${item.category || 'N/A'}
-Còn hàng: ${item.stock > 0 ? 'Có' : 'Hết hàng'}
-Link xem: ${item.productUrl}
-Link mua: ${item.checkoutUrl}`;
-        } else if (item.name && item.slug && item.url) {
-          return `- ${item.name}: ${item.url}`;
-        }
-        return JSON.stringify(item);
-      })
-      .join('\n\n');
-  };
-
+  // NOTE: buildContextMessage is a method on ChatbotService
+  // which cannot be imported directly due to LangChain constructor initialization.
   const buildContextMessage = (userMessage, products) => {
     if (products && Array.isArray(products) && products.length > 0) {
       const formattedData = formatProducts(products);
       return `[KHÁCH HỎI]: ${userMessage}\n\n[DỮ LIỆU SẢN PHẨM THỰC TẾ - CHỈ DÙNG THÔNG TIN NÀY]:\n${formattedData}`;
     }
     return `[KHÁCH HỎI]: ${userMessage}\n\n[THÔNG BÁO]: Không tìm thấy sản phẩm phù hợp trong hệ thống.`;
-  };
-
-  const validateResponse = (response, products) => {
-    if (!products || products.length === 0) {
-      const pricePattern = /\d{2,3}[.,]?\d{3}[.,]?\d{0,3}\s*đ/g;
-      const hasPrices = pricePattern.test(response);
-      if (hasPrices) {
-        return 'Em xin lỗi, hiện tại em chưa tìm thấy sản phẩm phù hợp với yêu cầu của anh/chị. Anh/chị có thể cho em biết cụ thể hơn muốn tìm loại sản phẩm gì không ạ? Ví dụ: áo, quần, giày, túi xách...';
-      }
-    }
-    return response;
   };
 
   describe('formatProducts()', () => {
