@@ -39,20 +39,25 @@ class PermissionService {
     if (!user) return [];
 
     const rolePermissions = this._getPermissionsForRoles(user.roles || user.role);
-    const userPermissions = Array.isArray(user.permissions) ? user.permissions : [];
-
     if (rolePermissions.includes('*')) {
       return this.getAllPermissions();
     }
 
-    const combined = new Set([...rolePermissions, ...userPermissions]);
+    const denied = new Set();
+    const granted = new Set(rolePermissions);
 
-    const positivePerms = [...combined].filter((p) => !p.startsWith('-'));
-    const negativePerms = [...combined].filter((p) => p.startsWith('-')).map((p) => p.substring(1));
+    const userPermissions = Array.isArray(user.permissions) ? user.permissions : [];
+    for (const p of userPermissions) {
+      if (typeof p !== 'string') continue;
+      if (p.startsWith('-')) {
+        denied.add(p.slice(1));
+      } else {
+        granted.add(p);
+      }
+    }
 
-    const finalPerms = positivePerms.filter((p) => !negativePerms.includes(p));
-
-    return expandManagePermissions(finalPerms);
+    const expanded = expandManagePermissions([...granted]);
+    return expanded.filter((p) => !denied.has(p));
   }
 
   /**
@@ -73,13 +78,10 @@ class PermissionService {
     if (!user || !permission) return false;
 
     const permissions = this.getUserPermissions(user);
+    if (permissions.includes('*') || permissions.includes(permission)) return true;
 
-    if (permissions.includes('*')) return true;
-    if (permissions.includes(permission)) return true;
     const [resource] = permission.split(':');
-    if (permissions.includes(`${resource}:manage`)) return true;
-
-    return false;
+    return permissions.includes(`${resource}:manage`);
   }
 
   /**
@@ -89,8 +91,15 @@ class PermissionService {
    * @returns {boolean}
    */
   hasAnyPermission(user, permissions) {
-    if (!user || !permissions || permissions.length === 0) return false;
-    return permissions.some((p) => this.hasPermission(user, p));
+    if (!user || !permissions?.length) return false;
+    const userPerms = new Set(this.getUserPermissions(user));
+    if (userPerms.has('*')) return true;
+
+    return permissions.some((p) => {
+      if (userPerms.has(p)) return true;
+      const [resource] = p.split(':');
+      return userPerms.has(`${resource}:manage`);
+    });
   }
 
   /**
@@ -100,8 +109,15 @@ class PermissionService {
    * @returns {boolean}
    */
   hasAllPermissions(user, permissions) {
-    if (!user || !permissions || permissions.length === 0) return false;
-    return permissions.every((p) => this.hasPermission(user, p));
+    if (!user || !permissions?.length) return false;
+    const userPerms = new Set(this.getUserPermissions(user));
+    if (userPerms.has('*')) return true;
+
+    return permissions.every((p) => {
+      if (userPerms.has(p)) return true;
+      const [resource] = p.split(':');
+      return userPerms.has(`${resource}:manage`);
+    });
   }
 
   /**

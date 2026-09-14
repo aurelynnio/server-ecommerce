@@ -6,6 +6,7 @@ const { uploadImage } = require('../configs/cloudinary');
 const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../utils/ApiError');
 const { ensureFound } = require('../utils/serviceAssertions');
+const { sanitizeUser } = require('../utils/user.util');
 
 /**
  * Service handling user management operations
@@ -13,9 +14,7 @@ const { ensureFound } = require('../utils/serviceAssertions');
  */
 class UserService {
   _sanitizeUserResponse(user) {
-    const userResponse = user.toObject();
-    delete userResponse.password;
-    return userResponse;
+    return sanitizeUser(user);
   }
 
   _ensureUserFound(user) {
@@ -132,7 +131,8 @@ class UserService {
    * @throws {Error} If user not found
    */
   async getUserProfile(userId) {
-    return this._ensureUserFound(await userModel.findByIdWithoutPassword(userId));
+    const user = this._ensureUserFound(await userModel.findByIdWithoutPassword(userId));
+    return this._sanitizeUserResponse(user);
   }
 
   /**
@@ -154,7 +154,7 @@ class UserService {
       select: '-password',
     });
 
-    return this._ensureUserFound(user);
+    return this._sanitizeUserResponse(this._ensureUserFound(user));
   }
 
   /**
@@ -171,7 +171,7 @@ class UserService {
       { new: true, runValidators: true, select: '-password' },
     );
 
-    return this._ensureUserFound(user);
+    return this._sanitizeUserResponse(this._ensureUserFound(user));
   }
 
   /**
@@ -197,9 +197,7 @@ class UserService {
     });
 
     await user.save();
-    const userObj = user.toObject({ transform: true, versionKey: false });
-    delete userObj.password;
-    return userObj;
+    return this._sanitizeUserResponse(user);
   }
 
   /**
@@ -216,7 +214,7 @@ class UserService {
       { new: true, select: '-password' },
     );
 
-    return this._ensureUserFound(userAfter);
+    return this._sanitizeUserResponse(this._ensureUserFound(userAfter));
   }
 
   /**
@@ -316,8 +314,10 @@ class UserService {
       recentUsers: statisticsFacet.recentUsers?.[0]?.count || 0,
     };
 
+    const sanitizedUsers = users.map((u) => this._sanitizeUserResponse(u));
+
     return {
-      ...buildPaginationResponse(users, paginationParams),
+      ...buildPaginationResponse(sanitizedUsers, paginationParams),
       statistics,
     };
   }
@@ -329,7 +329,8 @@ class UserService {
    * @throws {Error} If user not found
    */
   async getUserById(userId) {
-    return this._ensureUserFound(await userModel.findByIdWithoutPassword(userId));
+    const user = this._ensureUserFound(await userModel.findByIdWithoutPassword(userId));
+    return this._sanitizeUserResponse(user);
   }
 
   /**
@@ -356,7 +357,7 @@ class UserService {
       select: '-password',
     });
 
-    return updatedUser;
+    return this._sanitizeUserResponse(updatedUser);
   }
 
   /**
@@ -373,7 +374,7 @@ class UserService {
       { new: true, runValidators: true, select: '-password' },
     );
 
-    return this._ensureUserFound(user);
+    return this._sanitizeUserResponse(this._ensureUserFound(user));
   }
 
   /**
@@ -390,7 +391,7 @@ class UserService {
       { new: true, runValidators: true, select: '-password' },
     );
 
-    return this._ensureUserFound(user);
+    return this._sanitizeUserResponse(this._ensureUserFound(user));
   }
 
   /**

@@ -90,6 +90,21 @@ const userSchema = new Schema(
   {
     timestamps: true,
     collection: 'users',
+    toJSON: {
+      transform(_doc, ret) {
+        delete ret.password;
+        delete ret.codeVerifiEmail;
+        delete ret.codeVerifiPassword;
+        delete ret.expiresCodeVerifiEmail;
+        delete ret.expiresCodeVerifiPassword;
+        delete ret.refreshTokenHash;
+        delete ret.refreshTokenExpiresAt;
+        delete ret.twoFactorSecret;
+        delete ret.otp;
+        delete ret.__v;
+        return ret;
+      },
+    },
   },
 );
 

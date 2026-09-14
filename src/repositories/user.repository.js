@@ -54,6 +54,18 @@ class UserRepository extends BaseRepository {
     );
   }
 
+  updateRefreshToken(userId, refreshTokenHash, refreshTokenExpiresAt) {
+    return this.updateOneByFilter(
+      { _id: userId },
+      {
+        $set: {
+          refreshTokenHash,
+          refreshTokenExpiresAt,
+        },
+      },
+    );
+  }
+
   streamAllUserIds() {
     return this.findManyByFilter({}).select('_id').cursor();
   }
@@ -67,7 +79,9 @@ class UserRepository extends BaseRepository {
   }
 
   findByIdWithoutPassword(userId) {
-    return this.findById(userId).select('-password');
+    return this.findById(userId).select(
+      '-password -codeVerifiEmail -codeVerifiPassword -expiresCodeVerifiEmail -expiresCodeVerifiPassword -refreshTokenHash -refreshTokenExpiresAt -twoFactorSecret -otp',
+    );
   }
 
   findByIdWithAddresses(userId) {
@@ -96,7 +110,9 @@ class UserRepository extends BaseRepository {
     const filter = this.buildFilter({ search, role, isVerifiedEmail });
 
     return this.findManyByFilter(filter)
-      .select('-password')
+      .select(
+        '-password -codeVerifiEmail -codeVerifiPassword -expiresCodeVerifiEmail -expiresCodeVerifiPassword -refreshTokenHash -refreshTokenExpiresAt -twoFactorSecret -otp',
+      )
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 })

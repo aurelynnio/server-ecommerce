@@ -32,114 +32,84 @@ const SPECIAL_PERMISSIONS = {
   SELLER_ACCESS: 'seller:access',
 };
 
-const buildPermissions = () => {
-  const generated = {};
+// Generate lookup dictionary (16 resources * 5 actions + 2 special permissions = 82)
+const PERMISSIONS = Object.entries(RESOURCES).reduce(
+  (acc, [resKey, resVal]) => {
+    Object.entries(ACTIONS).forEach(([actKey, actVal]) => {
+      acc[`${resKey}_${actKey}`] = permission(resVal, actVal);
+    });
+    return acc;
+  },
+  {
+    ADMIN_ACCESS: SPECIAL_PERMISSIONS.ADMIN_ACCESS,
+    SELLER_ACCESS: SPECIAL_PERMISSIONS.SELLER_ACCESS,
+  },
+);
 
-  for (const [resourceKey, resourceValue] of Object.entries(RESOURCES)) {
-    for (const [actionKey, actionValue] of Object.entries(ACTIONS)) {
-      generated[`${resourceKey}_${actionKey}`] = permission(resourceValue, actionValue);
-    }
-  }
-
-  return generated;
-};
-
-const PERMISSIONS = {
-  ...buildPermissions(),
-  ADMIN_ACCESS: SPECIAL_PERMISSIONS.ADMIN_ACCESS,
-  SELLER_ACCESS: SPECIAL_PERMISSIONS.SELLER_ACCESS,
-};
-
+// Declarative role permission defaults — clean, grouped, and readable at a glance
 const ROLE_PERMISSIONS = {
   admin: ['*'],
   seller: [
     SPECIAL_PERMISSIONS.SELLER_ACCESS,
-    PERMISSIONS.PRODUCT_CREATE,
-    PERMISSIONS.PRODUCT_READ,
-    PERMISSIONS.PRODUCT_UPDATE,
-    PERMISSIONS.PRODUCT_DELETE,
-    PERMISSIONS.ORDER_READ,
-    PERMISSIONS.ORDER_UPDATE,
-    PERMISSIONS.SHOP_READ,
-    PERMISSIONS.SHOP_UPDATE,
-    PERMISSIONS.SHOP_CATEGORY_MANAGE,
-    PERMISSIONS.VOUCHER_CREATE,
-    PERMISSIONS.VOUCHER_READ,
-    PERMISSIONS.VOUCHER_UPDATE,
-    PERMISSIONS.VOUCHER_DELETE,
-    PERMISSIONS.STATISTICS_READ,
-    PERMISSIONS.CHAT_CREATE,
-    PERMISSIONS.CHAT_READ,
-    PERMISSIONS.FLASH_SALE_CREATE,
-    PERMISSIONS.FLASH_SALE_DELETE,
-    PERMISSIONS.NOTIFICATION_READ,
-    PERMISSIONS.NOTIFICATION_UPDATE,
+    'product:create', 'product:read', 'product:update', 'product:delete',
+    'order:read', 'order:update',
+    'shop:read', 'shop:update',
+    'shop-category:manage',
+    'voucher:create', 'voucher:read', 'voucher:update', 'voucher:delete',
+    'statistics:read',
+    'chat:create', 'chat:read',
+    'flash-sale:create', 'flash-sale:delete',
+    'notification:read', 'notification:update',
   ],
   user: [
-    PERMISSIONS.PRODUCT_READ,
-    PERMISSIONS.CART_MANAGE,
-    PERMISSIONS.WISHLIST_MANAGE,
-    PERMISSIONS.ORDER_CREATE,
-    PERMISSIONS.ORDER_READ,
-    PERMISSIONS.ORDER_DELETE,
-    PERMISSIONS.REVIEW_CREATE,
-    PERMISSIONS.REVIEW_READ,
-    PERMISSIONS.REVIEW_UPDATE,
-    PERMISSIONS.REVIEW_DELETE,
-    PERMISSIONS.NOTIFICATION_READ,
-    PERMISSIONS.NOTIFICATION_UPDATE,
-    PERMISSIONS.CHAT_CREATE,
-    PERMISSIONS.CHAT_READ,
-    PERMISSIONS.PAYMENT_CREATE,
+    'product:read',
+    'cart:manage',
+    'wishlist:manage',
+    'order:create', 'order:read', 'order:delete',
+    'review:create', 'review:read', 'review:update', 'review:delete',
+    'notification:read', 'notification:update',
+    'chat:create', 'chat:read',
+    'payment:create',
   ],
 };
 
-const getAllPermissionsList = () => [...new Set(Object.values(PERMISSIONS))];
+const ALL_PERMISSIONS_LIST = [...new Set(Object.values(PERMISSIONS))];
+const ALL_PERMISSIONS_SET = new Set(ALL_PERMISSIONS_LIST);
 
-const ALL_PERMISSIONS_SET = new Set(getAllPermissionsList());
+const getAllPermissionsList = () => ALL_PERMISSIONS_LIST;
 
 const getPermissionsByResource = () => {
   const grouped = {};
-
-  for (const value of Object.values(PERMISSIONS)) {
-    if (!value.includes(':')) continue;
-    const [resource] = value.split(':');
-
-    if (!grouped[resource]) {
-      grouped[resource] = [];
-    }
-    grouped[resource].push(value);
+  for (const perm of ALL_PERMISSIONS_SET) {
+    if (!perm.includes(':')) continue;
+    const [resource] = perm.split(':');
+    (grouped[resource] ||= []).push(perm);
   }
-
   return grouped;
 };
 
 const isValidPermission = (perm) => {
   if (!perm || typeof perm !== 'string') return false;
-  if (perm === '*') return true;
-  return ALL_PERMISSIONS_SET.has(perm);
+  return perm === '*' || ALL_PERMISSIONS_SET.has(perm);
 };
 
 const expandManagePermissions = (permissions) => {
   const expanded = new Set();
-
   for (const perm of permissions) {
     expanded.add(perm);
-    if (!perm.endsWith(':manage')) continue;
-
-    const [resource] = perm.split(':');
-    expanded.add(permission(resource, ACTIONS.CREATE));
-    expanded.add(permission(resource, ACTIONS.READ));
-    expanded.add(permission(resource, ACTIONS.UPDATE));
-    expanded.add(permission(resource, ACTIONS.DELETE));
+    if (perm.endsWith(':manage')) {
+      const [resource] = perm.split(':');
+      expanded.add(`${resource}:create`);
+      expanded.add(`${resource}:read`);
+      expanded.add(`${resource}:update`);
+      expanded.add(`${resource}:delete`);
+    }
   }
-
   return [...expanded];
 };
 
 const getRolePermissions = (role) => {
   const roles = Array.isArray(role) ? role : [role];
-
   return [...new Set(roles.flatMap((item) => ROLE_PERMISSIONS[item] || []))];
 };
 

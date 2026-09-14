@@ -13,6 +13,7 @@ const redisService = require('./redis.service');
 const logger = require('../utils/logger');
 const tokenService = require('./token.service');
 const parseDurationMs = require('../utils/parseDurationMs');
+const { sanitizeUser } = require('../utils/user.util');
 
 /**
  * Service handling authentication logic
@@ -47,16 +48,7 @@ class AuthService {
   }
 
   _sanitizeUser(user) {
-    const {
-      password: _password,
-      codeVerifiEmail: _codeVerifiEmail,
-      codeVerifiPassword: _codeVerifiPassword,
-      refreshTokenHash: _refreshTokenHash,
-      refreshTokenExpiresAt: _refreshTokenExpiresAt,
-      ...userWithoutPassword
-    } = user.toObject();
-
-    return userWithoutPassword;
+    return sanitizeUser(user);
   }
 
   /**
@@ -81,7 +73,15 @@ class AuthService {
    * @param {string} opts.errorMsg - Error message if send fails
    * @param {string[]} [opts.extraCleanupKeys=[]] - Additional keys to delete on failure
    */
-  async _sendOtpCode({ cacheKey, code, email, sender, ttl = 600, errorMsg, extraCleanupKeys = [] }) {
+  async _sendOtpCode({
+    cacheKey,
+    code,
+    email,
+    sender,
+    ttl = 600,
+    errorMsg,
+    extraCleanupKeys = [],
+  }) {
     await redisService.set(cacheKey, code, ttl);
     try {
       await sender(email, code);
@@ -99,9 +99,11 @@ class AuthService {
     const permissions = tokenService.getPermissionsForUser(user);
     const tokens = tokenService.generateTokensWithPermissions(user);
 
-    user.refreshTokenHash = this._hashToken(tokens.refreshToken);
-    user.refreshTokenExpiresAt = this._getRefreshTokenExpiresAt();
-    await user.save();
+    const refreshTokenHash = this._hashToken(tokens.refreshToken);
+    const refreshTokenExpiresAt = this._getRefreshTokenExpiresAt();
+    user.refreshTokenHash = refreshTokenHash;
+    user.refreshTokenExpiresAt = refreshTokenExpiresAt;
+    await User.updateRefreshToken(user._id, refreshTokenHash, refreshTokenExpiresAt);
 
     return {
       user: {
