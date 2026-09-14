@@ -103,7 +103,7 @@ groups:
         execErrState: Error
         for: 10m
         annotations:
-          summary: >20 hallucinations in last hour
+          summary: '>20 hallucinations in last hour'
           description: |
             Có hơn 20 response bị replace do hallucination. Có thể
             do grounding check hoặc prompt thiếu constraints.

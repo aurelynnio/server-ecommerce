@@ -1,4 +1,5 @@
 const ex = require('express');
+const compression = require('compression');
 const morgan = require('morgan');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
@@ -41,11 +42,13 @@ app.use(requestIdMiddleware);
 app.use(metricsMiddleware);
 
 const morganEnabled =
-  process.env.MORGAN_ENABLED === 'true' || process.env.NODE_ENV !== 'production';
+  process.env.MORGAN_ENABLED !== 'false' &&
+  (process.env.MORGAN_ENABLED === 'true' || process.env.NODE_ENV !== 'production');
 if (morganEnabled) {
   app.use(morgan(process.env.MORGAN_FORMAT || 'dev'));
 }
 app.use(corsMiddleware);
+app.use(compression());
 app.use(ex.json());
 app.use(ex.urlencoded({ extended: true }));
 app.use(sanitizeMiddleware);
@@ -66,7 +69,6 @@ app.get('/', (req, res) => {
   return sendJson(res, { status: 'API OK' }, 200);
 });
 
-
 // Prometheus scrape endpoint.
 // - Dev: mở để tiện debug.
 // - Production: bắt buộc cấu hình METRICS_BEARER_TOKEN (Prometheus scrape config
@@ -86,9 +88,7 @@ const isMetricsAuthorized = (req) => {
     const actual = Buffer.from(String(req.headers.authorization || ''));
     const expected = Buffer.from(`Bearer ${METRICS_BEARER_TOKEN}`);
     // Timing-safe so sánh để không lộ token qua thời gian phản hồi
-    return (
-      actual.length === expected.length && crypto.timingSafeEqual(actual, expected)
-    );
+    return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
   }
 
   if (METRICS_ALLOWED_IPS.length > 0) {
@@ -121,4 +121,3 @@ module.exports = {
   server,
   app,
 };
-

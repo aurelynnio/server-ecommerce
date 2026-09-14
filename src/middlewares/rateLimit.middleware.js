@@ -3,6 +3,9 @@ const { RedisStore } = require('rate-limit-redis');
 const redisClient = require('../configs/redis.config');
 
 const createRedisRateLimiter = ({ windowMs, limit, message, keyPrefix = 'rl' }) => {
+  if (process.env.DISABLE_RATE_LIMIT === 'true') {
+    return (req, res, next) => next();
+  }
   // Always use the Redis store. ioredis queues commands until the connection is
   // established, so the limiter stays Redis-backed (and cluster-scalable) instead
   // of silently falling back to a per-process MemoryStore at module-load time.

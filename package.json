@@ -23,7 +23,8 @@
     "seed:dev:reset": "node src/scripts/seed-dev.js --reset",
     "seed:products": "node src/scripts/seed-products.js",
     "seed:products:reset": "node src/scripts/seed-products.js --reset",
-    "dataset:build": "node src/scripts/build-real-dataset.js"
+    "dataset:build": "node src/scripts/build-real-dataset.js",
+    "test:reset": "node src/scripts/reset-test-environment.js"
   },
   "keywords": [],
   "author": "",
@@ -31,7 +32,7 @@
   "type": "commonjs",
   "devDependencies": {
     "@eslint/js": "^9.39.3",
-    "csv-parse": "^5.6.0",
+    "csv-parse": "^7.0.2",
     "eslint": "^10.0.2",
     "fast-check": "^4.5.3",
     "nodemon": "^3.1.10",
@@ -52,6 +53,7 @@
     "amqplib": "^0.10.9",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.8.0",
+    "compression": "^1.8.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",

@@ -18,9 +18,9 @@ const buildMongoUriFromParts = () => {
 
 const connectDB = async () => {
   const uri = process.env.MONGODB_URI || buildMongoUriFromParts();
-  const maxPoolSize = Number(process.env.MONGO_MAX_POOL_SIZE) || 10;
+  const maxPoolSize = Number(process.env.MONGO_MAX_POOL_SIZE) || 25;
   const minPoolSize = Number(process.env.MONGO_MIN_POOL_SIZE) || 0;
-  const maxConnecting = Number(process.env.MONGO_MAX_CONNECTING) || 10;
+  const maxConnecting = Number(process.env.MONGO_MAX_CONNECTING) || 5;
 
   if (!uri) {
     throw new Error(
@@ -29,7 +29,14 @@ const connectDB = async () => {
   }
 
   try {
-    await mongoose.connect(uri, { maxConnecting, maxPoolSize, minPoolSize });
+    await mongoose.connect(uri, {
+      maxConnecting,
+      maxPoolSize,
+      minPoolSize,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      waitQueueTimeoutMS: 10000,
+    });
     logger.info(`MongoDB connected: ${uri.includes('srv') ? 'Atlas (Cloud)' : 'Mongo'}`);
   } catch (error) {
     logger.error('MongoDB connection error', { error });
