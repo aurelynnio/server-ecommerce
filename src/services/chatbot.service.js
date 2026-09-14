@@ -3,6 +3,7 @@ const { MongoDBChatMessageHistory } = require('@langchain/mongodb');
 const { ChatPromptTemplate, MessagesPlaceholder } = require('@langchain/core/prompts');
 const { RunnableWithMessageHistory } = require('@langchain/core/runnables');
 const { StringOutputParser } = require('@langchain/core/output_parsers');
+const { HumanMessage, AIMessage } = require('@langchain/core/messages');
 const mongoose = require('mongoose');
 
 const { searchSimilarProducts, getFeaturedProducts } = require('./embedding.service');
@@ -29,7 +30,7 @@ const USE_AGENT = String(process.env.CHATBOT_USE_AGENT || '').toLowerCase() === 
 class ChatbotService {
   constructor() {
     this.model = new ChatMistralAI({
-      model: process.env.MISTRAL_MODEL || 'mistral-small-latest',
+      model: process.env.MISTRAL_MODEL || 'open-mistral-nemo',
       apiKey: process.env.MISTRAL_API_KEY,
       temperature: 0.3,
       streaming: true,
@@ -81,7 +82,9 @@ class ChatbotService {
           { sessionId, createdAt: { $exists: false } },
           { $set: { createdAt: new Date() } },
         );
-      } catch (_e) { /* best-effort — TTL fallback qua backfill script */ }
+      } catch (_e) {
+        /* best-effort — TTL fallback qua backfill script */
+      }
     };
 
     return baseHistory;
@@ -205,8 +208,12 @@ class ChatbotService {
     const result = sessions[0];
     const total = result.metadata[0]?.total || 0;
     const sessionData = result.data.map((s) => {
-      const firstMessages = s.firstMessage ? extractConversationMessages(s.firstMessage, s.firstMessage._id.getTimestamp()) : [];
-      const lastMessages = s.lastMessage ? extractConversationMessages(s.lastMessage, s.lastMessage._id.getTimestamp()) : [];
+      const firstMessages = s.firstMessage
+        ? extractConversationMessages(s.firstMessage, s.firstMessage._id.getTimestamp())
+        : [];
+      const lastMessages = s.lastMessage
+        ? extractConversationMessages(s.lastMessage, s.lastMessage._id.getTimestamp())
+        : [];
 
       const firstMessage = firstMessages[0] || null;
       const lastMessage = lastMessages[lastMessages.length - 1] || null;
@@ -308,7 +315,7 @@ class ChatbotService {
       logger.info('[Chatbot] User message:', redact(userMessage));
       metrics.chatbotTokensTotal.inc({ direction: 'in' }, metrics.estimateTokens(userMessage));
 
-      const products = await this.retrieveProducts(userMessage);
+      const products = await this.retrieveProducts(userMessage, sessionId);
 
       logger.info(
         '[Chatbot] RAG retrieved:',
@@ -325,16 +332,58 @@ class ChatbotService {
       });
 
       let fullResponse = '';
-      const stream = await chainWithHistory.stream(
-        { input: contextMessage },
-        { configurable: { sessionId } },
-      );
+      try {
+        const stream = await chainWithHistory.stream(
+          { input: contextMessage },
+          { configurable: { sessionId } },
+        );
 
-      for await (const chunk of stream) {
-        fullResponse += chunk;
-        if (onToken) {
-          onToken(chunk);
+        for await (const chunk of stream) {
+          fullResponse += chunk;
+          if (onToken) {
+            onToken(chunk);
+          }
         }
+      } catch (streamErr) {
+        logger.warn('[Chatbot] LangChain stream failed, checking RAG fallback:', streamErr.message);
+        if (fullResponse.trim().length === 0) {
+          let fallbackMessage = '';
+          if (products && products.length > 0) {
+            fallbackMessage =
+              'Dạ em chào anh/chị! Hiện tại phản hồi tự động hơi chậm một chút, nhưng em đã tìm thấy các sản phẩm phù hợp tại cửa hàng cho mình:\n\n' +
+              products
+                .slice(0, 4)
+                .map(
+                  (p) =>
+                    `- **[${p.name}](${p.productUrl || `/product/${p.slug || p._id}`})** - Giá: ${typeof p.price === 'number' ? p.price.toLocaleString('vi-VN') + 'đ' : 'Liên hệ'}`,
+                )
+                .join('\n') +
+              '\n\nAnh/chị bấm vào link sản phẩm để xem chi tiết hoặc nhắn thêm yêu cầu cho em nhé!';
+          } else {
+            fallbackMessage =
+              'Dạ em chào anh/chị! Hiện tại hệ thống tư vấn đang quá tải một chút. Anh/chị có thể cho em biết cụ thể hơn loại sản phẩm cần tìm (áo thun, sơ mi, quần...) hoặc thử lại sau ít phút nhé!';
+          }
+
+          for (const word of fallbackMessage.split(/(\s+)/)) {
+            if (word && onToken) onToken(word);
+          }
+
+          try {
+            const history = this.getMessageHistory(sessionId);
+            await history.addMessage(new HumanMessage(userMessage));
+            await history.addMessage(new AIMessage(fallbackMessage));
+          } catch (histErr) {
+            logger.warn('[Chatbot] Failed to save fallback history:', histErr.message);
+          }
+
+          return {
+            success: true,
+            message: fallbackMessage,
+            sessionId,
+            messageId: await this.getLatestAssistantMessageId(sessionId),
+          };
+        }
+        throw streamErr;
       }
 
       logger.info('[Chatbot] Stream completed');
@@ -345,10 +394,7 @@ class ChatbotService {
         metrics.chatbotHallucinationTotal.inc({ kind: 'replaced' });
         logger.warn('[Chatbot] Stream response corrected by grounding check');
       }
-      metrics.chatbotTokensTotal.inc(
-        { direction: 'out' },
-        metrics.estimateTokens(fullResponse),
-      );
+      metrics.chatbotTokensTotal.inc({ direction: 'out' }, metrics.estimateTokens(fullResponse));
 
       return {
         success: true,
@@ -362,9 +408,15 @@ class ChatbotService {
     } catch (error) {
       logger.error('[Chatbot] Stream error:', error.message);
       metrics.chatbotErrorsTotal.inc({ stage: 'stream' });
+      const fallbackMsg = 'Xin lỗi, hệ thống đang bận. Anh/chị vui lòng thử lại sau nhé!';
+      if (onToken) {
+        for (const word of fallbackMsg.split(/(\s+)/)) {
+          if (word) onToken(word);
+        }
+      }
       return {
         success: false,
-        message: 'Xin lỗi, hệ thống đang bận. Anh/chị vui lòng thử lại sau nhé!',
+        message: fallbackMsg,
         sessionId,
       };
     }
@@ -374,7 +426,11 @@ class ChatbotService {
    * Non-streaming chat (fallback)
    */
   async chat(sessionId, userMessage) {
-    const stopTimer = metrics.chatbotLatencySeconds.startTimer({ endpoint: 'message', stream: 'false' });
+    const stopTimer = metrics.chatbotLatencySeconds.startTimer({
+      endpoint: 'message',
+      stream: 'false',
+    });
+    let products = [];
     try {
       const cached = await getCachedResponse(userMessage);
       if (cached) {
@@ -387,7 +443,7 @@ class ChatbotService {
       metrics.chatbotTokensTotal.inc({ direction: 'in' }, metrics.estimateTokens(userMessage));
 
       // Use RAG to retrieve relevant products
-      const products = await this.retrieveProducts(userMessage);
+      products = await this.retrieveProducts(userMessage, sessionId);
 
       logger.info(
         '[Chatbot] RAG retrieved:',
@@ -428,6 +484,23 @@ class ChatbotService {
       logger.error('[Chatbot] Error:', error.message);
       metrics.chatbotErrorsTotal.inc({ stage: 'message' });
       stopTimer({ status: 'error' });
+      if (products && products.length > 0) {
+        const fallbackMsg =
+          'Dạ em chào anh/chị! Hiện tại phản hồi tự động hơi chậm một chút, nhưng em đã tìm thấy các sản phẩm phù hợp tại cửa hàng cho mình:\n\n' +
+          products
+            .slice(0, 4)
+            .map(
+              (p) =>
+                `- **[${p.name}](${p.productUrl || `/product/${p.slug || p._id}`})** - Giá: ${typeof p.price === 'number' ? p.price.toLocaleString('vi-VN') + 'đ' : 'Liên hệ'}`,
+            )
+            .join('\n') +
+          '\n\nAnh/chị bấm vào link sản phẩm để xem chi tiết hoặc nhắn thêm yêu cầu cho em nhé!';
+        return {
+          success: true,
+          message: fallbackMsg,
+          sessionId,
+        };
+      }
       return {
         success: false,
         message: 'Xin lỗi, hệ thống đang bận. Anh/chị vui lòng thử lại sau nhé!',
@@ -435,7 +508,6 @@ class ChatbotService {
       };
     }
   }
-
 
   parseMoneyValue(rawValue, unit = '') {
     return parseMoneyValue(rawValue, unit);
@@ -454,13 +526,90 @@ class ChatbotService {
   }
 
   /**
+   * Trích xuất các sản phẩm đã được giới thiệu trong tin nhắn assistant gần nhất của session.
+   * Dùng cho các câu hỏi tiếp nối như "tư vấn size các sản phẩm trên", "sản phẩm đó giá bao nhiêu"...
+   * @param {string} sessionId
+   * @returns {Promise<Array>}
+   */
+  async getPreviousProducts(sessionId) {
+    try {
+      if (!sessionId) return [];
+      const history = this.getMessageHistory(sessionId);
+      const messages = await history.getMessages();
+      if (!messages || messages.length === 0) return [];
+
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i];
+        const role = msg.role || msg.type;
+        if (role === 'ai' || role === 'assistant') {
+          const content = typeof msg.content === 'string' ? msg.content : '';
+          const matches = [...content.matchAll(/\[(?:Xem chi tiết|Chi tiết)\]\(([^)]+)\)/gi)];
+          if (matches.length > 0) {
+            const slugs = matches.map((m) => m[1].replace('/products/', '')).filter(Boolean);
+            const Product = mongoose.model('Product');
+            const foundProducts = await Product.find({
+              slug: { $in: slugs },
+            })
+              .limit(5)
+              .lean();
+            if (foundProducts.length > 0) {
+              return foundProducts.map((p) => ({
+                name: p.name,
+                price: p.price,
+                originalPrice: p.originalPrice,
+                brand: p.brand || 'N/A',
+                category: p.category?.name || 'Thời trang',
+                stock: p.stock,
+                productUrl: `/products/${p.slug || p._id}`,
+                checkoutUrl: `/checkout?product=${p._id}`,
+              }));
+            }
+          }
+        }
+      }
+      return [];
+    } catch (err) {
+      logger.warn('[Chatbot] Failed to extract previous products from history:', err.message);
+      return [];
+    }
+  }
+
+  /**
    * Retrieve relevant products using semantic search + structured tools
    * @param {string} message - User message
+   * @param {string} [sessionId] - Optional chat session ID for context continuity
    * @returns {Promise<Array>} - Array of products
    */
-  async retrieveProducts(message) {
+  async retrieveProducts(message, sessionId) {
     const lowerMessage = message.toLowerCase();
     const signals = this.extractSearchSignals(message);
+
+    const followUpKeywords = [
+      'sản phẩm trên',
+      'các sản phẩm trên',
+      'mẫu trên',
+      'món trên',
+      'cái trên',
+      'ở trên',
+      'vừa rồi',
+      'vừa xem',
+      'vừa gợi ý',
+      'vừa giới thiệu',
+      'áo này',
+      'quần này',
+      'mẫu này',
+      'sản phẩm này',
+    ];
+
+    const sizeKeywords = [
+      'bảng size',
+      'chọn size',
+      'tư vấn size',
+      'size gì',
+      'mặc size',
+      'hướng dẫn chọn size',
+      'chiều cao cân nặng',
+    ];
 
     const greetingKeywords = ['xin chào', 'hello', 'hi', 'chào', 'hey'];
     const categoryKeywords = ['danh mục', 'loại', 'category', 'thể loại', 'phân loại'];
@@ -479,6 +628,21 @@ class ChatbotService {
     const newKeywords = ['mới', 'new', 'vừa về', 'mới nhất', 'latest'];
 
     try {
+      // 1. Kiểm tra nếu là câu hỏi nối tiếp về các sản phẩm đã đề cập
+      if (sessionId && followUpKeywords.some((keyword) => lowerMessage.includes(keyword))) {
+        logger.info('[Chatbot] Detected: follow-up reference to previous products');
+        const prev = await this.getPreviousProducts(sessionId);
+        if (prev.length > 0) return prev;
+      }
+
+      // 2. Kiểm tra nếu là câu hỏi về size
+      if (sizeKeywords.some((keyword) => lowerMessage.includes(keyword))) {
+        logger.info('[Chatbot] Detected: size consultation request');
+        if (sessionId) {
+          const prev = await this.getPreviousProducts(sessionId);
+          if (prev.length > 0) return prev;
+        }
+      }
       if (greetingKeywords.some((keyword) => lowerMessage.includes(keyword))) {
         logger.info('[Chatbot] Detected: greeting - fetching featured products');
         return await getFeaturedProducts({ type: 'featured', limit: 3 });
@@ -625,6 +789,7 @@ ${formattedData}
 - CHỈ giới thiệu ĐÚNG các sản phẩm ở trên
 - PHẢI dùng ĐÚNG tên, giá, link như trong dữ liệu
 - TUYỆT ĐỐI KHÔNG được bịa thêm sản phẩm khác
+- Nếu khách hỏi về size, chiều cao, cân nặng, hoặc tư vấn chọn size: Hãy nhiệt tình giải thích và tư vấn chi tiết theo bảng size tiêu chuẩn (S/M/L/XL/XXL) và lưu ý về form dáng cho khách.
 - Nếu khách hỏi về sản phẩm không có trong danh sách → nói "Em chưa tìm thấy sản phẩm phù hợp, anh/chị có thể mô tả thêm không ạ?"`;
     }
 
