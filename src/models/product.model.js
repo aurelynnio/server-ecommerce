@@ -1,5 +1,6 @@
 const { Schema, model, Types } = require('mongoose');
 const slugify = require('slugify');
+const { isFlashSaleActive } = require('../utils/flashSale.util');
 
 const priceSchema = new Schema(
   {
@@ -127,11 +128,14 @@ const productSchema = new Schema(
 // ==================== VIRTUALS ====================
 
 productSchema.virtual('onSale').get(function () {
-  if (this.flashSale?.isActive) {
-    const now = new Date();
-    return this.flashSale.startTime <= now && this.flashSale.endTime > now;
+  if (isFlashSaleActive(this.flashSale)) {
+    return true;
   }
-  return this.price?.discountPrice && this.price.discountPrice < this.price.currentPrice;
+  return Boolean(
+    this.price?.discountPrice !== null &&
+    this.price?.discountPrice !== undefined &&
+    this.price.discountPrice < this.price.currentPrice,
+  );
 });
 
 productSchema.virtual('isActive').get(function () {
@@ -139,11 +143,8 @@ productSchema.virtual('isActive').get(function () {
 });
 
 productSchema.virtual('effectivePrice').get(function () {
-  if (this.flashSale?.isActive) {
-    const now = new Date();
-    if (this.flashSale.startTime <= now && this.flashSale.endTime > now) {
-      return this.flashSale.salePrice;
-    }
+  if (isFlashSaleActive(this.flashSale)) {
+    return this.flashSale.salePrice;
   }
   return this.price?.discountPrice || this.price?.currentPrice;
 });
@@ -159,9 +160,15 @@ productSchema.index({ status: 1, isFeatured: -1, createdAt: -1 }); // findFeatur
 productSchema.index({ status: 1, isNewArrival: -1, createdAt: -1 }); // findNewArrival / findHomepageNewArrivals
 productSchema.index({ status: 1, ratingAverage: -1, reviewCount: -1 }); // findTopRatedProducts / findHomepageTopRated
 productSchema.index({ status: 1, soldCount: -1 }); // findTopSellingProducts / findTrendingProducts
-productSchema.index({ status: 1, 'price.currentPrice': 1 }); // Price range filtering
+productSchema.index({ status: 1, 'price.currentPrice': 1 }); // Price range filtering (asc)
+productSchema.index({ status: 1, 'price.currentPrice': -1 }); // Price range sort (desc)
 productSchema.index({ 'flashSale.isActive': 1, 'flashSale.endTime': 1 }); // Active flash sale lookup
-
+productSchema.index({ status: 1, createdAt: -1 }); // Default catalog query (newest)
+productSchema.index({ category: 1, status: 1, createdAt: -1 }); // Category catalog query (newest)
+productSchema.index({ category: 1, status: 1, 'price.currentPrice': 1 }); // Category + price (asc)
+productSchema.index({ category: 1, status: 1, 'price.currentPrice': -1 }); // Category + price (desc)
+productSchema.index({ category: 1, status: 1, soldCount: -1 }); // Category + best sellers
+productSchema.index({ shop: 1, status: 1, createdAt: -1 }); // Shop products (newest)
 // Text search index
 productSchema.index(
   { name: 'text', description: 'text', brand: 'text', tags: 'text' },

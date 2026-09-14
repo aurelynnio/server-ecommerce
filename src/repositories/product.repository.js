@@ -2,6 +2,9 @@ const Product = require('../models/product.model');
 const BaseRepository = require('./base.repository');
 const { createLiteralRegex } = require('../utils/query.utils');
 
+const CATALOG_SUMMARY_FIELDS =
+  'name slug price stock soldCount ratingAverage reviewCount brand isFeatured isNewArrival status flashSale category shop shopCategory descriptionImages variants sizes tags createdAt updatedAt';
+
 class ProductRepository extends BaseRepository {
   constructor() {
     super(Product);
@@ -121,6 +124,73 @@ class ProductRepository extends BaseRepository {
     );
   }
 
+  decrementStockForVariantFlashSale(productId, variantId, quantity, session) {
+    return this.updateOneByFilter(
+      {
+        _id: productId,
+        status: 'published',
+        'variants._id': variantId,
+        'variants.stock': { $gte: quantity },
+        'flashSale.isActive': true,
+        $or: [
+          { 'flashSale.stock': { $exists: false } },
+          { 'flashSale.stock': null },
+          { 'flashSale.stock': 0 },
+          {
+            $expr: {
+              $lte: [
+                { $add: [{ $ifNull: ['$flashSale.soldCount', 0] }, quantity] },
+                '$flashSale.stock',
+              ],
+            },
+          },
+        ],
+      },
+      {
+        $inc: {
+          'variants.$.stock': -quantity,
+          'variants.$.sold': quantity,
+          stock: -quantity,
+          soldCount: quantity,
+          'flashSale.soldCount': quantity,
+        },
+      },
+      { session },
+    );
+  }
+
+  decrementStockForBaseFlashSale(productId, quantity, session) {
+    return this.updateOneByFilter(
+      {
+        _id: productId,
+        status: 'published',
+        stock: { $gte: quantity },
+        'flashSale.isActive': true,
+        $or: [
+          { 'flashSale.stock': { $exists: false } },
+          { 'flashSale.stock': null },
+          { 'flashSale.stock': 0 },
+          {
+            $expr: {
+              $lte: [
+                { $add: [{ $ifNull: ['$flashSale.soldCount', 0] }, quantity] },
+                '$flashSale.stock',
+              ],
+            },
+          },
+        ],
+      },
+      {
+        $inc: {
+          stock: -quantity,
+          soldCount: quantity,
+          'flashSale.soldCount': quantity,
+        },
+      },
+      { session },
+    );
+  }
+
   restoreStockForVariant(productId, variantId, quantity, options = {}) {
     return this.updateOneByFilter(
       {
@@ -146,6 +216,39 @@ class ProductRepository extends BaseRepository {
         $inc: {
           stock: quantity,
           soldCount: -quantity,
+        },
+      },
+      options,
+    );
+  }
+
+  restoreStockForVariantFlashSale(productId, variantId, quantity, options = {}) {
+    return this.updateOneByFilter(
+      {
+        _id: productId,
+        'variants._id': variantId,
+      },
+      {
+        $inc: {
+          'variants.$.stock': quantity,
+          'variants.$.sold': -quantity,
+          stock: quantity,
+          soldCount: -quantity,
+          'flashSale.soldCount': -quantity,
+        },
+      },
+      options,
+    );
+  }
+
+  restoreStockForBaseFlashSale(productId, quantity, options = {}) {
+    return this.updateOneByFilter(
+      { _id: productId },
+      {
+        $inc: {
+          stock: quantity,
+          soldCount: -quantity,
+          'flashSale.soldCount': -quantity,
         },
       },
       options,
@@ -343,6 +446,7 @@ class ProductRepository extends BaseRepository {
     const { search } = filters;
 
     let productsQuery = this.findManyByFilter(query)
+      .select(CATALOG_SUMMARY_FIELDS)
       .populate('category', 'name slug')
       .populate('shopCategory', 'name slug');
 
@@ -434,6 +538,7 @@ class ProductRepository extends BaseRepository {
       category: categoryId,
       status: 'published',
     })
+      .select(CATALOG_SUMMARY_FIELDS)
       .populate('category', 'name slug')
       .sort(sort)
       .skip(skip)
@@ -453,6 +558,7 @@ class ProductRepository extends BaseRepository {
       category: { $in: categoryIds },
       status: 'published',
     })
+      .select(CATALOG_SUMMARY_FIELDS)
       .populate('category', 'name slug')
       .sort(sort)
       .skip(skip)
@@ -469,6 +575,7 @@ class ProductRepository extends BaseRepository {
 
   findPublishedNewest(limit = 10) {
     return this.findManyByFilter({ status: 'published' })
+      .select(CATALOG_SUMMARY_FIELDS)
       .populate('category', 'name slug')
       .sort('-createdAt')
       .limit(Number(limit))
@@ -480,6 +587,7 @@ class ProductRepository extends BaseRepository {
       status: 'published',
       isFeatured: true,
     })
+      .select(CATALOG_SUMMARY_FIELDS)
       .populate('category', 'name slug')
       .sort({ createdAt: -1 })
       .limit(limit)
@@ -491,6 +599,7 @@ class ProductRepository extends BaseRepository {
       status: 'published',
       isNewArrival: true,
     })
+      .select(CATALOG_SUMMARY_FIELDS)
       .populate('category', 'name slug')
       .populate('shop', 'name slug logo rating followerCount')
       .sort({ createdAt: -1 })
@@ -510,6 +619,7 @@ class ProductRepository extends BaseRepository {
         },
       ],
     })
+      .select(CATALOG_SUMMARY_FIELDS)
       .populate('category', 'name slug')
       .sort({ createdAt: -1 })
       .limit(limit)
@@ -595,6 +705,7 @@ class ProductRepository extends BaseRepository {
 
   findAdvancedSearch(query, { sort, skip, limit, withTextScore = false }) {
     let productsQuery = this.findManyByFilter(query)
+      .select(CATALOG_SUMMARY_FIELDS)
       .populate('category', 'name slug')
       .populate('shop', 'name logo');
 

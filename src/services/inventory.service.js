@@ -1,6 +1,7 @@
 const Product = require('../repositories/product.repository');
 const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../utils/ApiError');
+const { isFlashSaleTimeWindowActive } = require('../utils/flashSale.util');
 
 /**
  * Service handling inventory operations
@@ -48,6 +49,26 @@ class InventoryService {
           throw new ApiError(StatusCodes.CONFLICT, `Out of stock for ${product.name}`);
         }
       }
+
+      // Check flash sale quota availability
+      if (item.isFlashSale) {
+        if (!isFlashSaleTimeWindowActive(product.flashSale)) {
+          throw new ApiError(
+            StatusCodes.CONFLICT,
+            `Flash sale has ended or is inactive for ${product.name}`,
+          );
+        }
+
+        if (product.flashSale.stock > 0) {
+          const remainingQuota = product.flashSale.stock - (product.flashSale.soldCount || 0);
+          if (remainingQuota < quantity) {
+            throw new ApiError(
+              StatusCodes.CONFLICT,
+              `Flash sale quota exceeded for ${product.name}. Only ${Math.max(0, remainingQuota)} remaining`,
+            );
+          }
+        }
+      }
     }
 
     return true;
@@ -63,8 +84,14 @@ class InventoryService {
     for (const item of items) {
       const productId = item.productId.toString();
       const modelId = item.modelId ? item.modelId.toString() : null;
-      const key = `${productId}:${modelId || 'base'}`;
-      const current = map.get(key) || { productId, modelId, quantity: 0 };
+      const isFlashSale = Boolean(item.isFlashSale);
+      const key = `${productId}:${modelId || 'base'}:${isFlashSale}`;
+      const current = map.get(key) || {
+        productId,
+        modelId,
+        quantity: 0,
+        ...(item.isFlashSale ? { isFlashSale: true } : {}),
+      };
       current.quantity += item.quantity;
       map.set(key, current);
     }
@@ -73,7 +100,7 @@ class InventoryService {
 
   /**
    * Deduct stock for multiple items in a transaction
-   * @param {Array} items - List of items [{ productId, modelId, quantity }]
+   * @param {Array} items - List of items [{ productId, modelId, quantity, isFlashSale? }]
    * @param {Object} session - Mongoose session
    */
   async deductStock(items, session) {
@@ -81,7 +108,37 @@ class InventoryService {
 
     for (const item of aggregatedItems) {
       const quantity = item.quantity;
-      if (item.modelId) {
+
+      if (item.isFlashSale) {
+        if (item.modelId) {
+          const result = await Product.decrementStockForVariantFlashSale(
+            item.productId,
+            item.modelId,
+            quantity,
+            session,
+          );
+
+          if (!result.matchedCount) {
+            throw new ApiError(
+              StatusCodes.CONFLICT,
+              'Flash sale quota reached, item out of stock, or variation unavailable',
+            );
+          }
+        } else {
+          const result = await Product.decrementStockForBaseFlashSale(
+            item.productId,
+            quantity,
+            session,
+          );
+
+          if (!result.matchedCount) {
+            throw new ApiError(
+              StatusCodes.CONFLICT,
+              'Flash sale quota reached or item out of stock',
+            );
+          }
+        }
+      } else if (item.modelId) {
         const result = await Product.decrementStockForVariantSale(
           item.productId,
           item.modelId,
@@ -104,7 +161,7 @@ class InventoryService {
 
   /**
    * Restore stock for cancelled/failed orders
-   * @param {Array} items - List of items [{ productId, modelId, quantity }]
+   * @param {Array} items - List of items [{ productId, modelId, quantity, isFlashSale? }]
    * @param {Object} session - Mongoose session (optional)
    */
   async restoreStock(items, session = null) {
@@ -113,7 +170,19 @@ class InventoryService {
 
     for (const item of aggregatedItems) {
       const quantity = item.quantity;
-      if (item.modelId) {
+
+      if (item.isFlashSale) {
+        if (item.modelId) {
+          await Product.restoreStockForVariantFlashSale(
+            item.productId,
+            item.modelId,
+            quantity,
+            options,
+          );
+        } else {
+          await Product.restoreStockForBaseFlashSale(item.productId, quantity, options);
+        }
+      } else if (item.modelId) {
         await Product.restoreStockForVariant(item.productId, item.modelId, quantity, options);
       } else {
         await Product.restoreStockForBaseProduct(item.productId, quantity, options);
