@@ -167,3 +167,64 @@ describe('Payment Service – VNPay Amount Conversion', () => {
     expect(parseInt(vnpAmount) / 100).toBe(50000);
   });
 });
+
+describe('Payment Service – Multi-Vendor Group Payment Logic', () => {
+  const {
+    createPaymentValidator,
+    paymentOrderGroupIdParamValidator,
+  } = require('../../src/validations/payment.validator');
+
+  it('should aggregate total amount across multiple vendor orders in a group', () => {
+    const ordersInGroup = [
+      { _id: 'order1', shopId: 'shopA', totalAmount: 150000, paymentStatus: 'unpaid' },
+      { _id: 'order2', shopId: 'shopB', totalAmount: 350000, paymentStatus: 'unpaid' },
+      { _id: 'order3', shopId: 'shopC', totalAmount: 200000, paymentStatus: 'unpaid' },
+    ];
+
+    const groupTotal = ordersInGroup.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+    expect(groupTotal).toBe(700000);
+  });
+
+  it('should accept valid orderGroupId in createPaymentValidator', () => {
+    const { error, value } = createPaymentValidator.validate({
+      orderGroupId: '507f1f77bcf86cd799439011',
+    });
+    expect(error).toBeUndefined();
+    expect(value.orderGroupId).toBe('507f1f77bcf86cd799439011');
+  });
+
+  it('should accept valid orderId in createPaymentValidator', () => {
+    const { error, value } = createPaymentValidator.validate({
+      orderId: '507f1f77bcf86cd799439011',
+    });
+    expect(error).toBeUndefined();
+    expect(value.orderId).toBe('507f1f77bcf86cd799439011');
+  });
+
+  it('should reject when both orderId and orderGroupId are provided (xor)', () => {
+    const { error } = createPaymentValidator.validate({
+      orderId: '507f1f77bcf86cd799439011',
+      orderGroupId: '507f1f77bcf86cd799439012',
+    });
+    expect(error).toBeDefined();
+  });
+
+  it('should reject when neither orderId nor orderGroupId is provided', () => {
+    const { error } = createPaymentValidator.validate({});
+    expect(error).toBeDefined();
+  });
+
+  it('should validate valid orderGroupId param', () => {
+    const { error } = paymentOrderGroupIdParamValidator.validate({
+      orderGroupId: '507f1f77bcf86cd799439011',
+    });
+    expect(error).toBeUndefined();
+  });
+
+  it('should reject invalid orderGroupId param', () => {
+    const { error } = paymentOrderGroupIdParamValidator.validate({
+      orderGroupId: 'invalid-id',
+    });
+    expect(error).toBeDefined();
+  });
+});

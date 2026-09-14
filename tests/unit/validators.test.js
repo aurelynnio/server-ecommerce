@@ -20,6 +20,7 @@ const {
 
 const {
   createOrderValidator,
+  buyNowValidator,
   updateOrderStatusValidator,
 } = require('../../src/validations/order.validator');
 
@@ -365,6 +366,31 @@ describe('Validators', () => {
           ],
         });
         expect(error).toBeUndefined();
+      });
+
+      it('should reject duplicate shopId in shopVouchers for createOrderValidator', () => {
+        const { error } = createOrderValidator.validate({
+          ...validOrder,
+          shopVouchers: [
+            { shopId: '507f1f77bcf86cd799439011', code: 'SHOP1' },
+            { shopId: '507f1f77bcf86cd799439011', code: 'SHOP2' },
+          ],
+        });
+        expect(error).toBeDefined();
+        expect(error.message).toMatch(/duplicate/i);
+      });
+
+      it('should reject duplicate shopId in shopVouchers for buyNowValidator', () => {
+        const { error } = buyNowValidator.validate({
+          productId: '507f1f77bcf86cd799439011',
+          addressId: '507f1f77bcf86cd799439012',
+          shopVouchers: [
+            { shopId: '507f1f77bcf86cd799439011', code: 'SHOP1' },
+            { shopId: '507f1f77bcf86cd799439011', code: 'SHOP2' },
+          ],
+        });
+        expect(error).toBeDefined();
+        expect(error.message).toMatch(/duplicate/i);
       });
     });
 
