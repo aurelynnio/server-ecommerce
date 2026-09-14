@@ -34,6 +34,7 @@ const orderSchema = new Schema(
         quantity: { type: Number, required: true, min: 1 },
         price: { type: Number, required: true }, // Snapshot price at purchase
         totalPrice: { type: Number, required: true }, // quantity * price
+        isFlashSale: { type: Boolean, default: false },
       },
     ],
 

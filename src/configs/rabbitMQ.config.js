@@ -7,7 +7,7 @@ let rabbitConnectionManager = null;
 let rabbitConnectionPromise = null;
 
 const HEARTBEAT_INTERVAL_IN_SECONDS =
-  Number(process.env.RABBITMQ_HEARTBEAT_INTERVAL_IN_SECONDS) || 5;
+  Number(process.env.RABBITMQ_HEARTBEAT_INTERVAL_IN_SECONDS) || 30;
 const RECONNECT_TIME_IN_SECONDS = Number(process.env.RABBITMQ_RECONNECT_DELAY_MS || 5000) / 1000;
 const CONNECT_TIMEOUT_MS = Number(process.env.RABBITMQ_CONNECT_TIMEOUT_MS) || 10000;
 
@@ -40,7 +40,7 @@ const config_rabbitMQ = {
     },
     order: {
       name: 'order_queue',
-      routingKey: 'order.*',
+      routingKey: ['order.created', 'order.status_changed', 'order.retry'],
       dlq: 'order_queue_dlq',
       dlRoutingKey: 'order.dlq',
       retryQueue: 'order_queue_retry',
@@ -170,7 +170,12 @@ async function setupQueueTopology(channel, serviceName) {
       'x-dead-letter-routing-key': queue.dlRoutingKey,
     },
   });
-  await channel.bindQueue(queue.name, config_rabbitMQ.exchange.name, queue.routingKey);
+
+  // queue.routingKey có thể là string (vd 'notification.*') hoặc mảng các key
+  const routingKeys = Array.isArray(queue.routingKey) ? queue.routingKey : [queue.routingKey];
+  for (const routingKey of routingKeys) {
+    await channel.bindQueue(queue.name, config_rabbitMQ.exchange.name, routingKey);
+  }
 
   await channel.assertQueue(queue.dlq, { durable: true });
   await channel.bindQueue(queue.dlq, config_rabbitMQ.deadLetterExchange.name, queue.dlRoutingKey);
@@ -319,5 +324,3 @@ module.exports = {
   getRabbitMQConnectionManager,
   isRabbitMQConnected,
 };
-
-

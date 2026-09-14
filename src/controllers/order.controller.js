@@ -19,6 +19,34 @@ const OrderController = {
   }),
 
   /**
+   * Buy now - direct checkout without cart
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  buyNow: catchAsync(async (req, res) => {
+    const userId = getRequestUserId(req.user);
+    const order = await orderService.buyNow(userId, req.body);
+
+    return sendSuccess(res, order, 'Order created successfully', StatusCodes.CREATED);
+  }),
+
+  /**
+   * Get order tracking status for asynchronous queue
+   * @deprecated Use WebSocket real-time events (`order_created`, `order_failed`) instead of polling Redis
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  getOrderTrackingStatus: catchAsync(async (req, res) => {
+    const userId = getRequestUserId(req.user);
+    const { trackingId } = req.params;
+    const tracking = await orderService.getOrderTrackingStatus(trackingId, userId);
+
+    return sendSuccess(res, tracking, 'Order tracking status retrieved', StatusCodes.OK);
+  }),
+
+  /**
    * Get all orders
    * @param {Object} req
    * @param {Object} res
@@ -52,7 +80,8 @@ const OrderController = {
   getOrderById: catchAsync(async (req, res) => {
     const userId = getRequestUserId(req.user);
     const isAdmin = isRequestUserAdmin(req.user);
-    const order = await orderService.getOrderById(req.params.orderId, userId, isAdmin);
+    const shopId = req.shop?._id || null;
+    const order = await orderService.getOrderById(req.params.orderId, userId, isAdmin, shopId);
 
     return sendSuccess(res, order, 'Order retrieved successfully', StatusCodes.OK);
   }),
@@ -110,23 +139,8 @@ const OrderController = {
   }),
 
   /**
-   * Update order status by seller
-   * @param {Object} req
-   * @param {Object} res
-   * @returns {Promise<any>}
-   */
-  updateOrderStatusBySeller: catchAsync(async (req, res) => {
-    const shopId = req.shop._id;
-    const { orderId } = req.params;
-    const { status } = req.body;
-
-    const order = await orderService.updateOrderStatusBySeller(orderId, shopId, status);
-
-    return sendSuccess(res, order, 'Order status updated successfully', StatusCodes.OK);
-  }),
-
-  /**
    * Update order status by admin or seller.
+   * (Cũng phục vụ route /seller/:orderId/status — xử lý chung qua 1 method.)
    */
   updateOrderStatus: catchAsync(async (req, res) => {
     const userId = getRequestUserId(req.user);

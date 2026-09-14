@@ -6,6 +6,7 @@ const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../utils/ApiError');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 const { connectRabbitMQ, publishToQueue, config_rabbitMQ } = require('../configs/rabbitMQ.config');
+const { publishToRetryQueue, publishToFailedQueue } = require('../utils/rabbitmq.utils');
 const { buildNotificationUpdatePayload } = require('../utils/notification-update.util');
 
 /**
@@ -20,7 +21,6 @@ class NotificationService {
   async publishToQueue(opts) {
     return publishToQueue({ serviceName: 'notification', ...opts });
   }
-
 
   async publishNotification(payload, routingKey) {
     const { channel, queue } = await this.initRabbitMQ('publisher');
@@ -67,35 +67,22 @@ class NotificationService {
   }
 
   async publishNotificationRetry(content, retryCount) {
-    const retryQueue = config_rabbitMQ.queues.notification.retryQueue;
-    return this.publishToQueue({
+    return publishToRetryQueue({
+      serviceName: 'notification',
       clientName: 'retry-publisher',
-      queueName: retryQueue,
+      queueName: config_rabbitMQ.queues.notification.retryQueue,
       content,
-      headers: {
-        'x-retry-count': retryCount,
-      },
-      bufferWarningMessage: 'RabbitMQ queue buffer is full for notification retry queue',
-      confirmErrorMessage: 'Failed to confirm notification retry message',
-      successMessage: 'Notification message sent to retry queue',
-      successMeta: { retryCount },
+      retryCount,
     });
   }
 
   async publishNotificationFailed(content, retryCount) {
-    const failedQueue = config_rabbitMQ.queues.notification.failedQueue;
-    return this.publishToQueue({
-      clientName: 'final-failed-publisher',
-      queueName: failedQueue,
+    return publishToFailedQueue({
+      serviceName: 'notification',
+      clientName: 'failed-publisher',
+      queueName: config_rabbitMQ.queues.notification.failedQueue,
       content,
-      headers: {
-        'x-retry-count': retryCount,
-        'x-final-failure-reason': 'max_retries_exceeded',
-      },
-      bufferWarningMessage: 'RabbitMQ queue buffer is full for notification final failed queue',
-      confirmErrorMessage: 'Failed to confirm final failed notification message',
-      successMessage: 'Notification message moved to final failed queue',
-      successMeta: { retryCount },
+      retryCount,
     });
   }
 

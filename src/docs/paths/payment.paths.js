@@ -40,6 +40,17 @@ module.exports = {
       responses: { 200: { description: 'Payment transaction status' } },
     },
   },
+  '/api/payment/group/{orderGroupId}': {
+    get: {
+      tags: ['Payment'],
+      summary: 'Get payment status by order group ID (multi-vendor checkout)',
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+      parameters: [
+        { name: 'orderGroupId', in: 'path', required: true, schema: { type: 'string' } },
+      ],
+      responses: { 200: { description: 'Group payment transaction status' } },
+    },
+  },
   '/api/payment/vnpay-return': {
     get: {
       tags: ['Payment'],
@@ -55,4 +66,3 @@ module.exports = {
     },
   },
 };
-

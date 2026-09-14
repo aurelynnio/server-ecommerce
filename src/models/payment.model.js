@@ -5,8 +5,20 @@ const paymentSchema = new Schema(
     orderId: {
       type: Types.ObjectId,
       ref: 'Order',
-      required: true,
+      required: function () {
+        return !this.orderGroupId;
+      },
     },
+    orderGroupId: {
+      type: Types.ObjectId,
+      default: null,
+    },
+    orderIds: [
+      {
+        type: Types.ObjectId,
+        ref: 'Order',
+      },
+    ],
     userId: {
       type: Types.ObjectId,
       ref: 'User',
@@ -53,6 +65,7 @@ const paymentSchema = new Schema(
 
 // Index for quick lookup by transaction ID
 paymentSchema.index({ orderId: 1 });
+paymentSchema.index({ orderGroupId: 1 });
 paymentSchema.index({ userId: 1 });
 paymentSchema.index({ status: 1 });
 

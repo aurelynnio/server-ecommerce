@@ -6,10 +6,11 @@ const validate = require('../middlewares/validate.middleware');
 const {
   createPaymentValidator,
   paymentOrderIdParamValidator,
+  paymentOrderGroupIdParamValidator,
 } = require('../validations/payment.validator');
 
 /**
- * @desc    Create payment for an order
+ * @desc    Create payment for an order or order group
  * @access  Private
  */
 router.post(
@@ -29,6 +30,18 @@ router.get(
   verifyAccessToken,
   validate({ params: paymentOrderIdParamValidator }),
   PaymentController.getPaymentByOrder,
+);
+
+/**
+ * @desc    Get payment details by order group ID
+ * @access  Private
+ * @param   orderGroupId - Order Group ID
+ */
+router.get(
+  '/group/:orderGroupId',
+  verifyAccessToken,
+  validate({ params: paymentOrderGroupIdParamValidator }),
+  PaymentController.getPaymentByOrderGroup,
 );
 
 /**

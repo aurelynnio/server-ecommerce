@@ -2,6 +2,7 @@ const Cart = require('../repositories/cart.repository');
 const Product = require('../repositories/product.repository');
 const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../utils/ApiError');
+const { isFlashSaleActive, getProductFlashSale } = require('../utils/flashSale.util');
 
 /**
  * Service handling shopping cart operations
@@ -76,6 +77,20 @@ class CartService {
         // Denormalized Shop Info (if not populated deep enough)
         if (!item.shopId && product.shop) {
           item.shopId = product.shop._id || product.shop;
+        }
+
+        // Check if item is in active flash sale
+        const isFlashSale = isFlashSaleActive(product.flashSale);
+
+        if (isFlashSale && Number.isFinite(product.flashSale?.salePrice)) {
+          item.price = { currentPrice: product.flashSale.salePrice, currency: 'VND' };
+          item.isFlashSale = true;
+          item.flashSaleInfo = {
+            salePrice: product.flashSale.salePrice,
+            endTime: product.flashSale.endTime,
+            stock: product.flashSale.stock,
+            soldCount: product.flashSale.soldCount || 0,
+          };
         }
 
         // Clean up large objects to reduce payload
@@ -182,6 +197,12 @@ class CartService {
       }
     }
 
+    // Check if flash sale applies (overrides standard price)
+    const { salePrice: flashSalePrice } = getProductFlashSale(product);
+    if (flashSalePrice !== null) {
+      price = flashSalePrice;
+    }
+
     // Find or create cart
     let cart = await Cart.findByUserId(userId);
     if (!cart) {
@@ -220,7 +241,12 @@ class CartService {
     cart.totalAmount = this.calculateTotal(cart.items);
     await cart.save();
 
-    return this.getCart(userId);
+    await cart.populate({
+      path: 'items.productId',
+      select: 'name slug images price status',
+    });
+
+    return cart;
   }
 
   /**
@@ -290,7 +316,12 @@ class CartService {
 
     await cart.save();
 
-    return this.getCart(userId);
+    await cart.populate({
+      path: 'items.productId',
+      select: 'name slug images price status',
+    });
+
+    return cart;
   }
 
   /**
@@ -346,10 +377,25 @@ class CartService {
    * @returns {number} Total amount
    */
   calculateTotal(items) {
-    return items.reduce((total, item) => {
-      const price = item.price?.discountPrice || item.price?.currentPrice || 0;
-      return total + price * (item.quantity || 0);
+    if (!Array.isArray(items)) return 0;
+    const total = items.reduce((sum, item) => {
+      let unitPrice = 0;
+      if (item) {
+        if (typeof item.price === 'number') {
+          unitPrice = Number.isFinite(item.price) ? item.price : 0;
+        } else if (item.price && typeof item.price === 'object') {
+          const raw = item.price.discountPrice ?? item.price.currentPrice;
+          const num = Number(raw);
+          unitPrice = Number.isFinite(num) ? num : 0;
+        } else if (item.price !== undefined && item.price !== null) {
+          const num = Number(item.price);
+          unitPrice = Number.isFinite(num) ? num : 0;
+        }
+      }
+      const quantity = Math.max(0, Number(item?.quantity) || 0);
+      return sum + unitPrice * quantity;
     }, 0);
+    return Number.isFinite(total) ? Math.max(0, total) : 0;
   }
 
   /**

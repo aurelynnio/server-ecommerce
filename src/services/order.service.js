@@ -8,33 +8,30 @@ const voucherService = require('./voucher.service');
 const Voucher = require('../repositories/voucher.repository');
 const VoucherUsage = require('../repositories/voucher-usage.repository');
 const User = require('../repositories/user.repository');
+const Shop = require('../repositories/shop.repository');
 const logger = require('../utils/logger');
 const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../utils/ApiError');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
+const redisService = require('./redis.service');
 const { ORDER_ACTORS, canTransition } = require('../shared/order/orderState');
-const { config_rabbitMQ, connectRabbitMQ, publishToQueue } = require('../configs/rabbitMQ.config');
-const { toFiniteNumber } = require('../utils/query.utils');
+const { config_rabbitMQ, connectRabbitMQ } = require('../configs/rabbitMQ.config');
+const { publishToRetryQueue, publishToFailedQueue } = require('../utils/rabbitmq.utils');
+const {
+  distributePlatformDiscount,
+  resolveEffectiveItemPrice,
+  requireFiniteNumber,
+} = require('../utils/discount.util');
+const outboxService = require('./outbox.service');
 
-
-const MAX_TX_RETRIES = Number(process.env.TXN_MAX_RETRIES) || 3;
-const TX_RETRY_DELAY_MS = Number(process.env.TXN_RETRY_DELAY_MS) || 50;
-const ORDER_EVENT_TYPES = {
-  CREATED: 'order.created',
-  STATUS_CHANGED: 'order.status_changed',
-};
+const MAX_TX_RETRIES = Number(process.env.TXN_MAX_RETRIES) || 5;
+const TX_RETRY_DELAY_MS = Number(process.env.TXN_RETRY_DELAY_MS) || 100;
+const { ORDER_EVENT_TYPES } = require('../shared/order/orderEvents');
 const SYSTEM_ORDER_ACTOR = 'system';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const toObjectIdString = (value) => (value ? value.toString() : null);
 const getOrderCode = (order) => order.orderNumber || order._id.toString().slice(-6).toUpperCase();
-const requireFiniteNumber = (value, message) => {
-  const parsed = toFiniteNumber(value);
-  if (parsed === null) {
-    throw new ApiError(StatusCodes.UNPROCESSABLE_ENTITY, message);
-  }
-  return parsed;
-};
 const sanitizeAddressField = (value) => (typeof value === 'string' ? value.trim() : '');
 const buildShippingAddressSnapshot = (address, note = '') => {
   const snapshot = {
@@ -45,8 +42,10 @@ const buildShippingAddressSnapshot = (address, note = '') => {
     district: sanitizeAddressField(address?.district),
     ward: sanitizeAddressField(address?.ward),
     note: sanitizeAddressField(note),
-    postalCode: sanitizeAddressField(address?.postalCode) || sanitizeAddressField(address?.postal_code),
-    countryCode: sanitizeAddressField(address?.countryCode) || sanitizeAddressField(address?.country_code),
+    postalCode:
+      sanitizeAddressField(address?.postalCode) || sanitizeAddressField(address?.postal_code),
+    countryCode:
+      sanitizeAddressField(address?.countryCode) || sanitizeAddressField(address?.country_code),
     email: sanitizeAddressField(address?.email),
   };
 
@@ -67,13 +66,248 @@ const buildShippingAddressSnapshot = (address, note = '') => {
   return snapshot;
 };
 
-const getErrorLabels = (error) => error?.errorLabels || error?.result?.errorLabels || [];
+const extractItemUnitPrice = (item) => {
+  if (!item) return 0;
+  if (typeof item.price === 'number') {
+    return Number.isFinite(item.price) ? item.price : 0;
+  }
+  if (item.price && typeof item.price === 'object') {
+    const raw = item.price.discountPrice ?? item.price.currentPrice;
+    const num = Number(raw);
+    if (Number.isFinite(num)) return num;
+  }
+  if (item.price !== undefined && item.price !== null) {
+    const directNum = Number(item.price);
+    if (Number.isFinite(directNum)) return directNum;
+  }
+  return 0;
+};
 
-const isRetryableTransactionError = (error) =>
-  getErrorLabels(error).includes('TransientTransactionError');
+const getErrorLabels = (error) => {
+  if (!error) return [];
+  if (Array.isArray(error.errorLabels)) return error.errorLabels;
+  if (Array.isArray(error.result?.errorLabels)) return error.result.errorLabels;
+  if (error.errorLabels instanceof Set) return Array.from(error.errorLabels);
+  if (error.result?.errorLabels instanceof Set) return Array.from(error.result.errorLabels);
+  return [];
+};
 
-const isUnknownCommitResult = (error) =>
-  getErrorLabels(error).includes('UnknownTransactionCommitResult');
+const isRetryableTransactionError = (error) => {
+  if (!error) return false;
+
+  if (typeof error.hasErrorLabel === 'function') {
+    if (error.hasErrorLabel('TransientTransactionError')) return true;
+  }
+
+  const labels = getErrorLabels(error);
+  if (labels.includes('TransientTransactionError')) return true;
+
+  if (error.code === 112 || error.codeName === 'WriteConflict') return true;
+  if (error.cause && (error.cause.code === 112 || error.cause.codeName === 'WriteConflict'))
+    return true;
+
+  const textToCheck = [
+    error.message,
+    error.codeName,
+    error.name,
+    error.cause?.message,
+    error.cause?.codeName,
+    error.stack,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    /write\s*conflict/i.test(textToCheck) ||
+    /transienttransactionerror/i.test(textToCheck) ||
+    textToCheck.includes('yielding is disabled') ||
+    textToCheck.includes('Please retry your operation')
+  );
+};
+
+const getRetryDelayMs = (attempt) => {
+  const base = TX_RETRY_DELAY_MS * Math.pow(2, attempt);
+  const jitter = Math.floor(Math.random() * 50);
+  return base + jitter;
+};
+
+const isUnknownCommitResult = (error) => {
+  if (!error) return false;
+  if (
+    typeof error.hasErrorLabel === 'function' &&
+    error.hasErrorLabel('UnknownTransactionCommitResult')
+  ) {
+    return true;
+  }
+  return getErrorLabels(error).includes('UnknownTransactionCommitResult');
+};
+
+const TX_OPTIONS = {
+  readPreference: 'primary',
+  readConcern: { level: 'local' },
+  writeConcern: { w: 'majority' },
+  maxCommitTimeMS: 10000,
+};
+
+/**
+ * Execute txnWork(session) inside a MongoDB transaction with automatic retries on:
+ * WriteConflict, TransientTransactionError, or UnknownTransactionCommitResult.
+ * Returns { committed: true, result } or { committed: false, error }.
+ */
+const runOrderTransaction = async (txnWork, retryMeta = {}) => {
+  for (let attempt = 0; attempt <= MAX_TX_RETRIES; attempt++) {
+    const session = await mongoose.startSession();
+    try {
+      session.startTransaction(TX_OPTIONS);
+      const result = await txnWork(session);
+      await session.commitTransaction();
+      return { committed: true, result };
+    } catch (error) {
+      try {
+        if (session.inTransaction()) {
+          await session.abortTransaction();
+        }
+      } catch {
+        // no-op
+      }
+
+      if (
+        (isRetryableTransactionError(error) || isUnknownCommitResult(error)) &&
+        attempt < MAX_TX_RETRIES
+      ) {
+        const delay = getRetryDelayMs(attempt);
+        logger.warn(
+          `Retrying transaction due to ${error.codeName || error.message} (attempt ${attempt + 1}/${MAX_TX_RETRIES}) after ${delay}ms`,
+          { ...retryMeta, attempt: attempt + 1, error: error.message },
+        );
+        await sleep(delay);
+        continue;
+      }
+
+      return { committed: false, error };
+    } finally {
+      try {
+        await session.endSession();
+      } catch {
+        // no-op
+      }
+    }
+  }
+
+  return {
+    committed: false,
+    error: new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to create order after retries'),
+  };
+};
+
+/**
+ * Handle post-transaction order creation outcome:
+ * - Commit succeeded -> publish created events and return result.
+ * - UnknownTransactionCommitResult -> query existing group orders; if present,
+ *   publish events and return result to prevent lost notifications.
+ * - Other errors -> rethrow.
+ */
+const finalizeOrderCreation = async (
+  { committed, result, orderGroupId },
+  successMessage,
+  publishCreatedEvents,
+) => {
+  if (committed) {
+    publishCreatedEvents(result.orders);
+    return result;
+  }
+
+  if (!isUnknownCommitResult(result.error)) {
+    throw result.error;
+  }
+
+  const existingOrders = await Order.findByOrderGroupIdLean(orderGroupId);
+  if (existingOrders.length > 0) {
+    publishCreatedEvents(existingOrders);
+    return { message: successMessage, orderGroupId, orders: existingOrders };
+  }
+
+  throw result.error;
+};
+
+/** Load user and snapshot shipping address (shared by createOrder and buyNow). */
+const loadUserAndShippingAddress = async (userId, addressId, note, session) => {
+  const user = await User.findByIdWithAddresses(userId).session(session);
+  if (!user) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
+  }
+
+  const selectedAddress = user.addresses?.id(addressId);
+  if (!selectedAddress) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Shipping address not found for current user');
+  }
+
+  return buildShippingAddressSnapshot(selectedAddress, note);
+};
+
+/**
+ * Apply shop voucher if provided and atomically increment usage count.
+ * @returns {Promise<{ discountShop: number, appliedVouchers: Array, shopVoucherResult: Object|null }>}
+ */
+const applyShopVoucher = async ({ shopVouchers, shopIdStr, userId, subtotal, session }) => {
+  const result = { discountShop: 0, appliedVouchers: [], shopVoucherResult: null };
+  const entry = (shopVouchers || []).find((v) => v?.shopId?.toString() === shopIdStr);
+  if (!entry) return result;
+
+  const voucherResult = await voucherService.applyVoucher(entry.code, userId, subtotal, shopIdStr);
+  result.discountShop = requireFiniteNumber(
+    voucherResult.discountAmount,
+    `Invalid shop voucher discount for shop ${shopIdStr}`,
+  );
+  result.appliedVouchers.push({
+    voucherId: voucherResult.voucherId,
+    code: voucherResult.code,
+    scope: 'shop',
+    discountAmount: result.discountShop,
+  });
+  result.shopVoucherResult = voucherResult;
+
+  const updateRes = await Voucher.incrementUsageWithLimit(voucherResult.voucherId, { session });
+  if (!updateRes?.matchedCount) {
+    throw new ApiError(StatusCodes.CONFLICT, 'Shop voucher usage limit reached');
+  }
+  return result;
+};
+
+/** Record shop voucher usage associated with orderId for cancellation rollback. */
+const recordShopVoucherUsage = (shopVoucherResult, userId, orderId, session) => {
+  if (!shopVoucherResult) return null;
+  return VoucherUsage.create([{ voucherId: shopVoucherResult.voucherId, userId, orderId }], {
+    session,
+  });
+};
+
+/** Build status counts object from aggregation rows. */
+const buildStatusStats = (rows) => {
+  const statusStats = {};
+  rows.forEach((item) => {
+    statusStats[item._id] = {
+      count: item.count,
+      totalAmount: item.totalAmount,
+    };
+  });
+  return statusStats;
+};
+
+/** Format daily aggregation rows to { date, orders, revenue }. */
+const formatDailyOrders = (dailyOrders) =>
+  dailyOrders.map((item) => ({
+    date: `${item._id.year}-${String(item._id.month).padStart(2, '0')}-${String(item._id.day).padStart(2, '0')}`,
+    orders: item.orders,
+    revenue: item.revenue,
+  }));
+
+/** Calculate 30-day cutoff date for rolling daily statistics. */
+const thirtyDaysAgo = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 30);
+  return d;
+};
 
 /**
  * Service handling order operations
@@ -84,12 +318,12 @@ class OrderService {
     return connectRabbitMQ('order', { confirm: true, clientName: clientName });
   }
 
-  async publishToQueue(opts) {
-    return publishToQueue({ serviceName: 'order', ...opts });
-  }
-
-  async publishOrder(payload, routingKey) {
-
+  /**
+   * Publish message to the topic exchange.
+   * - strict=false (fire-and-forget events): errors are logged without throwing.
+   * - strict=true (order commands): confirmation errors throw to prevent silent order loss.
+   */
+  async publishOrder(payload, routingKey, { strict = false } = {}) {
     const { channel } = await this.initRabbitMQ('publisher');
     const content = Buffer.from(JSON.stringify(payload));
     const exchange = config_rabbitMQ.exchange.name;
@@ -101,6 +335,7 @@ class OrderService {
       await channel.publish(exchange, routingKey, content, {
         persistent: true,
         contentType: 'application/json',
+        timeout: 5000,
       });
     } catch (error) {
       logger.error('Failed to confirm order message', {
@@ -108,39 +343,43 @@ class OrderService {
         routingKey,
         userId: payload.userId,
       });
+      if (strict) {
+        throw error;
+      }
     }
   }
 
-  async publishOrderRetry(content, retryCount) {
-    const retryQueue = config_rabbitMQ.queues.order.retryQueue;
-    return this.publishToQueue({
-      clientName: 'retry-publisher',
+  /**
+   * Route failed message to retry queue for the corresponding namespace.
+   * @param {Buffer} content
+   * @param {number} retryCount
+   * @param {'order'|'orderCommand'} [queueNamespace='order']
+   */
+  async publishOrderRetry(content, retryCount, queueNamespace = 'order') {
+    const { retryQueue } = config_rabbitMQ.queues[queueNamespace];
+    return publishToRetryQueue({
+      serviceName: 'order',
+      clientName: `retry-publisher-${queueNamespace}`,
       queueName: retryQueue,
       content,
-      headers: {
-        'x-retry-count': retryCount,
-      },
-      bufferWarningMessage: 'RabbitMQ queue buffer is full for order retry queue',
-      confirmErrorMessage: 'Failed to confirm order retry message',
-      successMessage: 'Order message sent to retry queue',
-      successMeta: { retryCount },
+      retryCount,
     });
   }
 
-  async publishOrderFailed(content, retryCount) {
-    const failedQueue = config_rabbitMQ.queues.order.failedQueue;
-    return this.publishToQueue({
-      clientName: 'failed-publisher',
+  /**
+   * Route message exceeding retry limits to the failed queue.
+   * @param {Buffer} content
+   * @param {number} retryCount
+   * @param {'order'|'orderCommand'} [queueNamespace='order']
+   */
+  async publishOrderFailed(content, retryCount, queueNamespace = 'order') {
+    const { failedQueue } = config_rabbitMQ.queues[queueNamespace];
+    return publishToFailedQueue({
+      serviceName: 'order',
+      clientName: `failed-publisher-${queueNamespace}`,
       queueName: failedQueue,
       content,
-      headers: {
-        'x-retry-count': retryCount,
-        'x-final-failure-reason': 'max_retries_exceeded',
-      },
-      bufferWarningMessage: 'RabbitMQ queue buffer is full for order final failed queue',
-      confirmErrorMessage: 'Failed to confirm final failed order message ',
-      successMessage: 'Order message sent to failed queue',
-      successMeta: { retryCount },
+      retryCount,
     });
   }
 
@@ -162,13 +401,14 @@ class OrderService {
     };
   }
 
-  async publishOrderEvent(eventName, payload) {
+  async publishOrderEvent(eventName, payload, options = {}) {
     return this.publishOrder(
       {
         eventName,
         ...payload,
       },
       eventName,
+      options,
     );
   }
 
@@ -186,92 +426,117 @@ class OrderService {
     actor = SYSTEM_ORDER_ACTOR,
     extra = {},
   ) {
-    return this.publishOrderEvent(
-      ORDER_EVENT_TYPES.STATUS_CHANGED,
-      this.buildOrderEventPayload(order, {
-        previousStatus,
-        actor,
-        ...extra,
-      }),
-    );
+    const payload = this.buildOrderEventPayload(order, {
+      previousStatus,
+      actor,
+      ...extra,
+    });
+
+    try {
+      await outboxService.enqueueEvent({
+        eventType: ORDER_EVENT_TYPES.STATUS_CHANGED,
+        routingKey: ORDER_EVENT_TYPES.STATUS_CHANGED,
+        payload,
+      });
+      outboxService.dispatchPendingEvents().catch((dispatchErr) => {
+        logger.warn('Background outbox dispatch error for status change (non-fatal)', {
+          error: dispatchErr.message,
+        });
+      });
+    } catch (err) {
+      logger.warn('Failed to enqueue status change in outbox, falling back to direct publish', {
+        error: err.message,
+      });
+      return this.publishOrderEvent(ORDER_EVENT_TYPES.STATUS_CHANGED, payload);
+    }
   }
   /**
-   * Create orders from cart items with transaction support
-   * Splits items by shop and creates separate orders per shop
-   * @param {string} userId - User ID placing the order
-   * @param {Object} orderData - Order details
-   * @param {string[]} orderData.cartItemIds - Cart item IDs to checkout
-   * @param {string} orderData.addressId - User address ID selected for delivery
-   * @param {string} [orderData.paymentMethod="cod"] - Payment method
-   * @param {Array} [orderData.shopVouchers] - Shop-specific vouchers [{shopId, code}]
-   * @param {string} [orderData.platformVoucher] - Platform voucher code
-   * @param {string} [orderData.note] - Order note
-   * @returns {Promise<Object>} Created orders with group ID
-   * @throws {Error} If cart is empty, items unavailable, or out of stock
+   * Unified core checkout execution inside a MongoDB transaction.
+   * Handles multi-shop splitting, inventory deduction, flash-sale pricing,
+   * shop & platform voucher calculations, and atomic cart cleanup.
+   * @param {string|Types.ObjectId} userId
+   * @param {Object} options
+   * @returns {Promise<Object>} { message, orderGroupId, orders }
    */
-  async createOrder(userId, orderData) {
+  async _executeCheckout(
+    userId,
+    {
+      addressId,
+      paymentMethod = 'cod',
+      shopVouchers = [],
+      platformVoucher,
+      note,
+      cartItemIds,
+      snapshottedItems,
+      buyNowItem,
+    } = {},
+  ) {
     const orderGroupId = new Types.ObjectId();
 
-    for (let attempt = 0; attempt <= MAX_TX_RETRIES; attempt++) {
-      const session = await mongoose.startSession();
-      try {
-        session.startTransaction();
+    const { committed, result } = await runOrderTransaction(
+      async (session) => {
+        const [shippingAddress, cart] = await Promise.all([
+          loadUserAndShippingAddress(userId, addressId, note, session),
+          Array.isArray(cartItemIds) && cartItemIds.length > 0
+            ? Cart.findByUserIdForCheckout(userId, session)
+            : Promise.resolve(null),
+        ]);
 
-        const {
-          cartItemIds,
-          addressId,
-          paymentMethod = 'cod',
-          shopVouchers = [], // Array of { shopId, code }
-          platformVoucher, // String (code)
-          note,
-        } = orderData;
+        let itemsToCheckout = [];
 
-        const user = await User.findByIdWithAddresses(userId).session(session);
-        if (!user) {
-          throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
-        }
-
-        const selectedAddress = user.addresses?.id(addressId);
-        if (!selectedAddress) {
-          throw new ApiError(
-            StatusCodes.BAD_REQUEST,
-            'Shipping address not found for current user',
-          );
-        }
-
-        const shippingAddress = buildShippingAddressSnapshot(selectedAddress, note);
-
-        // 1. Get Selected Items from Cart
-        const cart = await Cart.findByUserIdForCheckout(userId, session);
-        if (!cart) {
-          throw new ApiError(StatusCodes.NOT_FOUND, 'Cart is empty');
-        }
-
-        const itemsToCheckout = cart.items.filter((item) =>
-          cartItemIds.includes(item._id.toString()),
-        );
-
-        if (itemsToCheckout.length === 0) {
-          throw new ApiError(StatusCodes.BAD_REQUEST, 'No items selected');
-        }
-
-        // 2. Group items by Shop
-        const shopItemsMap = new Map(); // shopId -> [items]
-
-        for (const item of itemsToCheckout) {
-          const product = item.productId;
-          if (!product) {
-            throw new ApiError(StatusCodes.NOT_FOUND, 'Product info missing');
+        if (buyNowItem) {
+          const qty = requireFiniteNumber(buyNowItem.quantity ?? 1, 'Invalid quantity');
+          if (!Number.isInteger(qty) || qty < 1) {
+            throw new ApiError(StatusCodes.UNPROCESSABLE_ENTITY, 'Invalid quantity');
+          }
+          itemsToCheckout = [
+            {
+              productId: buyNowItem.productId,
+              variantId: buyNowItem.variantId || null,
+              modelId: buyNowItem.variantId || null,
+              quantity: qty,
+            },
+          ];
+        } else if (Array.isArray(snapshottedItems) && snapshottedItems.length > 0) {
+          itemsToCheckout = snapshottedItems;
+        } else if (Array.isArray(cartItemIds) && cartItemIds.length > 0) {
+          if (!cart || !Array.isArray(cart.items) || cart.items.length === 0) {
+            throw new ApiError(StatusCodes.NOT_FOUND, 'Cart is empty');
           }
 
-          // Ensure shopId is available
-          let shopId = item.shopId;
-          if (!shopId && product.shop) shopId = product.shop;
+          const idSet = new Set(cartItemIds.map((id) => id.toString()));
+          itemsToCheckout = cart.items.filter((item) => idSet.has(item._id.toString()));
 
+          if (itemsToCheckout.length === 0) {
+            throw new ApiError(StatusCodes.BAD_REQUEST, 'No items selected');
+          }
+        } else {
+          throw new ApiError(StatusCodes.BAD_REQUEST, 'No checkout items specified');
+        }
+
+        // 1. Fetch all products to validate existence and resolve shop IDs
+        const productIds = itemsToCheckout.map((item) => item.productId?._id || item.productId);
+        const products = await Product.findByIds(productIds).session(session);
+        const productMap = new Map(products.map((p) => [p._id.toString(), p]));
+
+        // 2. Group items by Shop
+        const shopItemsMap = new Map(); // shopIdStr -> Array<{ item, product }>
+
+        for (const item of itemsToCheckout) {
+          const prodIdStr = (item.productId?._id || item.productId).toString();
+          const product = productMap.get(prodIdStr);
+          if (!product || product.status !== 'published') {
+            throw new ApiError(
+              StatusCodes.CONFLICT,
+              `${product?.name || item.productId?.name || 'Product'} unavailable`,
+            );
+          }
+
+          const shopId = item.shopId || product.shop;
           if (!shopId) {
             throw new ApiError(
               StatusCodes.UNPROCESSABLE_ENTITY,
-              `Product ${product.name} has no shop`,
+              `Product ${product.name || 'item'} has no shop`,
             );
           }
 
@@ -279,33 +544,20 @@ class OrderService {
           if (!shopItemsMap.has(shopIdStr)) {
             shopItemsMap.set(shopIdStr, []);
           }
-          shopItemsMap.get(shopIdStr).push(item);
+          shopItemsMap.get(shopIdStr).push({ item, product });
         }
 
-        // 3. Create Orders per Shop
+        // 3. Process orders per shop
         const createdOrders = [];
-        let totalPlatformOrderValue = 0; // To check platform voucher condition
-
-        // Temporary storage for created orders to update them later with Platform Discount
         const tempOrders = [];
+        let totalPlatformOrderValue = 0;
 
-        for (const [shopId, items] of shopItemsMap.entries()) {
+        for (const [shopId, shopEntries] of shopItemsMap.entries()) {
           const orderProducts = [];
           let subtotal = 0;
           const inventoryItems = [];
 
-          // Batch fetch products to optimize performance
-          const productIds = items.map((item) => item.productId._id);
-          const products = await Product.findByIds(productIds).session(session);
-          const productMap = new Map(products.map((p) => [p._id.toString(), p]));
-
-          // Verify Price & Build Inventory List
-          for (const item of items) {
-            const product = productMap.get(item.productId._id.toString());
-            if (!product || product.status !== 'published') {
-              throw new ApiError(StatusCodes.CONFLICT, `${item.productId.name} unavailable`);
-            }
-
+          for (const { item, product } of shopEntries) {
             const quantity = requireFiniteNumber(
               item.quantity,
               `Invalid quantity for product ${product.name}`,
@@ -317,44 +569,18 @@ class OrderService {
               );
             }
 
-            let price = requireFiniteNumber(
-              product.price?.currentPrice,
-              `Invalid base price for product ${product.name}`,
-            );
-            let skuCode = '';
+            const variantId = item.variantId || item.modelId || null;
+            const { price, isFlashSale, skuCode, variant } = resolveEffectiveItemPrice({
+              product,
+              variantId,
+            });
 
-            if (item.modelId) {
-              const variant = product.variants?.find(
-                (v) => v._id.toString() === item.modelId.toString(),
-              );
-
-              if (!variant) {
-                throw new ApiError(
-                  StatusCodes.NOT_FOUND,
-                  `Variation for ${product.name} no longer exists`,
-                );
-              }
-
-              // Note: Stock check is now handled by inventoryService.deductStock
-
-              price = requireFiniteNumber(
-                variant.price,
-                `Invalid variant price for product ${product.name}`,
-              );
-              skuCode = variant.sku;
-
-              inventoryItems.push({
-                productId: product._id,
-                modelId: item.modelId,
-                quantity,
-              });
-            } else {
-              // Base product
-              inventoryItems.push({
-                productId: product._id,
-                quantity,
-              });
-            }
+            inventoryItems.push({
+              productId: product._id,
+              modelId: variantId,
+              quantity,
+              ...(isFlashSale ? { isFlashSale: true } : {}),
+            });
 
             const lineTotal = price * quantity;
             subtotal += lineTotal;
@@ -362,61 +588,31 @@ class OrderService {
             orderProducts.push({
               productId: product._id,
               sku: skuCode,
-              variantId: item.modelId,
-              name: product.name, // Snapshot name
-              image: product.images?.[0] || '', // simplified
+              variantId,
+              name: product.name,
+              image: (variant && variant.images?.[0]) || product.images?.[0] || '',
               quantity,
               price,
               totalPrice: lineTotal,
+              isFlashSale,
             });
           }
 
-          await inventoryService.checkStockAvailability(inventoryItems);
-
-          // --- DEDUCT STOCK (via InventoryService) ---
+          // Deduct stock atomically via inventoryService
           await inventoryService.deductStock(inventoryItems, session);
 
-          // --- APPLY SHOP VOUCHER ---
-          let discountShop = 0;
-          const appliedVouchers = [];
-          let shopVoucherResult = null;
-          const shopVoucherEntry = shopVouchers.find((v) => v.shopId === shopId);
-          if (shopVoucherEntry) {
-            const voucherResult = await voucherService.applyVoucher(
-              shopVoucherEntry.code,
-              userId,
-              subtotal,
-              shopId,
-            );
-            discountShop = requireFiniteNumber(
-              voucherResult.discountAmount,
-              `Invalid shop voucher discount for shop ${shopId}`,
-            );
-
-            // Snapshot voucher áp dụng để rollback usage khi hủy đơn
-            appliedVouchers.push({
-              voucherId: voucherResult.voucherId,
-              code: voucherResult.code,
-              scope: 'shop',
-              discountAmount: discountShop,
-            });
-            shopVoucherResult = voucherResult;
-
-            // Increment usage count
-            await Voucher.updateById(
-              voucherResult.voucherId,
-              { $inc: { usageCount: 1 } },
-              { session },
-            );
-          }
+          // Apply Shop Voucher
+          const { discountShop, appliedVouchers, shopVoucherResult } = await applyShopVoucher({
+            shopVouchers,
+            shopIdStr: shopId,
+            userId,
+            subtotal,
+            session,
+          });
 
           const totalAmount = Math.max(0, subtotal - discountShop);
-          totalPlatformOrderValue += totalAmount; // Platform discount applies on total after shop discount
+          totalPlatformOrderValue += totalAmount;
 
-          // shippingFee stays 0 until a shipping-fee provider is implemented
-          const shippingFee = 0;
-
-          // 4. Create Order Object (Not save yet)
           const newOrder = Order.build({
             orderGroupId,
             userId,
@@ -425,26 +621,19 @@ class OrderService {
             shippingAddress,
             paymentMethod,
             subtotal,
-            shippingFee,
+            shippingFee: 0,
             discountShop,
             discountPlatform: 0,
             appliedVouchers,
-            totalAmount: Math.max(0, subtotal - discountShop + shippingFee), // Temporary, will subtract platform discount later
+            totalAmount,
             status: 'pending',
           });
 
-          // Record shop voucher usage gắn với orderId để rollback chính xác khi hủy đơn
-          if (shopVoucherResult) {
-            await VoucherUsage.create(
-              [{ voucherId: shopVoucherResult.voucherId, userId, orderId: newOrder._id }],
-              { session },
-            );
-          }
-
+          await recordShopVoucherUsage(shopVoucherResult, userId, newOrder._id, session);
           tempOrders.push(newOrder);
         }
 
-        // --- APPLY PLATFORM VOUCHER (One for all) ---
+        // 4. Apply Platform Voucher proportionally across all orders
         if (platformVoucher) {
           const voucherResult = await voucherService.applyVoucher(
             platformVoucher,
@@ -457,35 +646,8 @@ class OrderService {
             'Invalid platform voucher discount',
           );
 
-          if (totalPlatformOrderValue > 0 && totalPlatformDiscount > 0) {
-            // Distribute platform discount to each order proportionally
-            // Weight = Order.totalAmount / totalPlatformOrderValue
-            let distributedDiscount = 0;
+          distributePlatformDiscount(tempOrders, totalPlatformDiscount);
 
-            tempOrders.forEach((order, index) => {
-              if (index === tempOrders.length - 1) {
-                // Last order takes the remainder to handle rounding issues
-                order.discountPlatform = Math.max(0, totalPlatformDiscount - distributedDiscount);
-              } else {
-                const ratio = order.totalAmount / totalPlatformOrderValue;
-                const portion = Math.floor(totalPlatformDiscount * ratio);
-                order.discountPlatform = requireFiniteNumber(
-                  portion,
-                  'Invalid platform discount distribution',
-                );
-                distributedDiscount += order.discountPlatform;
-              }
-
-              order.totalAmount = Math.max(0, order.totalAmount - order.discountPlatform);
-            });
-          } else {
-            tempOrders.forEach((order) => {
-              order.discountPlatform = 0;
-              order.totalAmount = Math.max(0, order.totalAmount);
-            });
-          }
-
-          // Snapshot platform voucher lên từng đơn trong group để rollback khi hủy
           tempOrders.forEach((order) => {
             order.appliedVouchers.push({
               voucherId: voucherResult.voucherId,
@@ -495,70 +657,81 @@ class OrderService {
             });
           });
 
-          // Increment usage count; usage record gắn orderGroupId vì voucher dùng chung cả group
-          await Voucher.updateById(
-            voucherResult.voucherId,
-            { $inc: { usageCount: 1 } },
-            { session },
-          );
+          const updateRes = await Voucher.incrementUsageWithLimit(voucherResult.voucherId, {
+            session,
+          });
+          if (!updateRes?.matchedCount) {
+            throw new ApiError(StatusCodes.CONFLICT, 'Platform voucher usage limit reached');
+          }
           await VoucherUsage.create(
             [{ voucherId: voucherResult.voucherId, userId, orderGroupId }],
             { session },
           );
         }
 
-        for (const order of tempOrders) {
-          await order.save({ session });
-          createdOrders.push(order);
+        // 5. Persist orders in a single batch
+        const insertedOrders = await Order.insertMany(tempOrders, { session });
+        createdOrders.push(...insertedOrders);
+
+        // 6. Atomic Cart Cleanup (Only executed when checkout from cart within the transaction)
+        if (cart && Array.isArray(cart.items) && Array.isArray(cartItemIds)) {
+          const idSet = new Set(cartItemIds.map((id) => id.toString()));
+          cart.items = cart.items.filter((item) => !idSet.has(item._id.toString()));
+          cart.totalAmount = Math.max(0, Number(this.calculateTotal(cart.items)) || 0);
+          cart.cartCount = cart.items.reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0);
+          await cart.save({ session });
         }
 
-        // 5. Cleanup Cart
-        cart.items = cart.items.filter((item) => !cartItemIds.includes(item._id.toString()));
-        cart.totalAmount = this.calculateTotal(cart.items);
-        await cart.save({ session });
-
-        await session.commitTransaction();
-        await this.publishOrderCreatedEvents(createdOrders);
+        // 7. Transactional Outbox: Enqueue order created events atomically within transaction session
+        const outboxEvents = createdOrders.map((order) => ({
+          eventType: ORDER_EVENT_TYPES.CREATED,
+          routingKey: ORDER_EVENT_TYPES.CREATED,
+          payload: this.buildOrderEventPayload(order),
+        }));
+        await outboxService.enqueueEvents(outboxEvents, { session });
 
         return {
-          message: 'Orders created successfully',
+          message:
+            createdOrders.length > 1 ? 'Orders created successfully' : 'Order created successfully',
           orderGroupId,
           orders: createdOrders,
         };
-      } catch (error) {
-        // Abort transaction on error - all changes will be rolled back
+      },
+      { userId },
+    );
+
+    return finalizeOrderCreation(
+      { committed, result, orderGroupId },
+      result?.message || 'Orders created successfully',
+      async (orders) => {
         try {
-          await session.abortTransaction();
-        } catch {
-          // no-op
+          await this.publishOrderCreatedEvents(orders);
+        } catch (pubErr) {
+          logger.warn('Failed to publish order created events directly (outbox will retry)', {
+            error: pubErr.message,
+          });
         }
+        outboxService.dispatchPendingEvents().catch((dispatchErr) => {
+          logger.warn('Background outbox dispatch error (non-fatal)', {
+            error: dispatchErr.message,
+          });
+        });
+      },
+    );
+  }
 
-        if (isUnknownCommitResult(error)) {
-          const existingOrders = await Order.findByOrderGroupIdLean(orderGroupId);
-          if (existingOrders.length > 0) {
-            await this.publishOrderCreatedEvents(existingOrders);
-            return {
-              message: 'Orders created successfully',
-              orderGroupId,
-              orders: existingOrders,
-            };
-          }
-        }
-
-        const canRetry = isRetryableTransactionError(error) || isUnknownCommitResult(error);
-
-        if (canRetry && attempt < MAX_TX_RETRIES) {
-          await sleep(TX_RETRY_DELAY_MS * (attempt + 1));
-          continue;
-        }
-
-        throw error;
-      } finally {
-        session.endSession();
-      }
-    }
-
-    throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to create order after retries');
+  /**
+   * Create orders from cart items with transaction support
+   * Splits items by shop and creates separate orders per shop
+   * @param {string} userId - User ID placing the order
+   * @param {Object} orderData - Order details
+   * @returns {Promise<Object>} Created orders with group ID
+   */
+  async createOrder(userId, orderData) {
+    return this._executeCheckout(userId, {
+      ...orderData,
+      cartItemIds: orderData.cartItemIds,
+    });
   }
 
   /**
@@ -567,32 +740,91 @@ class OrderService {
    * @returns {number} Total amount
    */
   calculateTotal(items) {
-    return items.reduce((total, item) => {
-      const price = item.price || 0;
-      return total + price * item.quantity;
+    if (!Array.isArray(items)) return 0;
+    const total = items.reduce((sum, item) => {
+      const unitPrice = extractItemUnitPrice(item);
+      const quantity = Math.max(0, Number(item?.quantity) || 0);
+      return sum + unitPrice * quantity;
     }, 0);
+    return Number.isFinite(total) ? Math.max(0, total) : 0;
   }
 
   /**
-   * Get all orders for a user
-   * @param {string} userId - User ID
-   * @param {Object} [filters] - Optional filters (unused, for future expansion)
-   * @returns {Promise<Object>} User's orders
+   * Buy now - direct checkout for a single product without cart
+   * Especially optimized for flash sales and instant purchases
+   * @param {string} userId - User ID placing the order
+   * @param {Object} buyNowData - Direct checkout details
+   * @returns {Promise<Object>} Created order with group ID
    */
-  async getUserOrders(userId, _filters = {}) {
-    const orders = await Order.findByUserIdWithShopAndProducts(userId);
-    return { data: orders }; // Unified response structure
+  async buyNow(userId, buyNowData) {
+    const { productId, variantId, quantity = 1, ...rest } = buyNowData;
+    return this._executeCheckout(userId, {
+      ...rest,
+      buyNowItem: { productId, variantId, quantity },
+    });
+  }
+
+  /**
+   * @deprecated Asynchronous order ingestion via queue is deprecated in favor of reliable transactional checkout.
+   */
+  async enqueueOrderCreation(userId, orderData, { isBuyNow = false } = {}) {
+    logger.warn('enqueueOrderCreation is deprecated. Executing checkout synchronously.');
+    if (isBuyNow) {
+      return this.buyNow(userId, orderData);
+    }
+    return this.createOrder(userId, orderData);
+  }
+
+  /**
+   * Get order tracking status from Redis
+   * @deprecated Use WebSocket real-time events (`order_created`, `order_failed`) instead of polling Redis keys
+   * @param {string} trackingId - UUID tracking ID
+   * @param {string} userId - User ID requesting status
+   * @returns {Promise<Object>} Order tracking status details
+   */
+  async getOrderTrackingStatus(trackingId, userId) {
+    const trackingKey = `order:tracking:${trackingId}`;
+    const statusData = await redisService.get(trackingKey);
+
+    if (!statusData) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Tracking information not found or expired');
+    }
+
+    if (statusData.userId && statusData.userId !== userId.toString()) {
+      throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized to view this order tracking');
+    }
+
+    return statusData;
+  }
+
+  /**
+   * Get all orders for a user with pagination and filters
+   * @param {string} userId - User ID
+   * @param {Object} [filters] - Query filters
+   * @returns {Promise<Object>} User's orders with pagination
+   */
+  async getUserOrders(userId, filters = {}) {
+    const { page = 1, limit = 10, status, paymentStatus, paymentMethod } = filters;
+    const filterArgs = { userId, status, paymentStatus, paymentMethod };
+    const total = await Order.countAllWithFilters(filterArgs);
+    const paginationParams = getPaginationParams(page, limit, total);
+    const orders = await Order.findAllWithFilters(filterArgs, paginationParams);
+    return buildPaginationResponse(orders, paginationParams);
   }
 
   /**
    * Get all orders for a shop (Seller dashboard)
    * @param {string} shopId - Shop ID
    * @param {Object} [filters] - Optional filters (unused, for future expansion)
-   * @returns {Promise<Object>} Shop's orders
+  /**
+   * Get all orders for a shop (delegates to paginated getOrdersByShop)
+   * @deprecated Use getOrdersByShop directly
+   * @param {string} shopId - Shop ID
+   * @param {Object} [filters={}] - Query filters
+   * @returns {Promise<Object>} Paginated orders
    */
-  async getShopOrders(shopId, _filters = {}) {
-    const orders = await Order.findByShopIdWithUser(shopId);
-    return { data: orders };
+  async getShopOrders(shopId, filters = {}) {
+    return this.getOrdersByShop(shopId, filters);
   }
 
   /**
@@ -618,141 +850,61 @@ class OrderService {
   }
 
   /**
-   * Update order status by seller
-   * Seller can only update: pending -> confirmed -> processing -> shipped
-   * @param {string} orderId - Order ID
-   * @param {string} shopId - Seller's shop ID
-   * @param {string} newStatus - New status
-   * @returns {Promise<Object>} Updated order
-   * @throws {Error} If invalid status transition
-   */
-  async updateOrderStatusBySeller(orderId, shopId, newStatus) {
-    // Hủy đơn: chạy atomic (transaction) vì phải hoàn stock + rollback voucher
-    if (newStatus === 'cancelled') {
-      return this._cancelOrderAtomically(async (session) => {
-        const order = await Order.findByIdAndShop(orderId, shopId).session(session);
-        if (!order) {
-          throw new ApiError(
-            StatusCodes.NOT_FOUND,
-            "Order not found or doesn't belong to your shop",
-          );
-        }
-        return order;
-      }, ORDER_ACTORS.SELLER);
-    }
-
-    const order = await Order.findByIdAndShop(orderId, shopId);
-
-    if (!order) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Order not found or doesn't belong to your shop");
-    }
-
-    if (!canTransition(order.status, newStatus, ORDER_ACTORS.SELLER)) {
-      throw new ApiError(
-        StatusCodes.BAD_REQUEST,
-        `Cannot change status from "${order.status}" to "${newStatus}"`,
-      );
-    }
-
-    const previousStatus = order.status;
-    order.status = newStatus;
-
-    if (newStatus === 'delivered') {
-      order.deliveredAt = new Date();
-      // Mark as paid for COD orders
-      if (order.paymentMethod === 'cod' && order.paymentStatus === 'unpaid') {
-        order.paymentStatus = 'paid';
-      }
-    }
-
-    await order.save();
-    await this.publishOrderStatusChangedEvent(order, previousStatus, ORDER_ACTORS.SELLER);
-    return order;
-  }
-
-  /**
-   * Restore stock when order is cancelled
+   * Restore inventory stock when an order is cancelled
    * @param {Object} order - Order object
-   * @param {Object} [session] - Mongoose session (đảm bảo atomic với việc đổi trạng thái đơn)
+   * @param {Object} [session=null] - Mongoose session for atomic execution
    */
   async restoreOrderStock(order, session = null) {
     const inventoryItems = order.products.map((item) => ({
       productId: item.productId,
       modelId: item.variantId,
       quantity: item.quantity,
+      ...(item.isFlashSale ? { isFlashSale: true } : {}),
     }));
 
     await inventoryService.restoreStock(inventoryItems, session);
   }
 
   /**
-   * Hủy đơn atomically trong 1 MongoDB transaction: hoàn stock + set trạng thái
-   * cancelled + commit cùng nhau. Write conflict của transaction đảm bảo 2 request
-   * hủy concurrent cùng 1 đơn không hoàn stock 2 lần (request thua bị abort/retry
-   * và thấy đơn đã hủy rồi).
+   * Cancel an order atomically in a transaction:
+   * Restores stock and marks status as cancelled in a single commit.
+   * Concurrent cancellation requests on the same order are protected via
+   * write conflict detection.
    *
-   * Voucher rollback + event publish chạy SAU commit: rollback usage là idempotent
-   * (delete-first), còn RabbitMQ publish thì không rollback được nếu nằm trong tx.
+   * Voucher rollback and event publishing run post-commit (rollback is idempotent,
+   * while RabbitMQ events cannot be rolled back if open in transaction).
    *
-   * @param {(session: Object) => Promise<Object>} loadOrder - Load order kèm
-   *        authorization check riêng cho từng actor (user/seller/admin).
-   *        Throw ApiError nếu không hợp lệ.
+   * @param {(session: Object) => Promise<Object>} loadOrder - Loads order with actor authorization checks
    * @param {string} actor - ORDER_ACTORS.USER | SELLER | ADMIN
-   * @returns {Promise<Object>} Order đã hủy
+   * @returns {Promise<Object>} Cancelled order
    */
   async _cancelOrderAtomically(loadOrder, actor) {
-    let committed = null;
+    const txn = await runOrderTransaction(async (session) => {
+      const order = await loadOrder(session);
+      const previousStatus = order.status;
 
-    for (let attempt = 0; attempt <= MAX_TX_RETRIES; attempt++) {
-      const session = await mongoose.startSession();
-      try {
-        session.startTransaction();
-
-        const order = await loadOrder(session);
-        const previousStatus = order.status;
-
-        if (!canTransition(order.status, 'cancelled', actor)) {
-          throw new ApiError(
-            StatusCodes.BAD_REQUEST,
-            `Cannot change status from "${order.status}" to "cancelled"`,
-          );
-        }
-
-        await this.restoreOrderStock(order, session);
-        order.status = 'cancelled';
-        order.cancelledAt = new Date();
-        await order.save({ session });
-
-        await session.commitTransaction();
-        committed = { order, previousStatus };
-        break;
-      } catch (error) {
-        try {
-          await session.abortTransaction();
-        } catch {
-          // no-op
-        }
-
-        const canRetry =
-          isRetryableTransactionError(error) || isUnknownCommitResult(error);
-        if (canRetry && attempt < MAX_TX_RETRIES) {
-          await sleep(TX_RETRY_DELAY_MS * (attempt + 1));
-          continue;
-        }
-        throw error;
-      } finally {
-        session.endSession();
+      if (!canTransition(order.status, 'cancelled', actor)) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          `Cannot change status from "${order.status}" to "cancelled"`,
+        );
       }
+
+      await this.restoreOrderStock(order, session);
+      order.status = 'cancelled';
+      order.cancelledAt = new Date();
+      await order.save({ session });
+
+      return { order, previousStatus };
+    });
+
+    if (!txn.committed) {
+      throw txn.result.error;
     }
 
-    if (!committed) {
-      throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to cancel order after retries');
-    }
+    const { order, previousStatus } = txn.result;
 
-    const { order, previousStatus } = committed;
-
-    // Đơn đã thanh toán online bị hủy → không có flow refund tự động,
-    // log để ops xử lý hoàn tiền thủ công (payment record vẫn 'completed')
+    // Online-paid orders requiring manual customer support refund
     if (order.paymentStatus === 'paid') {
       logger.warn('[Order] Cancelled order was already paid online — manual refund required', {
         orderId: order._id.toString(),
@@ -768,12 +920,12 @@ class OrderService {
   }
 
   /**
-   * Rollback usage các voucher đã áp dụng khi hủy đơn:
-   * - Voucher shop: usage gắn 1:1 với đơn → rollback ngay
-   * - Voucher platform: dùng chung cho cả order group → chỉ rollback khi
-   *   TẤT CẢ đơn trong group đã bị hủy (còn đơn nào alive thì giữ usage)
-   * - Đơn tạo trước khi có appliedVouchers → no-op (tương thích dữ liệu cũ)
-   * @param {Object} order - Order document đang được hủy
+   * Rollback voucher usages applied to an order upon cancellation:
+   * - Shop vouchers: 1:1 binding with order -> rolled back immediately.
+   * - Platform vouchers: shared across order group -> rolled back only when
+   *   ALL orders within the group have been cancelled.
+   * - Orders created prior to voucher tracking -> safe no-op.
+   * @param {Object} order - Order document being cancelled
    */
   async rollbackOrderVouchers(order) {
     const applied = order.appliedVouchers || [];
@@ -781,7 +933,7 @@ class OrderService {
 
     for (const appliedVoucher of applied) {
       if (appliedVoucher.scope === 'platform') {
-        // Thiếu orderGroupId → không định vị được usage record, skip để tránh rollback sai
+        // Missing orderGroupId -> cannot locate usage record safely, skip to prevent erroneous rollback
         if (!order.orderGroupId) continue;
 
         const remainingOrders = await Order.countActiveOrdersInGroupExcluding(
@@ -809,31 +961,17 @@ class OrderService {
   async getSellerOrderStatistics(shopId) {
     const shopObjectId = new Types.ObjectId(shopId);
 
-    // 1. Orders count by status
-    const ordersByStatus = await Order.aggregateSellerOrdersByStatus(shopObjectId);
+    // Run all shop statistics aggregations concurrently
+    const [ordersByStatus, revenueStats, dailyOrders, topProducts, summaryCounts] =
+      await Promise.all([
+        Order.aggregateSellerOrdersByStatus(shopObjectId),
+        Order.aggregateSellerRevenueStats(shopObjectId),
+        Order.aggregateSellerDailyOrders(shopObjectId, thirtyDaysAgo()),
+        Order.aggregateSellerTopProducts(shopObjectId, 10),
+        Order.aggregateSellerSummaryCounts(shopObjectId),
+      ]);
 
-    const statusStats = {};
-    ordersByStatus.forEach((item) => {
-      statusStats[item._id] = {
-        count: item.count,
-        totalAmount: item.totalAmount,
-      };
-    });
-
-    // 2. Revenue statistics (only paid orders)
-    const revenueStats = await Order.aggregateSellerRevenueStats(shopObjectId);
-
-    // 3. Daily orders for last 30 days
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const dailyOrders = await Order.aggregateSellerDailyOrders(shopObjectId, thirtyDaysAgo);
-
-    // 4. Top selling products
-    const topProducts = await Order.aggregateSellerTopProducts(shopObjectId, 10);
-
-    // 7. Summary counts - compute all counters in one aggregation pass
-    const summaryCounts = await Order.aggregateSellerSummaryCounts(shopObjectId);
+    const statusStats = buildStatusStats(ordersByStatus);
 
     const counts = summaryCounts[0] || {};
     const totalOrders = counts.total?.[0]?.count || 0;
@@ -851,11 +989,7 @@ class OrderService {
         avgOrderValue: Math.round(revenueStats[0]?.avgOrderValue || 0),
       },
       ordersByStatus: statusStats,
-      dailyOrders: dailyOrders.map((item) => ({
-        date: `${item._id.year}-${String(item._id.month).padStart(2, '0')}-${String(item._id.day).padStart(2, '0')}`,
-        orders: item.orders,
-        revenue: item.revenue,
-      })),
+      dailyOrders: formatDailyOrders(dailyOrders),
       topProducts,
     };
   }
@@ -889,15 +1023,38 @@ class OrderService {
    * @returns {Promise<Object>} Order object
    * @throws {Error} If order not found or unauthorized
    */
-  async getOrderById(orderId, userId, isAdmin = false) {
+  /**
+   * Get order by ID with authorization check (Admin, Buyer, or Shop Owner)
+   * @param {string} orderId - Order ID
+   * @param {string} userId - Requesting user's ID
+   * @param {boolean} isAdmin - Whether user is admin
+   * @param {string} [shopId] - Seller's shop ID if available
+   * @returns {Promise<Object>} Order object
+   * @throws {Error} If order not found or unauthorized
+   */
+  async getOrderById(orderId, userId, isAdmin = false, shopId = null) {
     const order = await Order.findByIdWithShopAndProducts(orderId);
 
     if (!order) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found');
     }
 
-    // Authorization check: user can only view their own orders unless admin
-    if (!isAdmin && order.userId.toString() !== userId.toString()) {
+    const userIdStr = userId ? userId.toString() : '';
+    const isBuyer =
+      Boolean(userIdStr) &&
+      (order.userId?._id?.toString() || order.userId?.toString()) === userIdStr;
+
+    const orderShopId = (order.shopId?._id || order.shopId)?.toString();
+    let isSeller = Boolean(shopId && orderShopId && shopId.toString() === orderShopId);
+
+    if (!isAdmin && !isBuyer && !isSeller && orderShopId && userIdStr) {
+      const shop = await Shop.findByIdLean(orderShopId);
+      if (shop && shop.owner?.toString() === userIdStr) {
+        isSeller = true;
+      }
+    }
+
+    if (!isAdmin && !isBuyer && !isSeller) {
       throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized to view this order');
     }
 
@@ -917,7 +1074,7 @@ class OrderService {
   async updateOrderStatus(orderId, status, userId, isAdmin = false, shopId = null) {
     const actor = isAdmin ? ORDER_ACTORS.ADMIN : ORDER_ACTORS.SELLER;
 
-    // Hủy đơn: chạy atomic (transaction) vì phải hoàn stock + rollback voucher
+    // Cancel status requires atomic stock restoration and voucher rollback within a transaction
     if (status === 'cancelled') {
       return this._cancelOrderAtomically(async (session) => {
         const order = await Order.findById(orderId).session(session);
@@ -925,9 +1082,10 @@ class OrderService {
           throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found');
         }
 
-        // Authorization check (giống nhánh không hủy)
+        // Authorization check matching non-cancel path
         if (!isAdmin) {
-          if (shopId && order.shopId.toString() !== shopId.toString()) {
+          const currentShopIdStr = (order.shopId?._id || order.shopId)?.toString();
+          if (shopId && currentShopIdStr !== shopId.toString()) {
             throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized to update this order');
           }
           if (!shopId) {
@@ -948,7 +1106,8 @@ class OrderService {
     // Authorization check
     if (!isAdmin) {
       // Seller can only update orders for their shop
-      if (shopId && order.shopId.toString() !== shopId.toString()) {
+      const currentShopIdStr = (order.shopId?._id || order.shopId)?.toString();
+      if (shopId && currentShopIdStr !== shopId.toString()) {
         throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized to update this order');
       }
       // Regular users cannot update order status
@@ -965,36 +1124,55 @@ class OrderService {
     }
 
     const previousStatus = order.status;
-    order.status = status;
+    const updateFields = { status };
 
     if (status === 'delivered') {
-      order.deliveredAt = new Date();
+      updateFields.deliveredAt = new Date();
+      if (order.paymentMethod === 'cod' && order.paymentStatus === 'unpaid') {
+        updateFields.paymentStatus = 'paid';
+      }
     }
 
-    await order.save();
-    await this.publishOrderStatusChangedEvent(order, previousStatus, actor);
-    return order;
+    // Atomic CAS to prevent concurrent lost updates
+    const updatedOrder = await Order.findOneAndUpdate(
+      { _id: orderId, status: previousStatus },
+      { $set: updateFields },
+      { new: true },
+    );
+
+    if (!updatedOrder) {
+      throw new ApiError(
+        StatusCodes.CONFLICT,
+        'Order status was modified by another concurrent request',
+      );
+    }
+
+    await this.publishOrderStatusChangedEvent(updatedOrder, previousStatus, actor);
+    return updatedOrder;
   }
 
   /**
-   * Cancel an order and restore stock (user path)
-   * Stock restore + status change chạy trong 1 transaction (chống hoàn stock
-   * 2 lần khi 2 request cancel concurrent, hoặc stock phình nếu save fail).
+   * Cancel an order and restore stock (user or admin path)
+   * Atomic stock restoration and status mutation within a transaction to prevent double stock return.
    * @param {string} orderId - Order ID
    * @param {string} userId - User ID (for ownership verification)
+   * @param {boolean} [isAdmin=false] - Admin can cancel any order
    * @returns {Promise<Object>} Cancelled order
    * @throws {Error} If order not found, access denied, or cannot be cancelled
    */
-  async cancelOrder(orderId, userId) {
+  async cancelOrder(orderId, userId, isAdmin = false) {
+    const actor = isAdmin ? ORDER_ACTORS.ADMIN : ORDER_ACTORS.USER;
     return this._cancelOrderAtomically(async (session) => {
-      const order = await Order.findByIdAndUser(orderId, userId).session(session);
+      const order = isAdmin
+        ? await Order.findById(orderId).session(session)
+        : await Order.findByIdAndUser(orderId, userId).session(session);
+
       if (!order) {
         throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found or access denied');
       }
 
-      // Đơn đã thanh toán online: không cho user tự hủy vì chưa có flow refund
-      // tự động — hướng dẫn liên hệ hỗ trợ để hoàn tiền
-      if (order.paymentStatus === 'paid') {
+      // Online-paid orders: user self-cancellation blocked to prevent inventory/fund desync without automated refunds. Admin cancellation remains allowed.
+      if (!isAdmin && order.paymentStatus === 'paid') {
         throw new ApiError(
           StatusCodes.CONFLICT,
           'Đơn hàng đã được thanh toán online. Vui lòng liên hệ hỗ trợ để hủy đơn và hoàn tiền.',
@@ -1002,11 +1180,11 @@ class OrderService {
       }
 
       return order;
-    }, ORDER_ACTORS.USER);
+    }, actor);
   }
 
   /**
-   * Confirm delivery by the buyer.
+   * Confirm delivery by the buyer (atomic CAS update).
    * @param {string} orderId - Order ID
    * @param {string} userId - User ID
    * @returns {Promise<Object>} Delivered order
@@ -1022,16 +1200,73 @@ class OrderService {
     }
 
     const previousStatus = order.status;
-    order.status = 'delivered';
-    order.deliveredAt = new Date();
-
+    const updateFields = {
+      status: 'delivered',
+      deliveredAt: new Date(),
+    };
     if (order.paymentMethod === 'cod' && order.paymentStatus === 'unpaid') {
-      order.paymentStatus = 'paid';
+      updateFields.paymentStatus = 'paid';
     }
 
-    await order.save();
-    await this.publishOrderStatusChangedEvent(order, previousStatus, ORDER_ACTORS.USER);
-    return order;
+    const updatedOrder = await Order.findOneAndUpdate(
+      { _id: orderId, userId, status: 'shipped' },
+      { $set: updateFields },
+      { new: true },
+    );
+
+    if (!updatedOrder) {
+      throw new ApiError(
+        StatusCodes.CONFLICT,
+        'Order status was modified by another concurrent request',
+      );
+    }
+
+    await this.publishOrderStatusChangedEvent(updatedOrder, previousStatus, ORDER_ACTORS.USER);
+    return updatedOrder;
+  }
+
+  /**
+   * Auto-cancel online orders that remained unpaid beyond timeout (Denial-of-Inventory protection).
+   * Restores stock and returns count of cancelled orders.
+   * @param {number} [timeoutMinutes=15]
+   * @returns {Promise<number>} Number of expired orders cancelled
+   */
+  async cancelExpiredUnpaidOrders(timeoutMinutes = 15) {
+    const cutoffDate = new Date(Date.now() - timeoutMinutes * 60 * 1000);
+    const expiredOrders = await Order.findManyByFilter({
+      status: 'pending',
+      paymentStatus: 'unpaid',
+      paymentMethod: { $in: ['vnpay', 'momo'] },
+      createdAt: { $lt: cutoffDate },
+    });
+
+    let cancelledCount = 0;
+    for (const order of expiredOrders) {
+      try {
+        await this._cancelOrderAtomically(async (session) => {
+          const freshOrder = await Order.findById(order._id).session(session);
+          if (
+            freshOrder &&
+            freshOrder.status === 'pending' &&
+            freshOrder.paymentStatus === 'unpaid'
+          ) {
+            freshOrder.cancelReason = 'Online payment expired';
+            return freshOrder;
+          }
+          throw new ApiError(
+            StatusCodes.CONFLICT,
+            'Order no longer eligible for auto-cancellation',
+          );
+        }, ORDER_ACTORS.ADMIN);
+        cancelledCount++;
+      } catch (err) {
+        logger.warn('Failed to auto-cancel expired order', {
+          orderId: order._id?.toString(),
+          error: err.message,
+        });
+      }
+    }
+    return cancelledCount;
   }
 
   /**
@@ -1044,41 +1279,27 @@ class OrderService {
   async getOrderStatistics(filters = {}) {
     const { startDate, endDate } = filters;
 
-    // 1. Total orders count by status
-    const ordersByStatus = await Order.aggregateAdminOrdersByStatusInRange(startDate, endDate);
+    // Run all statistics aggregations concurrently
+    const [
+      ordersByStatus,
+      revenueStats,
+      ordersByPaymentMethod,
+      dailyOrders,
+      topProducts,
+      ordersByShop,
+      adminSummaryCounts,
+    ] = await Promise.all([
+      Order.aggregateAdminOrdersByStatusInRange(startDate, endDate),
+      Order.aggregateAdminRevenueStatsInRange(startDate, endDate),
+      Order.aggregateAdminOrdersByPaymentMethodInRange(startDate, endDate),
+      Order.aggregateAdminDailyOrders(thirtyDaysAgo()),
+      Order.aggregateAdminTopProductsInRange(startDate, endDate, 10),
+      Order.aggregateAdminOrdersByShopInRange(startDate, endDate, 10),
+      Order.aggregateAdminSummaryCountsInRange(startDate, endDate),
+    ]);
 
     // Convert to object for easier access
-    const statusStats = {};
-    ordersByStatus.forEach((item) => {
-      statusStats[item._id] = {
-        count: item.count,
-        totalAmount: item.totalAmount,
-      };
-    });
-
-    // 2. Revenue statistics
-    const revenueStats = await Order.aggregateAdminRevenueStatsInRange(startDate, endDate);
-
-    // 3. Orders by payment method
-    const ordersByPaymentMethod = await Order.aggregateAdminOrdersByPaymentMethodInRange(
-      startDate,
-      endDate,
-    );
-
-    // 4. Daily orders for last 30 days
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const dailyOrders = await Order.aggregateAdminDailyOrders(thirtyDaysAgo);
-
-    // 5. Top selling products
-    const topProducts = await Order.aggregateAdminTopProductsInRange(startDate, endDate, 10);
-
-    // 6. Orders by shop (for multi-vendor)
-    const ordersByShop = await Order.aggregateAdminOrdersByShopInRange(startDate, endDate, 10);
-
-    // 7. Summary counts - compute all counters in one aggregation pass
-    const adminSummaryCounts = await Order.aggregateAdminSummaryCountsInRange(startDate, endDate);
+    const statusStats = buildStatusStats(ordersByStatus);
 
     const adminCounts = adminSummaryCounts[0] || {};
     const totalOrders = adminCounts.total?.[0]?.count || 0;
@@ -1097,15 +1318,19 @@ class OrderService {
       },
       ordersByStatus: statusStats,
       ordersByPaymentMethod,
-      dailyOrders: dailyOrders.map((item) => ({
-        date: `${item._id.year}-${String(item._id.month).padStart(2, '0')}-${String(item._id.day).padStart(2, '0')}`,
-        orders: item.orders,
-        revenue: item.revenue,
-      })),
+      dailyOrders: formatDailyOrders(dailyOrders),
       topProducts,
       ordersByShop,
     };
   }
 }
 
-module.exports = new OrderService();
+const orderServiceInstance = new OrderService();
+orderServiceInstance.isRetryableTransactionError = isRetryableTransactionError;
+orderServiceInstance._isRetryableTransactionError = isRetryableTransactionError;
+orderServiceInstance._extractItemUnitPrice = extractItemUnitPrice;
+orderServiceInstance._isUnknownCommitResult = isUnknownCommitResult;
+orderServiceInstance.distributeDiscount = distributePlatformDiscount;
+orderServiceInstance._resolveEffectiveItemPrice = resolveEffectiveItemPrice;
+
+module.exports = orderServiceInstance;

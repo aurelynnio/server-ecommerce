@@ -14,6 +14,7 @@ const createOrderValidator = Joi.object({
         code: Joi.string().uppercase().trim().required(),
       }),
     )
+    .unique('shopId')
     .default([]),
   note: sanitizedString().allow(''),
 });
@@ -44,9 +45,36 @@ const getOrdersQueryValidator = Joi.object({
   shop: objectId,
 });
 
+const buyNowValidator = Joi.object({
+  productId: objectId.required(),
+  variantId: objectId.allow('', null),
+  quantity: Joi.number().integer().min(1).default(1),
+  addressId: objectId.required(),
+  paymentMethod: Joi.string().valid('cod', 'vnpay', 'momo').default('cod'),
+  platformVoucher: Joi.string().uppercase().trim().allow('', null),
+  shopVouchers: Joi.array()
+    .items(
+      Joi.object({
+        shopId: objectId.required(),
+        code: Joi.string().uppercase().trim().required(),
+      }),
+    )
+    .unique('shopId')
+    .default([]),
+  note: sanitizedString().allow(''),
+});
+
+const trackingIdParamValidator = Joi.object({
+  trackingId: Joi.string()
+    .uuid({ version: ['uuidv4'] })
+    .required(),
+});
+
 module.exports = {
   createOrderValidator,
+  buyNowValidator,
   updateOrderStatusValidator,
   orderIdParamValidator,
   getOrdersQueryValidator,
+  trackingIdParamValidator,
 };

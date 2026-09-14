@@ -33,6 +33,15 @@ const getStatusCode = (err) => {
   // MongoDB duplicate key error (must be checked before the generic MongoServerError mapping)
   if (err.code === 11000) return StatusCodes.CONFLICT;
 
+  // MongoDB WriteConflict concurrency error
+  if (
+    err.code === 112 ||
+    err.codeName === 'WriteConflict' ||
+    (typeof err.message === 'string' && err.message.includes('Write conflict'))
+  ) {
+    return StatusCodes.CONFLICT;
+  }
+
   if (errorStatusMap[err.name]) return errorStatusMap[err.name];
 
   return StatusCodes.INTERNAL_SERVER_ERROR;
@@ -65,6 +74,15 @@ const getErrorMessage = (err) => {
   if (err.code === 11000) {
     const field = Object.keys(err.keyValue || {})[0];
     return `${field || 'Field'} already exists`;
+  }
+
+  // MongoDB WriteConflict error
+  if (
+    err.code === 112 ||
+    err.codeName === 'WriteConflict' ||
+    (typeof err.message === 'string' && err.message.includes('Write conflict'))
+  ) {
+    return 'Hệ thống đang có nhiều giao dịch đồng thời trên tài nguyên này. Vui lòng thử lại sau giây lát.';
   }
 
   // JWT errors

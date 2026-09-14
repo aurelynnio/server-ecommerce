@@ -6,6 +6,7 @@ const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../utils/ApiError');
 const { ensureFound } = require('../utils/serviceAssertions');
 const { getOwnedShopOrThrow } = require('../utils/shopAssertions');
+const { calculateVoucherDiscount } = require('../utils/discount.util');
 
 /**
  * Service handling voucher/coupon operations
@@ -299,19 +300,7 @@ class VoucherService {
     }
 
     // 6. Calculate Discount
-    let discountAmount = 0;
-    if (voucher.type === 'fixed_amount') {
-      discountAmount = voucher.value;
-    } else if (voucher.type === 'percentage') {
-      discountAmount = (normalizedOrderValue * voucher.value) / 100;
-      if (voucher.maxValue > 0) {
-        discountAmount = Math.min(discountAmount, voucher.maxValue);
-      }
-    }
-    if (!Number.isFinite(discountAmount) || discountAmount < 0) {
-      throw new ApiError(StatusCodes.UNPROCESSABLE_ENTITY, 'Voucher discount is invalid');
-    }
-    discountAmount = Math.min(discountAmount, normalizedOrderValue);
+    const discountAmount = calculateVoucherDiscount(voucher, normalizedOrderValue);
 
     return {
       voucherId: voucher._id,
@@ -329,15 +318,23 @@ class VoucherService {
   async getVoucherStatistics() {
     const now = new Date();
 
-    const totalVouchers = await Voucher.countAll();
-    const activeVouchers = await Voucher.countActive();
-    const expiredVouchers = await Voucher.countExpired(now);
-    const platformVouchers = await Voucher.countPlatformVouchers();
-    const shopVouchers = await Voucher.countShopVouchers();
-
-    const mostUsedVouchers = await Voucher.findMostUsed(5);
-
-    const discountStats = await Voucher.aggregateTotalUsage();
+    const [
+      totalVouchers,
+      activeVouchers,
+      expiredVouchers,
+      platformVouchers,
+      shopVouchers,
+      mostUsedVouchers,
+      discountStats,
+    ] = await Promise.all([
+      Voucher.countAll(),
+      Voucher.countActive(),
+      Voucher.countExpired(now),
+      Voucher.countPlatformVouchers(),
+      Voucher.countShopVouchers(),
+      Voucher.findMostUsed(5),
+      Voucher.aggregateTotalUsage(),
+    ]);
 
     return {
       totalVouchers,

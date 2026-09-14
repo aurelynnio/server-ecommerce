@@ -17,11 +17,6 @@ let vnpayInstance = null;
  * @returns {Object} VNPay instance
  */
 const getVNPayInstance = () => {
-  /**
-   * If
-   * @param {any} !vnpayInstance
-   * @returns {any}
-   */
   if (!vnpayInstance) {
     vnpayInstance = new VNPay({
       tmnCode: process.env.VNP_TMNCODE,
@@ -42,14 +37,89 @@ const getVNPayInstance = () => {
  */
 class PaymentService {
   /**
-   * Create VNPay payment URL and save payment record
-   * @param {string} orderId - Order ID
-   * @param {string} userId - User ID
-   * @param {string} ipAddress - Client IP address
+   * Create VNPay payment URL and save payment record.
+   * Supports both single order payment and multi-vendor group checkout.
+   * @param {string|Object} target - Order ID or options object { orderId, orderGroupId, userId, ipAddress }
+   * @param {string} [userIdParam] - User ID (when target is orderId)
+   * @param {string} [ipAddressParam] - Client IP address (when target is orderId)
    * @returns {Promise<Object>} Payment record with payment URL
    * @throws {Error} If order invalid, unauthorized, or already paid
    */
-  async createPaymentUrl(orderId, userId, ipAddress) {
+  async createPaymentUrl(target, userIdParam, ipAddressParam) {
+    let orderId;
+    let orderGroupId;
+    let userId;
+    let ipAddress;
+
+    if (typeof target === 'object' && target !== null) {
+      orderId = target.orderId;
+      orderGroupId = target.orderGroupId;
+      userId = target.userId;
+      ipAddress = target.ipAddress;
+    } else {
+      orderId = target;
+      userId = userIdParam;
+      ipAddress = ipAddressParam;
+    }
+
+    const vnpay = getVNPayInstance();
+    const createDate = getDateInGMT7(new Date());
+    const expireDate = getDateInGMT7(new Date(Date.now() + 15 * 60 * 1000));
+
+    // Multi-Vendor Group Payment Flow
+    if (orderGroupId) {
+      const orders = await Order.findManyByFilter({ orderGroupId });
+      if (!orders || orders.length === 0) {
+        throw new ApiError(StatusCodes.NOT_FOUND, 'Orders not found for the specified group');
+      }
+
+      for (const ord of orders) {
+        if (ord.userId.toString() !== userId.toString()) {
+          throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized access to order group');
+        }
+        if (ord.paymentMethod !== 'vnpay') {
+          throw new ApiError(StatusCodes.BAD_REQUEST, 'Order payment method is not VNPay');
+        }
+      }
+
+      const allPaid = orders.every((o) => o.paymentStatus === 'paid');
+      if (allPaid) {
+        throw new ApiError(StatusCodes.CONFLICT, 'Order has already been paid');
+      }
+
+      const totalAmount = orders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+      const transactionId = `grp_${orderGroupId}_${Date.now()}`;
+
+      const paymentUrl = vnpay.buildPaymentUrl({
+        vnp_Amount: totalAmount,
+        vnp_IpAddr: ipAddress,
+        vnp_TxnRef: transactionId,
+        vnp_OrderInfo: `Thanh toan don hang group ${orderGroupId}`,
+        vnp_OrderType: ProductCode.Other,
+        vnp_ReturnUrl:
+          process.env.VNP_RETURN_URL ||
+          `${process.env.SERVER_URL || 'http://localhost:5000'}/api/payment/vnpay-return`,
+        vnp_Locale: VnpLocale.VN,
+        vnp_CreateDate: dateFormat(createDate),
+        vnp_ExpireDate: dateFormat(expireDate),
+      });
+
+      const payment = Payment.build({
+        orderGroupId,
+        orderIds: orders.map((o) => o._id),
+        userId,
+        amount: totalAmount,
+        paymentMethod: 'vnpay',
+        status: 'pending',
+        transactionId,
+        paymentUrl,
+      });
+
+      await payment.save();
+      return payment;
+    }
+
+    // Single Order Payment Flow
     const order = await Order.findById(orderId);
     if (!order) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found');
@@ -67,14 +137,7 @@ class PaymentService {
       throw new ApiError(StatusCodes.CONFLICT, 'Order has already been paid');
     }
 
-    // PERFORMANCE FIX: Use singleton VNPay instance
-    const vnpay = getVNPayInstance();
-
     const transactionId = `${orderId}_${Date.now()}`;
-
-    // Generate dates in GMT+7 to avoid timezone issues (especially if server is in UTC)
-    const createDate = getDateInGMT7(new Date());
-    const expireDate = getDateInGMT7(new Date(Date.now() + 15 * 60 * 1000));
 
     const paymentUrl = vnpay.buildPaymentUrl({
       vnp_Amount: order.totalAmount, // Library vnpayjs already handles multiplication by 100 internally
@@ -192,9 +255,18 @@ class PaymentService {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid amount');
     }
 
-    const order = await Order.findById(payment.orderId);
-    if (!order) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found');
+    let orders = [];
+    if (payment.orderGroupId) {
+      orders = await Order.findManyByFilter({ orderGroupId: payment.orderGroupId });
+      if (!orders || orders.length === 0) {
+        throw new ApiError(StatusCodes.NOT_FOUND, 'Orders not found for payment group');
+      }
+    } else {
+      const order = await Order.findById(payment.orderId);
+      if (!order) {
+        throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found');
+      }
+      orders = [order];
     }
 
     const isSuccess = responseCode === '00' && transactionStatus === '00';
@@ -207,26 +279,28 @@ class PaymentService {
       await payment.save();
     }
 
-    let finalOrder = order;
-    let cancelled = false;
+    let finalOrders = orders;
+    let anyCancelled = false;
 
     // Áp dụng lên order khi gateway báo thành công VÀ payment record là completed.
     // _applySuccessfulPayment idempotent (CAS) nên gọi lại vẫn an toàn — kể cả khi
     // IPN đã xử lý trước nhưng crash trước khi kịp update order.
     if (isSuccess && payment.status === 'completed') {
-      const result = await this._applySuccessfulPayment(order);
-      finalOrder = result.order;
-      cancelled = result.cancelled;
+      const results = await Promise.all(orders.map((ord) => this._applySuccessfulPayment(ord)));
+      finalOrders = results.map((r) => r.order);
+      anyCancelled = results.some((r) => r.cancelled);
     }
 
-    if (isSuccess && !cancelled) {
+    if (isSuccess && !anyCancelled) {
       // Emit socket event to update dashboard
       try {
         const io = getIO();
-        io.emit('new_order', {
-          orderId: finalOrder._id,
-          totalAmount: finalOrder.totalAmount,
-          createdAt: finalOrder.createdAt,
+        finalOrders.forEach((finalOrder) => {
+          io.emit('new_order', {
+            orderId: finalOrder._id,
+            totalAmount: finalOrder.totalAmount,
+            createdAt: finalOrder.createdAt,
+          });
         });
       } catch (error) {
         logger.error('Socket emit error:', { error: error.message });
@@ -234,10 +308,11 @@ class PaymentService {
     }
 
     return {
-      success: isSuccess && !cancelled,
+      success: isSuccess && !anyCancelled,
       payment,
-      order: finalOrder,
-      message: cancelled
+      order: finalOrders[0],
+      orders: finalOrders,
+      message: anyCancelled
         ? 'Order was cancelled before payment completed. The transaction will be reviewed for refund.'
         : isSuccess
           ? 'Payment successful'
@@ -288,12 +363,24 @@ class PaymentService {
       };
     }
 
-    const order = await Order.findById(payment.orderId);
-    if (!order) {
-      return {
-        RspCode: '01',
-        Message: 'Order not found',
-      };
+    let orders = [];
+    if (payment.orderGroupId) {
+      orders = await Order.findManyByFilter({ orderGroupId: payment.orderGroupId });
+      if (!orders || orders.length === 0) {
+        return {
+          RspCode: '01',
+          Message: 'Order not found',
+        };
+      }
+    } else {
+      const order = await Order.findById(payment.orderId);
+      if (!order) {
+        return {
+          RspCode: '01',
+          Message: 'Order not found',
+        };
+      }
+      orders = [order];
     }
 
     const isSuccess = responseCode === '00';
@@ -305,13 +392,38 @@ class PaymentService {
 
     if (isSuccess) {
       // Guard: không đổi trạng thái đơn đã hủy (chống oversell do stock đã hoàn)
-      await this._applySuccessfulPayment(order);
+      await Promise.all(orders.map((ord) => this._applySuccessfulPayment(ord)));
     }
 
     return {
       RspCode: '00',
       Message: 'Confirm success',
     };
+  }
+
+  /**
+   * Get payment by order group ID
+   * @param {string} orderGroupId - Order group ID
+   * @param {string} [userId] - Current user ID for authorization check
+   * @param {boolean} [isAdmin=false] - Whether current user is admin
+   * @returns {Object} Payment record
+   * @throws {Error} If unauthorized access
+   */
+  async getPaymentByOrderGroupId(orderGroupId, userId, isAdmin = false) {
+    const payment = await Payment.findByOrderGroupIdWithOrdersAndUser(orderGroupId);
+
+    if (!payment) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Payment not found');
+    }
+
+    if (userId && !isAdmin) {
+      const paymentUserId = payment.userId?._id?.toString() || payment.userId?.toString();
+      if (paymentUserId !== userId.toString()) {
+        throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized access');
+      }
+    }
+
+    return payment;
   }
 
   /**

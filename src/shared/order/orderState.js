@@ -27,7 +27,7 @@ const ORDER_TRANSITIONS = {
     pending: ['cancelled'],
     confirmed: ['cancelled'],
     processing: [],
-    shipped: [],
+    shipped: ['delivered'],
     delivered: [],
     cancelled: [],
     returned: [],

@@ -20,7 +20,12 @@ voucherUsageSchema.index({ voucherId: 1, userId: 1 });
 voucherUsageSchema.index({ voucherId: 1, createdAt: -1 });
 // Query: lich su voucher cua user
 voucherUsageSchema.index({ userId: 1, createdAt: -1 });
-// Query: tim usage theo order group khi rollback voucher platform
-voucherUsageSchema.index({ voucherId: 1, userId: 1, orderGroupId: 1 });
+// Exactly-once guarantee: chống double-spend voucher shop theo orderId
+voucherUsageSchema.index({ voucherId: 1, userId: 1, orderId: 1 }, { unique: true, sparse: true });
+// Exactly-once guarantee: chống double-spend voucher platform theo orderGroupId
+voucherUsageSchema.index(
+  { voucherId: 1, userId: 1, orderGroupId: 1 },
+  { unique: true, sparse: true },
+);
 
 module.exports = model('VoucherUsage', voucherUsageSchema);

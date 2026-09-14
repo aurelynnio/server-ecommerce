@@ -125,6 +125,28 @@ module.exports = {
       },
     },
   },
+  '/api/orders/tracking/{trackingId}': {
+    get: {
+      tags: ['Orders'],
+      summary: 'Get order tracking status (Deprecated)',
+      description:
+        'Deprecated: Use WebSocket real-time events (order_created, order_failed) instead of polling Redis.',
+      deprecated: true,
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+      parameters: [
+        {
+          name: 'trackingId',
+          in: 'path',
+          required: true,
+          schema: { type: 'string', format: 'uuid' },
+        },
+      ],
+      responses: {
+        200: { description: 'Order async processing status' },
+        404: { description: 'Tracking ID not found or expired' },
+      },
+    },
+  },
   '/api/orders/{orderId}/cancel': {
     delete: {
       tags: ['Orders'],
@@ -194,4 +216,3 @@ module.exports = {
     },
   },
 };
-

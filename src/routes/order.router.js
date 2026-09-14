@@ -7,12 +7,15 @@ const {
   verifyOrderOwnership,
 } = require('../middlewares/ownership.middleware');
 const validate = require('../middlewares/validate.middleware');
+const idempotency = require('../middlewares/idempotency.middleware');
 const { isRequestUserAdmin } = require('../utils/requestUser');
 const {
   createOrderValidator,
+  buyNowValidator,
   updateOrderStatusValidator,
   orderIdParamValidator,
   getOrdersQueryValidator,
+  trackingIdParamValidator,
 } = require('../validations/order.validator');
 
 const verifyShopOwnershipForSeller = (req, res, next) => {
@@ -24,7 +27,25 @@ const verifyShopOwnershipForSeller = (req, res, next) => {
  * @desc    Create a new order from cart items
  * @access  Private
  */
-router.post('/', verifyAccessToken, validate(createOrderValidator), orderController.createOrder);
+router.post(
+  '/',
+  verifyAccessToken,
+  idempotency(),
+  validate(createOrderValidator),
+  orderController.createOrder,
+);
+
+/**
+ * @desc    Buy now - direct checkout without cart
+ * @access  Private
+ */
+router.post(
+  '/buy-now',
+  verifyAccessToken,
+  idempotency(),
+  validate(buyNowValidator),
+  orderController.buyNow,
+);
 
 /**
  * @desc    Get current user's orders with pagination
@@ -35,6 +56,18 @@ router.get(
   verifyAccessToken,
   validate({ query: getOrdersQueryValidator }),
   orderController.getUserOrders,
+);
+
+/**
+ * @desc    Get order tracking status (for async order queue)
+ * @access  Private
+ * @deprecated Use WebSocket real-time events (`order_created`, `order_failed`) instead of polling Redis
+ */
+router.get(
+  '/tracking/:trackingId',
+  verifyAccessToken,
+  validate({ params: trackingIdParamValidator }),
+  orderController.getOrderTrackingStatus,
 );
 
 /**
@@ -124,20 +157,25 @@ router.put(
 );
 
 /**
- * @desc    Update order status by seller
+ * @desc    Update order status by seller (dùng chung handler updateOrderStatus)
  * @access  Private (Seller)
  */
+const verifyOrderOwnershipForSeller = (req, res, next) => {
+  if (isRequestUserAdmin(req.user)) return next();
+  return verifyOrderOwnership(req, res, next);
+};
+
 router.put(
   '/seller/:orderId/status',
   verifyAccessToken,
   requireRole('seller', 'admin'),
-  verifyShopOwnership,
-  verifyOrderOwnership,
+  verifyShopOwnershipForSeller,
+  verifyOrderOwnershipForSeller,
   validate({
     params: orderIdParamValidator,
     body: updateOrderStatusValidator,
   }),
-  orderController.updateOrderStatusBySeller,
+  orderController.updateOrderStatus,
 );
 
 /**

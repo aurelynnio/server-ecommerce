@@ -95,6 +95,23 @@ class VoucherRepository extends BaseRepository {
   }
 
   /**
+   * Tăng usageCount kèm guard usageLimit:
+   * Chỉ tăng nếu usageLimit = 0 (vô hạn) hoặc usageCount < usageLimit.
+   * Chống TOCTOU race condition khi nhiều request checkout đồng thời.
+   */
+  incrementUsageWithLimit(voucherId, options = {}) {
+    return this.updateOneByFilter(
+      {
+        _id: voucherId,
+        isActive: true,
+        $or: [{ usageLimit: 0 }, { $expr: { $lt: ['$usageCount', '$usageLimit'] } }],
+      },
+      { $inc: { usageCount: 1 } },
+      options,
+    );
+  }
+
+  /**
    * Giảm usageCount khi rollback voucher do hủy đơn.
    * Guard usageCount > 0 để không bị âm khi rollback lặp.
    */
