@@ -53,7 +53,6 @@ const formatMessage = (level, message, meta = {}) => {
     return `[${timestamp}] [${level}]${reqStr} ${message}${metaStr}`;
   }
 
-
   const logPayload = {
     timestamp,
     level,
@@ -124,7 +123,6 @@ const logger = {
       logger.debug(`DB ${operation} on ${collection}`, meta);
     }
   },
-
 
   // Export helpers for testing
   _formatMessage: formatMessage,

@@ -343,8 +343,7 @@ async function ensureShopCategories(shops) {
 const realProducts = require('./data/real-products.json');
 
 function buildRealVariants(item) {
-  const colors =
-    item.colors && item.colors.length ? item.colors.slice(0, 4) : ['Black'];
+  const colors = item.colors && item.colors.length ? item.colors.slice(0, 4) : ['Black'];
   const colorsList = colors.length ? colors : ['Black'];
   const basePrice = item.price.currentPrice || 0;
   return colorsList.map((color, idx) => {
@@ -406,7 +405,10 @@ async function seedProducts({ shops, shopCategories, categories, productsPerShop
         category: category._id,
         shopCategory: shopCats.length ? pick(shopCats)._id : undefined,
         brand: item.brand || '',
-        tags: pickMany(['real', 'hot', 'deal', 'new', 'best', 'sale', 'freeship'], faker.number.int({ min: 1, max: 4 })),
+        tags: pickMany(
+          ['real', 'hot', 'deal', 'new', 'best', 'sale', 'freeship'],
+          faker.number.int({ min: 1, max: 4 }),
+        ),
         sizes: item.sizes || [],
         descriptionImages: (item.images || []).slice(0, 10),
         video: '',

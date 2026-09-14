@@ -11,7 +11,9 @@ module.exports = {
       responses: {
         200: {
           description: 'Server process is alive',
-          content: { 'application/json': { schema: { $ref: '#/components/schemas/LivenessResponse' } } },
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/LivenessResponse' } },
+          },
         },
       },
     },
@@ -20,11 +22,14 @@ module.exports = {
     get: {
       tags: ['Monitoring & Health'],
       summary: 'Kubernetes / Load Balancer Readiness Probe',
-      description: 'Verifies MongoDB, Redis, and RabbitMQ dependencies. Cached in RAM for 10s to prevent database hammering.',
+      description:
+        'Verifies MongoDB, Redis, and RabbitMQ dependencies. Cached in RAM for 10s to prevent database hammering.',
       responses: {
         200: {
           description: 'All vital dependencies operational',
-          content: { 'application/json': { schema: { $ref: '#/components/schemas/ReadinessResponse' } } },
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/ReadinessResponse' } },
+          },
         },
         503: { description: 'One or more required services are down' },
       },
@@ -34,7 +39,8 @@ module.exports = {
     get: {
       tags: ['Monitoring & Health'],
       summary: 'Prometheus metrics scrape endpoint',
-      description: 'Exports RED metrics (rate, errors, duration), GC metrics, heap memory, and multi-worker aggregated metrics.',
+      description:
+        'Exports RED metrics (rate, errors, duration), GC metrics, heap memory, and multi-worker aggregated metrics.',
       security: [{ metricsAuth: [] }],
       responses: {
         200: {
@@ -46,4 +52,3 @@ module.exports = {
     },
   },
 };
-

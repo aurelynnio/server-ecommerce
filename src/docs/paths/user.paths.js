@@ -140,7 +140,11 @@ module.exports = {
       parameters: [
         { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
         { name: 'limit', in: 'query', schema: { type: 'integer', default: 20 } },
-        { name: 'role', in: 'query', schema: { type: 'string', enum: ['user', 'seller', 'admin'] } },
+        {
+          name: 'role',
+          in: 'query',
+          schema: { type: 'string', enum: ['user', 'seller', 'admin'] },
+        },
       ],
       responses: {
         200: { description: 'Paginated user list' },
@@ -200,4 +204,3 @@ module.exports = {
     },
   },
 };
-

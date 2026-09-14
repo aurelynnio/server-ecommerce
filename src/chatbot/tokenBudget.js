@@ -13,12 +13,7 @@ const normalizeMessage = (m) => {
   if (typeof m === 'string') return { content: m };
   return {
     role: m.role || m.type || 'user',
-    content:
-      typeof m.content === 'string'
-        ? m.content
-        : typeof m.text === 'string'
-          ? m.text
-          : '',
+    content: typeof m.content === 'string' ? m.content : typeof m.text === 'string' ? m.text : '',
   };
 };
 

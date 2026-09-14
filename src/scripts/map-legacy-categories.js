@@ -73,7 +73,9 @@ async function main() {
   const roots = after.filter((c) => !c.parentCategory);
   console.log(`\nTop-level roots now: ${roots.length}`);
   for (const r of roots) {
-    const children = after.filter((c) => c.parentCategory && String(c.parentCategory) === String(r._id));
+    const children = after.filter(
+      (c) => c.parentCategory && String(c.parentCategory) === String(r._id),
+    );
     console.log(`  - ${r.name} (${r.slug}) [${children.length} direct children]`);
   }
 

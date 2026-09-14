@@ -12,9 +12,19 @@ const {
   sessionIdParamValidator,
 } = require('../validations/chatbot.validator');
 
-router.post('/message', chatbotRateLimiter, validate(chatMessageValidator), chatbotController.sendMessage);
+router.post(
+  '/message',
+  chatbotRateLimiter,
+  validate(chatMessageValidator),
+  chatbotController.sendMessage,
+);
 
-router.post('/stream', chatbotRateLimiter, validate(chatMessageValidator), chatbotController.streamMessage);
+router.post(
+  '/stream',
+  chatbotRateLimiter,
+  validate(chatMessageValidator),
+  chatbotController.streamMessage,
+);
 
 /**
  * @desc    Get chat history by session ID

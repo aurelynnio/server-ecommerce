@@ -19,7 +19,10 @@ const ensureIndexes = async () => {
   const collection = mongoose.connection.collection('chatbot_messages');
 
   const existing = await collection.indexes();
-  logger.info('[Chatbot-TTL] Existing indexes:', existing.map((i) => i.name));
+  logger.info(
+    '[Chatbot-TTL] Existing indexes:',
+    existing.map((i) => i.name),
+  );
 
   // Drop old broken TTL index on _id if it exists (TTL on ObjectId never fires)
   const oldTtl = existing.find((i) => i.name === 'chatbot_messages_ttl');
@@ -36,22 +39,22 @@ const ensureIndexes = async () => {
       expireAfterSeconds: TTL_SECONDS,
     },
   );
-  logger.info(`[Chatbot-TTL] TTL index created on createdAt (expireAfterSeconds=${TTL_SECONDS}s = ${TTL_DAYS}d)`);
+  logger.info(
+    `[Chatbot-TTL] TTL index created on createdAt (expireAfterSeconds=${TTL_SECONDS}s = ${TTL_DAYS}d)`,
+  );
 
   // Index on sessionId for fast lookups (getHistory, clearSession, etc.)
-  await collection.createIndex(
-    { sessionId: 1 },
-    { name: 'chatbot_messages_sessionId' },
-  );
+  await collection.createIndex({ sessionId: 1 }, { name: 'chatbot_messages_sessionId' });
   logger.info('[Chatbot-TTL] sessionId index created');
 
   // Backfill: set createdAt from ObjectId timestamp for existing docs without it
-  const backfillResult = await collection.updateMany(
-    { createdAt: { $exists: false } },
-    [{ $set: { createdAt: { $toDate: '$_id' } } }],
-  );
+  const backfillResult = await collection.updateMany({ createdAt: { $exists: false } }, [
+    { $set: { createdAt: { $toDate: '$_id' } } },
+  ]);
   if (backfillResult.modifiedCount > 0) {
-    logger.info(`[Chatbot-TTL] Backfilled createdAt for ${backfillResult.modifiedCount} existing documents`);
+    logger.info(
+      `[Chatbot-TTL] Backfilled createdAt for ${backfillResult.modifiedCount} existing documents`,
+    );
   }
 };
 

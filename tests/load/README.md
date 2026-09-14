@@ -35,12 +35,12 @@ k6 run --out json=result.json tests/load/chatbot-load.js
 
 ## Acceptance criteria
 
-| Metric | Target |
-|---|---|
-| p95 latency | < 5s |
-| p99 latency | < 10s |
-| Error rate | < 1% |
-| Throughput | ≥ 50 req/s sustained |
+| Metric      | Target               |
+| ----------- | -------------------- |
+| p95 latency | < 5s                 |
+| p99 latency | < 10s                |
+| Error rate  | < 1%                 |
+| Throughput  | ≥ 50 req/s sustained |
 
 ## Lưu ý
 

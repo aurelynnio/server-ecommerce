@@ -88,7 +88,11 @@ function parseList(v) {
   return raw
     .replace(/^\[|\]$/g, '')
     .split(',')
-    .map((x) => String(x).replace(/^["']|["']$/g, '').trim())
+    .map((x) =>
+      String(x)
+        .replace(/^["']|["']$/g, '')
+        .trim(),
+    )
     .filter(Boolean);
 }
 
@@ -103,37 +107,178 @@ const CATEGORY_KEYWORDS = [
   {
     slug: 'dien-thoai-phu-kien',
     name: 'Điện thoại & Phụ kiện',
-    keywords: ['phone', 'smartphone', 'iphone', 'samsung galaxy', 'case', 'charger', 'mobile', 'cell', 'sim', 'screen protector', 'power bank'],
+    keywords: [
+      'phone',
+      'smartphone',
+      'iphone',
+      'samsung galaxy',
+      'case',
+      'charger',
+      'mobile',
+      'cell',
+      'sim',
+      'screen protector',
+      'power bank',
+    ],
   },
   {
     slug: 'thoi-trang',
     name: 'Thời trang',
-    keywords: ['dress', 'shirt', 'shoes', 'sneaker', 'jean', 'jacket', 'hoodie', 'skirt', 't-shirt', 'tshirt', 'top', 'blouse', 'sandal', 'boot', 'fashion', 'apparel', 'trouser', 'pant', 'sock', 'hat', 'cap', 'bag', 'wallet', 'purse', 'watch'],
+    keywords: [
+      'dress',
+      'shirt',
+      'shoes',
+      'sneaker',
+      'jean',
+      'jacket',
+      'hoodie',
+      'skirt',
+      't-shirt',
+      'tshirt',
+      'top',
+      'blouse',
+      'sandal',
+      'boot',
+      'fashion',
+      'apparel',
+      'trouser',
+      'pant',
+      'sock',
+      'hat',
+      'cap',
+      'bag',
+      'wallet',
+      'purse',
+      'watch',
+    ],
   },
   {
     slug: 'lam-dep',
     name: 'Làm đẹp',
-    keywords: ['makeup', 'lipstick', 'foundation', 'serum', 'cream', 'skincare', 'skin care', 'shampoo', 'conditioner', 'perfume', 'fragrance', 'eyeliner', 'mascara', 'beauty', 'cosmetic', 'face', 'mask skin', 'lotion'],
+    keywords: [
+      'makeup',
+      'lipstick',
+      'foundation',
+      'serum',
+      'cream',
+      'skincare',
+      'skin care',
+      'shampoo',
+      'conditioner',
+      'perfume',
+      'fragrance',
+      'eyeliner',
+      'mascara',
+      'beauty',
+      'cosmetic',
+      'face',
+      'mask skin',
+      'lotion',
+    ],
   },
   {
     slug: 'nha-cua-doi-song',
     name: 'Nhà cửa & Đời sống',
-    keywords: ['furniture', 'chair', 'table', 'sofa', 'lamp', 'bed', 'shelf', 'kitchen', 'cookware', 'pot', 'pan', 'towel', 'tumbler', 'water bottle', 'storage', 'bathroom', 'cabinet', 'decor', 'pillow', 'cushion', 'curtain'],
+    keywords: [
+      'furniture',
+      'chair',
+      'table',
+      'sofa',
+      'lamp',
+      'bed',
+      'shelf',
+      'kitchen',
+      'cookware',
+      'pot',
+      'pan',
+      'towel',
+      'tumbler',
+      'water bottle',
+      'storage',
+      'bathroom',
+      'cabinet',
+      'decor',
+      'pillow',
+      'cushion',
+      'curtain',
+    ],
   },
   {
     slug: 'may-tinh-thiet-bi',
     name: 'Máy tính & Thiết bị',
-    keywords: ['laptop', 'notebook', 'keyboard', 'mouse', 'headphone', 'earbud', 'speaker', 'monitor', 'tablet', 'camera', 'webcam', 'computer', 'printer', 'router', 'ssd', 'hard drive', 'memory', 'gpu', 'desktop'],
+    keywords: [
+      'laptop',
+      'notebook',
+      'keyboard',
+      'mouse',
+      'headphone',
+      'earbud',
+      'speaker',
+      'monitor',
+      'tablet',
+      'camera',
+      'webcam',
+      'computer',
+      'printer',
+      'router',
+      'ssd',
+      'hard drive',
+      'memory',
+      'gpu',
+      'desktop',
+    ],
   },
   {
     slug: 'the-thao-du-lich',
     name: 'Thể thao & Du lịch',
-    keywords: ['running', 'sport', 'fitness', 'gym', 'yoga', 'bicycle', 'bike', 'soccer', 'football', 'basketball', 'tennis', 'dumbbell', 'tent', 'camping', 'hiking', 'backpack', 'travel', 'luggage', 'suitcase', 'jersey'],
+    keywords: [
+      'running',
+      'sport',
+      'fitness',
+      'gym',
+      'yoga',
+      'bicycle',
+      'bike',
+      'soccer',
+      'football',
+      'basketball',
+      'tennis',
+      'dumbbell',
+      'tent',
+      'camping',
+      'hiking',
+      'backpack',
+      'travel',
+      'luggage',
+      'suitcase',
+      'jersey',
+    ],
   },
   {
     slug: 'thuc-pham-do-uong',
     name: 'Thực phẩm & Đồ uống',
-    keywords: ['coffee', 'tea', 'snack', 'candy', 'chocolate', 'cookie', 'rice', 'pasta', 'sauce', 'oil', 'spice', 'cereal', 'drink', 'juice', 'protein', 'supplement', 'food', 'granola', 'nut', 'dried'],
+    keywords: [
+      'coffee',
+      'tea',
+      'snack',
+      'candy',
+      'chocolate',
+      'cookie',
+      'rice',
+      'pasta',
+      'sauce',
+      'oil',
+      'spice',
+      'cereal',
+      'drink',
+      'juice',
+      'protein',
+      'supplement',
+      'food',
+      'granola',
+      'nut',
+      'dried',
+    ],
   },
 ];
 
@@ -188,7 +333,8 @@ function normalizeAmazon(r) {
     category: r.department || r.categories || '',
     price,
     currency: r.currency,
-    stock: availability.includes('in') || availability.includes('true') || availability === '1' ? 1 : 0,
+    stock:
+      availability.includes('in') || availability.includes('true') || availability === '1' ? 1 : 0,
     rating: clampConfidence(num(r.rating)),
     reviewCount: num(r.reviews_count),
     images: main ? [main, ...images.filter((x) => x !== main)].slice(0, 8) : images.slice(0, 8),
@@ -254,7 +400,12 @@ function normalizeShein(r) {
     category: r.root_category || r.category_tree || '',
     price: r.final_price || r.initial_price,
     currency: r.currency,
-    stock: r.in_stock === true || r.in_stock === 'true' || String(r.in_stock).toLowerCase().includes('true') ? 1 : 0,
+    stock:
+      r.in_stock === true ||
+      r.in_stock === 'true' ||
+      String(r.in_stock).toLowerCase().includes('true')
+        ? 1
+        : 0,
     rating: clampConfidence(num(r.rating)),
     reviewCount: num(r.reviews_count),
     images,
@@ -294,7 +445,12 @@ function load(file) {
     return [];
   }
   const content = fs.readFileSync(p, 'utf8');
-  return parse(content, { columns: true, skip_empty_lines: true, relax_quotes: true, relax_column_count: true });
+  return parse(content, {
+    columns: true,
+    skip_empty_lines: true,
+    relax_quotes: true,
+    relax_column_count: true,
+  });
 }
 
 function main() {

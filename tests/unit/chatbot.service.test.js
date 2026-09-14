@@ -3,7 +3,11 @@
  * Tests pure logic: buildContextMessage, formatProducts, validateResponse
  */
 import { describe, it, expect } from 'vitest';
-import { formatProducts, normalizePriceInText, validateResponse } from '../../src/chatbot/chatbotHelpers';
+import {
+  formatProducts,
+  normalizePriceInText,
+  validateResponse,
+} from '../../src/chatbot/chatbotHelpers';
 
 // Can't import the full service (LangChain constructor runs), so test logic directly
 describe('ChatbotService Logic', () => {

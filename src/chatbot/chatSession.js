@@ -71,4 +71,3 @@ module.exports = {
   setChatSessionCookie,
   resolveChatSession,
 };
-

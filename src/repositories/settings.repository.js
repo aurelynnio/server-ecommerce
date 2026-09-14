@@ -1,16 +1,21 @@
 const Settings = require('../models/settings.model');
+const BaseRepository = require('./base.repository');
 
-class SettingsRepository {
+class SettingsRepository extends BaseRepository {
+  constructor() {
+    super(Settings);
+  }
+
   findMain() {
-    return Settings.findOne({ key: 'main' });
+    return this.findOneByFilter({ key: 'main' });
   }
 
   createMain(data = {}) {
-    return Settings.create({ ...data, key: 'main' });
+    return this.create({ ...data, key: 'main' });
   }
 
   upsertMainBySet(updateData) {
-    return Settings.findOneAndUpdate(
+    return this.findOneAndUpdateByFilter(
       { key: 'main' },
       { $set: updateData },
       { new: true, upsert: true },
@@ -18,7 +23,7 @@ class SettingsRepository {
   }
 
   deleteMain() {
-    return Settings.deleteOne({ key: 'main' });
+    return this.deleteOneByFilter({ key: 'main' });
   }
 }
 

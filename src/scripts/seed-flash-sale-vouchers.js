@@ -38,19 +38,115 @@ function pickFloat(min, max, precision = 1) {
 // Voucher templates — Tmall/JD-style platform vouchers
 const voucherTemplates = [
   // Fixed amount vouchers
-  { code: 'GIAM20K', name: 'Giảm 20K', description: 'Giảm 20,000đ cho đơn từ 200K', type: 'fixed_amount', value: 20000, maxValue: null, minOrderValue: 200000 },
-  { code: 'GIAM50K', name: 'Giảm 50K', description: 'Giảm 50,000đ cho đơn từ 500K', type: 'fixed_amount', value: 50000, maxValue: null, minOrderValue: 500000 },
-  { code: 'GIAM100K', name: 'Giảm 100K', description: 'Giảm 100,000đ cho đơn từ 1 triệu', type: 'fixed_amount', value: 100000, maxValue: null, minOrderValue: 1000000 },
-  { code: 'GIAM200K', name: 'Giảm 200K', description: 'Giảm 200,000đ cho đơn từ 2 triệu', type: 'fixed_amount', value: 200000, maxValue: null, minOrderValue: 2000000 },
-  { code: 'GIAM500K', name: 'Giảm 500K Mega', description: 'Giảm 500,000đ cho đơn từ 5 triệu', type: 'fixed_amount', value: 500000, maxValue: null, minOrderValue: 5000000 },
-  { code: 'NEWORDER30K', name: 'Đơn đầu tiên 30K', description: 'Giảm 30,000đ cho đơn hàng đầu tiên', type: 'fixed_amount', value: 30000, maxValue: null, minOrderValue: 150000 },
+  {
+    code: 'GIAM20K',
+    name: 'Giảm 20K',
+    description: 'Giảm 20,000đ cho đơn từ 200K',
+    type: 'fixed_amount',
+    value: 20000,
+    maxValue: null,
+    minOrderValue: 200000,
+  },
+  {
+    code: 'GIAM50K',
+    name: 'Giảm 50K',
+    description: 'Giảm 50,000đ cho đơn từ 500K',
+    type: 'fixed_amount',
+    value: 50000,
+    maxValue: null,
+    minOrderValue: 500000,
+  },
+  {
+    code: 'GIAM100K',
+    name: 'Giảm 100K',
+    description: 'Giảm 100,000đ cho đơn từ 1 triệu',
+    type: 'fixed_amount',
+    value: 100000,
+    maxValue: null,
+    minOrderValue: 1000000,
+  },
+  {
+    code: 'GIAM200K',
+    name: 'Giảm 200K',
+    description: 'Giảm 200,000đ cho đơn từ 2 triệu',
+    type: 'fixed_amount',
+    value: 200000,
+    maxValue: null,
+    minOrderValue: 2000000,
+  },
+  {
+    code: 'GIAM500K',
+    name: 'Giảm 500K Mega',
+    description: 'Giảm 500,000đ cho đơn từ 5 triệu',
+    type: 'fixed_amount',
+    value: 500000,
+    maxValue: null,
+    minOrderValue: 5000000,
+  },
+  {
+    code: 'NEWORDER30K',
+    name: 'Đơn đầu tiên 30K',
+    description: 'Giảm 30,000đ cho đơn hàng đầu tiên',
+    type: 'fixed_amount',
+    value: 30000,
+    maxValue: null,
+    minOrderValue: 150000,
+  },
   // Percentage vouchers
-  { code: 'SAVE5', name: 'Giảm 5%', description: 'Giảm 5% tối đa 30K', type: 'percentage', value: 5, maxValue: 30000, minOrderValue: 100000 },
-  { code: 'SAVE10', name: 'Giảm 10%', description: 'Giảm 10% tối đa 80K', type: 'percentage', value: 10, maxValue: 80000, minOrderValue: 300000 },
-  { code: 'SAVE15', name: 'Giảm 15%', description: 'Giảm 15% tối đa 150K', type: 'percentage', value: 15, maxValue: 150000, minOrderValue: 500000 },
-  { code: 'SAVE20', name: 'Giảm 20%', description: 'Giảm 20% tối đa 250K', type: 'percentage', value: 20, maxValue: 250000, minOrderValue: 800000 },
-  { code: 'DEAL12', name: 'Deal sốc 12%', description: 'Giảm 12% tối đa 100K', type: 'percentage', value: 12, maxValue: 100000, minOrderValue: 400000 },
-  { code: 'MEGA25', name: 'Mega Sale 25%', description: 'Giảm 25% tối đa 500K', type: 'percentage', value: 25, maxValue: 500000, minOrderValue: 1500000 },
+  {
+    code: 'SAVE5',
+    name: 'Giảm 5%',
+    description: 'Giảm 5% tối đa 30K',
+    type: 'percentage',
+    value: 5,
+    maxValue: 30000,
+    minOrderValue: 100000,
+  },
+  {
+    code: 'SAVE10',
+    name: 'Giảm 10%',
+    description: 'Giảm 10% tối đa 80K',
+    type: 'percentage',
+    value: 10,
+    maxValue: 80000,
+    minOrderValue: 300000,
+  },
+  {
+    code: 'SAVE15',
+    name: 'Giảm 15%',
+    description: 'Giảm 15% tối đa 150K',
+    type: 'percentage',
+    value: 15,
+    maxValue: 150000,
+    minOrderValue: 500000,
+  },
+  {
+    code: 'SAVE20',
+    name: 'Giảm 20%',
+    description: 'Giảm 20% tối đa 250K',
+    type: 'percentage',
+    value: 20,
+    maxValue: 250000,
+    minOrderValue: 800000,
+  },
+  {
+    code: 'DEAL12',
+    name: 'Deal sốc 12%',
+    description: 'Giảm 12% tối đa 100K',
+    type: 'percentage',
+    value: 12,
+    maxValue: 100000,
+    minOrderValue: 400000,
+  },
+  {
+    code: 'MEGA25',
+    name: 'Mega Sale 25%',
+    description: 'Giảm 25% tối đa 500K',
+    type: 'percentage',
+    value: 25,
+    maxValue: 500000,
+    minOrderValue: 1500000,
+  },
 ];
 
 async function publishAllProducts() {
@@ -69,7 +165,9 @@ async function seedFlashSale(flashCount) {
   // Clear existing flashSale on all products
   const clearResult = await Product.updateMany(
     { 'flashSale.isActive': true },
-    { $set: { 'flashSale.isActive': false, 'flashSale.startTime': null, 'flashSale.endTime': null } },
+    {
+      $set: { 'flashSale.isActive': false, 'flashSale.startTime': null, 'flashSale.endTime': null },
+    },
   );
   console.log(`  Cleared ${clearResult.modifiedCount} existing flash sale flags`);
 
@@ -88,11 +186,13 @@ async function seedFlashSale(flashCount) {
   }
 
   // Shuffle and pick N
-  const shuffled = products.sort(() => Math.random() - 0.5).slice(0, Math.min(flashCount, products.length));
+  const shuffled = products
+    .sort(() => Math.random() - 0.5)
+    .slice(0, Math.min(flashCount, products.length));
 
   const now = new Date();
   const startTime = new Date(now.getTime() - 60 * 60 * 1000); // started 1h ago
-  const endTime = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000); // ends in 2 days
+  const endTime = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // ends in 30 days
 
   let updated = 0;
   for (const product of shuffled) {
@@ -100,7 +200,7 @@ async function seedFlashSale(flashCount) {
     if (currentPrice <= 0) continue;
 
     const discountPercent = pickRandom(15, 45);
-    const salePrice = Math.round(currentPrice * (1 - discountPercent / 100) / 1000) * 1000; // round to 1000
+    const salePrice = Math.round((currentPrice * (1 - discountPercent / 100)) / 1000) * 1000; // round to 1000
     const stock = pickRandom(30, 200);
     const soldCount = pickRandom(2, 80);
 
@@ -123,7 +223,9 @@ async function seedFlashSale(flashCount) {
     updated++;
   }
 
-  console.log(`  Activated flash sale for ${updated} products (valid window: ${startTime.toISOString()} → ${endTime.toISOString()})`);
+  console.log(
+    `  Activated flash sale for ${updated} products (valid window: ${startTime.toISOString()} → ${endTime.toISOString()})`,
+  );
   return updated;
 }
 
@@ -139,7 +241,7 @@ async function seedVouchers() {
 
   const now = new Date();
   const startDate = new Date(now.getTime() - 60 * 60 * 1000); // started 1h ago
-  const endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
+  const endDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // 365 days
 
   const docs = voucherTemplates.map((tpl) => ({
     code: tpl.code,
@@ -160,7 +262,9 @@ async function seedVouchers() {
   }));
 
   await Voucher.insertMany(docs);
-  console.log(`  Inserted ${docs.length} platform vouchers (valid until ${endDate.toISOString().slice(0, 10)})`);
+  console.log(
+    `  Inserted ${docs.length} platform vouchers (valid until ${endDate.toISOString().slice(0, 10)})`,
+  );
   return docs.length;
 }
 
@@ -200,8 +304,26 @@ async function updateProductStats() {
     updated++;
   }
 
-  console.log(`  Updated stats for ${updated} products (rating 4.0-5.0, reviews 8-250, sold 30-2500)`);
+  console.log(
+    `  Updated stats for ${updated} products (rating 4.0-5.0, reviews 8-250, sold 30-2500)`,
+  );
   return updated;
+}
+
+async function clearRedisCache() {
+  try {
+    const redis = require('../config/redis');
+    if (redis && redis.isReady) {
+      const keys = await redis.keys('flash-sale:*');
+      if (keys.length > 0) {
+        await redis.del(...keys);
+      }
+      await redis.del('platform_vouchers');
+      console.log('  Cleared Redis cache for flash-sale and platform vouchers');
+    }
+  } catch (err) {
+    console.warn('  Could not clear Redis cache (optional):', err.message);
+  }
 }
 
 async function main() {
@@ -222,6 +344,7 @@ async function main() {
   const flashUpdated = await seedFlashSale(flashCount);
   const voucherInserted = await seedVouchers();
   const statsUpdated = await updateProductStats();
+  await clearRedisCache();
 
   console.log('\n=== Summary ===');
   console.log(`  Flash Sale activated: ${flashUpdated} products`);

@@ -37,17 +37,21 @@ const normalizeRoute = (req) => {
     return `${basePath}${routePath}` || '/';
   }
 
-
   // Fallback cleaner for unmatched 404s, custom handlers, or static routes
   const rawPath = req.originalUrl ? req.originalUrl.split('?')[0] : req.path || '/';
 
-  return rawPath
-    // Replace standard UUIDs (8-4-4-4-12)
-    .replace(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g, ':id')
-    // Replace MongoDB ObjectIds (24 hex characters)
-    .replace(/\b[0-9a-fA-F]{24}\b/g, ':id')
-    // Replace purely numeric IDs in path segments (/12345/ -> /:id/)
-    .replace(/\/\d+(?=\/|$)/g, '/:id');
+  return (
+    rawPath
+      // Replace standard UUIDs (8-4-4-4-12)
+      .replace(
+        /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g,
+        ':id',
+      )
+      // Replace MongoDB ObjectIds (24 hex characters)
+      .replace(/\b[0-9a-fA-F]{24}\b/g, ':id')
+      // Replace purely numeric IDs in path segments (/12345/ -> /:id/)
+      .replace(/\/\d+(?=\/|$)/g, '/:id')
+  );
 };
 
 /**
@@ -68,7 +72,6 @@ const metricsMiddleware = (req, res, next) => {
   ) {
     return next();
   }
-
 
   httpRequestsInFlight.inc({ method: req.method });
   const start = process.hrtime();

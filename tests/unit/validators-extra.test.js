@@ -28,7 +28,6 @@ const {
   updateShopValidator,
 } = require('../../src/validations/shop.validator');
 
-
 const {
   createBannerValidator,
   updateBannerValidator,
@@ -387,7 +386,6 @@ describe('Shop Validators', () => {
     });
   });
 });
-
 
 /* ===========================
  * BANNER VALIDATORS

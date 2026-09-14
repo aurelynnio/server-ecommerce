@@ -147,7 +147,11 @@ module.exports = {
       shop: { type: 'string', example: '65df8a76b91234567890abc3' },
       rating: { type: 'number', example: 4.8 },
       soldCount: { type: 'integer', example: 150 },
-      status: { type: 'string', enum: ['draft', 'published', 'suspended', 'deleted'], example: 'published' },
+      status: {
+        type: 'string',
+        enum: ['draft', 'published', 'suspended', 'deleted'],
+        example: 'published',
+      },
     },
   },
   // Cart & Order Models
@@ -193,10 +197,22 @@ module.exports = {
       finalAmount: { type: 'number', example: 480000 },
       status: {
         type: 'string',
-        enum: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'],
+        enum: [
+          'pending',
+          'confirmed',
+          'processing',
+          'shipped',
+          'delivered',
+          'cancelled',
+          'returned',
+        ],
         example: 'pending',
       },
-      paymentStatus: { type: 'string', enum: ['pending', 'paid', 'failed', 'refunded'], example: 'pending' },
+      paymentStatus: {
+        type: 'string',
+        enum: ['pending', 'paid', 'failed', 'refunded'],
+        example: 'pending',
+      },
       paymentMethod: { type: 'string', enum: ['cod', 'vnpay'], example: 'vnpay' },
     },
   },

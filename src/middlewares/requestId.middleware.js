@@ -8,9 +8,7 @@ const { asyncLocalStorage } = require('../utils/asyncContext');
 const requestIdMiddleware = (req, res, next) => {
   const incomingId = req.headers['x-request-id'];
   const requestId =
-    typeof incomingId === 'string' && incomingId.trim()
-      ? incomingId.trim()
-      : crypto.randomUUID();
+    typeof incomingId === 'string' && incomingId.trim() ? incomingId.trim() : crypto.randomUUID();
 
   // Expose on response header and request object
   res.setHeader('X-Request-Id', requestId);

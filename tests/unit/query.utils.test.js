@@ -102,4 +102,3 @@ describe('Query Utils Suite', () => {
     });
   });
 });
-

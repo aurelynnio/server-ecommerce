@@ -38,7 +38,10 @@ module.exports = {
             schema: {
               type: 'object',
               required: ['code', 'orderAmount'],
-              properties: { code: { type: 'string', example: 'SALE20' }, orderAmount: { type: 'number', example: 500000 } },
+              properties: {
+                code: { type: 'string', example: 'SALE20' },
+                orderAmount: { type: 'number', example: 500000 },
+              },
             },
           },
         },
@@ -109,4 +112,3 @@ module.exports = {
     },
   },
 };
-

@@ -101,7 +101,9 @@ module.exports = {
             schema: {
               type: 'object',
               required: ['email'],
-              properties: { email: { type: 'string', format: 'email', example: 'user@example.com' } },
+              properties: {
+                email: { type: 'string', format: 'email', example: 'user@example.com' },
+              },
             },
           },
         },
@@ -110,4 +112,3 @@ module.exports = {
     },
   },
 };
-

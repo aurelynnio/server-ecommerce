@@ -35,7 +35,7 @@ export const options = {
   thresholds: {
     'http_req_duration{endpoint:chatbot_stream}': ['p(95)<5000'],
     chatErrors: ['rate<0.01'],
-    'chatbot_stream_latency_ms': ['p(95)<5000'],
+    chatbot_stream_latency_ms: ['p(95)<5000'],
   },
 };
 

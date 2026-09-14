@@ -42,28 +42,56 @@ Comprehensive API documentation for the E-Commerce platform and AI Shopping Assi
     },
   ],
   tags: [
-    { name: 'Auth', description: 'Authentication, registration, OTP email verification, 2FA, and password management' },
-    { name: 'Users', description: 'User profiles, delivery addresses, and admin user administration' },
-    { name: 'Products', description: 'Public catalog, category browsing, variant management, and seller operations' },
+    {
+      name: 'Auth',
+      description:
+        'Authentication, registration, OTP email verification, 2FA, and password management',
+    },
+    {
+      name: 'Users',
+      description: 'User profiles, delivery addresses, and admin user administration',
+    },
+    {
+      name: 'Products',
+      description: 'Public catalog, category browsing, variant management, and seller operations',
+    },
     { name: 'Categories', description: 'Product categories and catalog hierarchy' },
     { name: 'Banners', description: 'Hero promotional banners' },
     { name: 'Shops', description: 'Multi-vendor shop registration, seller profiles, and settings' },
     { name: 'Cart', description: 'Shopping cart and line item operations' },
     { name: 'Orders', description: 'Order checkout, status fulfillment, and seller/admin listing' },
-    { name: 'Payment', description: 'VNPay payment gateway integration, return URL, and IPN callbacks' },
+    {
+      name: 'Payment',
+      description: 'VNPay payment gateway integration, return URL, and IPN callbacks',
+    },
     { name: 'Vouchers', description: 'Discounts, coupon codes, and checkout voucher application' },
     { name: 'Wishlist', description: 'Saved favorite products' },
     { name: 'Reviews', description: 'Product reviews, ratings, and customer feedback' },
     { name: 'Notifications', description: 'In-app notification feeds' },
     { name: 'Newsletter', description: 'Email newsletter subscriptions' },
-    { name: 'Search & Discovery', description: 'Product search autocomplete, semantic search, and recommendations' },
+    {
+      name: 'Search & Discovery',
+      description: 'Product search autocomplete, semantic search, and recommendations',
+    },
     { name: 'Flash Sale', description: 'Time-limited flash sale events and discounted items' },
-    { name: 'Statistics', description: 'Revenue analytics, order metrics, and business dashboards' },
+    {
+      name: 'Statistics',
+      description: 'Revenue analytics, order metrics, and business dashboards',
+    },
     { name: 'Settings', description: 'Global platform configurations' },
-    { name: 'Permissions', description: 'Role-Based Access Control (RBAC) and permission matrices' },
+    {
+      name: 'Permissions',
+      description: 'Role-Based Access Control (RBAC) and permission matrices',
+    },
     { name: 'Chat', description: 'Real-time peer-to-peer customer-to-shop messaging' },
-    { name: 'Chatbot', description: 'AI Shopping Assistant with tool-calling, SSE streaming, and session history' },
-    { name: 'Monitoring & Health', description: 'System liveness, dependency readiness probes, and Prometheus metrics' },
+    {
+      name: 'Chatbot',
+      description: 'AI Shopping Assistant with tool-calling, SSE streaming, and session history',
+    },
+    {
+      name: 'Monitoring & Health',
+      description: 'System liveness, dependency readiness probes, and Prometheus metrics',
+    },
   ],
   components: {
     securitySchemes: {

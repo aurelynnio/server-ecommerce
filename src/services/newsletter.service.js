@@ -4,7 +4,9 @@ const newsletterRepository = require('../repositories/newsletter.repository');
 
 class NewsletterService {
   async subscribe({ email, source = 'footer' }) {
-    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedEmail = String(email || '')
+      .trim()
+      .toLowerCase();
 
     if (!normalizedEmail) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Email is required');

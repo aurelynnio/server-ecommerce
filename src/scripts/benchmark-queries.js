@@ -41,7 +41,9 @@ async function fetchSampleIds(db) {
 
 async function runQueryWithTiming(db, name, buildQuery, ids, iters) {
   // Warm-up
-  await buildQuery(db, ids).toArray().catch(() => {});
+  await buildQuery(db, ids)
+    .toArray()
+    .catch(() => {});
 
   const stats = { name, times: [], docsExamined: null, keysExamined: null, indexUsed: null };
 
@@ -145,7 +147,10 @@ const QUERIES = [
     build: (db, ids) =>
       db
         .collection('orders')
-        .aggregate([{ $match: { shopId: ids.shopId, paymentStatus: 'paid' } }, { $group: { _id: null, total: { $sum: '$totalAmount' } } }]),
+        .aggregate([
+          { $match: { shopId: ids.shopId, paymentStatus: 'paid' } },
+          { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+        ]),
   },
   {
     name: 'order.findOrdersContainingProduct',
@@ -160,10 +165,14 @@ const QUERIES = [
 
 function printRow(stats) {
   console.log(`\n  ${stats.name}`);
-  console.log(`    avg=${stats.avg.toFixed(2)}ms  median=${stats.median.toFixed(2)}ms  p95=${stats.p95.toFixed(2)}ms  min=${stats.min.toFixed(2)}ms  max=${stats.max.toFixed(2)}ms`);
+  console.log(
+    `    avg=${stats.avg.toFixed(2)}ms  median=${stats.median.toFixed(2)}ms  p95=${stats.p95.toFixed(2)}ms  min=${stats.min.toFixed(2)}ms  max=${stats.max.toFixed(2)}ms`,
+  );
   if (stats.explain) {
     const e = stats.explain;
-    console.log(`    explain: stage=${e.winningStage || '?'} input=${e.inputStage || '-'} index=${e.indexName || '-'} keys=${e.totalKeysExamined} docs=${e.totalDocsExamined} execMs=${e.executionTimeMillis}`);
+    console.log(
+      `    explain: stage=${e.winningStage || '?'} input=${e.inputStage || '-'} index=${e.indexName || '-'} keys=${e.totalKeysExamined} docs=${e.totalDocsExamined} execMs=${e.executionTimeMillis}`,
+    );
   }
 }
 
@@ -197,10 +206,20 @@ async function main() {
   }
 
   console.log('\n=== Summary ===');
-  console.log('query'.padEnd(56), 'avg(ms)'.padStart(10), 'p95(ms)'.padStart(10), 'index'.padStart(20));
+  console.log(
+    'query'.padEnd(56),
+    'avg(ms)'.padStart(10),
+    'p95(ms)'.padStart(10),
+    'index'.padStart(20),
+  );
   for (const s of results) {
     const idx = s.explain?.indexName || '-';
-    console.log(s.name.padEnd(56), s.avg.toFixed(2).padStart(10), s.p95.toFixed(2).padStart(10), idx.padStart(20));
+    console.log(
+      s.name.padEnd(56),
+      s.avg.toFixed(2).padStart(10),
+      s.p95.toFixed(2).padStart(10),
+      idx.padStart(20),
+    );
   }
 
   await mongoose.disconnect();

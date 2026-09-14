@@ -37,7 +37,9 @@ module.exports = {
             schema: {
               type: 'object',
               required: ['status'],
-              properties: { status: { type: 'string', enum: ['active', 'inactive', 'suspended', 'rejected'] } },
+              properties: {
+                status: { type: 'string', enum: ['active', 'inactive', 'suspended', 'rejected'] },
+              },
             },
           },
         },
@@ -159,4 +161,3 @@ module.exports = {
     },
   },
 };
-

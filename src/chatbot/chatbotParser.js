@@ -1,6 +1,6 @@
 /**
  * chatbotParser - Tách parsing logic từ chatbot.controller.js
- * 
+ *
  * Các hàm này chịu trách nhiệm parse message từ MongoDB/LangChain format
  * về dạng chuẩn { role, content, timestamp } cho frontend.
  */
@@ -40,12 +40,7 @@ const extractTextValue = (value) => {
 };
 
 const extractMessageContent = (payload) => {
-  const prioritizedSources = [
-    payload?.data,
-    payload?.message,
-    payload?.lc_kwargs,
-    payload,
-  ];
+  const prioritizedSources = [payload?.data, payload?.message, payload?.lc_kwargs, payload];
 
   for (const source of prioritizedSources) {
     const extracted = extractTextValue(source);
@@ -80,7 +75,9 @@ const extractConversationMessages = (payload, fallbackTimestamp = new Date(), me
   if (!payload) return [];
 
   if (Array.isArray(payload)) {
-    return payload.flatMap((item) => extractConversationMessages(item, fallbackTimestamp, messageId));
+    return payload.flatMap((item) =>
+      extractConversationMessages(item, fallbackTimestamp, messageId),
+    );
   }
 
   if (typeof payload !== 'object') return [];

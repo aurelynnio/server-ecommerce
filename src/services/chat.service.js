@@ -89,21 +89,21 @@ class ChatService {
       messageType: conversation.lastMessage?.messageType || 'text',
       attachments: this._normalizeAttachments(conversation.lastMessage?.attachments),
     });
-    const lastMessage = conversation.lastMessage?.content
-      || conversation.lastMessage?.attachments?.length
-      ? {
-          _id: `${conversation._id}-last-message`,
-          conversation: String(conversation._id),
-          sender: String(conversation.lastMessage.senderId || ''),
-          senderType: this._getSenderType(conversation.lastMessage.senderId, shopOwnerId),
-          content: lastMessagePreview,
-          messageType: conversation.lastMessage.messageType || 'text',
-          attachments: this._normalizeAttachments(conversation.lastMessage.attachments),
-          isRead: unreadCount === 0,
-          createdAt: conversation.lastMessage.createdAt,
-          updatedAt: conversation.lastMessage.createdAt,
-        }
-      : undefined;
+    const lastMessage =
+      conversation.lastMessage?.content || conversation.lastMessage?.attachments?.length
+        ? {
+            _id: `${conversation._id}-last-message`,
+            conversation: String(conversation._id),
+            sender: String(conversation.lastMessage.senderId || ''),
+            senderType: this._getSenderType(conversation.lastMessage.senderId, shopOwnerId),
+            content: lastMessagePreview,
+            messageType: conversation.lastMessage.messageType || 'text',
+            attachments: this._normalizeAttachments(conversation.lastMessage.attachments),
+            isRead: unreadCount === 0,
+            createdAt: conversation.lastMessage.createdAt,
+            updatedAt: conversation.lastMessage.createdAt,
+          }
+        : undefined;
 
     return {
       _id: String(conversation._id),
@@ -146,13 +146,10 @@ class ChatService {
     return conversation;
   }
 
-  async _persistMessage(senderId, {
-    conversationId,
-    content = '',
-    attachments = [],
-    messageType = 'text',
-    productRef = null,
-  }) {
+  async _persistMessage(
+    senderId,
+    { conversationId, content = '', attachments = [], messageType = 'text', productRef = null },
+  ) {
     const conversation = await this._getConversationWithAccessCheck(conversationId, senderId);
     const normalizedAttachments = this._normalizeAttachments(attachments);
 
@@ -223,13 +220,7 @@ class ChatService {
    * @param {Object} options
    * @returns {Promise<any>}
    */
-  async sendMessage(senderId, {
-    conversationId,
-    content,
-    attachments,
-    messageType,
-    productRef,
-  }) {
+  async sendMessage(senderId, { conversationId, content, attachments, messageType, productRef }) {
     return this._persistMessage(senderId, {
       conversationId,
       content,
@@ -293,9 +284,7 @@ class ChatService {
       userId,
       conversationIds,
     );
-    const unreadCountMap = new Map(
-      unreadCounts.map((item) => [String(item._id), item.count]),
-    );
+    const unreadCountMap = new Map(unreadCounts.map((item) => [String(item._id), item.count]));
 
     return conversations.map((conversation) =>
       this._transformConversation(
@@ -328,7 +317,9 @@ class ChatService {
 
     const transformedMessages = messages
       .reverse()
-      .map((message) => this._transformMessage(message, { shopOwnerId: conversation.shopId?.owner }));
+      .map((message) =>
+        this._transformMessage(message, { shopOwnerId: conversation.shopId?.owner }),
+      );
     const response = buildPaginationResponse(transformedMessages, paginationParams);
 
     return {

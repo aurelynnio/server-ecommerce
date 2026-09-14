@@ -1,29 +1,14 @@
 const Banner = require('../models/banner.model');
+const BaseRepository = require('./base.repository');
 const { createLiteralRegex } = require('../utils/query.utils');
 
-class BannerRepository {
-  create(payload) {
-    return Banner.create(payload);
-  }
-
-  countByQuery(query) {
-    return Banner.countDocuments(query);
-  }
-
-  findWithPagination(query, { skip, limit }) {
-    return Banner.find(query).sort({ order: 1, createdAt: -1 }).skip(skip).limit(limit).lean();
-  }
-
-  findById(id) {
-    return Banner.findById(id);
+class BannerRepository extends BaseRepository {
+  constructor() {
+    super(Banner);
   }
 
   updateById(id, payload) {
-    return Banner.findByIdAndUpdate(id, payload, { new: true });
-  }
-
-  deleteById(id) {
-    return Banner.findByIdAndDelete(id);
+    return super.updateById(id, payload, { new: true });
   }
 
   _buildFilterQuery({ search, ...otherFilters } = {}) {
@@ -39,13 +24,16 @@ class BannerRepository {
 
   countByFilters(filter = {}) {
     const query = this._buildFilterQuery(filter);
-    return Banner.countDocuments(query);
+    return this.countByFilter(query);
   }
 
-  findByFilters(filter = {}, { skip, limit }) {
+  findByFilters(filter = {}, { skip, limit } = {}) {
     const query = this._buildFilterQuery(filter);
-
-    return Banner.find(query).sort({ order: 1, createdAt: -1 }).skip(skip).limit(limit).lean();
+    return this.findManyByFilter(query)
+      .sort({ order: 1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
   }
 }
 

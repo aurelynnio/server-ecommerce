@@ -12,11 +12,6 @@ let embeddingModel = null;
  * @returns {MistralAIEmbeddings}
  */
 function getEmbeddingModel() {
-  /**
-   * If
-   * @param {any} !embeddingModel
-   * @returns {any}
-   */
   if (!embeddingModel) {
     embeddingModel = new MistralAIEmbeddings({
       apiKey: process.env.MISTRAL_API_KEY,
@@ -40,7 +35,8 @@ function getEmbeddingsCollection() {
 }
 
 function getVietnameseKeywords(product) {
-  const combined = `${product.name || ''} ${product.brand || ''} ${product.category?.name || ''} ${(product.tags || []).join(' ')}`.toLowerCase();
+  const combined =
+    `${product.name || ''} ${product.brand || ''} ${product.category?.name || ''} ${(product.tags || []).join(' ')}`.toLowerCase();
   const synonyms = [];
 
   if (/shirt|tee|polo|top|tank/i.test(combined)) {

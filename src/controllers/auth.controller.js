@@ -78,7 +78,12 @@ const AuthController = {
     const result = await authService.verifyLoginTwoFactor(challengeToken, code);
     const { accessToken, refreshToken, user } = result;
     setAuthCookies(res, accessToken, refreshToken);
-    return sendSuccess(res, user, 'Two-factor authentication verified successfully', StatusCodes.OK);
+    return sendSuccess(
+      res,
+      user,
+      'Two-factor authentication verified successfully',
+      StatusCodes.OK,
+    );
   }),
 
   resendLoginTwoFactorCode: catchAsync(async (req, res) => {

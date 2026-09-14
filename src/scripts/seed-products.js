@@ -31,13 +31,33 @@ const realProducts = require('./data/real-products.json');
 
 // Category slug -> Vietnamese label (must match dataset categorySlug + storefront slugs)
 const GLOBAL_CATEGORIES = [
-  { slug: 'dien-thoai-phu-kien', name: 'Điện thoại & Phụ kiện', description: 'Smartphones, phụ kiện, thiết bị di động' },
+  {
+    slug: 'dien-thoai-phu-kien',
+    name: 'Điện thoại & Phụ kiện',
+    description: 'Smartphones, phụ kiện, thiết bị di động',
+  },
   { slug: 'thoi-trang', name: 'Thời trang', description: 'Quần áo, giày dép, phụ kiện thời trang' },
   { slug: 'lam-dep', name: 'Làm đẹp', description: 'Mỹ phẩm, dưỡng da, nước hoa' },
-  { slug: 'nha-cua-doi-song', name: 'Nhà cửa & Đời sống', description: 'Nội thất, gia dụng, trang trí nhà' },
-  { slug: 'may-tinh-thiet-bi', name: 'Máy tính & Thiết bị', description: 'Laptop, linh kiện, thiết bị điện tử' },
-  { slug: 'the-thao-du-lich', name: 'Thể thao & Du lịch', description: 'Dụng cụ thể thao, thiết bị du lịch' },
-  { slug: 'thuc-pham-do-uong', name: 'Thực phẩm & Đồ uống', description: 'Đồ ăn, thức uống, thực phẩm khô' },
+  {
+    slug: 'nha-cua-doi-song',
+    name: 'Nhà cửa & Đời sống',
+    description: 'Nội thất, gia dụng, trang trí nhà',
+  },
+  {
+    slug: 'may-tinh-thiet-bi',
+    name: 'Máy tính & Thiết bị',
+    description: 'Laptop, linh kiện, thiết bị điện tử',
+  },
+  {
+    slug: 'the-thao-du-lich',
+    name: 'Thể thao & Du lịch',
+    description: 'Dụng cụ thể thao, thiết bị du lịch',
+  },
+  {
+    slug: 'thuc-pham-do-uong',
+    name: 'Thực phẩm & Đồ uống',
+    description: 'Đồ ăn, thức uống, thực phẩm khô',
+  },
 ];
 
 const SHOP_TEMPLATES = {
@@ -78,7 +98,13 @@ async function ensureGlobalCategories() {
   const toCreate = [];
   for (const g of GLOBAL_CATEGORIES) {
     if (!bySlug.has(g.slug)) {
-      toCreate.push({ name: g.name, slug: g.slug, description: g.description, images: [], isActive: true });
+      toCreate.push({
+        name: g.name,
+        slug: g.slug,
+        description: g.description,
+        images: [],
+        isActive: true,
+      });
     }
   }
   if (toCreate.length) {
@@ -107,8 +133,7 @@ function buildVariants(item) {
   const colorsList = colors.slice(0, 4);
   const basePrice = item.price.currentPrice || 0;
   return colorsList.map((color, idx) => {
-    const priceBump =
-      colorsList.length > 1 ? getRandomInt(-2, 8) * 10000 : 0;
+    const priceBump = colorsList.length > 1 ? getRandomInt(-2, 8) * 10000 : 0;
     const price = Math.max(5000, basePrice + priceBump);
     return {
       name: color,

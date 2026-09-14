@@ -69,7 +69,9 @@ const getProductsQueryValidator = Joi.object({
   // category can be a Mongo id OR a slug (header/footer/category links use slugs)
   category: Joi.alternatives().try(
     objectId,
-    Joi.string().trim().pattern(/^[a-z0-9'’ -]+$/),
+    Joi.string()
+      .trim()
+      .pattern(/^[a-z0-9'’ -]+$/),
   ),
   brand: Joi.string(),
   shop: objectId,

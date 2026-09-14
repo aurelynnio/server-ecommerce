@@ -11,12 +11,7 @@ cloudinary.config({
 
 const uploadAsset = async (
   fileBuffer,
-  {
-    folder = 'uploads',
-    resourceType = 'auto',
-    originalFilename,
-    format,
-  } = {},
+  { folder = 'uploads', resourceType = 'auto', originalFilename, format } = {},
 ) => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
@@ -26,9 +21,7 @@ const uploadAsset = async (
         unique_filename: true,
         overwrite: true,
         resource_type: resourceType,
-        filename_override: originalFilename
-          ? path.parse(originalFilename).name
-          : undefined,
+        filename_override: originalFilename ? path.parse(originalFilename).name : undefined,
         format,
       },
       (err, result) => {

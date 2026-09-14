@@ -128,14 +128,16 @@ function extractSearchSignals(message) {
  */
 function escapePromptText(text) {
   if (!text) return '';
-  return String(text)
-    // Strip control characters
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u001F\u007F]/g, '')
-    // Collapse the marker tokens attackers might use to override instructions
-    .replace(/\[(?:HỆ THỐNG|SYSTEM|INSTRUCTIONS|YÊU CẦU|KHÁCH HỎI)\]/gi, '[nội dung]')
-    .trim()
-    .slice(0, 2000);
+  return (
+    String(text)
+      // Strip control characters
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u001F\u007F]/g, '')
+      // Collapse the marker tokens attackers might use to override instructions
+      .replace(/\[(?:HỆ THỐNG|SYSTEM|INSTRUCTIONS|YÊU CẦU|KHÁCH HỎI)\]/gi, '[nội dung]')
+      .trim()
+      .slice(0, 2000)
+  );
 }
 
 /**

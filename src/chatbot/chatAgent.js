@@ -13,12 +13,7 @@
  *    (và messageId trong event 'done' khớp tin nhắn thật cho feature feedback)
  */
 
-const {
-  AIMessage,
-  HumanMessage,
-  SystemMessage,
-  ToolMessage,
-} = require('@langchain/core/messages');
+const { AIMessage, HumanMessage, SystemMessage, ToolMessage } = require('@langchain/core/messages');
 const { DynamicTool } = require('@langchain/core/tools');
 
 const { toolHandlers } = require('./chatbot.tools');
@@ -185,10 +180,7 @@ class ChatbotAgent {
       stream: 'false',
     });
     try {
-      metrics.chatbotTokensTotal.inc(
-        { direction: 'in' },
-        metrics.estimateTokens(userMessage),
-      );
+      metrics.chatbotTokensTotal.inc({ direction: 'in' }, metrics.estimateTokens(userMessage));
 
       const { history, messages } = await this._buildContext(sessionId, userMessage);
 
@@ -225,10 +217,7 @@ class ChatbotAgent {
 
       await this._saveTurnToHistory(history, userMessage, output);
 
-      metrics.chatbotTokensTotal.inc(
-        { direction: 'out' },
-        metrics.estimateTokens(output),
-      );
+      metrics.chatbotTokensTotal.inc({ direction: 'out' }, metrics.estimateTokens(output));
       stopTimer({ status: 'success' });
 
       return {
@@ -262,10 +251,7 @@ class ChatbotAgent {
    * trong event 'done' khớp với tin nhắn thật trong DB).
    */
   async *stream(sessionId, userMessage) {
-    metrics.chatbotTokensTotal.inc(
-      { direction: 'in' },
-      metrics.estimateTokens(userMessage),
-    );
+    metrics.chatbotTokensTotal.inc({ direction: 'in' }, metrics.estimateTokens(userMessage));
 
     const { history, messages } = await this._buildContext(sessionId, userMessage);
 
@@ -304,14 +290,10 @@ class ChatbotAgent {
       finalContent = validated;
     }
 
-    metrics.chatbotTokensTotal.inc(
-      { direction: 'out' },
-      metrics.estimateTokens(finalContent),
-    );
+    metrics.chatbotTokensTotal.inc({ direction: 'out' }, metrics.estimateTokens(finalContent));
 
     await this._saveTurnToHistory(history, userMessage, finalContent);
   }
 }
 
 module.exports = ChatbotAgent;
-

@@ -84,7 +84,6 @@ const optionalAuth = (req, res, next) => {
   }
 };
 
-
 /**
  * Check if user has required role
  * @param {...string} allowedRoles - List of allowed roles (e.g., 'admin', 'user')

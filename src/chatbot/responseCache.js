@@ -65,7 +65,7 @@ const setCachedResponse = async (message, response) => {
 
   const key = `${KEY_PREFIX}${hash(message)}`;
   try {
-    await redisClient.setEx(key, DEFAULT_TTL_SECONDS, JSON.stringify(response));
+    await redisClient.set(key, JSON.stringify(response), 'EX', DEFAULT_TTL_SECONDS);
   } catch (err) {
     logger.warn('[ChatbotCache] SET error:', err.message);
   }

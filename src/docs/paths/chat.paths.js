@@ -86,7 +86,9 @@ module.exports = {
       tags: ['Chat'],
       summary: 'Get message history for conversation',
       security: [{ bearerAuth: [] }, { cookieAuth: [] }],
-      parameters: [{ name: 'conversationId', in: 'path', required: true, schema: { type: 'string' } }],
+      parameters: [
+        { name: 'conversationId', in: 'path', required: true, schema: { type: 'string' } },
+      ],
       responses: { 200: { description: 'Messages list' } },
     },
   },
@@ -95,9 +97,10 @@ module.exports = {
       tags: ['Chat'],
       summary: 'Mark all messages in conversation as read',
       security: [{ bearerAuth: [] }, { cookieAuth: [] }],
-      parameters: [{ name: 'conversationId', in: 'path', required: true, schema: { type: 'string' } }],
+      parameters: [
+        { name: 'conversationId', in: 'path', required: true, schema: { type: 'string' } },
+      ],
       responses: { 200: { description: 'Marked as read' } },
     },
   },
 };
-

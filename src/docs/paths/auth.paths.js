@@ -7,7 +7,8 @@ module.exports = {
     post: {
       tags: ['Auth'],
       summary: 'Register a new customer or merchant account',
-      description: 'Creates a new user account and sends a 6-digit OTP verification code to the registered email address.',
+      description:
+        'Creates a new user account and sends a 6-digit OTP verification code to the registered email address.',
       requestBody: {
         required: true,
         content: {
@@ -23,7 +24,9 @@ module.exports = {
         },
         400: {
           description: 'Validation error or email already in use',
-          content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } },
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/ApiErrorResponse' } },
+          },
         },
       },
     },
@@ -32,7 +35,8 @@ module.exports = {
     post: {
       tags: ['Auth'],
       summary: 'Authenticate with email and password',
-      description: 'Validates credentials. If 2FA is enabled, returns `twoFactorRequired: true` and a temporary token. Otherwise, sets httpOnly `accessToken` and `refreshToken` cookies.',
+      description:
+        'Validates credentials. If 2FA is enabled, returns `twoFactorRequired: true` and a temporary token. Otherwise, sets httpOnly `accessToken` and `refreshToken` cookies.',
       requestBody: {
         required: true,
         content: {
@@ -240,4 +244,3 @@ module.exports = {
     },
   },
 };
-

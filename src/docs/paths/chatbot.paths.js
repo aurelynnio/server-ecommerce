@@ -7,7 +7,8 @@ module.exports = {
     post: {
       tags: ['Chatbot'],
       summary: 'Send message to AI Shopping Assistant (JSON response)',
-      description: 'Executes RAG / Agent tool-calling chain to answer user product queries, recommendations, or order inquiries.',
+      description:
+        'Executes RAG / Agent tool-calling chain to answer user product queries, recommendations, or order inquiries.',
       requestBody: {
         required: true,
         content: {
@@ -29,7 +30,8 @@ module.exports = {
     post: {
       tags: ['Chatbot'],
       summary: 'Stream AI assistant response via Server-Sent Events (SSE)',
-      description: 'Streams tokens as generated in real time, emits tool invocation events, and provides message ID on completion.',
+      description:
+        'Streams tokens as generated in real time, emits tool invocation events, and provides message ID on completion.',
       requestBody: {
         required: true,
         content: {
@@ -40,7 +42,8 @@ module.exports = {
       },
       responses: {
         200: {
-          description: 'Server-Sent Events stream of JSON chunks (`data: {"type":"token"|"tool"|"done", "content":"..."}`)',
+          description:
+            'Server-Sent Events stream of JSON chunks (`data: {"type":"token"|"tool"|"done", "content":"..."}`)',
           content: { 'text/event-stream': {} },
         },
       },
@@ -104,4 +107,3 @@ module.exports = {
     },
   },
 };
-

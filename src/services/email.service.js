@@ -55,11 +55,6 @@ const getTransporter = () => {
     );
   }
 
-  /**
-   * If
-   * @param {any} !transporter
-   * @returns {any}
-   */
   if (!transporter) {
     transporter = nodemailer.createTransport({
       host: EMAIL_CONFIG.host,

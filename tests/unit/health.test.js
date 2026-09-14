@@ -89,8 +89,14 @@ describe('Health Checks (Liveness & Readiness)', () => {
       vi.spyOn(redis, 'isReady').mockReturnValue(true);
 
       const res1 = {
-        status(c) { this.statusCode = c; return this; },
-        json(d) { this.body = d; return this; },
+        status(c) {
+          this.statusCode = c;
+          return this;
+        },
+        json(d) {
+          this.body = d;
+          return this;
+        },
       };
       await HealthController.ready({}, res1);
       expect(res1.statusCode).toBe(200);
@@ -99,8 +105,14 @@ describe('Health Checks (Liveness & Readiness)', () => {
       vi.spyOn(mongoose.connection, 'readyState', 'get').mockReturnValue(0);
 
       const res2 = {
-        status(c) { this.statusCode = c; return this; },
-        json(d) { this.body = d; return this; },
+        status(c) {
+          this.statusCode = c;
+          return this;
+        },
+        json(d) {
+          this.body = d;
+          return this;
+        },
       };
       // Calling immediately should return cached 200 without querying dropped DB
       await HealthController.ready({}, res2);
