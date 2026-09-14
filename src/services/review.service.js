@@ -43,9 +43,11 @@ class ReviewService {
   async createReview(userId, reviewData) {
     const { productId, rating, comment } = reviewData;
 
-    await this._getProductOrThrow(productId);
-
-    const hasPurchased = await Order.existsDeliveredOrderForProductByUser(userId, productId);
+    const [_product, hasPurchased, existingReview] = await Promise.all([
+      this._getProductOrThrow(productId),
+      Order.existsDeliveredOrderForProductByUser(userId, productId),
+      Review.findByUserAndProduct(userId, productId),
+    ]);
 
     if (!hasPurchased) {
       throw new ApiError(
@@ -53,8 +55,6 @@ class ReviewService {
         'You can only review products you have purchased and received',
       );
     }
-
-    const existingReview = await Review.findByUserAndProduct(userId, productId);
 
     if (existingReview) {
       throw new ApiError(StatusCodes.CONFLICT, 'You have already reviewed this product');
@@ -149,7 +149,6 @@ class ReviewService {
         limit: paginationParams.limit,
       },
     );
-
 
     return buildPaginationResponse(reviews, paginationParams);
   }
@@ -400,15 +399,19 @@ class ReviewService {
    * @returns {Promise<Object>} Review statistics summary
    */
   async getReviewStatistics() {
-    const totalReviews = await Review.countAll();
-
-    const ratingDistribution = await Review.aggregateOverallRatingDistribution();
-
-    const averageRating = await Review.aggregateOverallAverageRating();
-
-    const topRatedProducts = await Product.findTopRatedProducts(5);
-
-    const mostReviewedProducts = await Product.findMostReviewedProducts(5);
+    const [
+      totalReviews,
+      ratingDistribution,
+      averageRating,
+      topRatedProducts,
+      mostReviewedProducts,
+    ] = await Promise.all([
+      Review.countAll(),
+      Review.aggregateOverallRatingDistribution(),
+      Review.aggregateOverallAverageRating(),
+      Product.findTopRatedProducts(5),
+      Product.findMostReviewedProducts(5),
+    ]);
 
     return {
       totalReviews,

@@ -11,6 +11,40 @@ const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../utils/ApiError');
 const { isValidObjectId } = require('../utils/query.utils');
 
+// In-flight query coalescer to prevent Cache Stampede (Thundering Herd) on cold-start
+const inFlightCatalogQueries = new Map();
+
+// High-speed L1 In-Memory Cache (60-second TTL, max 200 entries)
+// Eliminates Redis TCP roundtrips, CPU deserialization, and socket contention during load spikes
+const l1CatalogCache = new Map();
+const L1_TTL_MS = Number(process.env.CATALOG_L1_TTL_MS) || 60 * 1000;
+const L1_MAX_ENTRIES = 200;
+
+function getFromL1Cache(key) {
+  const entry = l1CatalogCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    l1CatalogCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setToL1Cache(key, data) {
+  if (l1CatalogCache.size >= L1_MAX_ENTRIES) {
+    const oldestKey = l1CatalogCache.keys().next().value;
+    l1CatalogCache.delete(oldestKey);
+  }
+  l1CatalogCache.set(key, {
+    data,
+    expiresAt: Date.now() + L1_TTL_MS,
+  });
+}
+
+function clearL1CatalogCache() {
+  l1CatalogCache.clear();
+}
+
 /**
  * Walk up category parent hierarchy to find root top-level category
  * @param {Object} categoryDoc
@@ -38,8 +72,6 @@ async function resolveCategoryFilter(category) {
   const root = await resolveRootCategory(cat);
   return root ? root._id : undefined;
 }
-
-
 
 class ProductService {
   syncVariantAggregates(payload) {
@@ -76,37 +108,78 @@ class ProductService {
     } = { ...filters, ...options };
 
     const cacheKey = buildHashedCacheKey('products:all', { filters, options });
-    const cachedData = await redisService.get(cacheKey);
-    if (cachedData) return cachedData;
 
-    // category may be an id or a slug -> normalize to _id
-    const resolvedCategory = await resolveCategoryFilter(category);
+    // 1. In-memory L1 cache (<0.1ms, zero I/O)
+    const l1Data = getFromL1Cache(cacheKey);
+    if (l1Data) return l1Data;
 
-    const filterArgs = {
-      status,
-      category: resolvedCategory,
-      brand,
-      shop: filters.shop,
-      shopCategory: filters.shopCategory,
-      minPrice,
-      maxPrice,
-      tags,
-      search,
-      colors,
-      sizes,
-      rating,
-    };
+    // Single-flight coalescer: if an identical query is already in-flight, await it to protect BOTH Redis and DB
+    if (inFlightCatalogQueries.has(cacheKey)) {
+      return await inFlightCatalogQueries.get(cacheKey);
+    }
 
-    const total = await Product.countWithCatalogFilters(filterArgs);
-    const paginationParams = getPaginationParams(page, limit, total);
+    const queryPromise = (async () => {
+      // 2. Redis L2 cache (~2ms) - only 1 request checks Redis on L1 miss
+      try {
+        const cachedData = await redisService.get(cacheKey);
+        if (cachedData) {
+          setToL1Cache(cacheKey, cachedData);
+          return cachedData;
+        }
+      } catch (redisErr) {
+        logger.warn('[ProductService] Redis L2 get error, falling back to DB:', {
+          error: redisErr.message,
+        });
+      }
 
-    const products = await Product.findWithCatalogFilters(filterArgs, {
-      sort,
-      skip: paginationParams.skip,
-      limit: paginationParams.limit,
-    });
+      // 3. Database query fallback
+      // category may be an id or a slug -> normalize to _id
+      const resolvedCategory = await resolveCategoryFilter(category);
 
-    return buildPaginationResponse(products, paginationParams);
+      const filterArgs = {
+        status,
+        category: resolvedCategory,
+        brand,
+        shop: filters.shop,
+        shopCategory: filters.shopCategory,
+        minPrice,
+        maxPrice,
+        tags,
+        search,
+        colors,
+        sizes,
+        rating,
+      };
+
+      const pageNum = Math.max(1, parseInt(page) || 1);
+      const limitNum = Math.max(1, Math.min(100, parseInt(limit) || 10));
+      const skip = (pageNum - 1) * limitNum;
+
+      const [total, products] = await Promise.all([
+        Product.countWithCatalogFilters(filterArgs),
+        Product.findWithCatalogFilters(filterArgs, {
+          sort,
+          skip,
+          limit: limitNum,
+        }),
+      ]);
+
+      const paginationParams = getPaginationParams(pageNum, limitNum, total);
+      const response = buildPaginationResponse(products, paginationParams);
+
+      // Cache catalog response in Redis for 5 minutes and L1 for 60s
+      redisService.set(cacheKey, response, 300).catch(() => {});
+      setToL1Cache(cacheKey, response);
+
+      return response;
+    })();
+
+    inFlightCatalogQueries.set(cacheKey, queryPromise);
+    try {
+      return await queryPromise;
+    } finally {
+      inFlightCatalogQueries.delete(cacheKey);
+    }
   }
 
   /**
@@ -307,6 +380,7 @@ class ProductService {
     await product.save();
 
     await redisService.delByPattern('products:*');
+    clearL1CatalogCache();
 
     const io = getIO();
     if (io) {
@@ -420,6 +494,7 @@ class ProductService {
       }
 
       await redisService.delByPattern('products:*');
+      clearL1CatalogCache();
 
       if (product.status === 'published') {
         const populatedProduct = await Product.findByIdWithCategoryNameLean(product._id);
@@ -452,6 +527,7 @@ class ProductService {
     }
 
     await redisService.delByPattern('products:*');
+    clearL1CatalogCache();
 
     deleteProductEmbedding(id).catch((err) => {
       logger.error('[ProductService] Error deleting product embedding:', err.message);
@@ -473,6 +549,7 @@ class ProductService {
     }
 
     await redisService.delByPattern('products:*');
+    clearL1CatalogCache();
 
     return product;
   }
@@ -571,16 +648,28 @@ class ProductService {
   async getProductsByCategory(categoryId, options = {}) {
     const { page = 1, limit = 10, sort = '-createdAt' } = options;
 
-    const total = await Product.countByCategory(categoryId);
-    const paginationParams = getPaginationParams(page, limit, total);
+    const cacheKey = buildHashedCacheKey(`products:category:${categoryId}`, options);
+    const cachedData = await redisService.get(cacheKey);
+    if (cachedData) return cachedData;
 
-    const products = await Product.findByCategory(categoryId, {
-      sort,
-      skip: paginationParams.skip,
-      limit: paginationParams.limit,
-    });
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit) || 10));
+    const skip = (pageNum - 1) * limitNum;
 
-    return buildPaginationResponse(products, paginationParams);
+    const [total, products] = await Promise.all([
+      Product.countByCategory(categoryId),
+      Product.findByCategory(categoryId, {
+        sort,
+        skip,
+        limit: limitNum,
+      }),
+    ]);
+
+    const paginationParams = getPaginationParams(pageNum, limitNum, total);
+    const response = buildPaginationResponse(products, paginationParams);
+
+    await redisService.set(cacheKey, response, 300);
+    return response;
   }
 
   /**
@@ -592,6 +681,10 @@ class ProductService {
   async getProductsByCategorySlug(slug, options = {}) {
     const { page = 1, limit = 10, sort = '-createdAt' } = options;
 
+    const cacheKey = buildHashedCacheKey(`products:category-slug:${slug}`, options);
+    const cachedData = await redisService.get(cacheKey);
+    if (cachedData) return cachedData;
+
     let category = await Category.findBySlugActive(slug);
     if (!category) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Category not found');
@@ -600,21 +693,25 @@ class ProductService {
     // Walk up to the top-level root so legacy/mapped subcategories return the root's products
     category = await resolveRootCategory(category);
 
-
     const childCategories = await Category.findSubcategoryIds(category._id);
-
     const categoryIds = [category._id, ...childCategories.map((child) => child._id)];
 
-    const total = await Product.countByCategoryIds(categoryIds);
-    const paginationParams = getPaginationParams(page, limit, total);
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit) || 10));
+    const skip = (pageNum - 1) * limitNum;
 
-    const products = await Product.findByCategoryIds(categoryIds, {
-      sort,
-      skip: paginationParams.skip,
-      limit: paginationParams.limit,
-    });
+    const [total, products] = await Promise.all([
+      Product.countByCategoryIds(categoryIds),
+      Product.findByCategoryIds(categoryIds, {
+        sort,
+        skip,
+        limit: limitNum,
+      }),
+    ]);
 
-    return {
+    const paginationParams = getPaginationParams(pageNum, limitNum, total);
+
+    const response = {
       ...buildPaginationResponse(products, paginationParams),
       category: {
         _id: category._id,
@@ -623,6 +720,9 @@ class ProductService {
         description: category.description,
       },
     };
+
+    await redisService.set(cacheKey, response, 300);
+    return response;
   }
 
   /**
@@ -716,6 +816,10 @@ class ProductService {
    * @returns {Promise<any>}
    */
   async getRelatedProducts(productId) {
+    const cacheKey = `products:related:${productId}`;
+    const cachedProducts = await redisService.get(cacheKey);
+    if (cachedProducts) return cachedProducts;
+
     const limit = 10;
     const currentProduct = await Product.findById(productId);
     if (!currentProduct) {
@@ -734,6 +838,7 @@ class ProductService {
       limit,
     });
 
+    await redisService.set(cacheKey, products, 1800);
     return products;
   }
 
@@ -782,6 +887,7 @@ class ProductService {
     }
 
     await redisService.delByPattern('products:*');
+    clearL1CatalogCache();
 
     deleteProductEmbedding(productId).catch((err) => {
       logger.error('[ProductService] Error deleting product embedding:', err.message);

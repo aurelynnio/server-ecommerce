@@ -37,27 +37,20 @@ class ShopCategoryService {
   }
 
   /**
-   * Get categories for current seller's shop (include inactive)
-   * @param {string} userId
-   * @returns {Promise<any>}
+   * Helper to enrich categories with product counts and compute total shop products
+   * @private
    */
-  async getMyShopCategories(userId) {
-    const shop = await this._getOwnedShop(userId);
-
-    const categories = await ShopCategory.findByShopIdSorted(shop._id);
-
+  async _attachProductCounts(shopId, categories) {
     const categoryIds = categories.map((c) => c._id);
-    const productCounts = await Product.aggregatePublishedCountsByShopCategories(
-      shop._id,
-      categoryIds,
-    );
+    const [productCounts, totalProducts] = await Promise.all([
+      Product.aggregatePublishedCountsByShopCategories(shopId, categoryIds),
+      Product.countPublishedByShop(shopId),
+    ]);
 
     const countMap = {};
     productCounts.forEach((p) => {
       countMap[p._id.toString()] = p.count;
     });
-
-    const totalProducts = await Product.countPublishedByShop(shop._id);
 
     const categoriesWithCount = categories.map((cat) => ({
       ...cat,
@@ -68,6 +61,17 @@ class ShopCategoryService {
       categories: categoriesWithCount,
       totalProducts,
     };
+  }
+
+  /**
+   * Get categories for current seller's shop (include inactive)
+   * @param {string} userId
+   * @returns {Promise<any>}
+   */
+  async getMyShopCategories(userId) {
+    const shop = await this._getOwnedShop(userId);
+    const categories = await ShopCategory.findByShopIdSorted(shop._id);
+    return this._attachProductCounts(shop._id, categories);
   }
 
   /**
@@ -90,31 +94,8 @@ class ShopCategoryService {
     }
 
     const shopObjectId = typeof shopId === 'string' ? new mongoose.Types.ObjectId(shopId) : shopId;
-
     const categories = await ShopCategory.findActiveByShopIdSorted(shopObjectId);
-
-    const categoryIds = categories.map((c) => c._id);
-    const productCounts = await Product.aggregatePublishedCountsByShopCategories(
-      shopObjectId,
-      categoryIds,
-    );
-
-    const countMap = {};
-    productCounts.forEach((p) => {
-      countMap[p._id.toString()] = p.count;
-    });
-
-    const totalProducts = await Product.countPublishedByShop(shopObjectId);
-
-    const categoriesWithCount = categories.map((cat) => ({
-      ...cat,
-      productCount: countMap[cat._id.toString()] || 0,
-    }));
-
-    return {
-      categories: categoriesWithCount,
-      totalProducts,
-    };
+    return this._attachProductCounts(shopObjectId, categories);
   }
 
   /**

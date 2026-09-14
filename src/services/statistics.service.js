@@ -3,7 +3,6 @@ const User = require('../repositories/user.repository');
 const Product = require('../repositories/product.repository');
 const { buildMonthlyChartData } = require('../utils/query.utils');
 
-
 class StatisticsService {
   _getPeriodBounds() {
     const now = new Date();
@@ -45,7 +44,9 @@ class StatisticsService {
     } = this._getPeriodBounds();
 
     const [
-      countsResult,
+      orderAggResultRaw,
+      totalUsers,
+      totalProducts,
       recentOrdersRaw,
       topProductsRaw,
       monthlyStatsRaw,
@@ -61,22 +62,12 @@ class StatisticsService {
       currentMonthRevenueRaw,
       previousMonthRevenueRaw,
     ] = await Promise.all([
-      // Single aggregation for all counts
-      Promise.all([
-        Order.aggregateRevenueAndOrderCount(),
-        User.countUsersByRole(),
-        Product.countPublishedProducts(),
-      ]),
-
-      // Recent Orders (5)
+      Order.aggregateRevenueAndOrderCount(),
+      User.countUsersByRole(),
+      Product.countPublishedProducts(),
       Order.findRecentWithUser(5),
-
-      // Top Products (By Revenue or Sold Count) - Only products with sales
       Product.findTopSellingProducts(5),
-
-      // Monthly Stats
       Order.aggregateMonthlyStatsLastMonths(6),
-
       Order.countCreatedBetween(startOfToday, startOfTomorrow),
       User.countCreatedBetween(startOfToday, startOfTomorrow),
       Order.aggregatePaidRevenueBetween(startOfToday, startOfTomorrow),
@@ -90,11 +81,9 @@ class StatisticsService {
       Order.aggregatePaidRevenueBetween(startOfPreviousMonth, startOfCurrentMonth),
     ]);
 
-    const orderAggResult = countsResult[0]?.[0] || {};
+    const orderAggResult = orderAggResultRaw?.[0] || {};
     const totalRevenue = orderAggResult.totalRevenue?.[0]?.total || 0;
     const totalOrders = orderAggResult.totalOrders?.[0]?.count || 0;
-    const totalUsers = countsResult[1];
-    const totalProducts = countsResult[2];
     const revenueToday = revenueTodayRaw?.[0]?.total || 0;
     const currentMonthRevenue = currentMonthRevenueRaw?.[0]?.total || 0;
     const previousMonthRevenue = previousMonthRevenueRaw?.[0]?.total || 0;
@@ -134,7 +123,6 @@ class StatisticsService {
 
     // 4. Monthly Revenue & Orders (Last 6 months) for Chart
     const chartData = buildMonthlyChartData(monthlyStatsRaw, 6);
-
 
     const revenueGrowth = this._calculateGrowth(currentMonthRevenue, previousMonthRevenue);
     const orderGrowth = this._calculateGrowth(currentMonthOrders, previousMonthOrders);

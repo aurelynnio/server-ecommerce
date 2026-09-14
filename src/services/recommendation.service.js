@@ -21,7 +21,10 @@ class RecommendationService {
     const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
-    const orders = await Order.findRecentNonCancelledOrdersByUser(userId, 10);
+    const [orders, wishlistEntries] = await Promise.all([
+      Order.findRecentNonCancelledOrdersByUser(userId, 10),
+      Wishlist.findProductIdsByUserIdAll(userId),
+    ]);
 
     const purchasedProductIds = orders.flatMap((o) =>
       o.products.map((p) => p.productId.toString()),
@@ -32,8 +35,7 @@ class RecommendationService {
 
     const categoryIds = [...new Set(purchasedProducts.map((p) => p.category?.toString()))];
 
-    // Get user's wishlist from Wishlist collection
-    const wishlistEntries = await Wishlist.findProductIdsByUserIdAll(userId);
+    // Wishlist ids
     const wishlistIds = wishlistEntries.map((e) => e.productId.toString());
 
     // Exclude already purchased and wishlisted products

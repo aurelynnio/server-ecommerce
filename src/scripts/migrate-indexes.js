@@ -47,6 +47,42 @@ const INDEX_OPS = [
     options: { name: 'status_1_ratingAverage_-1_reviewCount_-1' },
     reason: 'findTopRatedProducts / findHomepageTopRated / rating catalog filter',
   },
+  {
+    collection: 'products',
+    spec: { status: 1, createdAt: -1 },
+    options: { name: 'status_1_createdAt_-1' },
+    reason: 'getAllProducts default catalog query (sort newest)',
+  },
+  {
+    collection: 'products',
+    spec: { category: 1, status: 1, createdAt: -1 },
+    options: { name: 'category_1_status_1_createdAt_-1' },
+    reason: 'getAllProducts & getProductsByCategory (category + sort newest)',
+  },
+  {
+    collection: 'products',
+    spec: { category: 1, status: 1, 'price.currentPrice': 1 },
+    options: { name: 'category_1_status_1_price.currentPrice_1' },
+    reason: 'getAllProducts (category + sort price asc)',
+  },
+  {
+    collection: 'products',
+    spec: { category: 1, status: 1, 'price.currentPrice': -1 },
+    options: { name: 'category_1_status_1_price.currentPrice_-1' },
+    reason: 'getAllProducts (category + sort price desc)',
+  },
+  {
+    collection: 'products',
+    spec: { category: 1, status: 1, soldCount: -1 },
+    options: { name: 'category_1_status_1_soldCount_-1' },
+    reason: 'getAllProducts (category + sort best selling)',
+  },
+  {
+    collection: 'products',
+    spec: { shop: 1, status: 1, createdAt: -1 },
+    options: { name: 'shop_1_status_1_createdAt_-1' },
+    reason: 'Shop product listing (sort newest)',
+  },
   // ---- orders ----
   {
     collection: 'orders',
@@ -59,6 +95,43 @@ const INDEX_OPS = [
     spec: { 'products.productId': 1, status: 1 },
     options: { name: 'products.productId_1_status_1' },
     reason: 'existsDeliveredOrderForProductByUser / findOrdersContainingProduct',
+  },
+  // ---- carts ----
+  {
+    collection: 'carts',
+    spec: { userId: 1 },
+    options: { unique: true, name: 'userId_1' },
+    reason: 'Primary user cart lookup (findByUserId, checkout, getCart)',
+  },
+  {
+    collection: 'carts',
+    spec: { 'items.productId': 1 },
+    options: { name: 'items.productId_1' },
+    reason: 'Find carts containing a specific product (stock/price updates, deletion)',
+  },
+  {
+    collection: 'carts',
+    spec: { 'items._id': 1 },
+    options: { name: 'items._id_1' },
+    reason: 'Direct cart item lookup and subdocument operations',
+  },
+  {
+    collection: 'carts',
+    spec: { userId: 1, 'items._id': 1 },
+    options: { name: 'userId_1_items._id_1' },
+    reason: 'User-scoped cart item operations (updateCartItem, removeCartItem)',
+  },
+  {
+    collection: 'carts',
+    spec: { 'items.shopId': 1 },
+    options: { sparse: true, name: 'items.shopId_1' },
+    reason: 'Find carts containing products from a specific shop',
+  },
+  {
+    collection: 'carts',
+    spec: { updatedAt: -1 },
+    options: { name: 'updatedAt_-1' },
+    reason: 'Abandoned cart recovery and recent cart activity tracking',
   },
 ];
 

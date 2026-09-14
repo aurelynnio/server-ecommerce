@@ -15,9 +15,6 @@ const ApiError = require('../utils/ApiError');
 const { getOwnedShopOrThrow } = require('../utils/shopAssertions');
 const { buildMonthlyChartData } = require('../utils/query.utils');
 
-
-
-
 class ShopService {
   /**
    * Create shop
@@ -177,15 +174,23 @@ class ShopService {
     const shop = await getOwnedShopOrThrow(userId);
     const shopId = shop._id;
 
-    const [totalProducts, totalOrders, orderStatusCounts, revenueData, topProducts, recentOrders] =
-      await Promise.all([
-        Product.countPublishedByShop(shopId),
-        Order.countByShopId(shopId),
-        Order.aggregateStatusCountsByShopId(shopId),
-        Order.aggregatePaidRevenueByShopId(shopId),
-        Product.findTopSellingByShop(shopId, 5),
-        Order.findRecentByShopIdWithUser(shopId, 5),
-      ]);
+    const [
+      totalProducts,
+      totalOrders,
+      orderStatusCounts,
+      revenueData,
+      topProducts,
+      recentOrders,
+      monthlyRevenueRaw,
+    ] = await Promise.all([
+      Product.countPublishedByShop(shopId),
+      Order.countByShopId(shopId),
+      Order.aggregateStatusCountsByShopId(shopId),
+      Order.aggregatePaidRevenueByShopId(shopId),
+      Product.findTopSellingByShop(shopId, 5),
+      Order.findRecentByShopIdWithUser(shopId, 5),
+      Order.aggregateMonthlyStatsLastMonths(6, { shopId }),
+    ]);
     const ordersByStatus = {
       pending: 0,
       confirmed: 0,
@@ -201,12 +206,7 @@ class ShopService {
       }
     });
 
-    const monthlyRevenueRaw = await Order.aggregateMonthlyStatsLastMonths(6, {
-      shopId,
-    });
-
     const chartData = buildMonthlyChartData(monthlyRevenueRaw, 6);
-
 
     const formattedTopProducts = topProducts.map((product) => {
       const image = product.variants?.[0]?.images?.[0] || null;

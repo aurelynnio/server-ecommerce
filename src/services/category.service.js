@@ -276,7 +276,9 @@ class CategoryService {
     // products-page tab bar shows top-level categories, not every subcategory.
     const { page = 1, limit = 10 } = filters;
     const parentCategory =
-      filters.parentCategory === undefined || filters.parentCategory === null || filters.parentCategory === ''
+      filters.parentCategory === undefined ||
+      filters.parentCategory === null ||
+      filters.parentCategory === ''
         ? null
         : filters.parentCategory;
 
@@ -296,11 +298,13 @@ class CategoryService {
    * @returns {Promise<Object>} Statistics including counts and top categories
    */
   async getCategoryStatistics() {
-    const totalCategories = await Category.countAllCategories();
-    const activeCategories = await Category.countActiveCategories();
-    const rootCategories = await Category.countRootCategories();
-
-    const categoriesWithProductCount = await Category.aggregateTopCategoriesByProductCount(5);
+    const [totalCategories, activeCategories, rootCategories, categoriesWithProductCount] =
+      await Promise.all([
+        Category.countAllCategories(),
+        Category.countActiveCategories(),
+        Category.countRootCategories(),
+        Category.aggregateTopCategoriesByProductCount(5),
+      ]);
 
     return {
       totalCategories,
