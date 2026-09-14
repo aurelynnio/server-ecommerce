@@ -72,4 +72,11 @@ describe('Password Utilities', () => {
       expect(await comparePassword(password, hashed)).toBe(true);
     });
   });
+
+  describe('backward compatibility re-exports', () => {
+    it('should re-export hashPassword and comparePassword directly', () => {
+      expect(legacyHashPassword).toBe(hashPassword);
+      expect(legacyComparePassword).toBe(comparePassword);
+    });
+  });
 });
