@@ -33,7 +33,7 @@ const connectDB = async () => {
       maxConnecting,
       maxPoolSize,
       minPoolSize,
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS) || 15000,
       socketTimeoutMS: 45000,
       waitQueueTimeoutMS: 10000,
     });

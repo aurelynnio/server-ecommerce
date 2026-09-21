@@ -3,14 +3,26 @@ const { connectRabbitMQ } = require('../configs/rabbitMQ.config');
 const Shop = require('../repositories/shop.repository');
 const notificationService = require('../services/notification.service');
 const orderService = require('../services/order.service');
+const redisService = require('../services/redis.service');
 const logger = require('../utils/logger');
 const connectDB = require('../db/connect.db');
 const { ORDER_EVENT_TYPES } = require('../shared/order/orderEvents');
 const { getRetryCount } = require('../utils/rabbitmq.utils');
 const { createQueueMetrics } = require('../monitoring/queue.metrics');
 
-const ORDER_WORKER_PREFETCH = Number(process.env.ORDER_WORKER_PREFETCH) || 1;
-const ORDER_DLQ_PREFETCH = Number(process.env.ORDER_DLQ_PREFETCH) || 1;
+/**
+ * RabbitMQ prefetch sizing:
+ * Setting PREFETCH = 1 creates a severe Stop-and-Wait bottleneck where the consumer
+ * idles waiting for a network round-trip ACK before receiving the next message.
+ * Under high throughput (e.g., 10,000 orders/s), network latency (e.g., 5ms) × 10,000 = 50s just for ACKs.
+ *
+ * Little's Law formula for optimal prefetch:
+ *   prefetch = (target_throughput × average_processing_time_seconds) / number_of_workers
+ *
+ * For production order worker event handling, recommended prefetch is 50-100.
+ */
+const ORDER_WORKER_PREFETCH = Number(process.env.ORDER_WORKER_PREFETCH) || 50;
+const ORDER_DLQ_PREFETCH = Number(process.env.ORDER_DLQ_PREFETCH) || 10;
 const ORDER_PROCESSING_TIMEOUT_MS = Number(process.env.ORDER_PROCESSING_TIMEOUT_MS) || 30000;
 
 const metrics = createQueueMetrics('order_worker');
@@ -50,320 +62,348 @@ const isNonRetryableError = (error) => {
   return false;
 };
 
-const getOrderCode = (payload) =>
-  payload.orderCode || payload.orderId?.toString().slice(-6).toUpperCase() || 'N/A';
+/**
+ * Xử lý chính sự kiện order và phát notification trực tiếp.
+ * Viết trực tiếp logic notification cho người mua và chủ shop mà không phân mảnh helper.
+ */
+const handleOrderEvent = async (payload) => {
+  const { eventName, orderId, shopId, userId, customerName, status, actor } = payload;
+  const orderCode =
+    payload.orderCode || (orderId ? String(orderId).slice(-6).toUpperCase() : 'N/A');
 
-const publishNotifications = async (notifications) => {
-  const filteredNotifications = notifications.filter((notification) => notification?.userId);
-  if (filteredNotifications.length === 0) {
-    return;
+  if (eventName === ORDER_EVENT_TYPES.COMMAND_CREATE) {
+    const { trackingId, userId, orderData, isBuyNow } = payload;
+    const trackingKey = `order:tracking:${trackingId}`;
+
+    try {
+      await redisService.set(
+        trackingKey,
+        {
+          trackingId,
+          userId,
+          status: 'processing',
+          updatedAt: new Date().toISOString(),
+        },
+        86400,
+      );
+    } catch (_redisErr) {}
+
+    try {
+      let orderResult;
+      if (isBuyNow) {
+        orderResult = await orderService.buyNow(userId, orderData);
+      } else {
+        orderResult = await orderService.createOrder(userId, orderData);
+      }
+
+      try {
+        await redisService.set(
+          trackingKey,
+          {
+            trackingId,
+            userId,
+            status: 'completed',
+            orderGroupId: orderResult?.orderGroupId,
+            orders: orderResult?.orders?.map((o) => ({
+              orderId: o._id,
+              orderCode: o.orderNumber || o._id?.toString()?.slice(-6).toUpperCase(),
+            })),
+            completedAt: new Date().toISOString(),
+          },
+          86400,
+        );
+      } catch (_redisErr) {}
+
+      return { success: true };
+    } catch (error) {
+      if (payload.redisStockReserved && payload.reservedProductId) {
+        try {
+          await redisService.releaseFlashSaleStock(
+            payload.reservedProductId,
+            payload.reservedVariantId,
+            payload.reservedQuantity || 1,
+          );
+        } catch (_compErr) {}
+      }
+
+      if (isNonRetryableError(error)) {
+        try {
+          await redisService.set(
+            trackingKey,
+            {
+              trackingId,
+              userId,
+              status: 'failed',
+              reason: error.message || 'Order execution failed',
+              failedAt: new Date().toISOString(),
+            },
+            86400,
+          );
+        } catch (_redisErr) {}
+
+        logger.warn('Order command execution rejected (non-retryable business error)', {
+          trackingId,
+          error: error.message,
+        });
+
+        return { success: true };
+      }
+
+      logger.error('Order command execution failed with retryable error, routing to DLQ', {
+        trackingId,
+        error: error.message,
+      });
+      throw error;
+    }
   }
 
-  const results = await Promise.allSettled(
-    filteredNotifications.map((notification) =>
-      notificationService.publishNotification(notification, 'notification.created'),
-    ),
-  );
+  const notifications = [];
 
-  const failedResult = results.find((result) => result.status === 'rejected');
-  if (failedResult) {
-    throw failedResult.reason;
-  }
-};
-
-/** Trả về userId của chủ shop, hoặc null nếu không có shop/owner. */
-const getSellerUserId = async (shopId) => {
-  if (!shopId) return null;
-  const shop = await Shop.findByIdLean(shopId);
-  const owner = shop?.owner;
-  return owner ? String(owner) : null;
-};
-
-const buildSellerNotification = ({ title, message, orderId, shopId, sellerUserId }) => ({
-  userId: sellerUserId,
-  type: 'order_status',
-  title,
-  message,
-  orderId,
-  shopId,
-  link: '/seller/orders',
-});
-
-const buildCreatedNotifications = async (payload) => {
-  const notifications = [
-    {
-      userId: payload.userId,
+  if (eventName === ORDER_EVENT_TYPES.CREATED) {
+    // 1. Notification cho người mua
+    notifications.push({
+      userId,
       type: 'order_status',
       title: 'Đơn hàng mới',
-      message: `Đơn hàng ${getOrderCode(payload)} đã được tạo.`,
-      orderId: payload.orderId,
-      shopId: payload.shopId,
+      message: `Đơn hàng ${orderCode} đã được tạo.`,
+      orderId,
+      shopId,
       link: '/user/purchase',
-    },
-  ];
+    });
 
-  const sellerUserId = await getSellerUserId(payload.shopId);
-  if (sellerUserId && sellerUserId !== payload.userId?.toString()) {
-    notifications.push(
-      buildSellerNotification({
-        title: 'Bạn có đơn hàng mới',
-        message: `Có đơn hàng mới từ ${payload.customerName || 'khách hàng'}.`,
-        orderId: payload.orderId,
-        shopId: payload.shopId,
-        sellerUserId,
-      }),
-    );
-  }
+    // 2. Notification cho chủ shop (nếu có và không phải người mua)
+    if (shopId) {
+      const shop = await Shop.findByIdLean(shopId);
+      const sellerUserId = shop?.owner ? String(shop.owner) : null;
+      if (sellerUserId && sellerUserId !== String(userId)) {
+        notifications.push({
+          userId: sellerUserId,
+          type: 'order_status',
+          title: 'Bạn có đơn hàng mới',
+          message: `Có đơn hàng mới từ ${customerName || 'khách hàng'}.`,
+          orderId,
+          shopId,
+          link: '/seller/orders',
+        });
+      }
+    }
+  } else if (eventName === ORDER_EVENT_TYPES.STATUS_CHANGED) {
+    const isCancelledByUser = status === 'cancelled' && actor === 'user';
+    const statusMsg = ORDER_STATUS_MESSAGES[status] || 'Trạng thái đơn hàng đã thay đổi.';
 
-  return notifications;
-};
-
-const buildStatusChangedNotifications = async (payload) => {
-  const notifications = [
-    {
-      userId: payload.userId,
+    // 1. Notification cho người mua
+    notifications.push({
+      userId,
       type: 'order_status',
       title: 'Cập nhật đơn hàng',
-      message:
-        payload.status === 'cancelled' && payload.actor === 'user'
-          ? `Bạn đã hủy đơn hàng ${getOrderCode(payload)}.`
-          : `Đơn hàng ${getOrderCode(payload)}: ${ORDER_STATUS_MESSAGES[payload.status] || 'Trạng thái đơn hàng đã thay đổi.'}`,
-      orderId: payload.orderId,
-      shopId: payload.shopId,
+      message: isCancelledByUser
+        ? `Bạn đã hủy đơn hàng ${orderCode}.`
+        : `Đơn hàng ${orderCode}: ${statusMsg}`,
+      orderId,
+      shopId,
       link: '/user/purchase',
-    },
-  ];
+    });
 
-  if (payload.status === 'cancelled' && payload.actor === 'user') {
-    const sellerUserId = await getSellerUserId(payload.shopId);
-    if (sellerUserId && sellerUserId !== payload.userId?.toString()) {
-      notifications.push(
-        buildSellerNotification({
+    // 2. Notification cho chủ shop khi user hủy
+    if (isCancelledByUser && shopId) {
+      const shop = await Shop.findByIdLean(shopId);
+      const sellerUserId = shop?.owner ? String(shop.owner) : null;
+      if (sellerUserId && sellerUserId !== String(userId)) {
+        notifications.push({
+          userId: sellerUserId,
+          type: 'order_status',
           title: 'Đơn hàng đã bị hủy',
-          message: `Khách hàng đã hủy đơn hàng ${getOrderCode(payload)}.`,
-          orderId: payload.orderId,
-          shopId: payload.shopId,
-          sellerUserId,
-        }),
-      );
+          message: `Khách hàng đã hủy đơn hàng ${orderCode}.`,
+          orderId,
+          shopId,
+          link: '/seller/orders',
+        });
+      }
     }
+  } else {
+    return { success: false, unsupported: true };
   }
 
-  return notifications;
-};
-
-const handleOrderEvent = async (payload) => {
-  switch (payload.eventName) {
-    case ORDER_EVENT_TYPES.CREATED: {
-      const notifications = await buildCreatedNotifications(payload);
-      await publishNotifications(notifications);
-      return { success: true };
-    }
-    case ORDER_EVENT_TYPES.STATUS_CHANGED: {
-      const notifications = await buildStatusChangedNotifications(payload);
-      await publishNotifications(notifications);
-      return { success: true };
-    }
-    default:
-      return { success: false, unsupported: true };
-  }
-};
-
-/** Áp prefetch 1 lần; addSetup tự áp dụng khi channel (đoàn kết) mới connect lại. */
-const applyPrefetch = async (channel, count) => {
-  await channel.addSetup((rawChannel) => rawChannel.prefetch(count));
-};
-
-/**
- * Đảm bảo mỗi message chỉ được settle (ack/nack) đúng 1 lần, kể cả timeout,
- * exception hoặc code path trả về sớm.
- */
-const createSettler = (channel, message, name = 'message') => {
-  let isSettled = false;
-
-  const settle = (fn, action, ...args) => {
-    if (isSettled) return;
-    isSettled = true;
-    try {
-      fn(...args);
-    } catch (err) {
-      logger.error(`Failed to ${action} ${name}`, { error: err.message });
-    }
-  };
-
-  return {
-    isSettled: () => isSettled,
-    ack: () => settle(channel.ack, 'ACK', message),
-    nack: (requeue) => settle(channel.nack, 'NACK', message, false, requeue),
-  };
-};
-
-/** Chạy task với timeout; khi quá hạn reject để consumer đưa message về DLQ/retry. */
-const withProcessingTimeout = (task, timeoutMessage) => {
-  let timeoutHandle;
-  const timeoutPromise = new Promise((_, reject) => {
-    timeoutHandle = setTimeout(
-      () => reject(new Error(timeoutMessage)),
-      ORDER_PROCESSING_TIMEOUT_MS,
+  // Publish tất cả notifications hợp lệ
+  const validNotifications = notifications.filter((item) => item?.userId);
+  if (validNotifications.length > 0) {
+    const publishResults = await Promise.allSettled(
+      validNotifications.map((notification) =>
+        notificationService.publishNotification(notification, 'notification.created'),
+      ),
     );
-  });
 
-  const processing = task();
-  return Promise.race([processing, timeoutPromise]).finally(() => clearTimeout(timeoutHandle));
+    const failedResult = publishResults.find((result) => result.status === 'rejected');
+    if (failedResult) {
+      throw failedResult.reason;
+    }
+  }
+
+  return { success: true };
 };
 
 /**
- * Tạo consumer tổng quát cho 1 queue (main hoặc DLQ) của 1 namespace.
- * Đảm bảo: watchdog timeout + settle đúng 1 lần + không bao giờ bỏ message ở Unacked.
+ * Consumer cho hàng đợi sự kiện order chính.
+ * Viết trực tiếp kết nối, prefetch, timeout safeguard, parse payload, logging và metrics.
  */
-const consumeOrderQueue = async ({
-  serviceKey,
-  clientName,
-  prefetch,
-  queueName = 'name', // 'name' | 'dlq'
-  messageName = 'order message',
-  requeueOnFailure = false,
-  handleMessage,
-}) => {
-  const { channel, queue } = await connectRabbitMQ(serviceKey, { clientName });
-  await applyPrefetch(channel, prefetch);
+const startOrderEventConsumer = async () => {
+  const { channel, queue } = await connectRabbitMQ('order', {
+    clientName: 'event-consumer',
+  });
+  await channel.addSetup((rawChannel) => rawChannel.prefetch(ORDER_WORKER_PREFETCH));
 
   await channel.consume(
-    queue[queueName] || queue.name,
+    queue.name,
     async (data) => {
       if (!data) return;
 
-      const settler = createSettler(channel, data, messageName);
+      let isSettled = false;
+      const settle = (action) => {
+        if (isSettled) return;
+        isSettled = true;
+        try {
+          action();
+        } catch (err) {
+          logger.error('Failed to settle order message', { error: err.message });
+        }
+      };
+
+      let timeoutHandle;
       let eventName = 'unknown';
 
       try {
-        await withProcessingTimeout(async () => {
-          await handleMessage({ data, queue, settler, setEventName: (name) => (eventName = name) });
-        }, `${messageName} processing timed out after ${ORDER_PROCESSING_TIMEOUT_MS}ms`);
+        let payload;
+        try {
+          payload = JSON.parse(data.content.toString());
+        } catch (parseError) {
+          logger.error('Failed to parse order message JSON', { error: parseError.message });
+          settle(() => channel.nack(data, false, false));
+          return;
+        }
+
+        eventName = payload.eventName || data.fields?.routingKey || 'unknown';
+        payload.eventName = eventName;
+
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutHandle = setTimeout(
+            () =>
+              reject(
+                new Error(
+                  `Order event processing timed out after ${ORDER_PROCESSING_TIMEOUT_MS}ms`,
+                ),
+              ),
+            ORDER_PROCESSING_TIMEOUT_MS,
+          );
+        });
+
+        const result = await Promise.race([handleOrderEvent(payload), timeoutPromise]);
+
+        if (result?.unsupported || !result) {
+          metrics.unsupported.inc();
+          logger.warn('Unsupported order event received', { eventName });
+          settle(() => channel.ack(data));
+        } else if (result.success) {
+          metrics.processed.inc();
+          logger.info('Order event processed successfully', {
+            eventName,
+            orderId: payload.orderId,
+            trackingId: payload.trackingId,
+          });
+          settle(() => channel.ack(data));
+        } else {
+          metrics.failed.inc();
+          logger.error('Order event execution failed in worker, routing to DLQ', {
+            eventName,
+            trackingId: payload.trackingId,
+          });
+          settle(() => channel.nack(data, false, false));
+        }
       } catch (error) {
         if (error.message.includes('timed out')) {
           metrics.timeout.inc();
-          logger.warn(`Timeout while consuming ${messageName}`, { eventName });
+          logger.warn('Timeout while consuming order message', { eventName, error: error.message });
         } else {
           metrics.failed.inc();
-          logger.error(`Error occurred while consuming ${messageName}`, {
+          logger.error('Error occurred while consuming order message', {
             eventName,
             error: error.message,
           });
         }
-        settler.nack(requeueOnFailure);
+        settle(() => channel.nack(data, false, false));
       } finally {
-        // Absolute guarantee: never leave a message in Unacked state!
-        if (!settler.isSettled()) {
-          settler.nack(requeueOnFailure);
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+        if (!isSettled) {
+          settle(() => channel.nack(data, false, false));
         }
       }
     },
     { noAck: false },
   );
 
-  logger.info(`${messageName} consumer started`, { queue: queue.name, prefetch });
-  return { channel, queue };
-};
-
-/** Parse payload + gán eventName (fallback routingKey). */
-const parseOrderPayload = (data, setEventName) => {
-  const payload = JSON.parse(data.content.toString());
-  const eventName = payload.eventName || data.fields?.routingKey || 'unknown';
-  setEventName(eventName);
-  payload.eventName = eventName;
-  return payload;
-};
-
-/** Message chính: xử lý event rồi ACK thành công / NACK(false) thất bại. */
-const handleMainOrderMessage = async ({ data, settler, setEventName }) => {
-  const payload = parseOrderPayload(data, setEventName);
-  const { eventName } = payload;
-
-  const result = await handleOrderEvent(payload);
-  if (result?.unsupported || !result) {
-    metrics.unsupported.inc();
-    logger.warn('Unsupported order event received', { eventName });
-    settler.ack();
-    return;
-  }
-
-  if (result.success) {
-    // ONLY call ACK when MongoDB transaction committed successfully
-    metrics.processed.inc();
-    logger.info('Order event processed successfully', {
-      eventName,
-      orderId: payload.orderId,
-      trackingId: payload.trackingId,
-    });
-    settler.ack();
-    return;
-  }
-
-  // Order failed in worker: do NOT ACK! Dead-letter without requeue to DLQ
-  metrics.failed.inc();
-  const error = result.error || new Error('Order event execution failed');
-  logger.error('Order event execution failed in worker, routing to DLQ', {
-    eventName,
-    trackingId: payload.trackingId,
-    error: error.message,
-    nonRetryable: result.nonRetryable,
+  logger.info('Order event consumer started', {
+    queue: queue.name,
+    prefetch: ORDER_WORKER_PREFETCH,
   });
-  settler.nack(false);
 };
 
 /**
- * Message DLQ của 1 namespace: quá retry → failedQueue; tracking 'completed'
- * → drop (idempotency); lỗi non-retryable → failedQueue; còn lại → retryQueue.
+ * Consumer cho hàng đợi DLQ order.
+ * Viết trực tiếp logic retry và failedQueue mà không dùng abstraction thừa.
  */
-const handleDlqMessage =
-  (queueNamespace = 'order') =>
-  async ({ data, queue, settler }) => {
-    const nextRetryCount = getRetryCount(data) + 1;
-
-    let payload = null;
-    try {
-      payload = JSON.parse(data.content.toString());
-    } catch {}
-
-    if (nextRetryCount > queue.maxRetries) {
-      await orderService.publishOrderFailed(data.content, queue.maxRetries, queueNamespace);
-      metrics.dlqFailed.inc();
-      logger.error('Order message exceeded retry limit in DLQ, moved to failedQueue', {
-        queue: queue.dlq,
-        failedQueue: queue.failedQueue,
-        maxRetries: queue.maxRetries,
-        orderId: payload?.orderId,
-      });
-      settler.ack();
-      return;
-    }
-
-    await orderService.publishOrderRetry(data.content, nextRetryCount, queueNamespace);
-    metrics.dlqRetried.inc();
-    settler.ack();
-  };
-
-/** EVENT order (created/status_changed): xử lý notification */
-const startOrderEventConsumer = () =>
-  consumeOrderQueue({
-    serviceKey: 'order',
-    clientName: 'event-consumer',
-    prefetch: ORDER_WORKER_PREFETCH,
-    messageName: 'order event',
-    handleMessage: handleMainOrderMessage,
-  });
-
-const startOrderEventDLQConsumer = () =>
-  consumeOrderQueue({
-    serviceKey: 'order',
+const startOrderEventDLQConsumer = async () => {
+  const { channel, queue } = await connectRabbitMQ('order', {
     clientName: 'event-dlq-consumer',
-    prefetch: ORDER_DLQ_PREFETCH,
-    queueName: 'dlq',
-    messageName: 'order event DLQ message',
-    requeueOnFailure: true,
-    handleMessage: handleDlqMessage('order'),
   });
+  await channel.addSetup((rawChannel) => rawChannel.prefetch(ORDER_DLQ_PREFETCH));
+
+  await channel.consume(
+    queue.dlq,
+    async (data) => {
+      if (!data) return;
+
+      try {
+        const nextRetryCount = getRetryCount(data) + 1;
+        let payload = null;
+        try {
+          payload = JSON.parse(data.content.toString());
+        } catch {}
+
+        if (nextRetryCount > queue.maxRetries) {
+          await orderService.publishOrderFailed(data.content, queue.maxRetries, 'order');
+          metrics.dlqFailed.inc();
+          logger.error('Order message exceeded retry limit in DLQ, moved to failedQueue', {
+            queue: queue.dlq,
+            failedQueue: queue.failedQueue,
+            maxRetries: queue.maxRetries,
+            orderId: payload?.orderId,
+          });
+          channel.ack(data);
+          return;
+        }
+
+        await orderService.publishOrderRetry(data.content, nextRetryCount, 'order');
+        metrics.dlqRetried.inc();
+        channel.ack(data);
+      } catch (error) {
+        metrics.failed.inc();
+        logger.error('Error occurred while retrying order DLQ message', {
+          error: error.message,
+          currentRetryCount: getRetryCount(data),
+        });
+        channel.nack(data, false, true);
+      }
+    },
+    { noAck: false },
+  );
+
+  logger.info('Order event DLQ consumer started', {
+    queue: queue.dlq,
+    retryQueue: queue.retryQueue,
+    failedQueue: queue.failedQueue,
+    retryDelayMs: queue.retryDelayMs,
+    prefetch: ORDER_DLQ_PREFETCH,
+  });
+};
 
 const consumerOrderQueue = async () => {
   await Promise.all([startOrderEventConsumer(), startOrderEventDLQConsumer()]);
@@ -381,4 +421,11 @@ if (require.main === module) {
 // Exports dùng trong test
 consumerOrderQueue._handleOrderEvent = handleOrderEvent;
 consumerOrderQueue._isNonRetryableError = isNonRetryableError;
+consumerOrderQueue.ORDER_WORKER_PREFETCH = ORDER_WORKER_PREFETCH;
+consumerOrderQueue.ORDER_DLQ_PREFETCH = ORDER_DLQ_PREFETCH;
+consumerOrderQueue.calculateOptimalPrefetch = (
+  targetThroughput,
+  avgProcessingTimeSeconds,
+  numberOfWorkers = 1,
+) => Math.max(1, Math.round((targetThroughput * avgProcessingTimeSeconds) / numberOfWorkers));
 module.exports = consumerOrderQueue;

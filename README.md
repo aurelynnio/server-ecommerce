@@ -126,12 +126,13 @@ Chi tiết endpoint, method, quyền truy cập và validation nằm tại `src/
 
 ### MongoDB, Redis và RabbitMQ
 
-| Nhóm         | Variables                                                                                                                                                                                                    |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| MongoDB      | `MONGODB_URI` hoặc `MONGODB_HOST`, `MONGODB_PORT`, `MONGODB_DATABASE`, `MONGODB_USER`, `MONGODB_PASSWORD`, `MONGODB_AUTH_SOURCE`; pool: `MONGO_MIN_POOL_SIZE`, `MONGO_MAX_POOL_SIZE`, `MONGO_MAX_CONNECTING` |
-| Redis        | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`; Socket adapter: `REDIS_URL`, `SOCKET_REDIS_ADAPTER`                                                                                                            |
-| RabbitMQ     | `RABBITMQ_URL`, `RABBITMQ_EXCHANGE`, `RABBITMQ_DLX`, `RABBITMQ_HEARTBEAT_INTERVAL_IN_SECONDS`, `RABBITMQ_RECONNECT_DELAY_MS`, `RABBITMQ_CONNECT_TIMEOUT_MS`                                                  |
-| Worker retry | `NOTIFICATION_RETRY_DELAY_MS`, `NOTIFICATION_MAX_RETRIES`, `ORDER_RETRY_DELAY_MS`, `ORDER_MAX_RETRIES`                                                                                                       |
+| Nhóm            | Variables                                                                                                                                                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MongoDB         | `MONGODB_URI` hoặc `MONGODB_HOST`, `MONGODB_PORT`, `MONGODB_DATABASE`, `MONGODB_USER`, `MONGODB_PASSWORD`, `MONGODB_AUTH_SOURCE`; pool: `MONGO_MIN_POOL_SIZE`, `MONGO_MAX_POOL_SIZE`, `MONGO_MAX_CONNECTING`                                |
+| Redis           | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`; Socket adapter: `REDIS_URL`, `SOCKET_REDIS_ADAPTER`                                                                                                                                           |
+| RabbitMQ        | `RABBITMQ_URL`, `RABBITMQ_EXCHANGE`, `RABBITMQ_DLX`, `RABBITMQ_HEARTBEAT_INTERVAL_IN_SECONDS`, `RABBITMQ_RECONNECT_DELAY_MS`, `RABBITMQ_CONNECT_TIMEOUT_MS`                                                                                 |
+| Worker prefetch | `ORDER_WORKER_PREFETCH` (default: `50`), `ORDER_DLQ_PREFETCH` (`10`), `NOTIFICATION_WORKER_PREFETCH` (`50`), `NOTIFICATION_DLQ_PREFETCH` (`10`). Công thức sizing: `prefetch = (target_throughput × avg_processing_time_sec) / num_workers` |
+| Worker retry    | `NOTIFICATION_RETRY_DELAY_MS`, `NOTIFICATION_MAX_RETRIES`, `ORDER_RETRY_DELAY_MS`, `ORDER_MAX_RETRIES`                                                                                                                                      |
 
 ### Authentication, media và integrations
 

@@ -23,6 +23,7 @@ const {
   requireFiniteNumber,
 } = require('../utils/discount.util');
 const outboxService = require('./outbox.service');
+const crypto = require('crypto');
 
 const MAX_TX_RETRIES = Number(process.env.TXN_MAX_RETRIES) || 5;
 const TX_RETRY_DELAY_MS = Number(process.env.TXN_RETRY_DELAY_MS) || 100;
@@ -208,7 +209,7 @@ const runOrderTransaction = async (txnWork, retryMeta = {}) => {
  * - Other errors -> rethrow.
  */
 const finalizeOrderCreation = async (
-  { committed, result, orderGroupId },
+  { committed, result, error, orderGroupId },
   successMessage,
   publishCreatedEvents,
 ) => {
@@ -217,8 +218,10 @@ const finalizeOrderCreation = async (
     return result;
   }
 
-  if (!isUnknownCommitResult(result.error)) {
-    throw result.error;
+  const errToThrow = error || result?.error || new Error('Transaction failed');
+
+  if (!isUnknownCommitResult(errToThrow)) {
+    throw errToThrow;
   }
 
   const existingOrders = await Order.findByOrderGroupIdLean(orderGroupId);
@@ -227,7 +230,7 @@ const finalizeOrderCreation = async (
     return { message: successMessage, orderGroupId, orders: existingOrders };
   }
 
-  throw result.error;
+  throw errToThrow;
 };
 
 /** Load user and snapshot shipping address (shared by createOrder and buyNow). */
@@ -473,7 +476,7 @@ class OrderService {
   ) {
     const orderGroupId = new Types.ObjectId();
 
-    const { committed, result } = await runOrderTransaction(
+    const { committed, result, error } = await runOrderTransaction(
       async (session) => {
         const [shippingAddress, cart] = await Promise.all([
           loadUserAndShippingAddress(userId, addressId, note, session),
@@ -701,7 +704,7 @@ class OrderService {
     );
 
     return finalizeOrderCreation(
-      { committed, result, orderGroupId },
+      { committed, result, error, orderGroupId },
       result?.message || 'Orders created successfully',
       async (orders) => {
         try {
@@ -765,14 +768,83 @@ class OrderService {
   }
 
   /**
-   * @deprecated Asynchronous order ingestion via queue is deprecated in favor of reliable transactional checkout.
+   * Asynchronous order ingestion via RabbitMQ queue (Buffer / Shock Absorber for MongoDB).
+   * Fast ACK: Publishes order command to RabbitMQ and returns immediately with trackingId (HTTP 202 Accepted).
+   * @param {string|Types.ObjectId} userId
+   * @param {Object} orderData
+   * @param {Object} [options]
+   * @returns {Promise<{trackingId: string, status: string, message: string}>}
    */
   async enqueueOrderCreation(userId, orderData, { isBuyNow = false } = {}) {
-    logger.warn('enqueueOrderCreation is deprecated. Executing checkout synchronously.');
-    if (isBuyNow) {
-      return this.buyNow(userId, orderData);
+    // Fail-Fast Shield: If buyNow or product info is present, atomically reserve stock on Redis
+    let redisStockReserved = false;
+    let reservedProductId = null;
+    let reservedVariantId = null;
+    let reservedQuantity = 1;
+
+    if (isBuyNow && orderData?.productId) {
+      reservedProductId = orderData.productId.toString();
+      reservedVariantId = orderData.variantId ? orderData.variantId.toString() : null;
+      reservedQuantity = Number(orderData.quantity) || 1;
+
+      const reserveResult = await redisService.reserveFlashSaleStock(
+        reservedProductId,
+        reservedVariantId,
+        reservedQuantity,
+      );
+
+      if (reserveResult === -1) {
+        // FAIL FAST! Immediate rejection without hitting RabbitMQ buffer or MongoDB!
+        throw new ApiError(StatusCodes.CONFLICT, 'Flash sale quota reached or item out of stock');
+      }
+
+      if (reserveResult >= 0) {
+        redisStockReserved = true;
+      }
     }
-    return this.createOrder(userId, orderData);
+
+    const trackingId = crypto.randomUUID();
+    const trackingKey = `order:tracking:${trackingId}`;
+
+    const trackingPayload = {
+      trackingId,
+      userId: userId.toString(),
+      status: 'queued',
+      isBuyNow,
+      createdAt: new Date().toISOString(),
+    };
+
+    // 1. Lưu tracking sơ bộ vào Redis (TTL 24 giờ)
+    await redisService.set(trackingKey, trackingPayload, 86400);
+
+    // 2. Bắn command vào RabbitMQ (persistent: true)
+    const commandPayload = {
+      eventName: ORDER_EVENT_TYPES.COMMAND_CREATE,
+      trackingId,
+      userId: userId.toString(),
+      orderData,
+      isBuyNow,
+      redisStockReserved,
+      reservedProductId,
+      reservedVariantId,
+      reservedQuantity,
+      enqueuedAt: new Date().toISOString(),
+    };
+
+    await this.publishOrder(commandPayload, ORDER_EVENT_TYPES.COMMAND_CREATE);
+
+    logger.info('Order creation enqueued to RabbitMQ buffer', {
+      trackingId,
+      userId: userId.toString(),
+      isBuyNow,
+      redisStockReserved,
+    });
+
+    return {
+      trackingId,
+      status: 'queued',
+      message: 'Đơn hàng đã được tiếp nhận vào hàng đợi xử lý',
+    };
   }
 
   /**

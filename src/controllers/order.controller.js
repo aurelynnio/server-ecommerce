@@ -13,8 +13,18 @@ const OrderController = {
    */
   createOrder: catchAsync(async (req, res) => {
     const userId = getRequestUserId(req.user);
-    const order = await orderService.createOrder(userId, req.body);
+    const isAsync =
+      req.headers?.['x-async-processing'] === 'true' ||
+      req.headers?.['x-async'] === 'true' ||
+      req.query?.async === 'true' ||
+      (process.env.ASYNC_ORDER_INGESTION === 'true' && process.env.NODE_ENV !== 'test');
 
+    if (isAsync) {
+      const result = await orderService.enqueueOrderCreation(userId, req.body, { isBuyNow: false });
+      return sendSuccess(res, result, result.message, StatusCodes.ACCEPTED);
+    }
+
+    const order = await orderService.createOrder(userId, req.body);
     return sendSuccess(res, order, 'Order created successfully', StatusCodes.CREATED);
   }),
 
@@ -26,8 +36,18 @@ const OrderController = {
    */
   buyNow: catchAsync(async (req, res) => {
     const userId = getRequestUserId(req.user);
-    const order = await orderService.buyNow(userId, req.body);
+    const isAsync =
+      req.headers?.['x-async-processing'] === 'true' ||
+      req.headers?.['x-async'] === 'true' ||
+      req.query?.async === 'true' ||
+      (process.env.ASYNC_ORDER_INGESTION === 'true' && process.env.NODE_ENV !== 'test');
 
+    if (isAsync) {
+      const result = await orderService.enqueueOrderCreation(userId, req.body, { isBuyNow: true });
+      return sendSuccess(res, result, result.message, StatusCodes.ACCEPTED);
+    }
+
+    const order = await orderService.buyNow(userId, req.body);
     return sendSuccess(res, order, 'Order created successfully', StatusCodes.CREATED);
   }),
 

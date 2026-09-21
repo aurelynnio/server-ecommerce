@@ -2,7 +2,7 @@ const rateLimit = require('express-rate-limit');
 const { RedisStore } = require('rate-limit-redis');
 const redisClient = require('../configs/redis.config');
 
-const createRedisRateLimiter = ({ windowMs, limit, message, keyPrefix = 'rl' }) => {
+const createRedisRateLimiter = ({ windowMs, limit, message, keyPrefix = 'rl', keyGenerator }) => {
   if (process.env.DISABLE_RATE_LIMIT === 'true') {
     return (req, res, next) => next();
   }
@@ -19,6 +19,7 @@ const createRedisRateLimiter = ({ windowMs, limit, message, keyPrefix = 'rl' }) 
       code: 429,
       message,
     },
+    ...(keyGenerator ? { keyGenerator } : {}),
     store: new RedisStore({
       sendCommand: (...args) => redisClient.call(...args),
       prefix: `${keyPrefix}:`,
@@ -52,13 +53,8 @@ const chatbotRateLimiter = createRedisRateLimiter({
   limit: 30,
   message: 'Bạn đang gửi quá nhiều tin nhắn. Vui lòng thử lại sau ít phút.',
   keyPrefix: 'rl:chatbot',
+  keyGenerator: userKeyGenerator,
 });
-
-// Override keyGenerator cho chatbot để ưu tiên userId
-chatbotRateLimiter.keyGenerator = (req) => {
-  const key = userKeyGenerator(req);
-  return key;
-};
 
 const newsletterRateLimiter = createRedisRateLimiter({
   windowMs: 60 * 60 * 1000,

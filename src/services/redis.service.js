@@ -78,6 +78,77 @@ class RedisService {
   async deleteKey(key) {
     return this.del(key);
   }
+
+  /**
+   * Initialize Flash Sale stock in Redis (Fail-Fast Ingestion Shield)
+   * @param {string} productId
+   * @param {string|null} variantId
+   * @param {number} stock
+   * @param {number} ttl
+   */
+  async initFlashSaleStock(productId, variantId, stock, ttl = 86400) {
+    try {
+      const stockKey = `stock:flashsale:${productId}${variantId ? `:${variantId}` : ''}`;
+      await this.redisClient.set(stockKey, String(stock), 'EX', ttl);
+      logger.info(`Redis: Initialized flash sale stock [${stockKey}] = ${stock}`);
+    } catch (error) {
+      logger.error('Redis initFlashSaleStock Error:', { error: error.message, productId });
+    }
+  }
+
+  /**
+   * Atomically reserve Flash Sale stock using Lua script (Fail-Fast Shield)
+   * Returns:
+   *   >= 0 : Succeeded, remaining stock in Redis
+   *   -1   : Out of stock (Fail-Fast trigger)
+   *   1    : Key does not exist (Bypass shield for non-flash-sale items)
+   * @param {string} productId
+   * @param {string|null} variantId
+   * @param {number} quantity
+   * @returns {Promise<number>}
+   */
+  async reserveFlashSaleStock(productId, variantId = null, quantity = 1) {
+    const LUA_RESERVE = `
+      local stock = redis.call('get', KEYS[1])
+      if not stock then
+        return 1
+      end
+      local current = tonumber(stock)
+      local qty = tonumber(ARGV[1])
+      if current < qty then
+        return -1
+      end
+      return redis.call('decrby', KEYS[1], qty)
+    `;
+
+    try {
+      const stockKey = `stock:flashsale:${productId}${variantId ? `:${variantId}` : ''}`;
+      const result = await this.redisClient.eval(LUA_RESERVE, 1, stockKey, quantity);
+      return Number(result);
+    } catch (error) {
+      logger.error('Redis reserveFlashSaleStock Error:', { error: error.message, productId });
+      return 1; // Fallback to DB on unexpected Redis failure
+    }
+  }
+
+  /**
+   * Release / rollback reserved Flash Sale stock back to Redis (Compensation on worker error)
+   * @param {string} productId
+   * @param {string|null} variantId
+   * @param {number} quantity
+   */
+  async releaseFlashSaleStock(productId, variantId = null, quantity = 1) {
+    try {
+      const stockKey = `stock:flashsale:${productId}${variantId ? `:${variantId}` : ''}`;
+      const exists = await this.redisClient.exists(stockKey);
+      if (exists) {
+        await this.redisClient.incrby(stockKey, quantity);
+        logger.info(`Redis: Released flash sale stock [${stockKey}] +${quantity}`);
+      }
+    } catch (error) {
+      logger.error('Redis releaseFlashSaleStock Error:', { error: error.message, productId });
+    }
+  }
 }
 
 module.exports = new RedisService(redisClient);

@@ -16,8 +16,12 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# Benchmark results
+# Benchmark & load test results
 benchmark-results/
+*.jtl
+tests/load/results.jtl
+tests/load/report/
+temp/
 
 # IDE & editors
 .idea/

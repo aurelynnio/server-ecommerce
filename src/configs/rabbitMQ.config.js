@@ -40,7 +40,7 @@ const config_rabbitMQ = {
     },
     order: {
       name: 'order_queue',
-      routingKey: ['order.created', 'order.status_changed', 'order.retry'],
+      routingKey: ['order.created', 'order.status_changed', 'order.retry', 'order.command.create'],
       dlq: 'order_queue_dlq',
       dlRoutingKey: 'order.dlq',
       retryQueue: 'order_queue_retry',

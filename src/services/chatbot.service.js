@@ -844,6 +844,7 @@ ${formattedData}
     for (const p of products) {
       if (p.productUrl) allowedUrls.add(p.productUrl);
       if (p.checkoutUrl) allowedUrls.add(p.checkoutUrl);
+      if (p.image) allowedUrls.add(p.image);
     }
 
     const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;

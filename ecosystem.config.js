@@ -34,7 +34,8 @@ module.exports = {
       max_memory_restart: '1G',
       env: {
         NODE_ENV: 'production',
-        ORDER_WORKER_PREFETCH: '1',
+        ORDER_WORKER_PREFETCH: '50',
+        ORDER_DLQ_PREFETCH: '10',
         ORDER_PROCESSING_TIMEOUT_MS: '30000',
       },
     },
@@ -46,6 +47,8 @@ module.exports = {
       max_memory_restart: '1G',
       env: {
         NODE_ENV: 'production',
+        NOTIFICATION_WORKER_PREFETCH: '50',
+        NOTIFICATION_DLQ_PREFETCH: '10',
       },
     },
   ],

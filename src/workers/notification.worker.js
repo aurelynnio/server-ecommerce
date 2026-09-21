@@ -6,12 +6,16 @@ const connectDB = require('../db/connect.db');
 const { getRetryCount } = require('../utils/rabbitmq.utils');
 const { createQueueMetrics } = require('../monitoring/queue.metrics');
 
+const NOTIFICATION_WORKER_PREFETCH = Number(process.env.NOTIFICATION_WORKER_PREFETCH) || 50;
+const NOTIFICATION_DLQ_PREFETCH = Number(process.env.NOTIFICATION_DLQ_PREFETCH) || 10;
+
 const metrics = createQueueMetrics('notification_worker');
 
 const startNotificationConsumer = async () => {
   const { channel, queue } = await connectRabbitMQ('notification', {
     clientName: 'consumer',
   });
+  await channel.addSetup((rawChannel) => rawChannel.prefetch(NOTIFICATION_WORKER_PREFETCH));
 
   await channel.consume(
     queue.name,
@@ -31,17 +35,20 @@ const startNotificationConsumer = async () => {
     },
     {
       noAck: false,
-      prefetch: 10,
     },
   );
 
-  logger.info('Notification consumer started', { queue: queue.name });
+  logger.info('Notification consumer started', {
+    queue: queue.name,
+    prefetch: NOTIFICATION_WORKER_PREFETCH,
+  });
 };
 
 const startNotificationDLQConsumer = async () => {
   const { channel, queue } = await connectRabbitMQ('notification', {
     clientName: 'dlq-consumer',
   });
+  await channel.addSetup((rawChannel) => rawChannel.prefetch(NOTIFICATION_DLQ_PREFETCH));
 
   await channel.consume(
     queue.dlq,
@@ -77,7 +84,6 @@ const startNotificationDLQConsumer = async () => {
     },
     {
       noAck: false,
-      prefetch: 5,
     },
   );
 
@@ -86,6 +92,7 @@ const startNotificationDLQConsumer = async () => {
     retryQueue: queue.retryQueue,
     failedQueue: queue.failedQueue,
     retryDelayMs: queue.retryDelayMs,
+    prefetch: NOTIFICATION_DLQ_PREFETCH,
   });
 };
 
@@ -102,4 +109,7 @@ if (require.main === module) {
     });
 }
 
+// Exports dùng trong test
+consumerNotificationQueue.NOTIFICATION_WORKER_PREFETCH = NOTIFICATION_WORKER_PREFETCH;
+consumerNotificationQueue.NOTIFICATION_DLQ_PREFETCH = NOTIFICATION_DLQ_PREFETCH;
 module.exports = consumerNotificationQueue;

@@ -170,6 +170,9 @@ function formatProducts(products) {
             ? ` (gốc ${item.originalPrice.toLocaleString('vi-VN')}đ, giảm ${Math.round((1 - item.price / item.originalPrice) * 100)}%)`
             : '';
         const similarity = item.score ? ` [Độ phù hợp: ${(item.score * 100).toFixed(0)}%]` : '';
+        const sizes = item.sizes?.length ? `Size: ${item.sizes.join(', ')}\n` : '';
+        const colors = item.colors?.length ? `Màu: ${item.colors.join(', ')}\n` : '';
+        const image = item.image ? `Ảnh: ${item.image}\n` : '';
 
         return `[SẢN PHẨM ${index + 1}]${similarity}
 Tên: ${item.name}
@@ -177,7 +180,7 @@ Giá: ${item.price?.toLocaleString('vi-VN')}đ${discount}
 Thương hiệu: ${item.brand || 'N/A'}
 Danh mục: ${item.category || 'N/A'}
 Còn hàng: ${item.stock > 0 ? 'Có' : 'Hết hàng'}
-Link xem: ${item.productUrl}
+${sizes}${colors}${image}Link xem: ${item.productUrl}
 Link mua: ${item.checkoutUrl}`;
       } else if (item.name && item.slug && item.url) {
         return `- ${item.name}: ${item.url}`;
@@ -217,6 +220,7 @@ function validateResponse(response, products, logger = null) {
   for (const p of products) {
     if (p.productUrl) allowedUrls.add(p.productUrl);
     if (p.checkoutUrl) allowedUrls.add(p.checkoutUrl);
+    if (p.image) allowedUrls.add(p.image);
   }
 
   const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;

@@ -23,7 +23,9 @@
     "seed:products": "node src/scripts/seed-products.js",
     "seed:products:reset": "node src/scripts/seed-products.js --reset",
     "dataset:build": "node src/scripts/build-real-dataset.js",
-    "test:reset": "node src/scripts/reset-test-environment.js"
+    "test:reset": "node src/scripts/reset-test-environment.js",
+    "loadtest:prepare": "node tests/load/prepare-test-data.js",
+    "loadtest:run": "powershell -ExecutionPolicy Bypass -File tests/load/run-loadtest.ps1"
   },
   "keywords": [],
   "author": "",
