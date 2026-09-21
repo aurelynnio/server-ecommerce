@@ -45,7 +45,11 @@ const morganEnabled =
   process.env.MORGAN_ENABLED !== 'false' &&
   (process.env.MORGAN_ENABLED === 'true' || process.env.NODE_ENV !== 'production');
 if (morganEnabled) {
-  app.use(morgan(process.env.MORGAN_FORMAT || 'dev'));
+  app.use(
+    morgan(
+      process.env.MORGAN_FORMAT || (process.env.NODE_ENV === 'production' ? 'combined' : 'dev'),
+    ),
+  );
 }
 app.use(corsMiddleware);
 app.use(compression());

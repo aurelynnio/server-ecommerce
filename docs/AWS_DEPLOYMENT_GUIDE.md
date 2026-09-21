@@ -205,13 +205,25 @@ Dán cấu hình (chú ý mục CORS trỏ về domain Vercel của bạn):
 NODE_ENV=production
 PORT=5000
 TRUST_PROXY=true
-START_QUEUE_WORKERS=true
 ENABLE_CLUSTER=true
 WEB_CONCURRENCY=2
+ENABLE_SCHEDULER=true
+START_QUEUE_WORKERS=true
+SOCKET_REDIS_ADAPTER=true
+EXPOSE_ERROR_DETAILS=false
+
+# Rate Limiting & Access Logging
+DISABLE_RATE_LIMIT=false
+MORGAN_ENABLED=true
+MORGAN_FORMAT=combined
+
+# Order Ingestion (false = trả về 201 Created trực tiếp cho web checkout)
+ASYNC_ORDER_INGESTION=false
 
 # CORS: Cho phép frontend trên Vercel gọi API
 FRONTEND_URL=https://nantianshop.tech
 FRONTEND_URLS=https://nantianshop.tech,https://www.nantianshop.tech
+
 
 # Khóa JWT và Chatbot Session (Tạo bằng lệnh: openssl rand -hex 32)
 JWT_ACCESS_SECRET=a8f9c0d1e2b3a4f5e6d7c8b9a0f1e2d3c4b5a6f7e8d9c0b1a2f3e4d5c6b7a8f9

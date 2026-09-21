@@ -40,12 +40,14 @@ const authRateLimiter = createRedisRateLimiter({
   windowMs: 15 * 60 * 1000,
   limit: 10,
   message: 'Too many authentication attempts. Please try again later.',
+  keyPrefix: 'rl:auth',
 });
 
 const passwordResetRateLimiter = createRedisRateLimiter({
   windowMs: 60 * 60 * 1000,
   limit: 5,
   message: 'Too many password reset requests. Please try again later.',
+  keyPrefix: 'rl:pw-reset',
 });
 
 // Per-user (ưu tiên) hoặc per-IP, lưu trên Redis để scale nhiều instance.
@@ -61,9 +63,11 @@ const newsletterRateLimiter = createRedisRateLimiter({
   windowMs: 60 * 60 * 1000,
   limit: 5,
   message: 'Too many newsletter requests. Please try again later.',
+  keyPrefix: 'rl:newsletter',
 });
 
 module.exports = {
+  createRedisRateLimiter,
   authRateLimiter,
   passwordResetRateLimiter,
   chatbotRateLimiter,
