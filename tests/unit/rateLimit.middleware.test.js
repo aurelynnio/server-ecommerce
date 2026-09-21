@@ -47,8 +47,12 @@ describe('Rate Limit Middleware', () => {
 
   it('exports all standard rate limiters with expected functions', () => {
     process.env.DISABLE_RATE_LIMIT = 'false';
-    const { authRateLimiter, passwordResetRateLimiter, chatbotRateLimiter, newsletterRateLimiter } =
-      loadRateLimitMiddleware();
+    const {
+      authRateLimiter,
+      passwordResetRateLimiter,
+      chatbotRateLimiter,
+      newsletterRateLimiter,
+    } = loadRateLimitMiddleware();
 
     expect(typeof authRateLimiter).toBe('function');
     expect(typeof passwordResetRateLimiter).toBe('function');
@@ -56,3 +60,4 @@ describe('Rate Limit Middleware', () => {
     expect(typeof newsletterRateLimiter).toBe('function');
   });
 });
+

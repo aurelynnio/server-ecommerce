@@ -25,6 +25,4 @@ const newsletterSubscriberSchema = new Schema(
   },
 );
 
-newsletterSubscriberSchema.index({ email: 1 }, { unique: true });
-
 module.exports = model('NewsletterSubscriber', newsletterSubscriberSchema);
