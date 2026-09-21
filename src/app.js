@@ -52,7 +52,18 @@ if (morganEnabled) {
   );
 }
 app.use(corsMiddleware);
-app.use(compression());
+app.use(
+  compression({
+    // SSE (chatbot stream) không được nén: middleware compression gom dữ liệu vào
+    // gzip stream và chỉ đẩy ra khi buffer đầy hoặc response kết thúc, khiến client
+    // nhận toàn bộ câu trả lời trong 1 chunk thay vì stream từng token.
+    filter: (req, res) => {
+      const contentType = String(res.getHeader('Content-Type') || '');
+      if (contentType.includes('text/event-stream')) return false;
+      return compression.filter(req, res);
+    },
+  }),
+);
 app.use(ex.json());
 app.use(ex.urlencoded({ extended: true }));
 app.use(sanitizeMiddleware);

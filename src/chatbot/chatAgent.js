@@ -260,19 +260,37 @@ class ChatbotAgent {
     const collectedProducts = [];
 
     for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-      const response = await boundModel.invoke(messages);
-      const toolCalls = response.tool_calls || [];
+      // Dùng .stream() để token ra client ngay khi LLM sinh (không gom cả câu
+      // rồi mới cắt thành từ — cách đó khiến client nhận 1 cục duy nhất).
+      const stream = await boundModel.stream(messages);
+
+      let aggregated = null;
+      let sawToolCalls = false;
+
+      for await (const chunk of stream) {
+        aggregated = aggregated ? aggregated.concat(chunk) : chunk;
+
+        // Chunk mang tool_call_chunks → model đang gọi tool, phần text (nếu có)
+        // không phải câu trả lời cuối nên không stream ra client.
+        if (chunk.tool_call_chunks?.length || chunk.tool_calls?.length) {
+          sawToolCalls = true;
+        }
+
+        const text = typeof chunk.content === 'string' ? chunk.content : '';
+        if (text && !sawToolCalls) {
+          yield { type: 'token', content: text };
+        }
+      }
+
+      const toolCalls = aggregated?.tool_calls || [];
 
       if (toolCalls.length === 0) {
-        finalContent = typeof response?.content === 'string' ? response.content : '';
-        for (const word of finalContent.split(/(\s+)/)) {
-          if (word) yield { type: 'token', content: word };
-        }
+        finalContent = typeof aggregated?.content === 'string' ? aggregated.content : '';
         break;
       }
 
       // Có tool call → thêm AI message + execute tools
-      messages.push(response);
+      messages.push(aggregated);
       yield* this._runToolCalls(messages, toolCalls, collectedProducts);
     }
 

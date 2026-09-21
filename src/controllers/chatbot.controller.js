@@ -181,7 +181,16 @@ const ChatbotController = {
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
-    res.write(`data: ${JSON.stringify({ type: 'session', sessionId: chatSessionId })}\n\n`);
+    // Ghi 1 SSE frame rồi flush ngay. Nếu không flush, compression/proxy có thể
+    // gom buffer tới lúc response kết thúc → client nhận cả câu trả lời trong
+    // 1 cục thay vì stream từng token.
+    const sendEvent = (payload) => {
+      if (res.writableEnded) return;
+      res.write(`data: ${JSON.stringify(payload)}\n\n`);
+      res.flush?.();
+    };
+
+    sendEvent({ type: 'session', sessionId: chatSessionId });
 
     let aborted = false;
     let timedOut = false;
@@ -201,9 +210,7 @@ const ChatbotController = {
     const streamTimeoutTimer = setTimeout(() => {
       timedOut = true;
       if (!res.writableEnded) {
-        res.write(
-          `data: ${JSON.stringify({ type: 'error', message: STREAM_TIMEOUT_MESSAGE })}\n\n`,
-        );
+        sendEvent({ type: 'error', message: STREAM_TIMEOUT_MESSAGE });
         res.end();
       }
       stopTimer({ status: 'timeout' });
@@ -218,19 +225,17 @@ const ChatbotController = {
         for await (const event of agent.stream(chatSessionId, message.trim())) {
           if (aborted || timedOut || res.writableEnded) break;
           if (event.type === 'token') {
-            res.write(`data: ${JSON.stringify({ type: 'token', content: event.content })}\n\n`);
+            sendEvent({ type: 'token', content: event.content });
           } else if (event.type === 'tool_call') {
             logger.info('[Chatbot] Agent tool call', { name: event.name });
-            res.write(`data: ${JSON.stringify({ type: 'tool', name: event.name })}\n\n`);
+            sendEvent({ type: 'tool', name: event.name });
           } else if (event.type === 'correction') {
-            res.write(
-              `data: ${JSON.stringify({ type: 'correction', content: event.content })}\n\n`,
-            );
+            sendEvent({ type: 'correction', content: event.content });
           }
         }
         if (!aborted && !timedOut) {
           const messageId = await chatbotService.getLatestAssistantMessageId(chatSessionId);
-          res.write(`data: ${JSON.stringify({ type: 'done', success: true, messageId })}\n\n`);
+          sendEvent({ type: 'done', success: true, messageId });
           stopTimer({ status: 'success' });
           metrics.chatbotRequestsTotal.inc({ endpoint: 'stream', status: 'success' });
         }
@@ -247,7 +252,7 @@ const ChatbotController = {
         if (timedOut) throw new Error('STREAM_TIMEOUT');
         if (aborted || res.writableEnded) return;
         tokenCount++;
-        res.write(`data: ${JSON.stringify({ type: 'token', content: token })}\n\n`);
+        sendEvent({ type: 'token', content: token });
       });
 
       if (timedOut || aborted) return;
@@ -264,16 +269,16 @@ const ChatbotController = {
         // Đảm bảo nếu chưa gửi token nào nhưng có message (kể cả fallback/error message)
         // thì stream ra client trước khi gửi done để tránh hiển thị bong bóng rỗng
         if (tokenCount === 0 && response.message) {
-          res.write(`data: ${JSON.stringify({ type: 'token', content: response.message })}\n\n`);
+          sendEvent({ type: 'token', content: response.message });
         }
         if (response.correctedMessage) {
-          res.write(
-            `data: ${JSON.stringify({ type: 'correction', content: response.correctedMessage })}\n\n`,
-          );
+          sendEvent({ type: 'correction', content: response.correctedMessage });
         }
-        res.write(
-          `data: ${JSON.stringify({ type: 'done', success: response.success, messageId: response.messageId ?? null })}\n\n`,
-        );
+        sendEvent({
+          type: 'done',
+          success: response.success,
+          messageId: response.messageId ?? null,
+        });
       }
       res.end();
     } catch (error) {
@@ -284,9 +289,10 @@ const ChatbotController = {
         metrics.chatbotRequestsTotal.inc({ endpoint: 'stream', status: 'error' });
       }
       if (!aborted && !timedOut && !res.writableEnded) {
-        res.write(
-          `data: ${JSON.stringify({ type: 'error', message: 'Xin lỗi, hệ thống đang bận. Bạn vui lòng thử lại sau nhé!' })}\n\n`,
-        );
+        sendEvent({
+          type: 'error',
+          message: 'Xin lỗi, hệ thống đang bận. Bạn vui lòng thử lại sau nhé!',
+        });
       }
       if (!res.writableEnded) {
         res.end();
