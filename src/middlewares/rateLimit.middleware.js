@@ -1,4 +1,4 @@
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { RedisStore } = require('rate-limit-redis');
 const redisClient = require('../configs/redis.config');
 
@@ -14,6 +14,7 @@ const createRedisRateLimiter = ({ windowMs, limit, message, keyPrefix = 'rl', ke
     limit,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
+    validate: { keyGeneratorIpFallback: false },
     message: {
       status: 'fail',
       code: 429,
@@ -32,7 +33,7 @@ const createRedisRateLimiter = ({ windowMs, limit, message, keyPrefix = 'rl', ke
 const userKeyGenerator = (req) => {
   if (req.user?._id) return `user:${req.user._id}`;
   if (req.user?.userId) return `user:${req.user.userId}`;
-  return `ip:${req.ip}`;
+  return `ip:${ipKeyGenerator(req.ip)}`;
 };
 
 const authRateLimiter = createRedisRateLimiter({
