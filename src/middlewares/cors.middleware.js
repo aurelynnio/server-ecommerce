@@ -1,10 +1,16 @@
 const cors = require('cors');
 const logger = require('../utils/logger');
 
-const defaultProductionOrigins = ['https://nantianshop.tech', 'https://www.nantianshop.tech'];
+const defaultProductionOrigins = [
+  'https://nantianshop.tech',
+  'https://www.nantianshop.tech',
+  'http://nantianshop.tech',
+  'http://www.nantianshop.tech',
+];
 
 const defaultDevOrigins = [
   ...defaultProductionOrigins,
+  'http://localhost:3000',
   'http://localhost:3001',
   'https://etiso.me',
 ];
@@ -12,6 +18,18 @@ const defaultDevOrigins = [
 const normalizeOrigin = (origin) => {
   if (typeof origin !== 'string') return '';
   return origin.trim().replace(/\/+$/, '');
+};
+
+const isVercelPreviewOrigin = (origin) => {
+  try {
+    const url = new URL(origin);
+    return (
+      url.protocol === 'https:' &&
+      (url.hostname.endsWith('.vercel.app') || url.hostname === 'vercel.app')
+    );
+  } catch {
+    return false;
+  }
 };
 
 const getConfiguredFrontendOrigins = () => {
@@ -44,9 +62,11 @@ const isLocalhostOrigin = (origin) => {
 const isAllowedOrigin = (origin) => {
   if (!origin) return true;
 
+  const normalized = normalizeOrigin(origin);
   return (
     (process.env.NODE_ENV !== 'production' && isLocalhostOrigin(origin)) ||
-    getAllowedOrigins().includes(normalizeOrigin(origin))
+    isVercelPreviewOrigin(origin) ||
+    getAllowedOrigins().includes(normalized)
   );
 };
 
@@ -60,7 +80,19 @@ const corsOptions = {
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-  allowedHeaders: ['Authorization', 'Content-Type'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
+  allowedHeaders: [
+    'Authorization',
+    'Content-Type',
+    'Accept',
+    'Origin',
+    'X-Requested-With',
+    'x-async-processing',
+    'x-async',
+    'Cache-Control',
+    'Pragma',
+  ],
+  maxAge: 86400,
 };
 
 const corsMiddleware = cors(corsOptions);

@@ -52,6 +52,7 @@ if (morganEnabled) {
   );
 }
 app.use(corsMiddleware);
+app.options('*', corsMiddleware);
 app.use(compression());
 app.use(ex.json());
 app.use(ex.urlencoded({ extended: true }));
