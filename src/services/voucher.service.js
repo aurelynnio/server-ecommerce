@@ -1,5 +1,6 @@
 const Voucher = require('../repositories/voucher.repository');
 const VoucherUsage = require('../repositories/voucher-usage.repository');
+const UserSavedVoucher = require('../repositories/user-saved-voucher.repository');
 const mongoose = require('mongoose');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 const { StatusCodes } = require('http-status-codes');
@@ -345,6 +346,94 @@ class VoucherService {
       mostUsedVouchers,
       totalUsage: discountStats[0]?.totalUsage || 0,
     };
+  }
+
+  /**
+   * Save a voucher to user's wallet
+   * @param {string} userId - User ID
+   * @param {string} voucherId - Voucher ID
+   * @returns {Promise<Object>}
+   */
+  async saveVoucherForUser(userId, voucherId) {
+    const voucher = await this._getVoucherOrThrow(voucherId);
+    if (!voucher.isActive) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Voucher is not active');
+    }
+    const now = new Date();
+    if (new Date(voucher.endDate) < now) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Voucher has expired');
+    }
+    await UserSavedVoucher.saveVoucher(userId, voucher._id);
+    return { message: 'Voucher saved successfully', voucher };
+  }
+
+  /**
+   * Remove a voucher from user's wallet
+   * @param {string} userId - User ID
+   * @param {string} voucherId - Voucher ID
+   * @returns {Promise<Object>}
+   */
+  async unsaveVoucherForUser(userId, voucherId) {
+    await UserSavedVoucher.unsaveVoucher(userId, voucherId);
+    return { message: 'Voucher removed from wallet' };
+  }
+
+  /**
+   * Get list of voucher IDs saved by user
+   * @param {string} userId - User ID
+   * @returns {Promise<string[]>}
+   */
+  async getSavedVoucherIds(userId) {
+    return UserSavedVoucher.findSavedVoucherIdsByUserId(userId);
+  }
+
+  /**
+   * Get all saved vouchers in user's wallet with computed usage status
+   * @param {string} userId - User ID
+   * @returns {Promise<Array<Object>>}
+   */
+  async getSavedVouchers(userId) {
+    const savedList = await UserSavedVoucher.findSavedVouchersByUserId(userId);
+    const now = new Date();
+
+    const voucherIds = savedList
+      .filter((item) => item.voucherId)
+      .map((item) => item.voucherId._id);
+
+    let usageMap = new Map();
+    if (voucherIds.length > 0) {
+      const usages = await VoucherUsage.aggregateUsageByVoucherIdsAndUser(
+        voucherIds,
+        new mongoose.Types.ObjectId(userId),
+      );
+      usageMap = new Map(usages.map((u) => [u._id.toString(), u.count]));
+    }
+
+    return savedList
+      .filter((item) => item.voucherId)
+      .map((item) => {
+        const v = item.voucherId;
+        const usedCount = usageMap.get(v._id.toString()) || 0;
+        const limitPerUser = typeof v.usageLimitPerUser === 'number' ? v.usageLimitPerUser : 1;
+        const remainingUsage =
+          limitPerUser === 0 ? 999999 : Math.max(0, limitPerUser - usedCount);
+
+        let status = 'valid';
+        if (!v.isActive || new Date(v.endDate) < now) {
+          status = 'expired';
+        } else if (limitPerUser > 0 && usedCount >= limitPerUser) {
+          status = 'used';
+        }
+
+        return {
+          _id: item._id,
+          voucher: v,
+          savedAt: item.createdAt,
+          status,
+          usedCount,
+          remainingUsage,
+        };
+      });
   }
 }
 

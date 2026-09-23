@@ -145,6 +145,56 @@ const VoucherController = {
     const stats = await voucherService.getVoucherStatistics();
     return sendSuccess(res, stats, 'Voucher statistics retrieved', StatusCodes.OK);
   }),
+
+  /**
+   * Save voucher to user's wallet
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  saveVoucher: catchAsync(async (req, res) => {
+    const result = await voucherService.saveVoucherForUser(
+      getRequestUserId(req.user),
+      req.params.id,
+    );
+    return sendSuccess(res, result, 'Voucher saved to wallet', StatusCodes.OK);
+  }),
+
+  /**
+   * Remove voucher from user's wallet
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  unsaveVoucher: catchAsync(async (req, res) => {
+    const result = await voucherService.unsaveVoucherForUser(
+      getRequestUserId(req.user),
+      req.params.id,
+    );
+    return sendSuccess(res, result, 'Voucher removed from wallet', StatusCodes.OK);
+  }),
+
+  /**
+   * Get saved vouchers for user
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  getSavedVouchers: catchAsync(async (req, res) => {
+    const vouchers = await voucherService.getSavedVouchers(getRequestUserId(req.user));
+    return sendSuccess(res, vouchers, 'Saved vouchers retrieved', StatusCodes.OK);
+  }),
+
+  /**
+   * Get IDs of vouchers saved by user
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  getSavedVoucherIds: catchAsync(async (req, res) => {
+    const ids = await voucherService.getSavedVoucherIds(getRequestUserId(req.user));
+    return sendSuccess(res, ids, 'Saved voucher IDs retrieved', StatusCodes.OK);
+  }),
 };
 
 module.exports = VoucherController;

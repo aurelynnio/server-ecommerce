@@ -57,6 +57,42 @@ router.get(
 );
 
 /**
+ * @desc    Get saved vouchers for current user (Wallet)
+ * @access  Private
+ */
+router.get('/saved', verifyAccessToken, voucherController.getSavedVouchers);
+
+/**
+ * @desc    Get IDs of vouchers saved by current user
+ * @access  Private
+ */
+router.get('/saved/ids', verifyAccessToken, voucherController.getSavedVoucherIds);
+
+/**
+ * @desc    Save voucher to user's wallet
+ * @access  Private
+ * @param   id - Voucher ID
+ */
+router.post(
+  '/:id/save',
+  verifyAccessToken,
+  validate({ params: voucherIdParamValidator }),
+  voucherController.saveVoucher,
+);
+
+/**
+ * @desc    Remove voucher from user's wallet
+ * @access  Private
+ * @param   id - Voucher ID
+ */
+router.delete(
+  '/:id/save',
+  verifyAccessToken,
+  validate({ params: voucherIdParamValidator }),
+  voucherController.unsaveVoucher,
+);
+
+/**
  * @desc    Get voucher by ID
  * @access  Private
  * @param   id - Voucher ID
