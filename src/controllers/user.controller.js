@@ -53,6 +53,18 @@ const UserController = {
   }),
 
   /**
+   * Delete avatar
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  deleteAvatar: catchAsync(async (req, res) => {
+    const userId = getRequestUserId(req.user);
+    const user = await userService.deleteAvatar(userId);
+    return sendSuccess(res, user, 'Avatar deleted successfully', StatusCodes.OK);
+  }),
+
+  /**
    * Get profile
    * @param {Object} req
    * @param {Object} res
@@ -128,6 +140,18 @@ const UserController = {
   }),
 
   /**
+   * Get address by id
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  getAddressById: catchAsync(async (req, res) => {
+    const userId = getRequestUserId(req.user);
+    const address = await userService.getAddressById(userId, req.params.addressId);
+    return sendSuccess(res, address, 'Address retrieved successfully', StatusCodes.OK);
+  }),
+
+  /**
    * Set default address
    * @param {Object} req
    * @param {Object} res
@@ -152,6 +176,30 @@ const UserController = {
       req.body.oldPassword,
       req.body.newPassword,
     );
+    return sendSuccess(res, result, result.message, StatusCodes.OK);
+  }),
+
+  /**
+   * Get user profile dashboard statistics
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  getUserStats: catchAsync(async (req, res) => {
+    const userId = getRequestUserId(req.user);
+    const stats = await userService.getUserStats(userId);
+    return sendSuccess(res, stats, 'User statistics retrieved successfully', StatusCodes.OK);
+  }),
+
+  /**
+   * Delete own account
+   * @param {Object} req
+   * @param {Object} res
+   * @returns {Promise<any>}
+   */
+  deleteOwnAccount: catchAsync(async (req, res) => {
+    const userId = getRequestUserId(req.user);
+    const result = await userService.deleteOwnAccount(userId, req.body?.password);
     return sendSuccess(res, result, result.message, StatusCodes.OK);
   }),
 

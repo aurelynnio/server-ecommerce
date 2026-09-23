@@ -18,11 +18,25 @@ const updateProfileValidator = Joi.object({
   username: sanitizedString().min(3).max(50),
   email: sanitizedString().email(),
   avatar: Joi.string().uri().allow(null, ''),
+  fullName: sanitizedString().min(2).max(100).allow(null, ''),
+  phone: Joi.string()
+    .pattern(/^[0-9]{10,11}$/)
+    .allow(null, ''),
+  gender: Joi.string().valid('male', 'female', 'other').allow(null, ''),
+  dateOfBirth: Joi.date().iso().max('now').allow(null, ''),
 });
 
 const changePasswordValidator = Joi.object({
   oldPassword: Joi.string().required(),
   newPassword: Joi.string().min(6).invalid(Joi.ref('oldPassword')).required(),
+});
+
+const deleteAccountValidator = Joi.object({
+  password: Joi.string().optional().allow(''),
+});
+
+const updatePermissionsValidator = Joi.object({
+  permissions: Joi.array().items(Joi.string()).required(),
 });
 
 const adminCreateUserValidator = Joi.object({
@@ -31,6 +45,13 @@ const adminCreateUserValidator = Joi.object({
   password: Joi.string().min(6).required(),
   roles: Joi.string().valid('user', 'admin', 'seller').default('user'),
   isVerifiedEmail: Joi.boolean().default(false),
+  fullName: sanitizedString().min(2).max(100).allow(null, ''),
+  phone: Joi.string()
+    .pattern(/^[0-9]{10,11}$/)
+    .allow(null, ''),
+  gender: Joi.string().valid('male', 'female', 'other').allow(null, ''),
+  dateOfBirth: Joi.date().iso().max('now').allow(null, ''),
+  permissions: Joi.array().items(Joi.string()),
 });
 
 const adminUpdateUserValidator = Joi.object({
@@ -40,6 +61,12 @@ const adminUpdateUserValidator = Joi.object({
   roles: Joi.string().valid('user', 'admin', 'seller'),
   isVerifiedEmail: Joi.boolean(),
   avatar: Joi.string().uri().allow(null, ''),
+  fullName: sanitizedString().min(2).max(100).allow(null, ''),
+  phone: Joi.string()
+    .pattern(/^[0-9]{10,11}$/)
+    .allow(null, ''),
+  gender: Joi.string().valid('male', 'female', 'other').allow(null, ''),
+  dateOfBirth: Joi.date().iso().max('now').allow(null, ''),
   permissions: Joi.array().items(Joi.string()),
 });
 
@@ -51,6 +78,8 @@ module.exports = {
     (schema) => schema.optional(),
   ),
   changePasswordValidator,
+  deleteAccountValidator,
+  updatePermissionsValidator,
   createUserValidator: adminCreateUserValidator,
   updateUserValidator: adminUpdateUserValidator,
   updateUserByIdValidator: adminUpdateUserValidator.keys({ id: Joi.forbidden() }),

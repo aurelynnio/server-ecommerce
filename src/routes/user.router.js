@@ -15,6 +15,8 @@ const {
   addressIdParamValidator,
   paginationQueryValidator,
   changePasswordValidator,
+  deleteAccountValidator,
+  updatePermissionsValidator,
 } = require('../validations/user.validator');
 const upload = require('../configs/upload');
 const { validateImageSignature } = require('../middlewares/uploadSignature.middleware');
@@ -32,10 +34,24 @@ router.post(
 );
 
 /**
+ * @desc    Delete user avatar image
+ * @access  Private
+ */
+router.delete('/avatar', verifyAccessToken, userController.deleteAvatar);
+
+/**
+ * @desc    Get user profile dashboard statistics
+ * @access  Private
+ */
+router.get('/profile/stats', verifyAccessToken, userController.getUserStats);
+router.get('/me/stats', verifyAccessToken, userController.getUserStats);
+
+/**
  * @desc    Get current user's profile
  * @access  Private
  */
 router.get('/profile', verifyAccessToken, userController.getProfile);
+router.get('/me', verifyAccessToken, userController.getProfile);
 
 /**
  * @desc    Update current user's profile
@@ -46,6 +62,41 @@ router.put(
   verifyAccessToken,
   validate(updateProfileValidator),
   userController.updateProfile,
+);
+router.put(
+  '/me',
+  verifyAccessToken,
+  validate(updateProfileValidator),
+  userController.updateProfile,
+);
+router.patch(
+  '/profile',
+  verifyAccessToken,
+  validate(updateProfileValidator),
+  userController.updateProfile,
+);
+router.patch(
+  '/me',
+  verifyAccessToken,
+  validate(updateProfileValidator),
+  userController.updateProfile,
+);
+
+/**
+ * @desc    Delete own account
+ * @access  Private
+ */
+router.delete(
+  '/profile',
+  verifyAccessToken,
+  validate(deleteAccountValidator),
+  userController.deleteOwnAccount,
+);
+router.delete(
+  '/me',
+  verifyAccessToken,
+  validate(deleteAccountValidator),
+  userController.deleteOwnAccount,
 );
 
 /**
@@ -89,6 +140,17 @@ router.delete(
  * @access  Private
  */
 router.get('/addresses', verifyAccessToken, userController.getAddresses);
+
+/**
+ * @desc    Get single address by ID
+ * @access  Private
+ */
+router.get(
+  '/addresses/:addressId',
+  verifyAccessToken,
+  validate({ params: addressIdParamValidator }),
+  userController.getAddressById,
+);
 
 /**
  * @desc    Set address as default
@@ -177,6 +239,21 @@ router.put(
     body: updateRoleValidator,
   }),
   userController.updateUserRole,
+);
+
+/**
+ * @desc    Update user permissions
+ * @access  Private (Admin)
+ */
+router.put(
+  '/:id/permissions',
+  verifyAccessToken,
+  requireRole('admin'),
+  validate({
+    params: mongoIdParamValidator,
+    body: updatePermissionsValidator,
+  }),
+  userController.updateUserPermissions,
 );
 
 /**

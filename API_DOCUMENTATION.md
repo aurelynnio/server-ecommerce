@@ -379,9 +379,15 @@ Hệ thống áp dụng Redis-backed rate limiting để chống brute-force và
 - **Form Field**: `avatar` (File ảnh: jpg, jpeg, png, webp; tối đa 5MB; kiểm tra magic bytes signature).
 - **Phản hồi (200)**: Trả về URL ảnh vừa upload.
 
-#### `GET /api/users/profile`
+#### `DELETE /api/users/avatar`
 
-- **Mô tả**: Lấy thông tin hồ sơ của người dùng hiện tại.
+- **Mô tả**: Xoá ảnh đại diện hiện tại (đặt về null/mặc định).
+- **Quyền hạn**: `User`
+- **Phản hồi (200)**: Trả về thông tin user đã cập nhật avatar = null.
+
+#### `GET /api/users/profile` / `GET /api/users/me`
+
+- **Mô tả**: Lấy thông tin hồ sơ của người dùng hiện tại (`/me` là alias).
 - **Quyền hạn**: `User`
 - **Phản hồi (200)**:
   ```json
@@ -394,24 +400,58 @@ Hệ thống áp dụng Redis-backed rate limiting để chống brute-force và
       "email": "user@example.com",
       "role": "user",
       "avatar": "https://res.cloudinary.com/.../avatar.png",
+      "fullName": "Nguyễn Văn A",
+      "phone": "0987654321",
+      "gender": "male",
+      "dateOfBirth": "1995-05-15T00:00:00.000Z",
       "isVerifiedEmail": true,
       "isTwoFactorEnabled": false
     }
   }
   ```
 
-#### `PUT /api/users/profile`
+#### `PUT /api/users/profile` / `PUT /api/users/me` & `PATCH`
 
-- **Mô tả**: Cập nhật thông tin hồ sơ của người dùng hiện tại.
+- **Mô tả**: Cập nhật thông tin hồ sơ người dùng (hỗ trợ PUT và PATCH, alias `/me`).
 - **Quyền hạn**: `User`
 - **Request Body (JSON)**:
   ```json
   {
     "username": "nguyen_van_a_updated",
     "email": "new_email@example.com",
-    "avatar": "https://res.cloudinary.com/.../avatar.png"
+    "avatar": "https://res.cloudinary.com/.../avatar.png",
+    "fullName": "Nguyễn Văn A",
+    "phone": "0987654321",
+    "gender": "male",
+    "dateOfBirth": "1995-05-15"
   }
   ```
+
+#### `GET /api/users/profile/stats` / `GET /api/users/me/stats`
+
+- **Mô tả**: Lấy dữ liệu thống kê tổng quan của profile (số đơn hàng, đơn chờ xử lý, số voucher đã lưu, số sản phẩm yêu thích, số địa chỉ).
+- **Quyền hạn**: `User`
+- **Phản hồi (200)**:
+  ```json
+  {
+    "status": "success",
+    "code": 200,
+    "data": {
+      "orders": { "total": 12, "pending": 2 },
+      "wishlist": { "total": 5 },
+      "vouchers": { "saved": 3 },
+      "notifications": { "unread": 4 },
+      "addresses": { "total": 2 }
+    }
+  }
+  ```
+
+#### `DELETE /api/users/profile` / `DELETE /api/users/me`
+
+- **Mô tả**: Người dùng tự xóa/hủy tài khoản cá nhân.
+- **Quyền hạn**: `User`
+- **Request Body (JSON - tuỳ chọn)**: `{ "password": "current_password" }` (cần cho tài khoản local).
+- **Phản hồi (200)**: `{ "status": "success", "message": "Account deleted successfully" }`
 
 #### `POST /api/users/addresses`
 
@@ -429,6 +469,12 @@ Hệ thống áp dụng Redis-backed rate limiting để chống brute-force và
     "isDefault": true
   }
   ```
+
+#### `GET /api/users/addresses/:addressId`
+
+- **Mô tả**: Lấy thông tin chi tiết của 1 địa chỉ nhận hàng theo `addressId`.
+- **Quyền hạn**: `User`
+- **Path Param**: `addressId` (MongoDB ObjectId)
 
 #### `PUT /api/users/addresses/:addressId`
 
@@ -507,6 +553,18 @@ Hệ thống áp dụng Redis-backed rate limiting để chống brute-force và
   ```json
   {
     "roles": "seller" // 'user' | 'seller' | 'admin'
+  }
+  ```
+
+#### `PUT /api/users/:id/permissions`
+
+- **Mô tả**: Admin cập nhật danh sách quyền trực tiếp của người dùng.
+- **Quyền hạn**: `Admin`
+- **Path Param**: `id` (User ID)
+- **Request Body (JSON)**:
+  ```json
+  {
+    "permissions": ["product:read", "order:update"]
   }
   ```
 

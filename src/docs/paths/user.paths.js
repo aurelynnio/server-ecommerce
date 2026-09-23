@@ -40,6 +40,58 @@ module.exports = {
         400: { description: 'Validation error' },
       },
     },
+    patch: {
+      tags: ['Users'],
+      summary: 'Partial update of current user profile',
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+      responses: {
+        200: { description: 'Profile updated successfully' },
+      },
+    },
+    delete: {
+      tags: ['Users'],
+      summary: 'Delete own user account',
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+      responses: {
+        200: { description: 'Account deleted successfully' },
+      },
+    },
+  },
+  '/api/users/profile/stats': {
+    get: {
+      tags: ['Users'],
+      summary: 'Get user dashboard statistics (orders, wishlist, vouchers, notifications)',
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+      responses: {
+        200: {
+          description: 'User profile statistics',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  orders: { type: 'object' },
+                  wishlist: { type: 'object' },
+                  vouchers: { type: 'object' },
+                  notifications: { type: 'object' },
+                  addresses: { type: 'object' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  '/api/users/avatar': {
+    delete: {
+      tags: ['Users'],
+      summary: 'Remove current user avatar',
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+      responses: {
+        200: { description: 'Avatar deleted successfully' },
+      },
+    },
   },
   '/api/users/upload-avatar': {
     post: {
@@ -100,6 +152,19 @@ module.exports = {
     },
   },
   '/api/users/addresses/{addressId}': {
+    get: {
+      tags: ['Users'],
+      summary: 'Get delivery address by ID',
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+      parameters: [{ name: 'addressId', in: 'path', required: true, schema: { type: 'string' } }],
+      responses: {
+        200: {
+          description: 'Delivery address details',
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/Address' } } },
+        },
+        404: { description: 'Address not found' },
+      },
+    },
     put: {
       tags: ['Users'],
       summary: 'Update existing delivery address',
@@ -201,6 +266,27 @@ module.exports = {
         },
       },
       responses: { 200: { description: 'User role updated' } },
+    },
+  },
+  '/api/users/{id}/permissions': {
+    put: {
+      tags: ['Users'],
+      summary: 'Update user permissions (Admin only)',
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              required: ['permissions'],
+              properties: { permissions: { type: 'array', items: { type: 'string' } } },
+            },
+          },
+        },
+      },
+      responses: { 200: { description: 'User permissions updated' } },
     },
   },
 };

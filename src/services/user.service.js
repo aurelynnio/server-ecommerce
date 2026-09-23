@@ -1,4 +1,8 @@
 const userModel = require('../repositories/user.repository');
+const orderRepository = require('../repositories/order.repository');
+const wishlistRepository = require('../repositories/wishlist.repository');
+const userSavedVoucherRepository = require('../repositories/user-saved-voucher.repository');
+const notificationRepository = require('../repositories/notification.repository');
 const { hashPassword, comparePassword } = require('../utils/password.util');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
 const { uploadImage } = require('../configs/cloudinary');
@@ -65,6 +69,9 @@ class UserService {
       password,
       roles = 'user',
       phone,
+      fullName,
+      gender,
+      dateOfBirth,
       isVerifiedEmail = false,
       permissions = [],
     } = userData;
@@ -84,6 +91,9 @@ class UserService {
       password: hashedPassword,
       roles,
       phone: phone || undefined,
+      fullName: fullName || undefined,
+      gender: gender || undefined,
+      dateOfBirth: dateOfBirth || undefined,
       isVerifiedEmail,
       permissions,
     });
@@ -122,6 +132,22 @@ class UserService {
     }
 
     return this.uploadAvatar(userId, result.secure_url);
+  }
+
+  /**
+   * Remove user avatar
+   * @param {string} userId - User ID
+   * @returns {Promise<Object>} Updated user object
+   * @throws {Error} If user not found
+   */
+  async deleteAvatar(userId) {
+    const user = await userModel.updateById(
+      userId,
+      { avatar: null },
+      { new: true, select: '-password' },
+    );
+
+    return this._sanitizeUserResponse(this._ensureUserFound(user));
   }
 
   /**
@@ -229,6 +255,22 @@ class UserService {
   }
 
   /**
+   * Get single address by ID
+   * @param {string} userId - User ID
+   * @param {string} addressId - Address ID
+   * @returns {Promise<Object>} User's address
+   * @throws {Error} If user or address not found
+   */
+  async getAddressById(userId, addressId) {
+    const user = this._ensureUserFound(await userModel.findById(userId));
+    const address = user.addresses?.id(addressId);
+    if (!address) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Address not found');
+    }
+    return address;
+  }
+
+  /**
    * Set an address as the default address
    * @param {string} userId - User ID
    * @param {string} addressId - Address ID to set as default
@@ -275,6 +317,65 @@ class UserService {
     await user.save();
 
     return { message: 'Password changed successfully' };
+  }
+
+  /**
+   * Delete own account
+   * @param {string} userId - User ID
+   * @param {string} [password] - Password for confirmation if local provider
+   * @returns {Promise<Object>} Deletion confirmation message
+   * @throws {Error} If user not found or password incorrect
+   */
+  async deleteOwnAccount(userId, password) {
+    const user = this._ensureUserFound(await userModel.findById(userId));
+
+    if (user.provider === 'local' && user.password && password) {
+      const isMatch = await comparePassword(password, user.password);
+      if (!isMatch) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Password is incorrect');
+      }
+    }
+
+    await userModel.deleteById(userId);
+    return { message: 'Account deleted successfully' };
+  }
+
+  /**
+   * Get user profile dashboard statistics
+   * @param {string} userId - User ID
+   * @returns {Promise<Object>} User statistics
+   * @throws {Error} If user not found
+   */
+  async getUserStats(userId) {
+    const user = this._ensureUserFound(await userModel.findById(userId));
+
+    const [totalOrders, pendingOrders, wishlistCount, savedVouchersCount, unreadNotificationsCount] =
+      await Promise.all([
+        orderRepository.countAllWithFilters({ userId }),
+        orderRepository.countAllWithFilters({ userId, status: 'pending' }),
+        wishlistRepository.countByUserId(userId),
+        userSavedVoucherRepository.countByUserId(userId),
+        notificationRepository.countUnreadByUserId(userId),
+      ]);
+
+    return {
+      orders: {
+        total: totalOrders || 0,
+        pending: pendingOrders || 0,
+      },
+      wishlist: {
+        total: wishlistCount || 0,
+      },
+      vouchers: {
+        saved: savedVouchersCount || 0,
+      },
+      notifications: {
+        unread: unreadNotificationsCount || 0,
+      },
+      addresses: {
+        total: user.addresses?.length || 0,
+      },
+    };
   }
 
   /**

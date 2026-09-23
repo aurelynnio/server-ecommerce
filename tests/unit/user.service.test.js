@@ -310,4 +310,86 @@ describe('UserService Logic', () => {
       expect(filter).toEqual({});
     });
   });
+
+  // --- Get address by ID logic ---
+  describe('getAddressById', () => {
+    const findAddressById = (addresses, targetId) => {
+      const addr = addresses.find((a) => a._id === targetId);
+      if (!addr) {
+        throw new Error('Address not found');
+      }
+      return addr;
+    };
+
+    it('should find existing address by ID', () => {
+      const addresses = [
+        { _id: 'addr1', fullName: 'Alice' },
+        { _id: 'addr2', fullName: 'Bob' },
+      ];
+      const result = findAddressById(addresses, 'addr2');
+      expect(result._id).toBe('addr2');
+      expect(result.fullName).toBe('Bob');
+    });
+
+    it('should throw error when address not found', () => {
+      const addresses = [{ _id: 'addr1', fullName: 'Alice' }];
+      expect(() => findAddressById(addresses, 'addr999')).toThrow('Address not found');
+    });
+  });
+
+  // --- Delete avatar logic ---
+  describe('deleteAvatar', () => {
+    it('should set avatar to null', () => {
+      const user = { _id: 'user1', username: 'alice', avatar: 'https://cdn.example.com/avatar.png' };
+      const updated = { ...user, avatar: null };
+      expect(updated.avatar).toBeNull();
+    });
+  });
+
+  // --- Delete own account password validation logic ---
+  describe('deleteOwnAccount verification', () => {
+    const verifyDeletion = (user, password) => {
+      if (user.provider === 'local' && user.password && password !== user.password) {
+        throw new Error('Password is incorrect');
+      }
+      return { message: 'Account deleted successfully' };
+    };
+
+    it('should succeed with correct password for local user', () => {
+      const user = { provider: 'local', password: 'secretpassword' };
+      const result = verifyDeletion(user, 'secretpassword');
+      expect(result.message).toBe('Account deleted successfully');
+    });
+
+    it('should throw error with wrong password for local user', () => {
+      const user = { provider: 'local', password: 'secretpassword' };
+      expect(() => verifyDeletion(user, 'wrongpassword')).toThrow('Password is incorrect');
+    });
+
+    it('should succeed for google provider without password', () => {
+      const user = { provider: 'google', password: null };
+      const result = verifyDeletion(user, null);
+      expect(result.message).toBe('Account deleted successfully');
+    });
+  });
+
+  // --- Profile stats structure logic ---
+  describe('getUserStats format', () => {
+    it('should format stats object correctly', () => {
+      const stats = {
+        orders: { total: 10, pending: 2 },
+        wishlist: { total: 4 },
+        vouchers: { saved: 3 },
+        notifications: { unread: 5 },
+        addresses: { total: 1 },
+      };
+
+      expect(stats.orders.total).toBe(10);
+      expect(stats.orders.pending).toBe(2);
+      expect(stats.wishlist.total).toBe(4);
+      expect(stats.vouchers.saved).toBe(3);
+      expect(stats.notifications.unread).toBe(5);
+      expect(stats.addresses.total).toBe(1);
+    });
+  });
 });

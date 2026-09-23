@@ -48,6 +48,25 @@ const userSchema = new Schema(
       type: String,
       default: null,
     },
+    fullName: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    phone: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    gender: {
+      type: String,
+      enum: ['male', 'female', 'other'],
+      default: null,
+    },
+    dateOfBirth: {
+      type: Date,
+      default: null,
+    },
     // Wishlist and followingShops are now in separate collections:
     // - Wishlist model (wishlists collection)
     // - ShopFollower model (shop_followers collection)
