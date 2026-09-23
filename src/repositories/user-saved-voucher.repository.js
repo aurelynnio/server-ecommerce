@@ -10,8 +10,8 @@ class UserSavedVoucherRepository extends BaseRepository {
     return this.findOneByFilter({ userId, voucherId });
   }
 
-  async saveVoucher(userId, voucherId) {
-    return this.model.findOneAndUpdate(
+  saveVoucher(userId, voucherId) {
+    return this.findOneAndUpdateByFilter(
       { userId, voucherId },
       { userId, voucherId },
       { upsert: true, new: true, setDefaultsOnInsert: true },
@@ -28,7 +28,9 @@ class UserSavedVoucherRepository extends BaseRepository {
 
   async findSavedVoucherIdsByUserId(userId) {
     const list = await this.findManyByFilter({ userId }).select('voucherId').lean();
-    return list.map((item) => item.voucherId.toString());
+    return list
+      .filter((item) => item && item.voucherId)
+      .map((item) => item.voucherId.toString());
   }
 
   findSavedVouchersByUserId(userId) {
@@ -46,3 +48,4 @@ class UserSavedVoucherRepository extends BaseRepository {
 }
 
 module.exports = new UserSavedVoucherRepository();
+

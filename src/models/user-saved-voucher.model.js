@@ -19,3 +19,4 @@ userSavedVoucherSchema.index({ userId: 1, createdAt: -1 });
 userSavedVoucherSchema.index({ voucherId: 1 });
 
 module.exports = model('UserSavedVoucher', userSavedVoucherSchema);
+
