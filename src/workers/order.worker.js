@@ -75,6 +75,20 @@ const handleOrderEvent = async (payload) => {
     const { trackingId, userId, orderData, isBuyNow } = payload;
     const trackingKey = `order:tracking:${trackingId}`;
 
+    // IDEMPOTENCY GUARD: Check if order creation already completed
+    try {
+      const existingTracking = await redisService.get(trackingKey);
+      if (existingTracking && existingTracking.status === 'completed') {
+        logger.info('[OrderWorker] Skipping already completed order message (idempotency guard)', {
+          trackingId,
+          userId,
+          orderGroupId: existingTracking.orderGroupId,
+        });
+        metrics.duplicateSkipped.inc();
+        return { success: true, skipped: true };
+      }
+    } catch (_dedupErr) {}
+
     try {
       await redisService.set(
         trackingKey,
@@ -367,6 +381,20 @@ const startOrderEventDLQConsumer = async () => {
         try {
           payload = JSON.parse(data.content.toString());
         } catch {}
+
+        if (payload?.eventName === ORDER_EVENT_TYPES.COMMAND_CREATE && payload?.trackingId) {
+          try {
+            const tracking = await redisService.get(`order:tracking:${payload.trackingId}`);
+            if (tracking && tracking.status === 'completed') {
+              logger.info('DLQ message dropped because order already completed', {
+                trackingId: payload.trackingId,
+              });
+              metrics.dlqDropped.inc();
+              channel.ack(data);
+              return;
+            }
+          } catch (_err) {}
+        }
 
         if (nextRetryCount > queue.maxRetries) {
           await orderService.publishOrderFailed(data.content, queue.maxRetries, 'order');

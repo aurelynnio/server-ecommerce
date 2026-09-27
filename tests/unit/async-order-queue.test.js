@@ -444,6 +444,7 @@ describe('Unified Order Processing & Event-Driven RabbitMQ Notification Flow', (
 
     it('worker should process COMMAND_CREATE, execute buyNow, and mark tracking completed', async () => {
       const redisService = require('../../src/services/redis.service');
+      vi.spyOn(redisService, 'get').mockResolvedValue(null);
       const setSpy = vi.spyOn(redisService, 'set').mockResolvedValue('OK');
       const mockOrderResult = {
         orderGroupId: 'grp-async-1',
@@ -480,8 +481,34 @@ describe('Unified Order Processing & Event-Driven RabbitMQ Notification Flow', (
       );
     });
 
+    it('worker should skip COMMAND_CREATE if tracking is already completed (idempotency guard)', async () => {
+      const redisService = require('../../src/services/redis.service');
+      vi.spyOn(redisService, 'get').mockResolvedValue({
+        status: 'completed',
+        orderGroupId: 'grp-already-done',
+      });
+      const buyNowSpy = vi.spyOn(orderService, 'buyNow');
+      const createOrderSpy = vi.spyOn(orderService, 'createOrder');
+
+      const payload = {
+        eventName: ORDER_EVENT_TYPES.COMMAND_CREATE,
+        trackingId: 'track-completed',
+        userId: 'user-123',
+        orderData: { productId: 'prod-1' },
+        isBuyNow: true,
+      };
+
+      const result = await consumerOrderQueue._handleOrderEvent(payload);
+
+      expect(result.success).toBe(true);
+      expect(result.skipped).toBe(true);
+      expect(buyNowSpy).not.toHaveBeenCalled();
+      expect(createOrderSpy).not.toHaveBeenCalled();
+    });
+
     it('worker should mark tracking as failed and ACK when business error occurs', async () => {
       const redisService = require('../../src/services/redis.service');
+      vi.spyOn(redisService, 'get').mockResolvedValue(null);
       const setSpy = vi.spyOn(redisService, 'set').mockResolvedValue('OK');
       vi.spyOn(orderService, 'buyNow').mockRejectedValue(
         new ApiError(StatusCodes.CONFLICT, 'Product out of stock'),

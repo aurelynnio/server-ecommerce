@@ -39,12 +39,34 @@ const idempotencyMiddleware = (_options = {}) => {
         }
       }
 
-      // Mark request as in-flight
-      await redisService.set(
-        redisKey,
-        { status: 'processing', startedAt: new Date().toISOString() },
-        IDEMPOTENCY_PROCESSING_TTL_SEC,
-      );
+      // Mark request as in-flight atomically using setNX
+      let acquired = true;
+      if (typeof redisService.setNX === 'function') {
+        acquired = await redisService.setNX(
+          redisKey,
+          { status: 'processing', startedAt: new Date().toISOString() },
+          IDEMPOTENCY_PROCESSING_TTL_SEC,
+        );
+      } else {
+        await redisService.set(
+          redisKey,
+          { status: 'processing', startedAt: new Date().toISOString() },
+          IDEMPOTENCY_PROCESSING_TTL_SEC,
+        );
+      }
+
+      if (!acquired) {
+        const concurrent = await redisService.get(redisKey);
+        if (concurrent && concurrent.status === 'completed') {
+          res.setHeader('X-Idempotent-Replayed', 'true');
+          return res.status(concurrent.statusCode || StatusCodes.OK).json(concurrent.body);
+        }
+        return res.status(StatusCodes.CONFLICT).json({
+          status: 'error',
+          code: StatusCodes.CONFLICT,
+          message: 'A request with this idempotency key is currently processing. Please wait.',
+        });
+      }
 
       // Intercept response to store completed result or clear on failure
       const originalJson = res.json.bind(res);

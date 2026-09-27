@@ -15,6 +15,17 @@ class RedisService {
     }
   }
 
+  async setNX(key, value, ttl = 3600) {
+    try {
+      const stringValue = JSON.stringify(value);
+      const result = await this.redisClient.set(key, stringValue, 'EX', ttl, 'NX');
+      return result === 'OK';
+    } catch (error) {
+      logger.error(`Redis SetNX Error [${key}]:`, { error });
+      return false;
+    }
+  }
+
   async get(key) {
     try {
       const value = await this.redisClient.get(key);

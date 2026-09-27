@@ -3,6 +3,7 @@ const { connectRabbitMQ } = require('../configs/rabbitMQ.config');
 const notificationService = require('../services/notification.service');
 const logger = require('../utils/logger');
 const connectDB = require('../db/connect.db');
+const redisService = require('../services/redis.service');
 const { getRetryCount } = require('../utils/rabbitmq.utils');
 const { createQueueMetrics } = require('../monitoring/queue.metrics');
 
@@ -24,6 +25,25 @@ const startNotificationConsumer = async () => {
 
       try {
         const payload = JSON.parse(data.content.toString());
+
+        // Deduplication guard for outbox / at-least-once message delivery
+        const dedupId = payload.eventId || payload._id || payload.notificationId;
+        if (dedupId) {
+          try {
+            const dedupKey = `notification:processed:${dedupId}`;
+            const isProcessed = await redisService.get(dedupKey);
+            if (isProcessed) {
+              logger.info('Skipping duplicate notification message (idempotency guard)', {
+                dedupId,
+              });
+              metrics.duplicateSkipped.inc();
+              channel.ack(data);
+              return;
+            }
+            await redisService.set(dedupKey, { processedAt: new Date().toISOString() }, 86400);
+          } catch (_redisErr) {}
+        }
+
         await notificationService.createNotification(payload);
         metrics.processed.inc();
         channel.ack(data);
