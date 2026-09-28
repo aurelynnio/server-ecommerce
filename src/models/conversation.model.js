@@ -65,9 +65,7 @@ const conversationSchema = new Schema(
   { timestamps: true, collection: 'conversations' },
 );
 
-conversationSchema.index({ members: 1 });
-conversationSchema.index({ members: 1, updatedAt: -1 });
-conversationSchema.index({ shopId: 1 });
+conversationSchema.index({ members: 1, updatedAt: -1 }); // User conversation list, sorted by latest
 
 const Conversation = model('Conversation', conversationSchema);
 const Message = model('Message', messageSchema);

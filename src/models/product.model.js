@@ -42,8 +42,8 @@ const productSchema = new Schema(
     description: { type: String, required: true, maxlength: 10000 },
 
     // Core Relations
-    shop: { type: Types.ObjectId, ref: 'Shop', required: true, index: true },
-    category: { type: Types.ObjectId, ref: 'Category', index: true },
+    shop: { type: Types.ObjectId, ref: 'Shop', required: true },
+    category: { type: Types.ObjectId, ref: 'Category' },
     shopCategory: { type: Types.ObjectId, ref: 'ShopCategory' },
 
     // Metadata
@@ -105,7 +105,7 @@ const productSchema = new Schema(
     },
 
     // Flags for filtering/display
-    isFeatured: { type: Boolean, default: false, index: true },
+    isFeatured: { type: Boolean, default: false },
     isNewArrival: { type: Boolean, default: false },
 
     // Status - Single source of truth (replaces isActive + onSale)
@@ -113,7 +113,6 @@ const productSchema = new Schema(
       type: String,
       enum: ['draft', 'published', 'suspended', 'deleted'],
       default: 'published',
-      index: true,
     },
   },
   {
@@ -152,8 +151,6 @@ productSchema.virtual('effectivePrice').get(function () {
 // ==================== INDEXES ====================
 // Compound indexes follow the ESR (Equality → Sort → Range) principle.
 // Reference: .agents/skills/mongodb-query-optimizer/references/core-indexing-principles.md
-productSchema.index({ shop: 1, status: 1 });
-productSchema.index({ category: 1, status: 1 });
 productSchema.index({ shop: 1, shopCategory: 1, status: 1 }); // Shop + shopCategory filtering
 productSchema.index({ shopCategory: 1, status: 1 }); // shopCategory filtering without shop (catalog search)
 productSchema.index({ status: 1, isFeatured: -1, createdAt: -1 }); // findFeatured
@@ -169,6 +166,7 @@ productSchema.index({ category: 1, status: 1, 'price.currentPrice': 1 }); // Cat
 productSchema.index({ category: 1, status: 1, 'price.currentPrice': -1 }); // Category + price (desc)
 productSchema.index({ category: 1, status: 1, soldCount: -1 }); // Category + best sellers
 productSchema.index({ shop: 1, status: 1, createdAt: -1 }); // Shop products (newest)
+productSchema.index({ status: 1, brand: 1 }); // Catalog filter theo brand
 // Text search index
 productSchema.index(
   { name: 'text', description: 'text', brand: 'text', tags: 'text' },

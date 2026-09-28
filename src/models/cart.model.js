@@ -93,22 +93,9 @@ cartSchema.pre('validate', function () {
   }
 });
 
-// 1. Khóa truy vấn chính: Mỗi user chỉ có đúng 1 giỏ hàng duy nhất (O(log N))
+// Khóa truy vấn chính: Mỗi user chỉ có đúng 1 giỏ hàng duy nhất (O(log N))
+// Các thao tác trên items được xử lý in-memory qua `cart.items` rồi save(),
+// không có truy vấn DB nào lọc theo items._id / items.productId / items.shopId.
 cartSchema.index({ userId: 1 }, { unique: true });
-
-// 2. Multikey index: Tìm các giỏ hàng chứa 1 productId (khi đổi giá, xóa sản phẩm, flash sale)
-cartSchema.index({ 'items.productId': 1 });
-
-// 3. Multikey index: Tìm theo Cart Item ID bên trong mảng items
-cartSchema.index({ 'items._id': 1 });
-
-// 4. Compound index: Tối ưu các thao tác update quantity / xóa item của user (PUT/DELETE /api/carts/:itemId)
-cartSchema.index({ userId: 1, 'items._id': 1 });
-
-// 5. Sparse index: Tìm các giỏ hàng đang giữ sản phẩm của 1 Shop (khi Shop tạm đóng hoặc thống kê)
-cartSchema.index({ 'items.shopId': 1 }, { sparse: true });
-
-// 6. Single index: Phục vụ quét giỏ hàng bị bỏ quên (Abandoned Cart Recovery) & sắp xếp giỏ hàng mới nhất
-cartSchema.index({ updatedAt: -1 });
 
 module.exports = model('Cart', cartSchema);

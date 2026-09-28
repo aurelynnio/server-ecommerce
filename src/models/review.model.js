@@ -13,10 +13,10 @@ const reviewSchema = new Schema(
 );
 
 // Indexes
-reviewSchema.index({ product: 1 });
-reviewSchema.index({ user: 1 });
 reviewSchema.index({ product: 1, createdAt: -1 });
 reviewSchema.index({ product: 1, rating: -1 });
 reviewSchema.index({ user: 1, createdAt: -1 });
+reviewSchema.index({ createdAt: -1 }); // Danh sách review admin (sort mặc định theo createdAt)
+reviewSchema.index({ rating: 1, createdAt: -1 }); // Lọc review theo rating + sort createdAt
 
 module.exports = model('Review', reviewSchema);

@@ -63,10 +63,8 @@ const paymentSchema = new Schema(
   },
 );
 
-// Index for quick lookup by transaction ID
+// Indexes cho tra cứu theo đơn hàng / nhóm checkout (transactionId có unique sparse index ở schema)
 paymentSchema.index({ orderId: 1 });
 paymentSchema.index({ orderGroupId: 1 });
-paymentSchema.index({ userId: 1 });
-paymentSchema.index({ status: 1 });
 
 module.exports = model('Payment', paymentSchema);
