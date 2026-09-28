@@ -84,7 +84,7 @@ class ProductRepository extends BaseRepository {
   }
 
   findByIds(productIds) {
-    return this.findManyByFilter({ _id: { $in: productIds } });
+    return this.findManyByFilter({ _id: { $in: productIds } }).lean();
   }
 
   decrementStockForVariantSale(productId, variantId, quantity, session) {
@@ -673,7 +673,8 @@ class ProductRepository extends BaseRepository {
   }
 
   findPublishedAutocomplete(search, limit = 10) {
-    const searchRegex = createLiteralRegex(search);
+    // Autocomplete dùng prefix (^) để tận dụng được index thay vì quét toàn bộ collection.
+    const searchRegex = createLiteralRegex(search, { match: 'prefix' });
     return this.findManyByFilter({
       status: 'published',
       ...(searchRegex && { $or: [{ name: searchRegex }, { tags: searchRegex }] }),
@@ -716,58 +717,66 @@ class ProductRepository extends BaseRepository {
     return productsQuery.sort(sort).skip(skip).limit(limit).lean();
   }
 
-  aggregatePriceRangeFacets(baseQuery) {
-    return this.aggregateByPipeline([
-      { $match: baseQuery },
-      {
-        $bucket: {
-          groupBy: '$price.currentPrice',
-          boundaries: [0, 100000, 500000, 1000000, 5000000, Infinity],
-          default: 'Other',
-          output: { count: { $sum: 1 } },
-        },
-      },
-    ]);
-  }
+  /**
+   * Lấy đồng thời 3 nhóm facet (khoảng giá, danh mục, đánh giá) trong MỘT lần quét
+   * collection bằng $facet, thay vì 3 aggregation riêng lặp lại cùng $match.
+   * @returns {Promise<[Array, Array, Array]>} [priceRanges, categories, ratings]
+   */
+  async getSearchFacetsByParams(params = {}) {
+    const baseQuery = this._buildAdvancedSearchQuery(params);
 
-  aggregateCategoryFacets(baseQuery, limit = 10) {
-    return this.aggregateByPipeline([
+    const [facetResult] = await this.aggregateByPipeline([
       { $match: baseQuery },
-      { $group: { _id: '$category', count: { $sum: 1 } } },
       {
-        $lookup: {
-          from: 'categories',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'category',
+        $facet: {
+          priceRanges: [
+            {
+              $bucket: {
+                groupBy: '$price.currentPrice',
+                boundaries: [0, 100000, 500000, 1000000, 5000000, Infinity],
+                default: 'Other',
+                output: { count: { $sum: 1 } },
+              },
+            },
+          ],
+          categories: [
+            { $group: { _id: '$category', count: { $sum: 1 } } },
+            {
+              $lookup: {
+                from: 'categories',
+                localField: '_id',
+                foreignField: '_id',
+                as: 'category',
+              },
+            },
+            { $unwind: '$category' },
+            {
+              $project: {
+                _id: '$category._id',
+                name: '$category.name',
+                slug: '$category.slug',
+                count: 1,
+              },
+            },
+            { $sort: { count: -1 } },
+            { $limit: 10 },
+          ],
+          ratings: [
+            {
+              $bucket: {
+                groupBy: '$ratingAverage',
+                boundaries: [0, 3, 4, 4.5, 5],
+                default: 'unrated',
+                output: { count: { $sum: 1 } },
+              },
+            },
+          ],
         },
       },
-      { $unwind: '$category' },
-      {
-        $project: {
-          _id: '$category._id',
-          name: '$category.name',
-          slug: '$category.slug',
-          count: 1,
-        },
-      },
-      { $sort: { count: -1 } },
-      { $limit: limit },
     ]);
-  }
 
-  aggregateRatingFacets(baseQuery) {
-    return this.aggregateByPipeline([
-      { $match: baseQuery },
-      {
-        $bucket: {
-          groupBy: '$ratingAverage',
-          boundaries: [0, 3, 4, 4.5, 5],
-          default: 'unrated',
-          output: { count: { $sum: 1 } },
-        },
-      },
-    ]);
+    const facet = facetResult || {};
+    return [facet.priceRanges || [], facet.categories || [], facet.ratings || []];
   }
 
   findByIdsSelectCategory(productIds) {
@@ -1037,15 +1046,6 @@ class ProductRepository extends BaseRepository {
     }
 
     return productsQuery.sort(sort).skip(skip).limit(limit).lean();
-  }
-
-  getSearchFacetsByParams(params = {}) {
-    const baseQuery = this._buildAdvancedSearchQuery(params);
-    return Promise.all([
-      this.aggregatePriceRangeFacets(baseQuery),
-      this.aggregateCategoryFacets(baseQuery),
-      this.aggregateRatingFacets(baseQuery),
-    ]);
   }
 }
 

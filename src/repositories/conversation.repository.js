@@ -21,11 +21,12 @@ class ConversationRepository extends BaseRepository {
     });
   }
 
-  findByMemberWithDetails(userId) {
+  findByMemberWithDetails(userId, limit = 200) {
     return this.findManyByFilter({ members: userId })
       .populate('shopId', 'name logo slug owner')
       .populate('members', 'username avatar')
       .sort({ updatedAt: -1 })
+      .limit(limit)
       .lean();
   }
 }

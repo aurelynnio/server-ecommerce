@@ -59,7 +59,8 @@ class OutboxRepository extends BaseRepository {
       $or: [{ nextRetryAt: null }, { nextRetryAt: { $lte: now } }],
     })
       .sort({ createdAt: 1 })
-      .limit(limit);
+      .limit(limit)
+      .lean();
   }
 
   /**
