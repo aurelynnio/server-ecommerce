@@ -1,8 +1,13 @@
 const { MistralAIEmbeddings } = require('@langchain/mistralai');
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 const Product = require('../repositories/product.repository');
 const Category = require('../repositories/category.repository');
 const logger = require('../utils/logger');
+const redisService = require('./redis.service');
+
+const QUERY_VECTOR_CACHE_PREFIX = 'embed:q:';
+const QUERY_VECTOR_TTL_SECONDS = Number(process.env.EMBEDDING_QUERY_CACHE_TTL) || 3600;
 
 // Singleton embedding model
 let embeddingModel = null;
@@ -32,6 +37,34 @@ function getEmbeddingModel() {
 function getEmbeddingsCollection() {
   const client = mongoose.connection.getClient();
   return client.db().collection('product_embeddings');
+}
+
+/**
+ * Lấy vector embedding cho câu query, có cache Redis theo hash(query).
+ * Tránh gọi API Mistral lặp lại cho cùng một câu hỏi (rất phổ biến với chatbot).
+ * @param {string} query
+ * @returns {Promise<number[]>}
+ */
+async function getQueryVector(query) {
+  const cacheKey = `${QUERY_VECTOR_CACHE_PREFIX}${crypto
+    .createHash('sha256')
+    .update(String(query).toLowerCase().trim())
+    .digest('hex')
+    .slice(0, 32)}`;
+
+  const cached = await redisService.get(cacheKey);
+  if (Array.isArray(cached) && cached.length > 0) {
+    return cached;
+  }
+
+  const embeddings = getEmbeddingModel();
+  const [vector] = await embeddings.embedDocuments([query]);
+
+  if (Array.isArray(vector) && vector.length > 0) {
+    await redisService.set(cacheKey, vector, QUERY_VECTOR_TTL_SECONDS);
+  }
+
+  return vector;
 }
 
 function getVietnameseKeywords(product) {
@@ -366,10 +399,8 @@ async function deleteProductEmbedding(productId) {
  */
 async function searchSimilarProducts(query, { limit = 5, filter = {} } = {}) {
   try {
-    const embeddings = getEmbeddingModel();
     const collection = getEmbeddingsCollection();
-
-    const [queryVector] = await embeddings.embedDocuments([query]);
+    const queryVector = await getQueryVector(query);
 
     // Note: Atlas Vector Search index 'product_vector_index'
     const vectorSearchStage = {

@@ -180,13 +180,6 @@ class VoucherService {
   async getAvailableVouchers(userId, shopId = null) {
     const now = new Date();
 
-    const platformVouchers = await Voucher.findAvailablePlatform(now);
-
-    let shopVouchers = [];
-    if (shopId) {
-      shopVouchers = await Voucher.findAvailableShop(shopId, now);
-    }
-
     const filterByUserUsage = async (vouchers) => {
       if (vouchers.length === 0) return vouchers;
       const voucherIds = vouchers.map((v) => v._id);
@@ -202,10 +195,18 @@ class VoucherService {
       });
     };
 
-    return {
-      platform: await filterByUserUsage(platformVouchers),
-      shop: await filterByUserUsage(shopVouchers),
-    };
+    // Các truy vấn độc lập chạy song song thay vì tuần tự.
+    const [platformVouchers, shopVouchers] = await Promise.all([
+      Voucher.findAvailablePlatform(now),
+      shopId ? Voucher.findAvailableShop(shopId, now) : Promise.resolve([]),
+    ]);
+
+    const [platform, shop] = await Promise.all([
+      filterByUserUsage(platformVouchers),
+      filterByUserUsage(shopVouchers),
+    ]);
+
+    return { platform, shop };
   }
 
   /**

@@ -1,5 +1,6 @@
 const logger = require('../utils/logger');
 const orderService = require('./order.service');
+const redisClient = require('../configs/redis.config');
 
 class SchedulerService {
   constructor() {
@@ -8,6 +9,36 @@ class SchedulerService {
     this._isCleaningUpOrders = false;
     this._isDispatchingOutbox = false;
     this._isRunning = false;
+  }
+
+  /**
+   * Acquire a Redis lock để đảm bảo chỉ 1 instance/container chạy 1 job tại một thời điểm.
+   * Degrade an toàn: nếu Redis chưa sẵn sàng hoặc lỗi → cho phép chạy (không chặn job).
+   * @param {string} key
+   * @param {number} ttlSeconds
+   * @returns {Promise<boolean>}
+   */
+  async _acquireLock(key, ttlSeconds) {
+    try {
+      if (!redisClient?.isReady?.()) return true;
+      const result = await redisClient.set(key, '1', 'EX', ttlSeconds, 'NX');
+      return result === 'OK';
+    } catch (error) {
+      logger.warn('[Scheduler] Redis lock acquire failed, proceeding without lock', {
+        error: error.message,
+      });
+      return true;
+    }
+  }
+
+  async _releaseLock(key) {
+    try {
+      if (redisClient?.isReady?.()) {
+        await redisClient.del(key);
+      }
+    } catch (error) {
+      logger.warn('[Scheduler] Redis lock release failed', { error: error.message });
+    }
   }
 
   /**
@@ -22,8 +53,17 @@ class SchedulerService {
       return 0;
     }
 
+    // Đặt cờ in-process TRƯỚC mọi await để chặn chồng lấn trong cùng tiến trình.
     this._isCleaningUpOrders = true;
+    const lockKey = 'lock:scheduler:order-expiry';
+    let lockAcquired = false;
     try {
+      lockAcquired = await this._acquireLock(lockKey, 300);
+      if (!lockAcquired) {
+        logger.info('[Scheduler] Order cleanup skipped (lock held by another instance)');
+        return 0;
+      }
+
       const cancelledCount = await orderService.cancelExpiredUnpaidOrders(timeoutMinutes);
       if (cancelledCount > 0) {
         logger.info('[Scheduler] Auto-cancelled expired unpaid online orders', {
@@ -40,6 +80,7 @@ class SchedulerService {
       return 0;
     } finally {
       this._isCleaningUpOrders = false;
+      if (lockAcquired) await this._releaseLock(lockKey);
     }
   }
 
@@ -54,7 +95,14 @@ class SchedulerService {
     }
 
     this._isDispatchingOutbox = true;
+    const lockKey = 'lock:scheduler:outbox-dispatch';
+    let lockAcquired = false;
     try {
+      lockAcquired = await this._acquireLock(lockKey, 60);
+      if (!lockAcquired) {
+        return { skipped: true };
+      }
+
       // Lazy-load to prevent circular dependencies
       const outboxService = require('./outbox.service');
       const result = await outboxService.dispatchPendingEvents();
@@ -67,6 +115,7 @@ class SchedulerService {
       return { error: error.message };
     } finally {
       this._isDispatchingOutbox = false;
+      if (lockAcquired) await this._releaseLock(lockKey);
     }
   }
 

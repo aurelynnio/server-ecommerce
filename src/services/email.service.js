@@ -2,7 +2,7 @@ require('@babel/register')({
   presets: ['@babel/preset-react', '@babel/preset-env'],
   ignore: [/node_modules/],
   extensions: ['.jsx', '.js'],
-  cache: false,
+  cache: true,
 });
 
 const nodemailer = require('nodemailer');

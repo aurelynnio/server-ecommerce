@@ -232,6 +232,42 @@ async function findProduct(productId) {
   return await Product.findOne({ slug: productId }).populate('category', 'name').lean();
 }
 
+/**
+ * Lấy nhiều sản phẩm trong 2 truy vấn gộp ($in theo _id và theo slug) thay vì
+ * N truy vấn tuần tự; giữ nguyên thứ tự của danh sách id đầu vào.
+ * @param {Array<string|ObjectId>} productIds
+ * @returns {Promise<Array>}
+ */
+async function findProductsBatch(productIds = []) {
+  if (!Array.isArray(productIds) || productIds.length === 0) return [];
+
+  const objectIds = [];
+  const slugs = [];
+  for (const id of productIds) {
+    if (mongoose.Types.ObjectId.isValid(id)) objectIds.push(id);
+    else slugs.push(String(id));
+  }
+
+  const [byIds, bySlugs] = await Promise.all([
+    objectIds.length
+      ? Product.find({ _id: { $in: objectIds } })
+          .populate('category', 'name')
+          .lean()
+      : Promise.resolve([]),
+    slugs.length
+      ? Product.find({ slug: { $in: slugs } })
+          .populate('category', 'name')
+          .lean()
+      : Promise.resolve([]),
+  ]);
+
+  const productMap = new Map();
+  for (const product of byIds) productMap.set(String(product._id), product);
+  for (const product of bySlugs) productMap.set(String(product.slug), product);
+
+  return productIds.map((id) => productMap.get(String(id))).filter(Boolean);
+}
+
 const toolHandlers = {
   async search_products({ keyword, category, minPrice, maxPrice, limit = 5 }) {
     try {
@@ -739,12 +775,7 @@ const toolHandlers = {
 
   async compare_products({ productIds }) {
     try {
-      const products = [];
-
-      for (const id of productIds) {
-        const product = await findProduct(id);
-        if (product) products.push(product);
-      }
+      const products = await findProductsBatch(productIds);
 
       return products.map((p) => ({
         id: p._id,

@@ -3,7 +3,11 @@ const { MongoDBChatMessageHistory } = require('@langchain/mongodb');
 const { ChatPromptTemplate, MessagesPlaceholder } = require('@langchain/core/prompts');
 const { RunnableWithMessageHistory } = require('@langchain/core/runnables');
 const { StringOutputParser } = require('@langchain/core/output_parsers');
-const { HumanMessage, AIMessage } = require('@langchain/core/messages');
+const {
+  HumanMessage,
+  AIMessage,
+  mapStoredMessagesToChatMessages,
+} = require('@langchain/core/messages');
 const mongoose = require('mongoose');
 
 const { searchSimilarProducts, getFeaturedProducts } = require('./embedding.service');
@@ -26,6 +30,10 @@ const logger = require('../utils/logger');
 const metrics = require('../monitoring/chatbot.metrics');
 
 const USE_AGENT = String(process.env.CHATBOT_USE_AGENT || '').toLowerCase() === 'true';
+
+// Số message gần nhất nạp từ DB cho mỗi lượt chat. Vì mỗi session lưu 1 document
+// với mảng `messages`, dùng $slice để chỉ lấy phần đuôi thay vì load toàn bộ mảng.
+const HISTORY_FETCH_LIMIT = Number(process.env.CHATBOT_HISTORY_FETCH_LIMIT) || 50;
 
 class ChatbotService {
   constructor() {
@@ -65,11 +73,15 @@ class ChatbotService {
       sessionId,
     });
 
-    // Wrap để truncate history theo token budget trước khi đưa vào prompt.
-    const originalGetMessages = baseHistory.getMessages.bind(baseHistory);
+    // Chỉ nạp HISTORY_FETCH_LIMIT message gần nhất bằng $slice rồi mới truncate
+    // theo token budget — tránh load toàn bộ mảng messages của session mỗi lượt chat.
     baseHistory.getMessages = async () => {
-      const all = await originalGetMessages();
-      return truncateHistory(all);
+      const doc = await collection.findOne(
+        { sessionId },
+        { projection: { messages: { $slice: -HISTORY_FETCH_LIMIT } } },
+      );
+      const stored = doc?.messages || [];
+      return truncateHistory(mapStoredMessagesToChatMessages(stored));
     };
 
     // Inject createdAt cho messages mới (cần cho TTL index hoạt động đúng).
@@ -395,6 +407,10 @@ class ChatbotService {
         logger.warn('[Chatbot] Stream response corrected by grounding check');
       }
       metrics.chatbotTokensTotal.inc({ direction: 'out' }, metrics.estimateTokens(fullResponse));
+
+      // Ghi cache cho nhánh stream (đường đi chính). Trước đây chỉ nhánh non-stream
+      // ghi cache nên hầu như không có lượt hit nào trên production.
+      await setCachedResponse(userMessage, { success: true, message: validatedResponse });
 
       return {
         success: true,

@@ -45,12 +45,18 @@ class RedisService {
   }
 
   async increment(key, ttl = 3600) {
+    // INCR + EXPIRE trong cùng 1 Lua script để nguyên tử: tránh trường hợp TTL
+    // không được set (key tồn tại vĩnh viễn) nếu lỗi xảy ra giữa 2 lệnh.
+    const LUA_INCR_TTL = `
+      local count = redis.call('incr', KEYS[1])
+      if count == 1 then
+        redis.call('expire', KEYS[1], ARGV[1])
+      end
+      return count
+    `;
     try {
-      const count = await this.redisClient.incr(key);
-      if (count === 1) {
-        await this.redisClient.expire(key, ttl);
-      }
-      return count;
+      const count = await this.redisClient.eval(LUA_INCR_TTL, 1, key, ttl);
+      return Number(count);
     } catch (error) {
       logger.error(`Redis Increment Error [${key}]:`, { error });
       return null;
@@ -149,11 +155,17 @@ class RedisService {
    * @param {number} quantity
    */
   async releaseFlashSaleStock(productId, variantId = null, quantity = 1) {
+    // EXISTS + INCRBY trong 1 Lua script để nguyên tử, tránh race check-then-act.
+    const LUA_RELEASE = `
+      if redis.call('exists', KEYS[1]) == 1 then
+        return redis.call('incrby', KEYS[1], ARGV[1])
+      end
+      return -1
+    `;
     try {
       const stockKey = `stock:flashsale:${productId}${variantId ? `:${variantId}` : ''}`;
-      const exists = await this.redisClient.exists(stockKey);
-      if (exists) {
-        await this.redisClient.incrby(stockKey, quantity);
+      const result = await this.redisClient.eval(LUA_RELEASE, 1, stockKey, quantity);
+      if (Number(result) >= 0) {
         logger.info(`Redis: Released flash sale stock [${stockKey}] +${quantity}`);
       }
     } catch (error) {
