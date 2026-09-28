@@ -1,12 +1,13 @@
 /**
- * One-time index migration script for query optimization.
+ * Index migration script for query optimization.
  *
- * Adds compound indexes that follow the ESR (Equality → Sort → Range)
- * principle to the `products` and `orders` collections. The DROP_OPS list
- * below is reserved for future suboptimal-index removal; it is intentionally
- * empty in this run because every existing index still has a query consumer
- * (notably `{shopCategory: 1, status: 1}`, which serves catalog queries that
- * filter by shopCategory without shop).
+ * Creates compound indexes that follow the ESR (Equality → Sort → Range)
+ * principle, and drops indexes that no query in the codebase consumes
+ * (single-field indexes shadowed by a compound prefix, or dead indexes left
+ * over from removed query paths).
+ *
+ * Notably KEPT: products `{shopCategory: 1, status: 1}` (catalog queries that
+ * filter by shopCategory without shop) and orders `{status: 1}` (countByStatus).
  *
  * Reference: .agents/skills/mongodb-query-optimizer/references/core-indexing-principles.md
  *
@@ -14,7 +15,7 @@
  *   node src/scripts/migrate-indexes.js
  *   node src/scripts/migrate-indexes.js --dry-run   # Preview without writing
  *
- * Safe to run multiple times (createIndex is idempotent for identical specs).
+ * Safe to run multiple times (create/drop guarded by existence checks).
  */
 
 require('dotenv').config();
@@ -103,43 +104,71 @@ const INDEX_OPS = [
     options: { unique: true, name: 'userId_1' },
     reason: 'Primary user cart lookup (findByUserId, checkout, getCart)',
   },
-  {
-    collection: 'carts',
-    spec: { 'items.productId': 1 },
-    options: { name: 'items.productId_1' },
-    reason: 'Find carts containing a specific product (stock/price updates, deletion)',
-  },
-  {
-    collection: 'carts',
-    spec: { 'items._id': 1 },
-    options: { name: 'items._id_1' },
-    reason: 'Direct cart item lookup and subdocument operations',
-  },
-  {
-    collection: 'carts',
-    spec: { userId: 1, 'items._id': 1 },
-    options: { name: 'userId_1_items._id_1' },
-    reason: 'User-scoped cart item operations (updateCartItem, removeCartItem)',
-  },
-  {
-    collection: 'carts',
-    spec: { 'items.shopId': 1 },
-    options: { sparse: true, name: 'items.shopId_1' },
-    reason: 'Find carts containing products from a specific shop',
-  },
-  {
-    collection: 'carts',
-    spec: { updatedAt: -1 },
-    options: { name: 'updatedAt_-1' },
-    reason: 'Abandoned cart recovery and recent cart activity tracking',
-  },
 ];
 
-// Single-field indexes that are now suboptimal / redundant.
-// NOTE: {shopCategory: 1, status: 1} is intentionally KEPT — it serves catalog
-// queries that filter by shopCategory WITHOUT shop (see _buildCatalogQuery).
+// Indexes that no query in the codebase consumes: single-field indexes
+// shadowed by a compound prefix, or dead indexes from removed query paths.
+// NOTE: {shopCategory: 1, status: 1} on products is intentionally KEPT — it
+// serves catalog queries that filter by shopCategory WITHOUT shop.
 const DROP_OPS = [
-  // { collection: 'products', indexName: 'tags_1' }, // example slot
+  // ---- orders ----
+  { collection: 'orders', indexName: 'shopId_1_status_1', reason: 'Prefix of {shopId,status,createdAt}' },
+  { collection: 'orders', indexName: 'paymentStatus_1', reason: 'Prefix of {paymentStatus,createdAt}' },
+  { collection: 'orders', indexName: 'userId_1', reason: 'Prefix of {userId,createdAt} / {userId,status}' },
+  { collection: 'orders', indexName: 'shopId_1', reason: 'Prefix of {shopId,...} compounds' },
+  { collection: 'orders', indexName: 'shipmondoShipmentId_1', reason: 'Legacy Shipmondo field, no code references' },
+  { collection: 'orders', indexName: 'shipmondoSalesOrderId_1', reason: 'Legacy Shipmondo field, no code references' },
+  // ---- products ----
+  { collection: 'products', indexName: 'shop_1', reason: 'Prefix of {shop,status,...} compounds' },
+  { collection: 'products', indexName: 'category_1', reason: 'Prefix of {category,status,...} compounds' },
+  { collection: 'products', indexName: 'status_1', reason: 'Prefix of every status-first compound' },
+  { collection: 'products', indexName: 'isFeatured_1', reason: 'Never queried without status' },
+  { collection: 'products', indexName: 'shop_1_status_1', reason: 'Prefix of {shop,status,createdAt}' },
+  { collection: 'products', indexName: 'category_1_status_1', reason: 'Prefix of {category,status,createdAt}' },
+  { collection: 'products', indexName: 'isActive_1', reason: 'Legacy field replaced by status' },
+  { collection: 'products', indexName: 'category_1_isActive_1', reason: 'Legacy isActive field' },
+  { collection: 'products', indexName: 'brand_1_isActive_1', reason: 'Legacy isActive field' },
+  { collection: 'products', indexName: 'models.sku_1', reason: 'Legacy models[] field replaced by variants[]' },
+  { collection: 'products', indexName: 'status_1_variants.size_1', reason: 'variants.size no longer exists in schema' },
+  // ---- reviews ----
+  { collection: 'reviews', indexName: 'product_1', reason: 'Prefix of {product,createdAt}' },
+  { collection: 'reviews', indexName: 'user_1', reason: 'Prefix of {user,createdAt}' },
+  // ---- notifications ----
+  { collection: 'notifications', indexName: 'userId_1', reason: 'Prefix of {userId,isRead} / {userId,createdAt}' },
+  // ---- carts (item ops are in-memory; no abandoned-cart job) ----
+  { collection: 'carts', indexName: 'items.productId_1', reason: 'No query consumer' },
+  { collection: 'carts', indexName: 'items._id_1', reason: 'No query consumer' },
+  { collection: 'carts', indexName: 'userId_1_items._id_1', reason: 'No query consumer' },
+  { collection: 'carts', indexName: 'items.shopId_1', reason: 'No query consumer' },
+  { collection: 'carts', indexName: 'updatedAt_-1', reason: 'No abandoned-cart scan exists' },
+  // ---- conversations ----
+  { collection: 'conversations', indexName: 'members_1', reason: 'Prefix of {members,updatedAt}' },
+  { collection: 'conversations', indexName: 'shopId_1', reason: 'No query filters shopId alone' },
+  // ---- payments ----
+  { collection: 'payments', indexName: 'userId_1', reason: 'No query consumer' },
+  { collection: 'payments', indexName: 'status_1', reason: 'No query consumer' },
+  // ---- shops ----
+  { collection: 'shops', indexName: 'name_text', reason: 'No $text search on shops (regex only)' },
+  // ---- vouchers ----
+  { collection: 'voucher_usages', indexName: 'voucherId_1_userId_1', reason: 'Prefix of unique {voucherId,userId,orderId}' },
+  { collection: 'voucher_usages', indexName: 'voucherId_1_createdAt_-1', reason: 'No query consumer' },
+  { collection: 'user_saved_vouchers', indexName: 'voucherId_1', reason: 'No count-by-voucher query' },
+  { collection: 'wishlists', indexName: 'productId_1', reason: 'No count-by-product query' },
+  { collection: 'shop_followers', indexName: 'shopId_1_createdAt_-1', reason: 'shopId count served by unique {shopId,userId}' },
+  // ---- banners ----
+  { collection: 'banners', indexName: 'isActive_1', reason: 'Prefix of {isActive,order,createdAt}' },
+  { collection: 'banners', indexName: 'order_1', reason: 'No order-alone query' },
+  // ---- shop categories ----
+  { collection: 'shop_categories', indexName: 'shopId_1', reason: 'Prefix of {shopId,displayOrder}' },
+  // ---- permission audits ----
+  { collection: 'permission_audits', indexName: 'adminId_1', reason: 'No query filters adminId' },
+  { collection: 'permission_audits', indexName: 'targetUserId_1', reason: 'Prefix of {targetUserId,createdAt}' },
+  { collection: 'permission_audits', indexName: 'timestamp_-1', reason: 'Legacy field replaced by createdAt' },
+  { collection: 'permission_audits', indexName: 'targetUserId_1_timestamp_-1', reason: 'Legacy timestamp field' },
+  // ---- outbox ----
+  { collection: 'outbox_events', indexName: 'eventType_1', reason: 'Never filtered' },
+  { collection: 'outbox_events', indexName: 'status_1', reason: 'Prefix of {status,nextRetryAt,createdAt}' },
+  { collection: 'outbox_events', indexName: 'nextRetryAt_1', reason: 'Only used inside $or with status' },
 ];
 
 async function listExistingIndexes(db, collection) {
@@ -216,9 +245,13 @@ async function applyDropOps(db) {
   }
 }
 
+const ALL_COLLECTIONS = [
+  ...new Set([...INDEX_OPS.map((op) => op.collection), ...DROP_OPS.map((op) => op.collection)]),
+];
+
 async function printSummary(db) {
   log('\n--- Current index summary ---');
-  for (const collection of ['products', 'orders']) {
+  for (const collection of ALL_COLLECTIONS) {
     const indexes = await listExistingIndexes(db, collection);
     log(`\n${collection} (${indexes.length} indexes):`);
     for (const idx of indexes) {

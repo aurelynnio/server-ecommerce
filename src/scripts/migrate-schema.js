@@ -383,10 +383,6 @@ async function createIndexes(db) {
     .collection('shop_followers')
     .createIndex({ userId: 1, createdAt: -1 })
     .catch(() => {});
-  await db
-    .collection('shop_followers')
-    .createIndex({ shopId: 1, createdAt: -1 })
-    .catch(() => {});
 
   // wishlists
   await db
@@ -397,20 +393,9 @@ async function createIndexes(db) {
     .collection('wishlists')
     .createIndex({ userId: 1, createdAt: -1 })
     .catch(() => {});
-  await db
-    .collection('wishlists')
-    .createIndex({ productId: 1 })
-    .catch(() => {});
 
-  // voucher_usages
-  await db
-    .collection('voucher_usages')
-    .createIndex({ voucherId: 1, userId: 1 })
-    .catch(() => {});
-  await db
-    .collection('voucher_usages')
-    .createIndex({ voucherId: 1, createdAt: -1 })
-    .catch(() => {});
+  // voucher_usages (unique sparse indexes come from Mongoose; the {voucherId, userId}
+  // prefix of the unique {voucherId, userId, orderId} index serves the usage count)
   await db
     .collection('voucher_usages')
     .createIndex({ userId: 1, createdAt: -1 })
