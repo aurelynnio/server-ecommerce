@@ -1,6 +1,7 @@
 const { StatusCodes } = require('http-status-codes');
 const { sendFail } = require('../shared/res/formatResponse');
 const tokenService = require('../services/token.service');
+const redisService = require('../services/redis.service');
 const { getRequestUserId, getRequestUserRoles } = require('../utils/requestUser');
 
 /**
@@ -109,9 +110,17 @@ const requireRole = (...allowedRoles) => {
       // If checking for seller role and user has a shop, treat them as seller
       if (flatRoles.includes('seller') && !userRoles.includes('seller')) {
         try {
-          const Shop = require('../models/shop.model');
-          const shop = await Shop.findOne({ owner: getRequestUserId(req.user) });
-          if (shop) {
+          const userId = getRequestUserId(req.user);
+          const cacheKey = `auth:seller:${userId}`;
+          // Cache quan hệ user→shop ngắn hạn để tránh DB hit lặp lại mỗi request.
+          let isSeller = await redisService.get(cacheKey);
+          if (isSeller === null) {
+            const Shop = require('../models/shop.model');
+            const shop = await Shop.findOne({ owner: userId }).select('_id').lean();
+            isSeller = Boolean(shop);
+            await redisService.set(cacheKey, isSeller, 60);
+          }
+          if (isSeller) {
             userRoles.push('seller');
           }
         } catch (_err) {

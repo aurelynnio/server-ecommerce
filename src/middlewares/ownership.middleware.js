@@ -17,7 +17,7 @@ const verifyShopOwnership = async (req, res, next) => {
       throw new ApiError(StatusCodes.UNAUTHORIZED, 'Authentication required');
     }
 
-    const shop = await Shop.findOne({ owner: userId });
+    const shop = await Shop.findOne({ owner: userId }).select('_id status').lean();
 
     if (!shop) {
       throw new ApiError(
@@ -61,7 +61,7 @@ const verifyProductOwnership = async (req, res, next) => {
       );
     }
 
-    const product = await Product.findById(productId);
+    const product = await Product.findById(productId).select('_id shop').lean();
 
     if (!product) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
@@ -102,7 +102,7 @@ const verifyOrderOwnership = async (req, res, next) => {
       );
     }
 
-    const order = await Order.findById(orderId);
+    const order = await Order.findById(orderId).select('_id shopId').lean();
 
     if (!order) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Order not found');

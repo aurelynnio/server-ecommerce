@@ -20,16 +20,8 @@ const normalizeOrigin = (origin) => {
   return origin.trim().replace(/\/+$/, '');
 };
 
-const isVercelPreviewOrigin = (origin) => {
-  try {
-    const url = new URL(origin);
-    return (
-      url.protocol === 'https:' &&
-      (url.hostname.endsWith('.vercel.app') || url.hostname === 'vercel.app')
-    );
-  } catch {
-    return false;
-  }
+const isVercelPreviewHost = (url) => {
+  return url.protocol === 'https:' && (url.hostname.endsWith('.vercel.app') || url.hostname === 'vercel.app');
 };
 
 const getConfiguredFrontendOrigins = () => {
@@ -43,31 +35,41 @@ const getConfiguredFrontendOrigins = () => {
   ];
 };
 
-const getAllowedOrigins = () => {
-  const defaults =
-    process.env.NODE_ENV === 'production' ? defaultProductionOrigins : defaultDevOrigins;
-
-  return [...new Set([...defaults, ...getConfiguredFrontendOrigins()])];
-};
-
-const isLocalhostOrigin = (origin) => {
-  try {
-    const url = new URL(origin);
-    return url.protocol === 'http:' && url.hostname === 'localhost';
-  } catch {
-    return false;
+// Memoize danh sách origin hợp lệ: env không đổi trong vòng đời tiến trình nên
+// chỉ dựng Set một lần thay vì tạo mảng + Set mới trên mỗi request.
+let allowedOriginsSet = null;
+const getAllowedOriginsSet = () => {
+  if (!allowedOriginsSet) {
+    const defaults =
+      process.env.NODE_ENV === 'production' ? defaultProductionOrigins : defaultDevOrigins;
+    allowedOriginsSet = new Set([...defaults, ...getConfiguredFrontendOrigins()]);
   }
+  return allowedOriginsSet;
 };
 
 const isAllowedOrigin = (origin) => {
   if (!origin) return true;
 
   const normalized = normalizeOrigin(origin);
-  return (
-    (process.env.NODE_ENV !== 'production' && isLocalhostOrigin(origin)) ||
-    isVercelPreviewOrigin(origin) ||
-    getAllowedOrigins().includes(normalized)
-  );
+  if (getAllowedOriginsSet().has(normalized)) return true;
+
+  // Chỉ parse URL khi origin chưa nằm trong allow-list để tránh chi phí thừa.
+  let url;
+  try {
+    url = new URL(origin);
+  } catch {
+    return false;
+  }
+
+  if (
+    process.env.NODE_ENV !== 'production' &&
+    url.protocol === 'http:' &&
+    url.hostname === 'localhost'
+  ) {
+    return true;
+  }
+
+  return isVercelPreviewHost(url);
 };
 
 const corsOptions = {

@@ -133,17 +133,48 @@ const sanitizeObject = (obj) => {
 };
 
 /**
+ * Sanitize object TẠI CHỖ: trim string, loại bỏ key bắt đầu bằng `$` và các key
+ * nguy hiểm (prototype pollution). Không cấp phát object/array mới nên giảm áp
+ * lực GC trên mỗi request so với việc deep-clone toàn bộ payload.
+ * @param {object|Array} obj
+ * @returns {object|Array} chính object đầu vào (đã được làm sạch)
+ */
+const sanitizeInPlace = (obj) => {
+  if (obj === null || typeof obj !== 'object') return obj;
+
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) {
+      const value = obj[i];
+      if (typeof value === 'string') obj[i] = value.trim();
+      else if (value && typeof value === 'object') sanitizeInPlace(value);
+    }
+    return obj;
+  }
+
+  for (const key of Object.keys(obj)) {
+    if (key.startsWith('$') || DANGEROUS_KEYS.has(key)) {
+      delete obj[key];
+      continue;
+    }
+    const value = obj[key];
+    if (typeof value === 'string') obj[key] = value.trim();
+    else if (value && typeof value === 'object') sanitizeInPlace(value);
+  }
+  return obj;
+};
+
+/**
  * Express middleware to sanitize request body
  */
 const sanitizeMiddleware = (req, res, next) => {
-  if (req.body) {
-    req.body = sanitizeObject(req.body);
+  if (req.body && typeof req.body === 'object') {
+    sanitizeInPlace(req.body);
   }
-  if (req.query) {
-    req.query = sanitizeObject(req.query);
+  if (req.query && typeof req.query === 'object') {
+    sanitizeInPlace(req.query);
   }
-  if (req.params) {
-    req.params = sanitizeObject(req.params);
+  if (req.params && typeof req.params === 'object') {
+    sanitizeInPlace(req.params);
   }
   next();
 };
