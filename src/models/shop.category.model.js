@@ -15,7 +15,6 @@ const shopCategorySchema = new Schema(
   },
 );
 
-shopCategorySchema.index({ shopId: 1 });
-shopCategorySchema.index({ shopId: 1, displayOrder: 1 });
+shopCategorySchema.index({ shopId: 1, displayOrder: 1 }); // covers { shopId } prefix queries
 
 module.exports = model('ShopCategory', shopCategorySchema);

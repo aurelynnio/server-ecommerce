@@ -14,12 +14,10 @@ const voucherUsageSchema = new Schema(
   },
 );
 
-// Query: dem so lan user da dung voucher nay
-voucherUsageSchema.index({ voucherId: 1, userId: 1 });
-// Query: dem tong so luot su dung cua voucher
-voucherUsageSchema.index({ voucherId: 1, createdAt: -1 });
 // Query: lich su voucher cua user
 voucherUsageSchema.index({ userId: 1, createdAt: -1 });
+// Lưu ý: countByVoucherAndUser + các aggregate theo voucherId được phục vụ bởi
+// tiền tố (prefix) của 2 unique sparse index phía dưới, không cần index riêng.
 // Exactly-once guarantee: chống double-spend voucher shop theo orderId
 voucherUsageSchema.index({ voucherId: 1, userId: 1, orderId: 1 }, { unique: true, sparse: true });
 // Exactly-once guarantee: chống double-spend voucher platform theo orderGroupId

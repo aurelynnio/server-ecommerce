@@ -5,7 +5,6 @@ const outboxSchema = new Schema(
     eventType: {
       type: String,
       required: true,
-      index: true,
     },
     routingKey: {
       type: String,
@@ -19,7 +18,6 @@ const outboxSchema = new Schema(
       type: String,
       enum: ['pending', 'processing', 'published', 'failed', 'dead_letter'],
       default: 'pending',
-      index: true,
     },
     retryCount: {
       type: Number,
@@ -36,7 +34,6 @@ const outboxSchema = new Schema(
     nextRetryAt: {
       type: Date,
       default: null,
-      index: true,
     },
     processedAt: {
       type: Date,

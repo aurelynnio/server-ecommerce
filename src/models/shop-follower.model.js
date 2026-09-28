@@ -12,10 +12,9 @@ const shopFollowerSchema = new Schema(
 );
 
 // Compound unique: 1 user chi follow 1 shop 1 lan
+// (countDocuments theo shopId duoc phuc vu boi tien to shopId cua index nay)
 shopFollowerSchema.index({ shopId: 1, userId: 1 }, { unique: true });
 // Query: lay danh sach shops ma user dang follow
 shopFollowerSchema.index({ userId: 1, createdAt: -1 });
-// Query: dem so followers cua shop
-shopFollowerSchema.index({ shopId: 1, createdAt: -1 });
 
 module.exports = model('ShopFollower', shopFollowerSchema);

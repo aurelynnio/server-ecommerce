@@ -15,7 +15,5 @@ const wishlistSchema = new Schema(
 wishlistSchema.index({ userId: 1, productId: 1 }, { unique: true });
 // Query: lay wishlist cua user (sorted by newest)
 wishlistSchema.index({ userId: 1, createdAt: -1 });
-// Query: dem so luot yeu thich cua product
-wishlistSchema.index({ productId: 1 });
 
 module.exports = model('Wishlist', wishlistSchema);
