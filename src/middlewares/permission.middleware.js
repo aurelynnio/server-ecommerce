@@ -52,35 +52,36 @@ const requirePermission = (requiredPermissions, options = { mode: 'all' }) => {
       // từ JWT claims để request không bị 500 hàng loạt. Fallback CHỈ dùng
       // nguyên bộ hiệu lực (role + permissions) chứ KHÔNG bỏ qua kiểm tra.
       let freshPermissions = null;
-      try {
-        freshPermissions = await withTimeout(
-          permissionService.getEffectivePermissionsByUserId(userId),
-          FRESHNESS_TIMEOUT_MS,
-          'permission lookup',
-        );
-      } catch (error) {
-        logger.warn('Permission freshness lookup failed, falling back to JWT claims', {
-          name: error?.name,
-          message: error?.message,
-        });
+      if (userId) {
+        try {
+          freshPermissions = await withTimeout(
+            permissionService.getEffectivePermissionsByUserId(userId),
+            FRESHNESS_TIMEOUT_MS,
+            'permission lookup',
+          );
+        } catch (error) {
+          logger.warn('Permission freshness lookup failed, falling back to JWT claims', {
+            name: error?.name,
+            message: error?.message,
+          });
+        }
       }
 
       const effectivePermissions =
         freshPermissions ?? permissionService.getUserPermissions(req.user);
-      const userWithEffectivePermissions = { ...req.user, permissions: effectivePermissions };
 
-      let hasPermission;
-      if (mode === 'any') {
-        hasPermission = permissionService.hasAnyPermission(
-          userWithEffectivePermissions,
-          permissions,
-        );
-      } else {
-        hasPermission = permissionService.hasAllPermissions(
-          userWithEffectivePermissions,
-          permissions,
-        );
-      }
+      // Evaluate directly against the resolved effectivePermissions list so DB role
+      // demotions and negative permissions (-resource:action) cannot be overridden by
+      // stale req.user.role claims in the JWT.
+      const effectiveSet = new Set(Array.isArray(effectivePermissions) ? effectivePermissions : []);
+      const checkPerm = (required) => {
+        if (effectiveSet.has('*') || effectiveSet.has(required)) return true;
+        const [resource] = String(required).split(':');
+        return effectiveSet.has(`${resource}:manage`);
+      };
+
+      const hasPermission =
+        mode === 'any' ? permissions.some(checkPerm) : permissions.every(checkPerm);
 
       if (!hasPermission) {
         return sendFail(

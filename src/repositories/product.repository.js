@@ -98,8 +98,12 @@ class ProductRepository extends BaseRepository {
       {
         _id: productId,
         status: 'published',
-        'variants._id': variantId,
-        'variants.stock': { $gte: quantity },
+        variants: {
+          $elemMatch: {
+            _id: variantId,
+            stock: { $gte: quantity },
+          },
+        },
       },
       {
         $inc: {
@@ -135,8 +139,12 @@ class ProductRepository extends BaseRepository {
       {
         _id: productId,
         status: 'published',
-        'variants._id': variantId,
-        'variants.stock': { $gte: quantity },
+        variants: {
+          $elemMatch: {
+            _id: variantId,
+            stock: { $gte: quantity },
+          },
+        },
         'flashSale.isActive': true,
         $or: [
           { 'flashSale.stock': { $exists: false } },

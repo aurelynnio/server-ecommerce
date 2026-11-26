@@ -2,6 +2,21 @@ const express = require('express');
 const router = express.Router();
 const flashSaleController = require('../controllers/flash-sale.controller');
 const { verifyAccessToken, requireRole } = require('../middlewares/auth.middleware');
+const {
+  verifyShopOwnership,
+  verifyProductOwnership,
+} = require('../middlewares/ownership.middleware');
+const { isRequestUserAdmin } = require('../utils/requestUser');
+
+const verifyFlashSaleProductOwnership = (req, res, next) => {
+  if (isRequestUserAdmin(req.user)) {
+    return next();
+  }
+  return verifyShopOwnership(req, res, (shopErr) => {
+    if (shopErr) return next(shopErr);
+    return verifyProductOwnership(req, res, next);
+  });
+};
 
 /**
  * @desc    Get active flash sale products
@@ -35,6 +50,7 @@ router.post(
   '/:productId',
   verifyAccessToken,
   requireRole('admin', 'seller'),
+  verifyFlashSaleProductOwnership,
   flashSaleController.addToFlashSale,
 );
 
@@ -46,6 +62,7 @@ router.delete(
   '/:productId',
   verifyAccessToken,
   requireRole('admin', 'seller'),
+  verifyFlashSaleProductOwnership,
   flashSaleController.removeFromFlashSale,
 );
 

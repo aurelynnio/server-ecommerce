@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { connectRabbitMQ, config_rabbitMQ } = require('../configs/rabbitMQ.config');
+const rabbitMQConfig = require('../configs/rabbitMQ.config');
 const Product = require('../repositories/product.repository');
 const {
   embedProduct,
@@ -158,19 +158,22 @@ const handleEmbeddingFailure = async ({ channel, msg, payload, error, config }) 
 };
 
 const consumerEmbeddingQueue = async () => {
-  const { channel, queue } = await connectRabbitMQ('embedding', {
+  const { channel, queue } = await rabbitMQConfig.connectRabbitMQ('embedding', {
     clientName: 'embedding-worker',
   });
-  const config = config_rabbitMQ.queues.embedding;
+  const config = rabbitMQConfig.config_rabbitMQ.queues.embedding;
+  const queueName = typeof queue === 'string' ? queue : queue.name;
 
-  await channel.prefetch(EMBEDDING_WORKER_PREFETCH);
-  logger.info('[EmbeddingWorker] Listening on queue', { queue });
+  await channel.addSetup((rawChannel) => rawChannel.prefetch(EMBEDDING_WORKER_PREFETCH));
+  logger.info('[EmbeddingWorker] Listening on queue', {
+    queue: queueName,
+    prefetch: EMBEDDING_WORKER_PREFETCH,
+  });
 
   await channel.consume(
-    queue,
+    queueName,
     async (msg) => {
       if (!msg) return;
-      const start = Date.now();
       let payload;
 
       try {
@@ -186,7 +189,6 @@ const consumerEmbeddingQueue = async () => {
       try {
         await handleEmbeddingEvent(payload);
         metrics.processed.inc();
-        metrics.duration.observe((Date.now() - start) / 1000);
         channel.ack(msg);
       } catch (err) {
         metrics.failed.inc();

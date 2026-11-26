@@ -1,5 +1,5 @@
 const outboxService = require('./outbox.service');
-const { connectRabbitMQ } = require('../configs/rabbitMQ.config');
+const rabbitMQConfig = require('../configs/rabbitMQ.config');
 const { bumpVersion } = require('../chatbot/responseCache');
 const logger = require('../utils/logger');
 
@@ -22,10 +22,11 @@ class EmbeddingSyncService {
    */
   async publishEmbeddingEvent(payload, routingKey, { strict = false } = {}) {
     try {
-      const { channel, exchange } = await connectRabbitMQ('embedding', {
+      const { channel } = await rabbitMQConfig.connectRabbitMQ('embedding', {
         confirm: strict,
         clientName: 'embedding-publisher',
       });
+      const exchange = rabbitMQConfig.config_rabbitMQ.exchange.name;
       const buffer = Buffer.from(JSON.stringify(payload));
       await channel.publish(exchange, routingKey, buffer, {
         persistent: true,

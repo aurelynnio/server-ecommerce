@@ -38,12 +38,17 @@ class VoucherService {
   }
 
   async _assertVoucherOwnership(voucher, userId, roles, action) {
-    if (roles.includes('admin') || voucher.scope !== 'shop') {
+    const normalizedRoles = Array.isArray(roles) ? roles : roles ? [roles] : [];
+    if (normalizedRoles.includes('admin')) {
       return;
     }
 
+    if (voucher.scope !== 'shop') {
+      throw new ApiError(StatusCodes.FORBIDDEN, `Unauthorized to ${action} platform voucher`);
+    }
+
     const shop = await getOwnedShopOrThrow(userId);
-    if (voucher.shopId.toString() !== shop._id.toString()) {
+    if (!voucher.shopId || voucher.shopId.toString() !== shop._id.toString()) {
       throw new ApiError(StatusCodes.FORBIDDEN, `Unauthorized to ${action} this voucher`);
     }
   }
@@ -116,7 +121,14 @@ class VoucherService {
       await this._ensureVoucherCodeAvailable(updateData.code, voucherId);
     }
 
-    Object.assign(voucher, updateData);
+    const normalizedRoles = Array.isArray(roles) ? roles : roles ? [roles] : [];
+    const safeUpdateData = { ...updateData };
+    if (!normalizedRoles.includes('admin')) {
+      delete safeUpdateData.scope;
+      delete safeUpdateData.shopId;
+    }
+
+    Object.assign(voucher, safeUpdateData);
     await voucher.save();
 
     return voucher;

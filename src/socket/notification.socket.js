@@ -10,8 +10,10 @@ const notificationSocket = (io, socket) => {
   logger.info(`[Socket] User ${userId} connected and joining room.`);
   socket.join(userId);
 
-  socket.on('get_notifications', async ({ page = 1, limit = 10 } = {}) => {
+  socket.on('get_notifications', async (payload) => {
     try {
+      const { page = 1, limit = 10 } =
+        payload && typeof payload === 'object' ? payload : {};
       const result = await notificationService.getListNotification(userId, {
         page,
         limit,

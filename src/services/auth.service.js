@@ -378,11 +378,11 @@ class AuthService {
     }
 
     const tokenHash = this._hashToken(refreshToken);
-    if (user.refreshTokenHash && user.refreshTokenHash !== tokenHash) {
+    if (!user.refreshTokenHash || !user.refreshTokenExpiresAt || user.refreshTokenHash !== tokenHash) {
       throw new ApiError(StatusCodes.UNAUTHORIZED, 'Invalid or revoked refresh token');
     }
 
-    if (user.refreshTokenExpiresAt && user.refreshTokenExpiresAt < new Date()) {
+    if (user.refreshTokenExpiresAt <= new Date()) {
       throw new ApiError(StatusCodes.UNAUTHORIZED, 'Refresh token has expired');
     }
 

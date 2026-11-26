@@ -971,7 +971,7 @@ class OrderService {
     });
 
     if (!txn.committed) {
-      throw txn.result.error;
+      throw txn.error || txn.result?.error || new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Order cancellation failed');
     }
 
     const { order, previousStatus } = txn.result;

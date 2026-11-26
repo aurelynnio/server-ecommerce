@@ -234,8 +234,13 @@ class PaymentService {
     // PERFORMANCE FIX: Use singleton VNPay instance
     const vnpay = getVNPayInstance();
 
-    const isValid = vnpay.verifyReturnUrl(vnpayParams);
-    if (!isValid) {
+    let verification;
+    try {
+      verification = vnpay.verifyReturnUrl(vnpayParams);
+    } catch (_err) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid signature');
+    }
+    if (!verification?.isVerified) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid signature');
     }
 
@@ -329,8 +334,17 @@ class PaymentService {
     // PERFORMANCE FIX: Use singleton VNPay instance
     const vnpay = getVNPayInstance();
 
-    const isValid = vnpay.verifyIpnCall(vnpayParams);
-    if (!isValid) {
+    let verification;
+    try {
+      verification = vnpay.verifyIpnCall(vnpayParams);
+    } catch (error) {
+      const isAmountError = String(error?.message || '').toLowerCase().includes('amount');
+      return {
+        RspCode: isAmountError ? '04' : '97',
+        Message: isAmountError ? 'Invalid amount' : 'Invalid signature',
+      };
+    }
+    if (!verification?.isVerified) {
       return {
         RspCode: '97',
         Message: 'Invalid signature',
