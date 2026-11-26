@@ -1,4 +1,3 @@
-require('dotenv').config();
 const { connectRabbitMQ } = require('../configs/rabbitMQ.config');
 const Shop = require('../repositories/shop.repository');
 const notificationService = require('../services/notification.service');
@@ -443,6 +442,7 @@ const consumerOrderQueue = async () => {
 };
 
 if (require.main === module) {
+  require('dotenv').config();
   connectDB()
     .then(() => consumerOrderQueue())
     .catch((error) => {

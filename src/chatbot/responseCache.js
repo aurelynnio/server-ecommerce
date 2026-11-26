@@ -58,12 +58,12 @@ const hash = (s) =>
   crypto.createHash('sha256').update(String(s).toLowerCase().trim()).digest('hex').slice(0, 32);
 
 const getCacheVersion = async () => {
-  if (!redisClient?.isReady?.()) return '1';
+  if (!redisClient?.isReady?.()) return '0';
   try {
     const version = await redisClient.get(VERSION_KEY);
-    return version || '1';
+    return version || '0';
   } catch {
-    return '1';
+    return '0';
   }
 };
 

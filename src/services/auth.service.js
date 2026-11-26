@@ -256,34 +256,6 @@ class AuthService {
   }
 
   /**
-   * Verify email using code only (no email required)
-   * @param {string} code - Verification code
-   * @returns {Promise<{ user: Object }>} Verified user data
-   * @throws {Error} If code is invalid or email already verified
-   */
-  async verifyEmailByCode(code) {
-    const user = await User.findByVerificationEmailCode(code);
-    if (!user) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid verification code');
-    }
-
-    if (user.isVerifiedEmail) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, 'Email already verified');
-    }
-
-    if (user.expiresCodeVerifiEmail && user.expiresCodeVerifiEmail < new Date()) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, 'Verification code has expired');
-    }
-
-    user.isVerifiedEmail = true;
-    user.codeVerifiEmail = undefined;
-    user.expiresCodeVerifiEmail = undefined;
-    await user.save();
-
-    return { user: this._sanitizeUser(user) };
-  }
-
-  /**
    * Send verification code to email (new or resend)
    * Anti-enumeration: email chưa đăng ký hoặc đã verified vẫn nhận response
    * thành công giống hệt (không gửi code) — attacker không dò được email nào

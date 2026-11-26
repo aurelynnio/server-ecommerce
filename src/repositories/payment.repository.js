@@ -10,12 +10,9 @@ class PaymentRepository extends BaseRepository {
     return this.findOneByFilter({ transactionId });
   }
 
-  findByOrderGroupId(orderGroupId) {
-    return this.findOneByFilter({ orderGroupId });
-  }
-
   findByOrderIdWithOrderAndUser(orderId) {
     return this.findOneByFilter({ orderId })
+      .sort({ createdAt: -1 })
       .populate('orderId')
       .populate('userId', 'email name')
       .lean();
@@ -23,6 +20,7 @@ class PaymentRepository extends BaseRepository {
 
   findByOrderGroupIdWithOrdersAndUser(orderGroupId) {
     return this.findOneByFilter({ orderGroupId })
+      .sort({ createdAt: -1 })
       .populate('orderIds')
       .populate('userId', 'email name')
       .lean();

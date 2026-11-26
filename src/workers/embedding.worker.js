@@ -1,4 +1,3 @@
-require('dotenv').config();
 const rabbitMQConfig = require('../configs/rabbitMQ.config');
 const Product = require('../repositories/product.repository');
 const {
@@ -200,6 +199,7 @@ const consumerEmbeddingQueue = async () => {
 };
 
 if (require.main === module) {
+  require('dotenv').config();
   connectDB()
     .then(() => consumerEmbeddingQueue())
     .catch((err) => {

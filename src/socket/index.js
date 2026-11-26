@@ -1,6 +1,6 @@
 const { Server } = require('socket.io');
 const { createAdapter } = require('@socket.io/redis-adapter');
-const { createClient } = require('redis');
+const redisClient = require('../configs/redis.config');
 const notificationSocket = require('./notification.socket');
 const chatSocket = require('./chat.socket');
 const socketAuthMiddleware = require('../middlewares/socketAuth.middleware');
@@ -15,25 +15,19 @@ let redisSubClient = null;
 
 const shouldUseRedisAdapter = () => {
   if (process.env.SOCKET_REDIS_ADAPTER === 'false') return false;
-  return process.env.SOCKET_REDIS_ADAPTER === 'true' || process.env.NODE_ENV === 'production';
-};
-
-const buildRedisUrl = () => {
-  if (process.env.REDIS_URL) return process.env.REDIS_URL;
-  const host = process.env.REDIS_HOST || 'localhost';
-  const port = process.env.REDIS_PORT || 6379;
-  const password = process.env.REDIS_PASSWORD;
-  const authPart = password ? `:${encodeURIComponent(password)}@` : '';
-  return `redis://${authPart}${host}:${port}`;
+  return (
+    process.env.SOCKET_REDIS_ADAPTER === 'true' ||
+    process.env.ENABLE_CLUSTER === 'true' ||
+    process.env.NODE_ENV === 'production'
+  );
 };
 
 const setupRedisAdapter = async () => {
   if (!shouldUseRedisAdapter()) return;
 
   try {
-    const url = buildRedisUrl();
-    redisPubClient = createClient({ url });
-    redisSubClient = redisPubClient.duplicate();
+    redisPubClient = redisClient.duplicate();
+    redisSubClient = redisClient.duplicate();
 
     redisPubClient.on('error', (err) => {
       logger.error('Socket Redis pub client error:', { error: err.message });
@@ -42,9 +36,8 @@ const setupRedisAdapter = async () => {
       logger.error('Socket Redis sub client error:', { error: err.message });
     });
 
-    await Promise.all([redisPubClient.connect(), redisSubClient.connect()]);
     io.adapter(createAdapter(redisPubClient, redisSubClient));
-    logger.info('Socket.io Redis adapter enabled');
+    logger.info('Socket.io Redis adapter enabled (ioredis)');
   } catch (error) {
     logger.error('Failed to initialize Socket.io Redis adapter:', {
       error: error.message,
@@ -104,11 +97,19 @@ const shutdownSocket = async () => {
       io.close();
     }
     if (redisPubClient) {
-      await redisPubClient.quit();
+      if (redisPubClient.status === 'ready') {
+        await redisPubClient.quit();
+      } else {
+        redisPubClient.disconnect();
+      }
       redisPubClient = null;
     }
     if (redisSubClient) {
-      await redisSubClient.quit();
+      if (redisSubClient.status === 'ready') {
+        await redisSubClient.quit();
+      } else {
+        redisSubClient.disconnect();
+      }
       redisSubClient = null;
     }
   } catch (error) {

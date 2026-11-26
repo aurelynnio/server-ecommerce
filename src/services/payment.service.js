@@ -481,16 +481,6 @@ class PaymentService {
 
     return payment;
   }
-
-  /**
-   * Get payment by transaction ID
-   * @param {string} transactionId - Transaction ID
-   * @returns {Object} Payment record
-   */
-  async getPaymentByTransactionId(transactionId) {
-    const payment = await Payment.findByTransactionIdWithOrderAndUser(transactionId);
-    return payment;
-  }
 }
 
 module.exports = new PaymentService();

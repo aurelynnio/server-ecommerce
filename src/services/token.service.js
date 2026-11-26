@@ -57,25 +57,6 @@ class TokenService {
   }
 
   /**
-   * Generate an access token with permissions included
-   * @param {Object} user - User document or user object
-   * @returns {string} Signed JWT access token with permissions
-   */
-  generateAccessTokenWithPermissions(user) {
-    const permissions = this.getPermissionsForUser(user);
-
-    const payload = {
-      userId: user._id || user.userId,
-      username: user.username,
-      email: user.email,
-      role: user.roles || user.role,
-      permissions: permissions,
-    };
-
-    return this.generateAccessToken(payload);
-  }
-
-  /**
    * Generate both access and refresh tokens with permissions
    * @param {Object} user - User document
    * @returns {Object} Object containing accessToken and refreshToken

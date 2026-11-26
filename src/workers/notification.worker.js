@@ -1,4 +1,3 @@
-require('dotenv').config();
 const { connectRabbitMQ } = require('../configs/rabbitMQ.config');
 const notificationService = require('../services/notification.service');
 const logger = require('../utils/logger');
@@ -125,6 +124,7 @@ const consumerNotificationQueue = async () => {
 };
 
 if (require.main === module) {
+  require('dotenv').config();
   connectDB()
     .then(consumerNotificationQueue)
     .catch((error) => {

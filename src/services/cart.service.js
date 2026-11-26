@@ -456,17 +456,6 @@ class CartService {
 
     return cart.items.reduce((count, item) => count + item.quantity, 0);
   }
-
-  /**
-   * Find a cart item by a list of item IDs
-   * @param {Object} cart - Cart document
-   * @param {string[]} listIds - List of cart item IDs
-   * @returns {Object|null} Matching cart item or null
-   */
-  getCartItemWithListIds(cart, listIds) {
-    if (!cart || !cart.items) return null;
-    return cart.items.find((item) => listIds.includes(item._id.toString()));
-  }
 }
 
 module.exports = new CartService();

@@ -5,7 +5,7 @@ const logger = require('../utils/logger');
 const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../utils/ApiError');
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
-const { connectRabbitMQ, publishToQueue, config_rabbitMQ } = require('../configs/rabbitMQ.config');
+const { connectRabbitMQ, config_rabbitMQ } = require('../configs/rabbitMQ.config');
 const { publishToRetryQueue, publishToFailedQueue } = require('../utils/rabbitmq.utils');
 const { buildNotificationUpdatePayload } = require('../utils/notification-update.util');
 
@@ -16,10 +16,6 @@ const { buildNotificationUpdatePayload } = require('../utils/notification-update
 class NotificationService {
   async initRabbitMQ(clientName = 'publisher') {
     return connectRabbitMQ('notification', { confirm: true, clientName });
-  }
-
-  async publishToQueue(opts) {
-    return publishToQueue({ serviceName: 'notification', ...opts });
   }
 
   async publishNotification(payload, routingKey) {

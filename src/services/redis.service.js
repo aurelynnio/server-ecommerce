@@ -92,10 +92,6 @@ class RedisService {
     }
   }
 
-  async deleteKey(key) {
-    return this.del(key);
-  }
-
   /**
    * Initialize Flash Sale stock in Redis (Fail-Fast Ingestion Shield)
    * @param {string} productId
