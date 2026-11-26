@@ -198,9 +198,10 @@ class NotificationService {
 
     try {
       const io = getIO();
-      io.to(userId).emit('new_notification', notification);
+      const roomId = String(userId);
+      io.to(roomId).emit('new_notification', notification);
       const unreadCount = await this.countUnread(userId);
-      io.to(userId).emit('unread_count', unreadCount);
+      io.to(roomId).emit('unread_count', unreadCount);
     } catch (error) {
       logger.error('Socket error:', { error: error.message });
     }
@@ -253,7 +254,7 @@ class NotificationService {
     try {
       const { getIO } = require('../socket/index');
       const io = getIO();
-      io.to(userId).emit('unread_count', 0);
+      io.to(String(userId)).emit('unread_count', 0);
     } catch (_error) {}
 
     return result;
@@ -269,7 +270,7 @@ class NotificationService {
     try {
       const { getIO } = require('../socket/index');
       const io = getIO();
-      io.to(userId).emit('unread_count', 0);
+      io.to(String(userId)).emit('unread_count', 0);
     } catch (_error) {}
 
     return result;
@@ -318,7 +319,7 @@ class NotificationService {
         const { getIO } = require('../socket/index');
         const io = getIO();
         const count = await this.countUnread(userId);
-        io.to(userId).emit('unread_count', count);
+        io.to(String(userId)).emit('unread_count', count);
       } catch (_error) {}
     }
 

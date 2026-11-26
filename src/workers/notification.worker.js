@@ -28,9 +28,9 @@ const startNotificationConsumer = async () => {
 
         // Deduplication guard for outbox / at-least-once message delivery
         const dedupId = payload.eventId || payload._id || payload.notificationId;
-        if (dedupId) {
+        const dedupKey = dedupId ? `notification:processed:${dedupId}` : null;
+        if (dedupKey) {
           try {
-            const dedupKey = `notification:processed:${dedupId}`;
             const isProcessed = await redisService.get(dedupKey);
             if (isProcessed) {
               logger.info('Skipping duplicate notification message (idempotency guard)', {
@@ -40,11 +40,15 @@ const startNotificationConsumer = async () => {
               channel.ack(data);
               return;
             }
-            await redisService.set(dedupKey, { processedAt: new Date().toISOString() }, 86400);
           } catch (_redisErr) {}
         }
 
         await notificationService.createNotification(payload);
+        if (dedupKey) {
+          await redisService
+            .set(dedupKey, { processedAt: new Date().toISOString() }, 86400)
+            .catch(() => {});
+        }
         metrics.processed.inc();
         channel.ack(data);
       } catch (error) {

@@ -1,4 +1,5 @@
 const { StatusCodes } = require('http-status-codes');
+const redisClient = require('../configs/redis.config');
 const redisService = require('../services/redis.service');
 const logger = require('../utils/logger');
 const { getRequestUserId } = require('../utils/requestUser');
@@ -19,7 +20,8 @@ const idempotencyMiddleware = (_options = {}) => {
     }
 
     const userId = getRequestUserId(req.user) || 'anonymous';
-    const redisKey = `idempotency:${userId}:${idempotencyKey}`;
+    const routeScope = `${req.baseUrl || ''}${req.path || ''}`;
+    const redisKey = `idempotency:${userId}:${routeScope}:${idempotencyKey}`;
 
     try {
       const cached = await redisService.get(redisKey);
@@ -60,6 +62,10 @@ const idempotencyMiddleware = (_options = {}) => {
         if (concurrent && concurrent.status === 'completed') {
           res.setHeader('X-Idempotent-Replayed', 'true');
           return res.status(concurrent.statusCode || StatusCodes.OK).json(concurrent.body);
+        }
+        if (!concurrent && typeof redisClient.isReady === 'function' && !redisClient.isReady()) {
+          logger.warn('Idempotency lock could not be acquired because Redis is not ready; bypassing');
+          return next();
         }
         return res.status(StatusCodes.CONFLICT).json({
           status: 'error',

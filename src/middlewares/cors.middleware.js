@@ -4,12 +4,12 @@ const logger = require('../utils/logger');
 const defaultProductionOrigins = [
   'https://nantianshop.tech',
   'https://www.nantianshop.tech',
-  'http://nantianshop.tech',
-  'http://www.nantianshop.tech',
 ];
 
 const defaultDevOrigins = [
   ...defaultProductionOrigins,
+  'http://nantianshop.tech',
+  'http://www.nantianshop.tech',
   'http://localhost:3000',
   'http://localhost:3001',
   'https://etiso.me',
@@ -21,6 +21,9 @@ const normalizeOrigin = (origin) => {
 };
 
 const isVercelPreviewHost = (url) => {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_VERCEL_PREVIEWS !== 'true') {
+    return false;
+  }
   return url.protocol === 'https:' && (url.hostname.endsWith('.vercel.app') || url.hostname === 'vercel.app');
 };
 

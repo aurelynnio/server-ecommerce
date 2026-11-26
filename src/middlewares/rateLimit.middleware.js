@@ -14,6 +14,7 @@ const createRedisRateLimiter = ({ windowMs, limit, message, keyPrefix = 'rl', ke
     limit,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
+    passOnStoreError: true,
     validate: { keyGeneratorIpFallback: false },
     message: {
       status: 'fail',

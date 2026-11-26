@@ -706,14 +706,7 @@ class OrderService {
     return finalizeOrderCreation(
       { committed, result, error, orderGroupId },
       result?.message || 'Orders created successfully',
-      async (orders) => {
-        try {
-          await this.publishOrderCreatedEvents(orders);
-        } catch (pubErr) {
-          logger.warn('Failed to publish order created events directly (outbox will retry)', {
-            error: pubErr.message,
-          });
-        }
+      async () => {
         outboxService.dispatchPendingEvents().catch((dispatchErr) => {
           logger.warn('Background outbox dispatch error (non-fatal)', {
             error: dispatchErr.message,
@@ -831,7 +824,7 @@ class OrderService {
       enqueuedAt: new Date().toISOString(),
     };
 
-    await this.publishOrder(commandPayload, ORDER_EVENT_TYPES.COMMAND_CREATE);
+    await this.publishOrder(commandPayload, ORDER_EVENT_TYPES.COMMAND_CREATE, { strict: true });
 
     logger.info('Order creation enqueued to RabbitMQ buffer', {
       trackingId,

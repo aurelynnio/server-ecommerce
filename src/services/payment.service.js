@@ -82,12 +82,21 @@ class PaymentService {
         }
       }
 
-      const allPaid = orders.every((o) => o.paymentStatus === 'paid');
-      if (allPaid) {
-        throw new ApiError(StatusCodes.CONFLICT, 'Order has already been paid');
+      const payableOrders = orders.filter(
+        (o) => o.status !== 'cancelled' && o.paymentStatus !== 'paid',
+      );
+      if (payableOrders.length === 0) {
+        const allPaid = orders.every((o) => o.paymentStatus === 'paid');
+        throw new ApiError(
+          StatusCodes.CONFLICT,
+          allPaid ? 'Order has already been paid' : 'No payable orders in this group',
+        );
       }
 
-      const totalAmount = orders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+      const totalAmount = payableOrders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+      if (totalAmount <= 0) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid payment amount');
+      }
       const transactionId = `grp_${orderGroupId}_${Date.now()}`;
 
       const paymentUrl = vnpay.buildPaymentUrl({
@@ -133,8 +142,16 @@ class PaymentService {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Order payment method is not VNPay');
     }
 
+    if (order.status === 'cancelled') {
+      throw new ApiError(StatusCodes.CONFLICT, 'Cannot pay for a cancelled order');
+    }
+
     if (order.paymentStatus === 'paid') {
       throw new ApiError(StatusCodes.CONFLICT, 'Order has already been paid');
+    }
+
+    if (!Number.isFinite(Number(order.totalAmount)) || Number(order.totalAmount) <= 0) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid payment amount');
     }
 
     const transactionId = `${orderId}_${Date.now()}`;
@@ -301,7 +318,7 @@ class PaymentService {
       try {
         const io = getIO();
         finalOrders.forEach((finalOrder) => {
-          io.emit('new_order', {
+          io.to('admin').emit('new_order', {
             orderId: finalOrder._id,
             totalAmount: finalOrder.totalAmount,
             createdAt: finalOrder.createdAt,
@@ -370,7 +387,7 @@ class PaymentService {
       };
     }
 
-    if (payment.status === 'completed') {
+    if (payment.status !== 'pending') {
       return {
         RspCode: '02',
         Message: 'Order already confirmed',

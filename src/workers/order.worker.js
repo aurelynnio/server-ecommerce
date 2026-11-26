@@ -238,8 +238,13 @@ const handleOrderEvent = async (payload) => {
     return { success: false, unsupported: true };
   }
 
-  // Publish tất cả notifications hợp lệ
-  const validNotifications = notifications.filter((item) => item?.userId);
+  // Publish tất cả notifications hợp lệ (gắn eventId ổn định để worker dedup hoạt động)
+  const validNotifications = notifications
+    .filter((item) => item?.userId)
+    .map((item) => ({
+      eventId: `order:${eventName}:${orderId || 'unknown'}:${item.userId}:${status || 'created'}`,
+      ...item,
+    }));
   if (validNotifications.length > 0) {
     const publishResults = await Promise.allSettled(
       validNotifications.map((notification) =>

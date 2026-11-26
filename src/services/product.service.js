@@ -382,13 +382,15 @@ class ProductService {
     await redisService.delByPattern('products:*');
     clearL1CatalogCache();
 
-    const io = getIO();
-    if (io) {
-      io.emit('new_product', {
+    try {
+      const io = getIO();
+      io.to('admin').emit('new_product', {
         name: product.name,
         _id: product._id,
         shop: shopId,
       });
+    } catch (_error) {
+      logger.warn('[ProductService] Socket not initialized, skipping emit');
     }
 
     // Schedule reliable embedding sync via Outbox/RabbitMQ worker

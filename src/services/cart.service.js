@@ -124,7 +124,8 @@ class CartService {
    * @throws {Error} If product/variant not found or out of stock
    */
   async addToCart(userId, itemData) {
-    const { productId, modelId, size, quantity } = itemData;
+    const { productId, modelId, variantId, size, quantity } = itemData;
+    const requestedModelId = modelId || variantId;
 
     if (!quantity || quantity < 1) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Quantity must be at least 1');
@@ -151,23 +152,26 @@ class CartService {
 
     let price = product.price?.currentPrice || 0;
     let selectedVariantId = null;
+    let availableStock = Number(product.stock ?? 0);
 
     if (product.variants && product.variants.length > 0) {
-      if (modelId) {
-        const variant = product.variants.find((v) => v._id.toString() === modelId);
+      if (requestedModelId) {
+        const variant = product.variants.find((v) => v._id.toString() === String(requestedModelId));
         if (!variant) {
           throw new ApiError(StatusCodes.NOT_FOUND, 'Variant not found');
         }
 
-        if (variant.stock < quantity) {
-          throw new ApiError(StatusCodes.CONFLICT, `Only ${variant.stock} item(s) available`);
+        availableStock = Number(variant.stock ?? 0);
+        if (availableStock < quantity) {
+          throw new ApiError(StatusCodes.CONFLICT, `Only ${availableStock} item(s) available`);
         }
         price = variant.price;
-        selectedVariantId = modelId;
+        selectedVariantId = String(requestedModelId);
       } else {
         // Default to first variant if not specified
         const variant = product.variants[0];
-        if (variant.stock < quantity) {
+        availableStock = Number(variant.stock ?? 0);
+        if (availableStock < quantity) {
           throw new ApiError(StatusCodes.CONFLICT, 'Out of stock');
         }
         price = variant.price;
@@ -176,25 +180,32 @@ class CartService {
     }
     // Handle legacy tier variations
     else if (product.models && product.models.length > 0) {
-      if (modelId) {
-        const model = product.models.find((m) => m._id.toString() === modelId);
+      if (requestedModelId) {
+        const model = product.models.find((m) => m._id.toString() === String(requestedModelId));
         if (!model) {
           throw new ApiError(StatusCodes.NOT_FOUND, 'Model variation not found');
         }
 
-        if (model.stock < quantity) {
-          throw new ApiError(StatusCodes.CONFLICT, `Only ${model.stock} item(s) available`);
+        availableStock = Number(model.stock ?? 0);
+        if (availableStock < quantity) {
+          throw new ApiError(StatusCodes.CONFLICT, `Only ${availableStock} item(s) available`);
         }
         price = model.price;
-        selectedVariantId = modelId;
+        selectedVariantId = String(requestedModelId);
       } else {
         const model = product.models[0];
-        if (model.stock < quantity) {
+        availableStock = Number(model.stock ?? 0);
+        if (availableStock < quantity) {
           throw new ApiError(StatusCodes.CONFLICT, 'Out of stock');
         }
         price = model.price;
         selectedVariantId = model._id.toString();
       }
+    } else if (availableStock < quantity) {
+      throw new ApiError(
+        StatusCodes.CONFLICT,
+        availableStock > 0 ? `Only ${availableStock} item(s) available` : 'Out of stock',
+      );
     }
 
     // Check if flash sale applies (overrides standard price)
@@ -221,7 +232,11 @@ class CartService {
     );
 
     if (existingItemIndex > -1) {
-      cart.items[existingItemIndex].quantity += quantity;
+      const nextQuantity = cart.items[existingItemIndex].quantity + quantity;
+      if (nextQuantity > availableStock) {
+        throw new ApiError(StatusCodes.CONFLICT, `Only ${availableStock} item(s) available`);
+      }
+      cart.items[existingItemIndex].quantity = nextQuantity;
       cart.items[existingItemIndex].price = {
         currentPrice: price,
         currency: 'VND',

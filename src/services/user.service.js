@@ -314,6 +314,8 @@ class UserService {
 
     const hashedPassword = await hashPassword(newPassword);
     user.password = hashedPassword;
+    user.refreshTokenHash = null;
+    user.refreshTokenExpiresAt = null;
     await user.save();
 
     return { message: 'Password changed successfully' };
@@ -329,7 +331,10 @@ class UserService {
   async deleteOwnAccount(userId, password) {
     const user = this._ensureUserFound(await userModel.findById(userId));
 
-    if (user.provider === 'local' && user.password && password) {
+    if (user.provider !== 'google' && user.password) {
+      if (!password) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Password is required to delete account');
+      }
       const isMatch = await comparePassword(password, user.password);
       if (!isMatch) {
         throw new ApiError(StatusCodes.BAD_REQUEST, 'Password is incorrect');

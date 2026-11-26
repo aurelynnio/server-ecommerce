@@ -439,6 +439,7 @@ describe('Unified Order Processing & Event-Driven RabbitMQ Notification Flow', (
           isBuyNow: true,
         }),
         ORDER_EVENT_TYPES.COMMAND_CREATE,
+        { strict: true },
       );
     });
 

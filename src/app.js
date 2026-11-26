@@ -22,9 +22,11 @@ if (trustProxyEnv) {
   const parsed =
     trustProxyEnv === 'true'
       ? 1
-      : Number.isNaN(Number(trustProxyEnv))
-        ? trustProxyEnv
-        : Number(trustProxyEnv);
+      : trustProxyEnv === 'false'
+        ? false
+        : Number.isNaN(Number(trustProxyEnv))
+          ? trustProxyEnv
+          : Number(trustProxyEnv);
   app.set('trust proxy', parsed);
 }
 

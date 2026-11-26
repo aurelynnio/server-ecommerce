@@ -91,9 +91,10 @@ class TokenService {
       permissions: permissions,
     };
 
+    const crypto = require('crypto');
     return {
       accessToken: this.generateAccessToken(payload),
-      refreshToken: this.generateRefreshToken({ userId: user._id }),
+      refreshToken: this.generateRefreshToken({ userId: user._id, jti: crypto.randomUUID() }),
     };
   }
 }

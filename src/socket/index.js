@@ -73,6 +73,11 @@ const initSocket = (httpServer) => {
   io.on('connection', (socket) => {
     logger.info(`User connected: ${socket.id} (User ID: ${socket.user.id})`);
 
+    const role = socket.user?.role || socket.user?.roles;
+    if (role === 'admin' || (Array.isArray(role) && role.includes('admin'))) {
+      socket.join('admin');
+    }
+
     // Initialize handlers for this specific socket
     notificationSocket(io, socket);
     chatSocket(io, socket);

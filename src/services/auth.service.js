@@ -174,12 +174,10 @@ class AuthService {
 
     try {
       const io = getIO();
-      if (io) {
-        io.emit('new_user', {
-          username: newUser.username,
-          _id: newUser._id,
-        });
-      }
+      io.to('admin').emit('new_user', {
+        username: newUser.username,
+        _id: newUser._id,
+      });
     } catch (_error) {
       logger.warn('[AuthService] Socket not initialized, skipping emit');
     }
@@ -462,6 +460,8 @@ class AuthService {
     const hashedPassword = await hashPassword(newPassword);
 
     user.password = hashedPassword;
+    user.refreshTokenHash = null;
+    user.refreshTokenExpiresAt = null;
     await user.save();
 
     await redisService.del(cacheKey);
@@ -490,6 +490,8 @@ class AuthService {
     const hashedPassword = await hashPassword(newPassword);
 
     user.password = hashedPassword;
+    user.refreshTokenHash = null;
+    user.refreshTokenExpiresAt = null;
     await user.save();
 
     return { userId: user._id };
@@ -540,6 +542,10 @@ class AuthService {
     await this.ensureValidOtp(cacheKey, code);
 
     user.isTwoFactorEnabled = action === 'enable';
+    if (action === 'disable') {
+      user.refreshTokenHash = null;
+      user.refreshTokenExpiresAt = null;
+    }
     await user.save();
     await redisService.del(cacheKey);
 
