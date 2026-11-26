@@ -46,6 +46,13 @@ const outboxSchema = new Schema(
   },
 );
 
-outboxSchema.index({ status: 1, nextRetryAt: 1, createdAt: 1 });
+outboxSchema.index(
+  { createdAt: 1, nextRetryAt: 1 },
+  { partialFilterExpression: { status: { $in: ['pending', 'failed'] } } },
+);
+outboxSchema.index(
+  { processedAt: 1 },
+  { expireAfterSeconds: 7 * 86400, partialFilterExpression: { status: 'published' } },
+);
 
 module.exports = model('Outbox', outboxSchema);

@@ -21,7 +21,7 @@ const notificationSchema = new Schema(
 );
 
 // Indexes
-notificationSchema.index({ userId: 1, isRead: 1 });
+notificationSchema.index({ userId: 1, isRead: 1, type: 1 });
 notificationSchema.index({ userId: 1, createdAt: -1 });
 
 module.exports = model('Notification', notificationSchema);

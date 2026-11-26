@@ -192,33 +192,30 @@ class VoucherService {
   async getAvailableVouchers(userId, shopId = null) {
     const now = new Date();
 
-    const filterByUserUsage = async (vouchers) => {
-      if (vouchers.length === 0) return vouchers;
-      const voucherIds = vouchers.map((v) => v._id);
-      const usages = await VoucherUsage.aggregateUsageByVoucherIdsAndUser(
-        voucherIds,
-        new mongoose.Types.ObjectId(userId),
-      );
-      const usageMap = new Map(usages.map((u) => [u._id.toString(), u.count]));
-      return vouchers.filter((voucher) => {
-        if (voucher.usageLimitPerUser === 0) return true;
-        const usedCount = usageMap.get(voucher._id.toString()) || 0;
-        return usedCount < voucher.usageLimitPerUser;
-      });
-    };
-
     // Các truy vấn độc lập chạy song song thay vì tuần tự.
     const [platformVouchers, shopVouchers] = await Promise.all([
       Voucher.findAvailablePlatform(now),
       shopId ? Voucher.findAvailableShop(shopId, now) : Promise.resolve([]),
     ]);
 
-    const [platform, shop] = await Promise.all([
-      filterByUserUsage(platformVouchers),
-      filterByUserUsage(shopVouchers),
-    ]);
+    const combinedVouchers = [...platformVouchers, ...shopVouchers];
+    if (combinedVouchers.length === 0) {
+      return { platform: [], shop: [] };
+    }
 
-    return { platform, shop };
+    const usages = await VoucherUsage.aggregateUsageByVoucherIdsAndUser(
+      combinedVouchers.map((v) => v._id),
+      new mongoose.Types.ObjectId(userId),
+    );
+    const usageMap = new Map(usages.map((u) => [u._id.toString(), u.count]));
+    const isEligibleForUser = (voucher) =>
+      voucher.usageLimitPerUser === 0 ||
+      (usageMap.get(voucher._id.toString()) || 0) < voucher.usageLimitPerUser;
+
+    return {
+      platform: platformVouchers.filter(isEligibleForUser),
+      shop: shopVouchers.filter(isEligibleForUser),
+    };
   }
 
   /**
@@ -332,32 +329,20 @@ class VoucherService {
   async getVoucherStatistics() {
     const now = new Date();
 
-    const [
-      totalVouchers,
-      activeVouchers,
-      expiredVouchers,
-      platformVouchers,
-      shopVouchers,
-      mostUsedVouchers,
-      discountStats,
-    ] = await Promise.all([
-      Voucher.countAll(),
-      Voucher.countActive(),
-      Voucher.countExpired(now),
-      Voucher.countPlatformVouchers(),
-      Voucher.countShopVouchers(),
+    const [overviewRaw, mostUsedVouchers] = await Promise.all([
+      Voucher.aggregateVoucherOverview(now),
       Voucher.findMostUsed(5),
-      Voucher.aggregateTotalUsage(),
     ]);
 
+    const overview = overviewRaw?.[0] || {};
     return {
-      totalVouchers,
-      activeVouchers,
-      expiredVouchers,
-      platformVouchers,
-      shopVouchers,
+      totalVouchers: overview.totalVouchers || 0,
+      activeVouchers: overview.activeVouchers || 0,
+      expiredVouchers: overview.expiredVouchers || 0,
+      platformVouchers: overview.platformVouchers || 0,
+      shopVouchers: overview.shopVouchers || 0,
       mostUsedVouchers,
-      totalUsage: discountStats[0]?.totalUsage || 0,
+      totalUsage: overview.totalUsage || 0,
     };
   }
 

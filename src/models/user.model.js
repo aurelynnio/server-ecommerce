@@ -128,8 +128,8 @@ const userSchema = new Schema(
 );
 
 // Indexes
-userSchema.index({ roles: 1 });
-userSchema.index({ isVerifiedEmail: 1 });
+userSchema.index({ roles: 1, isVerifiedEmail: 1, createdAt: -1 });
+userSchema.index({ isVerifiedEmail: 1, createdAt: -1 });
 userSchema.index({ createdAt: -1 });
 
 module.exports = model('User', userSchema);

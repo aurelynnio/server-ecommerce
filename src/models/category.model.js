@@ -17,7 +17,7 @@ const categorySchema = new Schema(
 
 // Indexes
 categorySchema.index({ name: 1, parentCategory: 1 }, { unique: true }); // Same name allowed under different parents
-categorySchema.index({ parentCategory: 1 });
+categorySchema.index({ parentCategory: 1, isActive: 1, name: 1 });
 categorySchema.index({ isActive: 1 });
 
 module.exports = model('Category', categorySchema);

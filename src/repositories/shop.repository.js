@@ -16,7 +16,7 @@ class ShopRepository extends BaseRepository {
   }
 
   findByName(name) {
-    return this.findOneByFilter({ name });
+    return this.findOneByFilter({ name }).select('_id').lean();
   }
 
   findBySlugActive(slug) {

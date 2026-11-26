@@ -1,5 +1,9 @@
+const { Types } = require('mongoose');
 const Notification = require('../models/notification.model');
 const BaseRepository = require('./base.repository');
+
+const toObjectId = (id) =>
+  typeof id === 'string' && Types.ObjectId.isValid(id) ? new Types.ObjectId(id) : id;
 
 class NotificationRepository extends BaseRepository {
   constructor() {
@@ -48,7 +52,7 @@ class NotificationRepository extends BaseRepository {
 
   aggregateSummaryByUserId(userId) {
     return this.aggregateByPipeline([
-      { $match: { userId } },
+      { $match: { userId: toObjectId(userId) } },
       {
         $group: {
           _id: null,

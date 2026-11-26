@@ -18,6 +18,7 @@ class OutboxRepository extends BaseRepository {
       routingKey,
       payload,
       status: 'pending',
+      nextRetryAt: new Date(0),
     });
 
     if (options.session) {
@@ -42,6 +43,7 @@ class OutboxRepository extends BaseRepository {
       routingKey: e.routingKey,
       payload: e.payload,
       status: 'pending',
+      nextRetryAt: new Date(0),
     }));
 
     return this.insertMany(docs, options);
@@ -56,7 +58,7 @@ class OutboxRepository extends BaseRepository {
     const now = new Date();
     return this.Model.find({
       status: { $in: ['pending', 'failed'] },
-      $or: [{ nextRetryAt: null }, { nextRetryAt: { $lte: now } }],
+      nextRetryAt: { $lte: now },
     })
       .sort({ createdAt: 1 })
       .limit(limit)
@@ -69,8 +71,8 @@ class OutboxRepository extends BaseRepository {
    * @returns {Promise<Object>}
    */
   markPublished(id) {
-    return this.updateById(
-      id,
+    return this.updateOneByFilter(
+      { _id: id },
       {
         $set: {
           status: 'published',
@@ -78,7 +80,6 @@ class OutboxRepository extends BaseRepository {
           lastError: null,
         },
       },
-      { new: true },
     );
   }
 
@@ -92,8 +93,8 @@ class OutboxRepository extends BaseRepository {
    * @returns {Promise<Object>}
    */
   markFailed(id, errorMessage, retryCount, nextRetryAt, isDeadLetter = false) {
-    return this.updateById(
-      id,
+    return this.updateOneByFilter(
+      { _id: id },
       {
         $set: {
           status: isDeadLetter ? 'dead_letter' : 'failed',
@@ -102,7 +103,6 @@ class OutboxRepository extends BaseRepository {
           nextRetryAt,
         },
       },
-      { new: true },
     );
   }
 }

@@ -405,16 +405,16 @@ class UserService {
       role,
       isVerifiedEmail,
     };
-    const total = await userModel.countWithFilters(filterArgs);
-
-    const paginationParams = getPaginationParams(page, limit, total);
-
-    const users = await userModel.findWithFilters(filterArgs, paginationParams);
     const statisticsResult = await userModel.aggregateStatisticsWithFilters(filterArgs);
     const statisticsFacet = statisticsResult?.[0] || {};
+    const total = statisticsFacet.totalUsers?.[0]?.count || 0;
+
+    const paginationParams = getPaginationParams(page, limit, total);
+    const users =
+      total > 0 ? await userModel.findWithFilters(filterArgs, paginationParams) : [];
 
     const statistics = {
-      totalUsers: statisticsFacet.totalUsers?.[0]?.count || 0,
+      totalUsers: total,
       verifiedUsers: statisticsFacet.verifiedUsers?.[0]?.count || 0,
       usersWithAddress: statisticsFacet.usersWithAddress?.[0]?.count || 0,
       recentUsers: statisticsFacet.recentUsers?.[0]?.count || 0,

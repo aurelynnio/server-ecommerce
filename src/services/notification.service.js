@@ -215,13 +215,7 @@ class NotificationService {
    * @throws {Error} If userId is missing
    */
   async getListNotification(userId, { page = 1, limit = 10 } = {}) {
-    const total = await Notification.countByUserId(userId);
-    const paginationParams = getPaginationParams(page, limit, total || 0);
-
-    const [notifications, summaryResult] = await Promise.all([
-      Notification.findByUserIdWithPagination(userId, paginationParams),
-      Notification.aggregateSummaryByUserId(userId),
-    ]);
+    const summaryResult = await Notification.aggregateSummaryByUserId(userId);
     const summaryFacet = summaryResult?.[0] || {};
     const summary = {
       total: summaryFacet.total?.[0]?.count || 0,
@@ -229,6 +223,12 @@ class NotificationService {
       system: summaryFacet.system?.[0]?.count || 0,
       promotion: summaryFacet.promotion?.[0]?.count || 0,
     };
+
+    const paginationParams = getPaginationParams(page, limit, summary.total);
+    const notifications =
+      summary.total > 0
+        ? await Notification.findByUserIdWithPagination(userId, paginationParams)
+        : [];
 
     return {
       ...buildPaginationResponse(notifications, paginationParams),

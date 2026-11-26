@@ -48,7 +48,7 @@ const productSchema = new Schema(
 
     // Metadata
     brand: { type: String, maxlength: 100 },
-    tags: { type: [String], default: [], index: true },
+    tags: { type: [String], default: [] },
 
     // Sizes - Product level (applies to all variants)
     // Example: ["S", "M", "L", "XL"] or ["36", "37", "38", "39", "40"]
@@ -149,24 +149,27 @@ productSchema.virtual('effectivePrice').get(function () {
 });
 
 // ==================== INDEXES ====================
-// Compound indexes follow the ESR (Equality → Sort → Range) principle.
+// Compound indexes follow the ESR (Equality → Sort → Range) principle (total <= 20).
 // Reference: .agents/skills/mongodb-query-optimizer/references/core-indexing-principles.md
-productSchema.index({ shop: 1, shopCategory: 1, status: 1 }); // Shop + shopCategory filtering
-productSchema.index({ shopCategory: 1, status: 1 }); // shopCategory filtering without shop (catalog search)
+productSchema.index({ shop: 1, shopCategory: 1, status: 1, createdAt: -1 }); // Shop + shopCategory filtering + sort
+productSchema.index({ shopCategory: 1, status: 1, createdAt: -1 }); // shopCategory filtering without shop
 productSchema.index({ status: 1, isFeatured: -1, createdAt: -1 }); // findFeatured
 productSchema.index({ status: 1, isNewArrival: -1, createdAt: -1 }); // findNewArrival / findHomepageNewArrivals
 productSchema.index({ status: 1, ratingAverage: -1, reviewCount: -1 }); // findTopRatedProducts / findHomepageTopRated
-productSchema.index({ status: 1, soldCount: -1 }); // findTopSellingProducts / findTrendingProducts
-productSchema.index({ status: 1, 'price.currentPrice': 1 }); // Price range filtering (asc)
-productSchema.index({ status: 1, 'price.currentPrice': -1 }); // Price range sort (desc)
-productSchema.index({ 'flashSale.isActive': 1, 'flashSale.endTime': 1 }); // Active flash sale lookup
+productSchema.index({ status: 1, soldCount: -1, ratingAverage: -1 }); // findTopSellingProducts / findTrendingProducts
+productSchema.index({ status: 1, 'price.currentPrice': 1 }); // Price range filtering (asc & reverse desc)
+productSchema.index(
+  { status: 1, 'flashSale.soldCount': -1, 'flashSale.endTime': 1, 'flashSale.startTime': 1 },
+  { partialFilterExpression: { 'flashSale.isActive': true } },
+); // Active flash sale lookup & sort
 productSchema.index({ status: 1, createdAt: -1 }); // Default catalog query (newest)
 productSchema.index({ category: 1, status: 1, createdAt: -1 }); // Category catalog query (newest)
-productSchema.index({ category: 1, status: 1, 'price.currentPrice': 1 }); // Category + price (asc)
-productSchema.index({ category: 1, status: 1, 'price.currentPrice': -1 }); // Category + price (desc)
-productSchema.index({ category: 1, status: 1, soldCount: -1 }); // Category + best sellers
+productSchema.index({ category: 1, status: 1, 'price.currentPrice': 1 }); // Category + price (asc & reverse desc)
+productSchema.index({ category: 1, status: 1, soldCount: -1, ratingAverage: -1 }); // Category + best sellers
 productSchema.index({ shop: 1, status: 1, createdAt: -1 }); // Shop products (newest)
-productSchema.index({ status: 1, brand: 1 }); // Catalog filter theo brand
+productSchema.index({ shop: 1, status: 1, soldCount: -1 }); // Shop top sellers
+productSchema.index({ status: 1, brand: 1, createdAt: -1 }); // Catalog filter theo brand + sort
+productSchema.index({ stock: 1 }, { partialFilterExpression: { status: 'published' } }); // Low-stock count
 // Text search index
 productSchema.index(
   { name: 'text', description: 'text', brand: 'text', tags: 'text' },

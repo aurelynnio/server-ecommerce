@@ -31,7 +31,7 @@ const messageSchema = new Schema(
 
 // Message Indexes
 messageSchema.index({ conversationId: 1, createdAt: -1 }); // Loading messages in conversation
-messageSchema.index({ conversationId: 1, isRead: 1 }); // Counting unread messages
+messageSchema.index({ conversationId: 1, isRead: 1, senderId: 1 }); // Counting & marking unread messages
 
 const conversationSchema = new Schema(
   {
@@ -66,6 +66,7 @@ const conversationSchema = new Schema(
 );
 
 conversationSchema.index({ members: 1, updatedAt: -1 }); // User conversation list, sorted by latest
+conversationSchema.index({ shopId: 1, members: 1 }); // Lookup conversation by shop + members
 
 const Conversation = model('Conversation', conversationSchema);
 const Message = model('Message', messageSchema);

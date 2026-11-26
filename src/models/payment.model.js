@@ -64,7 +64,7 @@ const paymentSchema = new Schema(
 );
 
 // Indexes cho tra cứu theo đơn hàng / nhóm checkout (transactionId có unique sparse index ở schema)
-paymentSchema.index({ orderId: 1 });
-paymentSchema.index({ orderGroupId: 1 });
+paymentSchema.index({ orderId: 1, createdAt: -1 });
+paymentSchema.index({ orderGroupId: 1, createdAt: -1 });
 
 module.exports = model('Payment', paymentSchema);

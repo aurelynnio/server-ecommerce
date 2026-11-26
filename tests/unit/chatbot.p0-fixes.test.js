@@ -418,7 +418,9 @@ describe('Chatbot P0 fixes (real modules)', () => {
       expect(hybridSpy).toHaveBeenCalledWith(
         'Tìm áo thun nam dưới 300k',
         expect.objectContaining({
-          maxPrice: 300000,
+          filter: expect.objectContaining({
+            maxPrice: 300000,
+          }),
         }),
       );
 

@@ -41,16 +41,16 @@ const normalizeStringArray = (value) => {
 const getProductSort = (sortBy) => {
   switch (sortBy) {
     case 'price_asc':
-      return { 'price.currentPrice': 1, soldCount: -1 };
+      return { 'price.currentPrice': 1 };
     case 'price_desc':
-      return { 'price.currentPrice': -1, soldCount: -1 };
+      return { 'price.currentPrice': -1 };
     case 'newest':
       return { createdAt: -1 };
     case 'rating':
-      return { ratingAverage: -1, soldCount: -1 };
+      return { ratingAverage: -1, reviewCount: -1 };
     case 'bestselling':
     default:
-      return { soldCount: -1, createdAt: -1 };
+      return { soldCount: -1, ratingAverage: -1 };
   }
 };
 
@@ -808,7 +808,6 @@ const toolHandlers = {
       }
 
       const products = await Product.find(query)
-        .populate('category', 'name')
         .select('name slug price variants brand')
         .sort(sort)
         .limit(limit)
@@ -818,7 +817,6 @@ const toolHandlers = {
       if (products.length === 0 && (type === 'featured' || type === 'newArrivals')) {
         logger.info(`[Tool] No ${type} products found, falling back to all products`);
         const fallbackProducts = await Product.find({ status: 'published' })
-          .populate('category', 'name')
           .select('name slug price variants brand')
           .sort({ soldCount: -1 })
           .limit(limit)

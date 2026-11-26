@@ -67,7 +67,73 @@ class UserRepository extends BaseRepository {
   }
 
   streamAllUserIds() {
-    return this.findManyByFilter({}).select('_id').cursor();
+    return this.findManyByFilter({}).select('_id').hint({ _id: 1 }).lean().cursor();
+  }
+
+  aggregateDashboardPeriodCounts({
+    startOfPreviousMonth,
+    startOfCurrentMonth,
+    startOfToday,
+    startOfTomorrow,
+    startOfNextMonth,
+  }) {
+    return this.aggregateByPipeline([
+      {
+        $match: {
+          createdAt: {
+            $gte: startOfPreviousMonth,
+            $lt: startOfNextMonth,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          newUsersToday: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $gte: ['$createdAt', startOfToday] },
+                    { $lt: ['$createdAt', startOfTomorrow] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          currentMonthUsers: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $gte: ['$createdAt', startOfCurrentMonth] },
+                    { $lt: ['$createdAt', startOfNextMonth] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          previousMonthUsers: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $gte: ['$createdAt', startOfPreviousMonth] },
+                    { $lt: ['$createdAt', startOfCurrentMonth] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+        },
+      },
+    ]);
   }
 
   countUsersByRole() {

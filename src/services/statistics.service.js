@@ -35,13 +35,7 @@ class StatisticsService {
    * @returns {Promise<Object>} Dashboard data
    */
   async getDashboardStats() {
-    const {
-      startOfToday,
-      startOfTomorrow,
-      startOfCurrentMonth,
-      startOfNextMonth,
-      startOfPreviousMonth,
-    } = this._getPeriodBounds();
+    const bounds = this._getPeriodBounds();
 
     const [
       orderAggResultRaw,
@@ -50,17 +44,10 @@ class StatisticsService {
       recentOrdersRaw,
       topProductsRaw,
       monthlyStatsRaw,
-      newOrdersToday,
-      newUsersToday,
-      revenueTodayRaw,
+      orderPeriodStatsRaw,
+      userPeriodStatsRaw,
       pendingOrders,
       lowStockProducts,
-      currentMonthOrders,
-      previousMonthOrders,
-      currentMonthUsers,
-      previousMonthUsers,
-      currentMonthRevenueRaw,
-      previousMonthRevenueRaw,
     ] = await Promise.all([
       Order.aggregateRevenueAndOrderCount(),
       User.countUsersByRole(),
@@ -68,25 +55,26 @@ class StatisticsService {
       Order.findRecentWithUser(5),
       Product.findTopSellingProducts(5),
       Order.aggregateMonthlyStatsLastMonths(6),
-      Order.countCreatedBetween(startOfToday, startOfTomorrow),
-      User.countCreatedBetween(startOfToday, startOfTomorrow),
-      Order.aggregatePaidRevenueBetween(startOfToday, startOfTomorrow),
+      Order.aggregateDashboardPeriodStats(bounds),
+      User.aggregateDashboardPeriodCounts(bounds),
       Order.countByStatus('pending'),
       Product.countLowStockPublished(),
-      Order.countCreatedBetween(startOfCurrentMonth, startOfNextMonth),
-      Order.countCreatedBetween(startOfPreviousMonth, startOfCurrentMonth),
-      User.countCreatedBetween(startOfCurrentMonth, startOfNextMonth),
-      User.countCreatedBetween(startOfPreviousMonth, startOfCurrentMonth),
-      Order.aggregatePaidRevenueBetween(startOfCurrentMonth, startOfNextMonth),
-      Order.aggregatePaidRevenueBetween(startOfPreviousMonth, startOfCurrentMonth),
     ]);
 
     const orderAggResult = orderAggResultRaw?.[0] || {};
     const totalRevenue = orderAggResult.totalRevenue?.[0]?.total || 0;
     const totalOrders = orderAggResult.totalOrders?.[0]?.count || 0;
-    const revenueToday = revenueTodayRaw?.[0]?.total || 0;
-    const currentMonthRevenue = currentMonthRevenueRaw?.[0]?.total || 0;
-    const previousMonthRevenue = previousMonthRevenueRaw?.[0]?.total || 0;
+    const orderPeriodStats = orderPeriodStatsRaw?.[0] || {};
+    const userPeriodStats = userPeriodStatsRaw?.[0] || {};
+    const newOrdersToday = orderPeriodStats.newOrdersToday || 0;
+    const revenueToday = orderPeriodStats.revenueToday || 0;
+    const currentMonthOrders = orderPeriodStats.currentMonthOrders || 0;
+    const previousMonthOrders = orderPeriodStats.previousMonthOrders || 0;
+    const currentMonthRevenue = orderPeriodStats.currentMonthRevenue || 0;
+    const previousMonthRevenue = orderPeriodStats.previousMonthRevenue || 0;
+    const newUsersToday = userPeriodStats.newUsersToday || 0;
+    const currentMonthUsers = userPeriodStats.currentMonthUsers || 0;
+    const previousMonthUsers = userPeriodStats.previousMonthUsers || 0;
 
     // Transform recentOrders to match client expected format
     const recentOrders = recentOrdersRaw.map((order) => ({

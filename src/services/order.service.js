@@ -1296,14 +1296,18 @@ class OrderService {
    * @param {number} [timeoutMinutes=15]
    * @returns {Promise<number>} Number of expired orders cancelled
    */
-  async cancelExpiredUnpaidOrders(timeoutMinutes = 15) {
+  async cancelExpiredUnpaidOrders(timeoutMinutes = 15, batchSize = 100) {
     const cutoffDate = new Date(Date.now() - timeoutMinutes * 60 * 1000);
     const expiredOrders = await Order.findManyByFilter({
       status: 'pending',
       paymentStatus: 'unpaid',
       paymentMethod: { $in: ['vnpay', 'momo'] },
       createdAt: { $lt: cutoffDate },
-    });
+    })
+      .select('_id')
+      .sort({ createdAt: 1 })
+      .limit(batchSize)
+      .lean();
 
     let cancelledCount = 0;
     for (const order of expiredOrders) {

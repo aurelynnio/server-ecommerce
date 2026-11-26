@@ -28,8 +28,11 @@ class SearchService {
     const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
-    // Search products - Note: images are in variants[].images, not root level
-    const products = await Product.findPublishedAutocomplete(normalizedKeyword, limit);
+    const [products, categories, shops] = await Promise.all([
+      Product.findPublishedAutocomplete(normalizedKeyword, limit),
+      Category.findActiveByNameRegex(normalizedKeyword, 5),
+      Shop.findActiveByNameRegex(normalizedKeyword, 5),
+    ]);
 
     // Map products to include first variant image for display in 'images' array
     const productsWithImages = products.map((product) => {
@@ -40,10 +43,6 @@ class SearchService {
         images,
       };
     });
-
-    const categories = await Category.findActiveByNameRegex(normalizedKeyword, 5);
-
-    const shops = await Shop.findActiveByNameRegex(normalizedKeyword, 5);
 
     const result = { products: productsWithImages, categories, shops };
     // PERFORMANCE FIX: Cache for 5 minutes
@@ -140,7 +139,10 @@ class SearchService {
       rating,
     };
 
-    const total = await Product.countByAdvancedSearchParams(searchParams);
+    const [total, facets] = await Promise.all([
+      Product.countByAdvancedSearchParams(searchParams),
+      this.getSearchFacets(searchParams),
+    ]);
     const paginationParams = getPaginationParams(page, limit, total);
 
     const products = await Product.findByAdvancedSearchParams(searchParams, {
@@ -148,8 +150,6 @@ class SearchService {
       skip: paginationParams.skip,
       limit: paginationParams.limit,
     });
-
-    const facets = await this.getSearchFacets(searchParams);
 
     return {
       ...buildPaginationResponse(products, paginationParams),

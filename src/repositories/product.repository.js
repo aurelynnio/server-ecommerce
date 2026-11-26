@@ -348,6 +348,8 @@ class ProductRepository extends BaseRepository {
     return this.aggregateByPipeline([
       { $match: { shop: shopId, status: 'published' } },
       { $group: { _id: '$category', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: limit },
       {
         $lookup: {
           from: 'categories',
@@ -365,8 +367,6 @@ class ProductRepository extends BaseRepository {
           productCount: '$count',
         },
       },
-      { $sort: { productCount: -1 } },
-      { $limit: limit },
     ]);
   }
 
@@ -435,7 +435,7 @@ class ProductRepository extends BaseRepository {
 
     if (sizes) {
       const sizeArray = Array.isArray(sizes) ? sizes : sizes.split(',');
-      query['variants.size'] = { $in: sizeArray };
+      query.sizes = { $in: sizeArray };
     }
 
     if (rating) {
@@ -1096,6 +1096,7 @@ class ProductRepository extends BaseRepository {
     const sort = this._getAdvancedSearchSort(sortBy, params.keyword);
 
     let productsQuery = this.findManyByFilter(query)
+      .select(CATALOG_SUMMARY_FIELDS)
       .populate('category', 'name slug')
       .populate('shop', 'name logo');
 

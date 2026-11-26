@@ -36,12 +36,12 @@ class WishlistRepository extends BaseRepository {
       userId,
       productId: { $in: productIds },
     })
-      .select('productId')
+      .select('productId -_id')
       .lean();
   }
 
-  findProductIdsByUserIdAll(userId) {
-    return this.findManyByFilter({ userId }).select('productId').lean();
+  findProductIdsByUserIdAll(userId, limit = 500) {
+    return this.findManyByFilter({ userId }).select('productId -_id').limit(limit).lean();
   }
 }
 

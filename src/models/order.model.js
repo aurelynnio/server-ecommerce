@@ -111,15 +111,19 @@ const orderSchema = new Schema(
 // Indexes
 // Compound indexes follow the ESR (Equality → Sort → Range) principle.
 orderSchema.index({ userId: 1, createdAt: -1 }); // User order history (findRecentNonCancelledOrdersByUser)
-orderSchema.index({ userId: 1, status: 1 }); // User filtering by status
+orderSchema.index({ userId: 1, status: 1, createdAt: -1 }); // User filtering by status + sort
 orderSchema.index({ shopId: 1, createdAt: -1 }); // Seller order history
 orderSchema.index({ shopId: 1, status: 1, createdAt: -1 }); // Status-filtered seller history (covers {shopId, status} prefix)
-orderSchema.index({ shopId: 1, paymentStatus: 1 }); // aggregatePaidRevenueByShopId / countByShopWithFilters
-orderSchema.index({ 'products.productId': 1, status: 1 }); // existsDeliveredOrderForProductByUser / findOrdersContainingProduct
+orderSchema.index({ shopId: 1, paymentStatus: 1, createdAt: -1, totalAmount: 1 }); // Seller payment filter + paid revenue
+orderSchema.index({ 'products.productId': 1, status: 1, userId: 1 }); // existsDeliveredOrderForProductByUser / findOrdersContainingProduct
 orderSchema.index({ orderGroupId: 1 }); // User finding their "checkout history"
-orderSchema.index({ status: 1 });
+orderSchema.index({ status: 1, createdAt: -1 }); // Admin status filter + sort
+orderSchema.index({ paymentMethod: 1, createdAt: -1 }); // Admin paymentMethod filter + sort
 orderSchema.index({ createdAt: -1 }); // Truy vấn chỉ lọc theo khoảng ngày (aggregateAdminDailyOrders, countCreatedBetween)
-orderSchema.index({ paymentStatus: 1, createdAt: -1 }); // Doanh thu đã thanh toán theo khoảng ngày (aggregatePaidRevenueBetween)
-orderSchema.index({ paymentStatus: 1, totalAmount: 1 }); // Covering index cho aggregateRevenueAndOrderCount (tổng toàn hệ thống)
+orderSchema.index({ paymentStatus: 1, createdAt: -1, totalAmount: 1 }); // Covering index cho doanh thu đã thanh toán
+orderSchema.index(
+  { paymentMethod: 1, createdAt: 1 },
+  { partialFilterExpression: { status: 'pending', paymentStatus: 'unpaid' } },
+); // Expiry job (cancelExpiredUnpaidOrders)
 
 module.exports = model('Order', orderSchema);

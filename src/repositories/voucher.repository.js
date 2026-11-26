@@ -53,33 +53,39 @@ class VoucherRepository extends BaseRepository {
     return this.findById(voucherId).populate('shopId', 'name logo').lean();
   }
 
-  findActiveByShop(shopId, now = new Date()) {
+  findActiveByShop(shopId, now = new Date(), limit = 100) {
     return this.findManyByFilter({
       shopId,
       isActive: true,
       endDate: { $gte: now },
-    }).lean();
+    })
+      .limit(limit)
+      .lean();
   }
 
-  findActivePlatform(now = new Date()) {
+  findActivePlatform(now = new Date(), limit = 100) {
     return this.findManyByFilter({
       scope: 'platform',
       isActive: true,
       endDate: { $gte: now },
-    }).lean();
+    })
+      .limit(limit)
+      .lean();
   }
 
-  findAvailablePlatform(now = new Date()) {
+  findAvailablePlatform(now = new Date(), limit = 100) {
     return this.findManyByFilter({
       isActive: true,
       startDate: { $lte: now },
       endDate: { $gte: now },
       scope: 'platform',
       $or: [{ usageLimit: 0 }, { $expr: { $lt: ['$usageCount', '$usageLimit'] } }],
-    }).lean();
+    })
+      .limit(limit)
+      .lean();
   }
 
-  findAvailableShop(shopId, now = new Date()) {
+  findAvailableShop(shopId, now = new Date(), limit = 100) {
     return this.findManyByFilter({
       isActive: true,
       startDate: { $lte: now },
@@ -87,7 +93,9 @@ class VoucherRepository extends BaseRepository {
       scope: 'shop',
       shopId,
       $or: [{ usageLimit: 0 }, { $expr: { $lt: ['$usageCount', '$usageLimit'] } }],
-    }).lean();
+    })
+      .limit(limit)
+      .lean();
   }
 
   findActiveByCode(code) {
@@ -149,6 +157,22 @@ class VoucherRepository extends BaseRepository {
         $group: {
           _id: null,
           totalUsage: { $sum: '$usageCount' },
+        },
+      },
+    ]);
+  }
+
+  aggregateVoucherOverview(now = new Date()) {
+    return this.aggregateByPipeline([
+      {
+        $group: {
+          _id: null,
+          totalVouchers: { $sum: 1 },
+          activeVouchers: { $sum: { $cond: [{ $eq: ['$isActive', true] }, 1, 0] } },
+          expiredVouchers: { $sum: { $cond: [{ $lt: ['$endDate', now] }, 1, 0] } },
+          platformVouchers: { $sum: { $cond: [{ $eq: ['$scope', 'platform'] }, 1, 0] } },
+          shopVouchers: { $sum: { $cond: [{ $eq: ['$scope', 'shop'] }, 1, 0] } },
+          totalUsage: { $sum: { $ifNull: ['$usageCount', 0] } },
         },
       },
     ]);

@@ -35,7 +35,7 @@ const permissionAuditSchema = new Schema(
 
 // Indexes for efficient querying
 permissionAuditSchema.index({ createdAt: -1 });
-permissionAuditSchema.index({ action: 1 });
+permissionAuditSchema.index({ action: 1, createdAt: -1 });
 permissionAuditSchema.index({ targetUserId: 1, createdAt: -1 });
 permissionAuditSchema.index({ targetUserId: 1, action: 1, createdAt: -1 }); // Lọc audit theo user + action, sort createdAt
 

@@ -39,11 +39,38 @@ class ChatbotService {
   constructor() {
     this.model = null;
     this.chain = null;
+    this._indexesEnsured = false;
     this.prompt = ChatPromptTemplate.fromMessages([
       ['system', SYSTEM_PROMPT],
       new MessagesPlaceholder('chat_history'),
       ['human', '{input}'],
     ]);
+  }
+
+  async ensureChatbotIndexes() {
+    if (this._indexesEnsured) return;
+    if (mongoose.connection.readyState !== 1) return;
+    this._indexesEnsured = true;
+    try {
+      const msgCol = this._getCollection();
+      const fbCol = mongoose.connection.collection('chatbot_feedback');
+      await Promise.all([
+        msgCol.createIndex({ sessionId: 1, _id: -1 }, { background: true }),
+        fbCol.createIndex({ sessionId: 1, messageId: 1 }, { unique: true, background: true }),
+        fbCol.createIndex({ createdAt: -1 }, { background: true }),
+        fbCol.createIndex(
+          { createdAt: -1 },
+          {
+            name: 'idx_feedback_comment_createdAt',
+            partialFilterExpression: { comment: { $type: 'string', $gt: '' } },
+            background: true,
+          },
+        ),
+      ]);
+    } catch (err) {
+      this._indexesEnsured = false;
+      logger.warn('[Chatbot] Failed to ensure chatbot indexes:', err.message);
+    }
   }
 
   _ensureModel() {
@@ -164,11 +191,25 @@ class ChatbotService {
    */
   async getLatestAssistantMessageId(sessionId) {
     const collection = this._getCollection();
-    const doc = await collection.find({ sessionId }).sort({ _id: -1 }).limit(1).toArray();
+    const doc = await collection
+      .aggregate([
+        { $match: { sessionId } },
+        { $sort: { _id: -1 } },
+        { $limit: 1 },
+        {
+          $project: {
+            _id: 1,
+            msgCount: {
+              $cond: [{ $isArray: '$messages' }, { $size: '$messages' }, 0],
+            },
+          },
+        },
+      ])
+      .toArray();
     if (!doc[0]?._id) return null;
     const baseId = doc[0]._id.toString();
-    if (Array.isArray(doc[0].messages) && doc[0].messages.length > 0) {
-      return `${baseId}:${doc[0].messages.length - 1}`;
+    if (doc[0].msgCount > 0) {
+      return `${baseId}:${doc[0].msgCount - 1}`;
     }
     return baseId;
   }
@@ -215,45 +256,48 @@ class ChatbotService {
     const skip = (page - 1) * limit;
     const collection = this._getCollection();
 
-    // Aggregate directly on the documents (no $push of full docs) to avoid
-    // loading every message of every session into memory (prevents OOM on large sessions).
-    const sessions = await collection
-      .aggregate([
-        { $sort: { _id: 1 } },
-        {
-          $group: {
-            _id: '$sessionId',
-            lastMessageAt: { $max: { $ifNull: ['$updatedAt', '$_id'] } },
-            firstMessageAt: { $min: '$_id' },
-            firstMessage: { $first: '$$ROOT' },
-            lastMessage: { $last: '$$ROOT' },
-            messageCount: {
-              $sum: {
-                $cond: [{ $isArray: '$messages' }, { $size: '$messages' }, 1],
+    const [countRows, rows] = await Promise.all([
+      collection
+        .aggregate([{ $group: { _id: '$sessionId' } }, { $count: 'total' }])
+        .toArray(),
+      collection
+        .aggregate([
+          { $sort: { _id: 1 } },
+          {
+            $group: {
+              _id: '$sessionId',
+              lastMessageAt: { $max: { $ifNull: ['$updatedAt', { $toDate: '$_id' }] } },
+              firstMessageAt: { $min: '$_id' },
+              firstDocId: { $first: '$_id' },
+              firstMessageElem: { $first: { $arrayElemAt: ['$messages', 0] } },
+              lastDocId: { $last: '$_id' },
+              lastMessageElem: { $last: { $arrayElemAt: ['$messages', -1] } },
+              lastLegacyContent: { $last: '$data.content' },
+              lastLegacyText: { $last: '$content' },
+              messageCount: {
+                $sum: {
+                  $cond: [{ $isArray: '$messages' }, { $size: '$messages' }, 1],
+                },
               },
             },
           },
-        },
-        { $sort: { lastMessageAt: -1 } },
-        {
-          $facet: {
-            metadata: [{ $count: 'total' }],
-            data: [{ $skip: skip }, { $limit: limit }],
-          },
-        },
-      ])
-      .allowDiskUse(true)
-      .toArray();
+          { $sort: { lastMessageAt: -1 } },
+          { $skip: skip },
+          { $limit: limit },
+        ])
+        .allowDiskUse(true)
+        .toArray(),
+    ]);
 
-    const result = sessions[0];
-    const total = result.metadata[0]?.total || 0;
-    const sessionData = result.data.map((s) => {
-      const firstMessages = s.firstMessage
-        ? extractConversationMessages(s.firstMessage, s.firstMessage._id.getTimestamp())
+    const total = countRows[0]?.total || 0;
+    const sessionData = rows.map((s) => {
+      const firstMessages = s.firstMessageElem
+        ? extractConversationMessages({ messages: [s.firstMessageElem] }, s.firstDocId?.getTimestamp?.())
         : [];
-      const lastMessages = s.lastMessage
-        ? extractConversationMessages(s.lastMessage, s.lastMessage._id.getTimestamp())
-        : [];
+      const lastDoc = s.lastMessageElem
+        ? { messages: [s.lastMessageElem] }
+        : { data: { content: s.lastLegacyContent }, content: s.lastLegacyText };
+      const lastMessages = extractConversationMessages(lastDoc, s.lastDocId?.getTimestamp?.());
 
       const firstMessage = firstMessages[0] || null;
       const lastMessage = lastMessages[lastMessages.length - 1] || null;
@@ -349,7 +393,7 @@ class ChatbotService {
       // dù withComment > 0.
       collection
         .find(
-          { comment: { $exists: true, $nin: [null, ''] } },
+          { comment: { $type: 'string', $gt: '' } },
           { projection: { userId: 0 } },
         )
         .sort({ createdAt: -1 })
@@ -906,12 +950,13 @@ class ChatbotService {
         const retrieval = embeddingService.searchHybridProducts
           ? await embeddingService.searchHybridProducts(message, {
               limit: signals.limit,
-              category: signals.category,
-              brand: signals.brand,
-              minPrice: signals.minPrice,
-              maxPrice: signals.maxPrice,
-              hasDiscount: signals.onlyDiscounted || undefined,
-              minStock: signals.inStockOnly ? 1 : undefined,
+              filter: {
+                brand: signals.brand || undefined,
+                minPrice: signals.minPrice,
+                maxPrice: signals.maxPrice,
+                hasDiscount: signals.onlyDiscounted || undefined,
+                minStock: signals.inStockOnly ? 1 : undefined,
+              },
             })
           : {
               items: await searchSimilarProducts(message, { limit: signals.limit }),

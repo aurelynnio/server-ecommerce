@@ -36,7 +36,7 @@ class CartRepository extends BaseRepository {
   }
 
   findByUserIdForCheckout(userId, session) {
-    return this.findOneByFilter({ userId }).populate('items.productId').session(session);
+    return this.findOneByFilter({ userId }).session(session);
   }
 }
 

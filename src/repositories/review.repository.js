@@ -1,6 +1,10 @@
+const { Types } = require('mongoose');
 const Review = require('../models/review.model');
 const BaseRepository = require('./base.repository');
 const { createLiteralRegex } = require('../utils/query.utils');
+
+const toObjectId = (id) =>
+  typeof id === 'string' && Types.ObjectId.isValid(id) ? new Types.ObjectId(id) : id;
 
 class ReviewRepository extends BaseRepository {
   constructor() {
@@ -129,7 +133,7 @@ class ReviewRepository extends BaseRepository {
 
   aggregateProductRatingStats(productId) {
     return this.aggregateByPipeline([
-      { $match: { product: productId } },
+      { $match: { product: toObjectId(productId) } },
       {
         $group: {
           _id: null,

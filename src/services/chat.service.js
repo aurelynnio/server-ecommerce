@@ -335,7 +335,7 @@ class ChatService {
    * @returns {Promise<any>}
    */
   async markAsRead(conversationId, userId) {
-    const conversation = await Conversation.findById(conversationId);
+    const conversation = await Conversation.findById(conversationId).select('members').lean();
     if (!conversation) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Conversation not found');
     }

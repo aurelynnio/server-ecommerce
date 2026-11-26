@@ -46,7 +46,10 @@ const voucherSchema = new Schema(
   },
 );
 
-voucherSchema.index({ shopId: 1 });
-voucherSchema.index({ startDate: 1, endDate: 1 });
+voucherSchema.index({ shopId: 1, isActive: 1, endDate: 1, startDate: 1 });
+voucherSchema.index({ scope: 1, isActive: 1, endDate: 1, startDate: 1 });
+voucherSchema.index({ endDate: 1 });
+voucherSchema.index({ createdAt: -1 });
+voucherSchema.index({ usageCount: -1 });
 
 module.exports = model('Voucher', voucherSchema);

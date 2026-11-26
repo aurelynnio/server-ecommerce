@@ -1,5 +1,9 @@
+const { Types } = require('mongoose');
 const { Conversation, Message } = require('../models/conversation.model');
 const BaseRepository = require('./base.repository');
+
+const toObjectId = (id) =>
+  typeof id === 'string' && Types.ObjectId.isValid(id) ? new Types.ObjectId(id) : id;
 
 class ConversationRepository extends BaseRepository {
   constructor() {
@@ -60,11 +64,15 @@ class MessageRepository extends BaseRepository {
   }
 
   aggregateUnreadCountsForUserByConversation(userId, conversationIds = []) {
+    if (!Array.isArray(conversationIds) || conversationIds.length === 0) {
+      return Promise.resolve([]);
+    }
+
     return this.aggregateByPipeline([
       {
         $match: {
-          conversationId: { $in: conversationIds },
-          senderId: { $ne: userId },
+          conversationId: { $in: conversationIds.map(toObjectId) },
+          senderId: { $ne: toObjectId(userId) },
           isRead: false,
         },
       },

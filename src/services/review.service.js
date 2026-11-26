@@ -327,6 +327,9 @@ class ReviewService {
 
     // 3. Query reviews for these products
     const { page = 1, limit = 10, rating, replyStatus, search } = filters;
+    if (productIds.length === 0) {
+      return buildPaginationResponse([], getPaginationParams(page, limit, 0));
+    }
 
     const filterArgs = { rating, replyStatus, search };
     const total = await Review.countByProductIdsWithFilters(productIds, filterArgs);
@@ -349,6 +352,10 @@ class ReviewService {
     const productIds = products.map((p) => p._id);
 
     const { page = 1, limit = 10, rating, search } = filters;
+    if (productIds.length === 0) {
+      return buildPaginationResponse([], getPaginationParams(page, limit, 0));
+    }
+
     const filterArgs = { rating, search };
     const total = await Review.countByProductIdsWithFilters(productIds, filterArgs);
     const paginationParams = getPaginationParams(page, limit, total);
@@ -403,23 +410,21 @@ class ReviewService {
    * @returns {Promise<Object>} Review statistics summary
    */
   async getReviewStatistics() {
-    const [
-      totalReviews,
-      ratingDistribution,
-      averageRating,
-      topRatedProducts,
-      mostReviewedProducts,
-    ] = await Promise.all([
-      Review.countAll(),
+    const [ratingDistribution, topRatedProducts, mostReviewedProducts] = await Promise.all([
       Review.aggregateOverallRatingDistribution(),
-      Review.aggregateOverallAverageRating(),
       Product.findTopRatedProducts(5),
       Product.findMostReviewedProducts(5),
     ]);
 
+    const totalReviews = ratingDistribution.reduce((sum, bucket) => sum + (bucket.count || 0), 0);
+    const weightedSum = ratingDistribution.reduce(
+      (sum, bucket) => sum + Number(bucket._id || 0) * (bucket.count || 0),
+      0,
+    );
+
     return {
       totalReviews,
-      averageRating: averageRating.length > 0 ? Math.round(averageRating[0].average * 10) / 10 : 0,
+      averageRating: totalReviews > 0 ? Math.round((weightedSum / totalReviews) * 10) / 10 : 0,
       ratingDistribution,
       topRatedProducts,
       mostReviewedProducts,

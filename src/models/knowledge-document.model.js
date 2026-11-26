@@ -17,8 +17,10 @@ const knowledgeDocumentSchema = new Schema(
 );
 
 knowledgeDocumentSchema.index(
-  { title: 'text', content: 'text' },
+  { isActive: 1, title: 'text', content: 'text' },
   { name: 'knowledge_text_search', weights: { title: 4, content: 1 } },
 );
+knowledgeDocumentSchema.index({ isActive: 1, type: 1, updatedAt: -1 });
+knowledgeDocumentSchema.index({ isActive: 1, updatedAt: -1 });
 
 module.exports = model('KnowledgeDocument', knowledgeDocumentSchema);

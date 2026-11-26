@@ -16,14 +16,17 @@ const voucherUsageSchema = new Schema(
 
 // Query: lich su voucher cua user
 voucherUsageSchema.index({ userId: 1, createdAt: -1 });
-// Lưu ý: countByVoucherAndUser + các aggregate theo voucherId được phục vụ bởi
-// tiền tố (prefix) của 2 unique sparse index phía dưới, không cần index riêng.
+// ESR index cho countByVoucherAndUser + aggregateUsageByVoucherIdsAndUser (userId Equality -> voucherId $in)
+voucherUsageSchema.index({ userId: 1, voucherId: 1 });
 // Exactly-once guarantee: chống double-spend voucher shop theo orderId
-voucherUsageSchema.index({ voucherId: 1, userId: 1, orderId: 1 }, { unique: true, sparse: true });
+voucherUsageSchema.index(
+  { voucherId: 1, userId: 1, orderId: 1 },
+  { unique: true, partialFilterExpression: { orderId: { $exists: true } } },
+);
 // Exactly-once guarantee: chống double-spend voucher platform theo orderGroupId
 voucherUsageSchema.index(
   { voucherId: 1, userId: 1, orderGroupId: 1 },
-  { unique: true, sparse: true },
+  { unique: true, partialFilterExpression: { orderGroupId: { $exists: true } } },
 );
 
 module.exports = model('VoucherUsage', voucherUsageSchema);

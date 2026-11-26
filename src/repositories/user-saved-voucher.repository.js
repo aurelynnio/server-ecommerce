@@ -26,14 +26,17 @@ class UserSavedVoucherRepository extends BaseRepository {
     return this.countByFilter({ userId });
   }
 
-  async findSavedVoucherIdsByUserId(userId) {
-    const list = await this.findManyByFilter({ userId }).select('voucherId').lean();
+  async findSavedVoucherIdsByUserId(userId, limit = 500) {
+    const list = await this.findManyByFilter({ userId })
+      .select('voucherId -_id')
+      .limit(limit)
+      .lean();
     return list
       .filter((item) => item && item.voucherId)
       .map((item) => item.voucherId.toString());
   }
 
-  findSavedVouchersByUserId(userId) {
+  findSavedVouchersByUserId(userId, limit = 100) {
     return this.findManyByFilter({ userId })
       .populate({
         path: 'voucherId',
@@ -43,6 +46,7 @@ class UserSavedVoucherRepository extends BaseRepository {
         },
       })
       .sort({ createdAt: -1 })
+      .limit(limit)
       .lean();
   }
 }

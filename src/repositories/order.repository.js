@@ -20,29 +20,134 @@ class OrderRepository extends BaseRepository {
     return dateFilter;
   }
 
-  aggregateRevenueAndOrderCount() {
+  async aggregateRevenueAndOrderCount() {
+    const [totalOrdersCount, revenueAgg] = await Promise.all([
+      this.Model.estimatedDocumentCount(),
+      this.aggregateByPipeline([
+        { $match: { paymentStatus: 'paid' } },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$totalAmount' },
+          },
+        },
+      ]),
+    ]);
+
+    return [
+      {
+        totalRevenue: revenueAgg,
+        totalOrders: [{ count: totalOrdersCount }],
+      },
+    ];
+  }
+
+  aggregateDashboardPeriodStats({
+    startOfPreviousMonth,
+    startOfCurrentMonth,
+    startOfToday,
+    startOfTomorrow,
+    startOfNextMonth,
+  }) {
     return this.aggregateByPipeline([
       {
-        $group: {
-          _id: null,
-          totalOrdersCount: { $sum: 1 },
-          paidOrdersCount: {
-            $sum: { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, 1, 0] },
-          },
-          paidRevenue: {
-            $sum: {
-              $cond: [{ $eq: ['$paymentStatus', 'paid'] }, '$totalAmount', 0],
-            },
+        $match: {
+          createdAt: {
+            $gte: startOfPreviousMonth,
+            $lt: startOfNextMonth,
           },
         },
       },
       {
-        $project: {
-          _id: 0,
-          totalRevenue: {
-            $cond: ['$paidOrdersCount', [{ _id: { $literal: null }, total: '$paidRevenue' }], []],
+        $group: {
+          _id: null,
+          newOrdersToday: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $gte: ['$createdAt', startOfToday] },
+                    { $lt: ['$createdAt', startOfTomorrow] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
           },
-          totalOrders: [{ count: '$totalOrdersCount' }],
+          revenueToday: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$paymentStatus', 'paid'] },
+                    { $gte: ['$createdAt', startOfToday] },
+                    { $lt: ['$createdAt', startOfTomorrow] },
+                  ],
+                },
+                '$totalAmount',
+                0,
+              ],
+            },
+          },
+          currentMonthOrders: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $gte: ['$createdAt', startOfCurrentMonth] },
+                    { $lt: ['$createdAt', startOfNextMonth] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          currentMonthRevenue: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$paymentStatus', 'paid'] },
+                    { $gte: ['$createdAt', startOfCurrentMonth] },
+                    { $lt: ['$createdAt', startOfNextMonth] },
+                  ],
+                },
+                '$totalAmount',
+                0,
+              ],
+            },
+          },
+          previousMonthOrders: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $gte: ['$createdAt', startOfPreviousMonth] },
+                    { $lt: ['$createdAt', startOfCurrentMonth] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          previousMonthRevenue: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$paymentStatus', 'paid'] },
+                    { $gte: ['$createdAt', startOfPreviousMonth] },
+                    { $lt: ['$createdAt', startOfCurrentMonth] },
+                  ],
+                },
+                '$totalAmount',
+                0,
+              ],
+            },
+          },
         },
       },
     ]);
@@ -85,6 +190,7 @@ class OrderRepository extends BaseRepository {
     return this.findManyByFilter()
       .sort({ createdAt: -1 })
       .limit(limit)
+      .select('_id orderNumber userId totalAmount status createdAt')
       .populate('userId', 'username email avatar')
       .lean();
   }
