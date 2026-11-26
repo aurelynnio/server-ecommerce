@@ -13,6 +13,7 @@ const slugify = require('slugify');
 const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../utils/ApiError');
 const { getOwnedShopOrThrow } = require('../utils/shopAssertions');
+const embeddingSyncService = require('./embedding-sync.service');
 const { buildMonthlyChartData } = require('../utils/query.utils');
 
 class ShopService {
@@ -359,6 +360,10 @@ class ShopService {
     if (!shop) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Shop not found');
     }
+
+    await embeddingSyncService.scheduleShopSync(shopId, status, {
+      reason: 'shop_status_updated',
+    });
 
     return shop;
   }

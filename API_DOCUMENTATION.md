@@ -1090,13 +1090,14 @@ _Lưu ý: Tất cả các route giỏ hàng đều yêu cầu người dùng đ�
 #### `POST /api/chatbot/feedback`
 
 - **Mô tả**: Gửi phản hồi đánh giá chất lượng câu trả lời của AI (Like / Dislike).
-- **Quyền hạn**: `Public` (Áp dụng `chatbotRateLimiter`)
+- **Quyền hạn**: `Public`; JWT tùy chọn để nhận diện người dùng và áp dụng giới hạn theo user, nếu không có JWT thì giới hạn theo IP.
+- **Xác thực dữ liệu**: `sessionId` phải là UUID v4, `messageId` từ 1–100 ký tự, `rating` là `up` hoặc `down`, `comment` tối đa 500 ký tự.
 - **Request Body (JSON)**:
   ```json
   {
     "sessionId": "b484594c-47b2-4d2b-bbd7-133e9d8e578c",
-    "messageId": "msg-65df8a76b91234567890abcd",
-    "rating": "up", // 'up' | 'down'
+    "messageId": "65df8a76b91234567890abcd:1",
+    "rating": "up",
     "comment": "Gợi ý rất chuẩn size và giá tốt"
   }
   ```
@@ -1106,6 +1107,18 @@ _Lưu ý: Tất cả các route giỏ hàng đều yêu cầu người dùng đ�
 - **Mô tả**: Quản trị viên xem danh sách các phiên chat của người dùng trên hệ thống.
 - **Quyền hạn**: `Admin`
 - **Query Params**: `page`, `limit`
+
+#### `GET /api/chatbot/admin/sessions/:sessionId`
+
+- **Mô tả**: Quản trị viên xem toàn bộ lịch sử tin nhắn của một phiên chat.
+- **Quyền hạn**: `Admin`
+- **Path Param**: `sessionId` (UUID v4)
+
+#### `GET /api/chatbot/admin/feedback/stats`
+
+- **Mô tả**: Thống kê feedback của chatbot (tổng, up/down, tỷ lệ tích cực, số có nhận xét) kèm danh sách feedback gần đây và các nhận xét gần đây.
+- **Quyền hạn**: `Admin`
+- **Response fields**: `total`, `up`, `down`, `withComment`, `positiveRate`, `recent`, `recentComments`
 
 #### `DELETE /api/chatbot/admin/sessions/:sessionId`
 
@@ -1483,28 +1496,31 @@ _Tất cả route yêu cầu người dùng đăng nhập (`verifyAccessToken`).
 - **Mô tả**: Tìm kiếm nâng cao kết hợp đa tiêu chí trên toàn bộ danh mục sản phẩm.
 - **Quyền hạn**: `Public`
 - **Query Params**:
-  - `q`: Từ khoá tìm kiếm
-  - `category`: ID danh mục
-  - `brand`: Tên thương hiệu
-  - `minPrice`, `maxPrice`: Khoảng giá lọc
-  - `rating`: Lọc theo số sao đánh giá (tối thiểu)
-  - `page`, `limit`
+  - `q` (tuỳ chọn): Từ khoá tìm kiếm, tối đa 200 ký tự; tự động trim, chuỗi rỗng bị bỏ qua. Param lặp (`?q=a&q=b`) bị từ chối `400`.
+  - `category` (tuỳ chọn): Slug danh mục; slug không tồn tại trả về trang rỗng thay vì toàn bộ sản phẩm.
+  - `minPrice`, `maxPrice` (tuỳ chọn): Số >= 0; `minPrice=0` là hợp lệ.
+  - `rating` (tuỳ chọn): 0–5, lọc theo số sao tối thiểu.
+  - `sort` (tuỳ chọn): `relevance` | `price_asc` | `price_desc` | `newest` | `bestselling` | `rating` (mặc định `relevance`).
+  - `page` >= 1, `limit` 1–100 (mặc định 20).
+- **Ghi chú**: `brand` không còn là param của endpoint này (dùng `q`).
 
 #### `GET /api/search/suggestions`
 
 - **Mô tả**: Lấy gợi ý từ khoá tự động hoàn thành khi người dùng gõ tìm kiếm.
 - **Quyền hạn**: `Public`
-- **Query Param**: `q`
+- **Query Params**: `q` (tối đa 100 ký tự, tự trim), `limit` 1–50 (mặc định 10)
 
 #### `GET /api/search/trending`
 
 - **Mô tả**: Lấy danh sách các từ khoá đang có lượng tìm kiếm tăng vọt (Trending Search).
 - **Quyền hạn**: `Public`
+- **Query Param**: `limit` 1–50 (mặc định 10)
 
 #### `GET /api/search/hot-keywords`
 
 - **Mô tả**: Lấy các từ khoá tìm kiếm nổi bật/khuyến mãi (Hot Keywords) hiển thị dạng tag chips.
 - **Quyền hạn**: `Public`
+- **Query Param**: `limit` 1–50 (mặc định 20)
 
 ---
 

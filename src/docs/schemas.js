@@ -253,10 +253,14 @@ module.exports = {
     type: 'object',
     required: ['sessionId', 'messageId', 'rating'],
     properties: {
-      sessionId: { type: 'string', example: 'sess-e2b694b8-0f73-4ea2-8d76' },
-      messageId: { type: 'string', example: 'msg-65df8a76b91234567890abcd' },
+      sessionId: {
+        type: 'string',
+        format: 'uuid',
+        example: 'b484594c-47b2-4d2b-bbd7-133e9d8e578c',
+      },
+      messageId: { type: 'string', minLength: 1, maxLength: 100, example: '65df8a76b91234567890abcd:1' },
       rating: { type: 'string', enum: ['up', 'down'], example: 'up' },
-      comment: { type: 'string', example: 'Gợi ý rất chuẩn size và giá' },
+      comment: { type: 'string', maxLength: 500, example: 'Gợi ý rất chuẩn size và giá' },
     },
   },
   // Health Models

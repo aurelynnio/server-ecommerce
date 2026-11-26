@@ -3,8 +3,7 @@ const chatbotService = require('../services/chatbot.service');
 const { sendSuccess, sendFail } = require('../shared/res/formatResponse');
 const { StatusCodes } = require('http-status-codes');
 const logger = require('../utils/logger');
-const { resolveChatSession } = require('../chatbot/chatSession');
-const { isShuttingDown } = require('../chatbot/gracefulShutdown');
+const { resolveChatSession, clearChatSessionCookie } = require('../chatbot/chatSession');
 const metrics = require('../monitoring/chatbot.metrics');
 const redisClient = require('../configs/redis.config');
 
@@ -61,7 +60,7 @@ const ChatbotController = {
       return sendFail(res, 'Message is required', StatusCodes.BAD_REQUEST);
     }
 
-    if (isShuttingDown) {
+    if (req.app.locals.isShuttingDown) {
       return sendFail(
         res,
         'Server đang bảo trì, vui lòng thử lại sau ít phút',
@@ -150,7 +149,7 @@ const ChatbotController = {
       return sendFail(res, 'Message is required', StatusCodes.BAD_REQUEST);
     }
 
-    if (isShuttingDown) {
+    if (req.app.locals.isShuttingDown) {
       return sendFail(
         res,
         'Server đang bảo trì, vui lòng thử lại sau ít phút',
@@ -194,7 +193,9 @@ const ChatbotController = {
 
     let aborted = false;
     let timedOut = false;
-    req.on('close', () => {
+    // Listen on `res` (not `req`): Express 5 / Node emits `req` 'close' as soon as
+    // `express.json()` finishes reading the request body, while the SSE response is still open.
+    res.on('close', () => {
       if (!res.writableEnded) {
         aborted = true;
         stopTimer({ status: 'aborted' });
@@ -231,6 +232,8 @@ const ChatbotController = {
             sendEvent({ type: 'tool', name: event.name });
           } else if (event.type === 'correction') {
             sendEvent({ type: 'correction', content: event.content });
+          } else if (event.type === 'products') {
+            sendEvent({ type: 'products', products: event.products });
           }
         }
         if (!aborted && !timedOut) {
@@ -266,6 +269,15 @@ const ChatbotController = {
       });
 
       if (!aborted && !res.writableEnded) {
+        if (!response.success) {
+          sendEvent({
+            type: 'error',
+            message: response.message || 'Xin lỗi, hệ thống đang bận. Bạn vui lòng thử lại sau nhé!',
+          });
+          res.end();
+          return;
+        }
+
         // Đảm bảo nếu chưa gửi token nào nhưng có message (kể cả fallback/error message)
         // thì stream ra client trước khi gửi done để tránh hiển thị bong bóng rỗng
         if (tokenCount === 0 && response.message) {
@@ -273,6 +285,9 @@ const ChatbotController = {
         }
         if (response.correctedMessage) {
           sendEvent({ type: 'correction', content: response.correctedMessage });
+        }
+        if (Array.isArray(response.products) && response.products.length > 0) {
+          sendEvent({ type: 'products', products: response.products });
         }
         sendEvent({
           type: 'done',
@@ -299,6 +314,9 @@ const ChatbotController = {
       }
     } finally {
       clearTimeout(streamTimeoutTimer);
+      if (!res.writableEnded) {
+        res.end();
+      }
       await releaseSessionLock(chatSessionId).catch(() => {});
     }
   }),
@@ -315,6 +333,15 @@ const ChatbotController = {
   }),
 
   /**
+   * Get chat history for any session (Admin only)
+   */
+  getAdminSessionHistory: catchAsync(async (req, res) => {
+    const { sessionId } = req.params;
+    const result = await chatbotService.getHistory(sessionId);
+    return sendSuccess(res, result, 'Admin chat history retrieved successfully', StatusCodes.OK);
+  }),
+
+  /**
    * Clear session
    */
   clearSession: catchAsync(async (req, res) => {
@@ -322,6 +349,7 @@ const ChatbotController = {
     resolveChatSession(req, res, sessionId);
 
     const result = await chatbotService.clearSession(sessionId);
+    clearChatSessionCookie(res);
     return sendSuccess(res, result, 'Session cleared successfully', StatusCodes.OK);
   }),
 
@@ -359,9 +387,16 @@ const ChatbotController = {
    * Get all sessions (admin)
    */
   getAllSessions: catchAsync(async (req, res) => {
-    const { page = 1, limit = 10 } = req.query;
-    const result = await chatbotService.getAllSessions(Number(page), Number(limit));
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    const result = await chatbotService.getAllSessions(page, limit);
     return sendSuccess(res, result, 'Chat sessions retrieved successfully', StatusCodes.OK);
+  }),
+
+  getFeedbackStats: catchAsync(async (req, res) => {
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    const result = await chatbotService.getFeedbackStats(limit);
+    return sendSuccess(res, result, 'Chatbot feedback statistics retrieved', StatusCodes.OK);
   }),
 
   /**

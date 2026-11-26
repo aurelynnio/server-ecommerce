@@ -106,4 +106,35 @@ module.exports = {
       responses: { 200: { description: 'Admin sessions list' } },
     },
   },
+  '/api/chatbot/admin/sessions/{sessionId}': {
+    get: {
+      tags: ['Chatbot'],
+      summary: 'Get conversation history of any session (Admin only)',
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+      parameters: [
+        { name: 'sessionId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+      ],
+      responses: { 200: { description: 'Admin session history' } },
+    },
+    delete: {
+      tags: ['Chatbot'],
+      summary: 'Delete a conversation session (Admin only)',
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+      parameters: [
+        { name: 'sessionId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+      ],
+      responses: { 200: { description: 'Admin session deleted' } },
+    },
+  },
+  '/api/chatbot/admin/feedback/stats': {
+    get: {
+      tags: ['Chatbot'],
+      summary: 'Get aggregated chatbot feedback statistics and recent comments (Admin only)',
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+      parameters: [
+        { name: 'limit', in: 'query', schema: { type: 'integer', default: 10, minimum: 1, maximum: 50 } },
+      ],
+      responses: { 200: { description: 'Feedback statistics payload' } },
+    },
+  },
 };

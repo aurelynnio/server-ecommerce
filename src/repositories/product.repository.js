@@ -5,6 +5,12 @@ const { createLiteralRegex } = require('../utils/query.utils');
 const CATALOG_SUMMARY_FIELDS =
   'name slug price stock soldCount ratingAverage reviewCount brand isFeatured isNewArrival status flashSale category shop shopCategory descriptionImages variants sizes tags createdAt updatedAt';
 
+const toFiniteNumber = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
 class ProductRepository extends BaseRepository {
   constructor() {
     super(Product);
@@ -394,13 +400,15 @@ class ProductRepository extends BaseRepository {
       query.shopCategory = shopCategory;
     }
 
-    if (minPrice || maxPrice) {
+    const min = toFiniteNumber(minPrice);
+    const max = toFiniteNumber(maxPrice);
+    if (min !== null || max !== null) {
       query['price.currentPrice'] = {};
-      if (minPrice) {
-        query['price.currentPrice'].$gte = Number(minPrice);
+      if (min !== null) {
+        query['price.currentPrice'].$gte = min;
       }
-      if (maxPrice) {
-        query['price.currentPrice'].$lte = Number(maxPrice);
+      if (max !== null) {
+        query['price.currentPrice'].$lte = max;
       }
     }
 
@@ -476,7 +484,10 @@ class ProductRepository extends BaseRepository {
   }
 
   findByIdWithCategoryNameLean(productId) {
-    return this.findById(productId).populate('category', 'name').lean();
+    return this.findById(productId)
+      .populate('category', 'name')
+      .populate('shop', 'status')
+      .lean();
   }
 
   updateByIdWithCategory(productId, updateData) {
@@ -675,9 +686,11 @@ class ProductRepository extends BaseRepository {
   findPublishedAutocomplete(search, limit = 10) {
     // Autocomplete dùng prefix (^) để tận dụng được index thay vì quét toàn bộ collection.
     const searchRegex = createLiteralRegex(search, { match: 'prefix' });
+    // Keyword rỗng/toàn khoảng trắng: trả rỗng thay vì bỏ $or và trả sản phẩm ngẫu nhiên.
+    if (!searchRegex) return Promise.resolve([]);
     return this.findManyByFilter({
       status: 'published',
-      ...(searchRegex && { $or: [{ name: searchRegex }, { tags: searchRegex }] }),
+      $or: [{ name: searchRegex }, { tags: searchRegex }],
     })
       .select('name slug price variants')
       .limit(limit)
@@ -765,7 +778,9 @@ class ProductRepository extends BaseRepository {
             {
               $bucket: {
                 groupBy: '$ratingAverage',
-                boundaries: [0, 3, 4, 4.5, 5],
+                // Upper bound phải > 5 để sản phẩm đúng 5.0 sao không rơi vào
+                // bucket `default: unrated` ($bucket loại biên trên).
+                boundaries: [0, 3, 4, 4.5, 5.1],
                 default: 'unrated',
                 output: { count: { $sum: 1 } },
               },
@@ -891,8 +906,9 @@ class ProductRepository extends BaseRepository {
   findPublishedForEmbedding() {
     return this.findManyByFilter({ status: 'published' })
       .populate('category', 'name')
+      .populate('shop', 'status')
       .select(
-        'name slug description brand tags sizes variants price status isFeatured isNewArrival stock soldCount ratingAverage updatedAt',
+        'name slug description brand tags sizes variants price flashSale attributes status isFeatured isNewArrival stock soldCount ratingAverage updatedAt shop',
       )
       .lean();
   }
@@ -928,7 +944,20 @@ class ProductRepository extends BaseRepository {
       .lean();
   }
 
-  findFallbackTextSearch(queryText, { isFeatured, categoryId, limit = 5 } = {}) {
+  findFallbackTextSearch(
+    queryText,
+    {
+      isFeatured,
+      categoryId,
+      brand,
+      minPrice,
+      maxPrice,
+      inStockOnly,
+      minStock,
+      hasDiscount,
+      limit = 5,
+    } = {},
+  ) {
     const queryRegex = createLiteralRegex(queryText);
     if (!queryRegex) return Promise.resolve([]);
 
@@ -947,6 +976,24 @@ class ProductRepository extends BaseRepository {
     }
     if (categoryId) {
       query.category = categoryId;
+    }
+    const brandRegex = createLiteralRegex(brand);
+    if (brandRegex) {
+      query.brand = brandRegex;
+    }
+    if (Number.isFinite(minPrice) || Number.isFinite(maxPrice)) {
+      query['price.currentPrice'] = {};
+      if (Number.isFinite(minPrice)) query['price.currentPrice'].$gte = minPrice;
+      if (Number.isFinite(maxPrice)) query['price.currentPrice'].$lte = maxPrice;
+    }
+    if (inStockOnly) {
+      query.stock = { $gt: 0 };
+    } else if (Number.isFinite(minStock)) {
+      query.stock = { $gte: minStock };
+    }
+    if (hasDiscount === true) {
+      query['price.discountPrice'] = { $exists: true, $ne: null };
+      query.$expr = { $lt: ['$price.discountPrice', '$price.currentPrice'] };
     }
 
     return this.findManyByFilter(query)
@@ -986,21 +1033,24 @@ class ProductRepository extends BaseRepository {
   _buildAdvancedSearchQuery({ keyword, categoryIds = [], minPrice, maxPrice, rating } = {}) {
     const query = { status: 'published' };
 
-    if (keyword) {
-      query.$text = { $search: keyword };
+    const normalizedKeyword = typeof keyword === 'string' ? keyword.trim() : keyword;
+    if (normalizedKeyword) {
+      query.$text = { $search: normalizedKeyword };
     }
 
     if (categoryIds.length > 0) {
       query.category = { $in: categoryIds };
     }
 
-    if (minPrice || maxPrice) {
+    const min = toFiniteNumber(minPrice);
+    const max = toFiniteNumber(maxPrice);
+    if (min !== null || max !== null) {
       query['price.currentPrice'] = {};
-      if (minPrice) {
-        query['price.currentPrice'].$gte = Number(minPrice);
+      if (min !== null) {
+        query['price.currentPrice'].$gte = min;
       }
-      if (maxPrice) {
-        query['price.currentPrice'].$lte = Number(maxPrice);
+      if (max !== null) {
+        query['price.currentPrice'].$lte = max;
       }
     }
 

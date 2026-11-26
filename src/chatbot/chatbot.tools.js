@@ -2,6 +2,7 @@ const Product = require('../models/product.model');
 const Category = require('../models/category.model');
 const mongoose = require('mongoose');
 const logger = require('../utils/logger');
+const Voucher = require('../repositories/voucher.repository');
 
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 20;
@@ -65,7 +66,9 @@ const mapProductSummary = (product) => {
       : 0;
 
   return {
-    id: product._id,
+    id: String(product._id),
+    productId: String(product._id),
+    shopId: product.shop?._id ? String(product.shop._id) : product.shop ? String(product.shop) : null,
     name: product.name,
     slug: product.slug,
     price: finalPrice,
@@ -73,21 +76,50 @@ const mapProductSummary = (product) => {
     hasDiscount,
     discountPercent,
     brand: product.brand || null,
-    category: product.category?.name || null,
+    category: product.category?._id
+      ? { id: String(product.category._id), name: product.category.name || null }
+      : product.category?.name
+        ? { id: null, name: product.category.name }
+        : null,
     shop: product.shop?.name || null,
     ratingAverage: product.ratingAverage || 0,
     soldCount: product.soldCount || 0,
     stock: product.stock || 0,
     inStock: (product.stock || 0) > 0,
-    variantCount: product.variants?.length || 0,
     sizes: product.sizes || [],
     colors: [...new Set(product.variants?.map((variant) => variant.color).filter(Boolean))],
+    variants: (product.variants || []).map((variant) => ({
+      id: String(variant._id),
+      modelId: String(variant._id),
+      size: variant.size || null,
+      color: variant.color || null,
+      stock: variant.stock || 0,
+      price: resolveVariantPrice(variant, product) ?? null,
+      image: variant.images?.[0] || null,
+    })),
     tags: product.tags || [],
     image: product.variants?.[0]?.images?.[0] || null,
     checkoutUrl: `/checkout?product=${product._id}`,
     productUrl: `/products/${product.slug}`,
   };
 };
+
+const PRODUCT_PROJECTION =
+  'name slug price variants brand category shop stock soldCount ratingAverage tags sizes createdAt';
+
+async function hydrateProductSummaries(items = []) {
+  const ids = items
+    .map((item) => item?.productId || item?.id || item?._id)
+    .filter((id) => mongoose.Types.ObjectId.isValid(id));
+  if (ids.length === 0) return [];
+  const products = await Product.find({ _id: { $in: ids }, status: 'published' })
+    .populate('category', 'name slug')
+    .populate('shop', 'name slug status')
+    .select(PRODUCT_PROJECTION)
+    .lean();
+  const byId = new Map(products.map((product) => [String(product._id), mapProductSummary(product)]));
+  return ids.map((id) => byId.get(String(id))).filter(Boolean);
+}
 
 async function resolveCategoryIds(categoryInput) {
   const categoryTokens = normalizeStringArray(categoryInput);
@@ -211,9 +243,7 @@ async function searchProductsByQuery(params = {}) {
   const products = await Product.find(query)
     .populate('category', 'name slug')
     .populate('shop', 'name slug')
-    .select(
-      'name slug price variants brand category shop stock soldCount ratingAverage tags sizes createdAt',
-    )
+    .select(PRODUCT_PROJECTION)
     .sort(sort)
     .limit(limit)
     .lean();
@@ -221,15 +251,72 @@ async function searchProductsByQuery(params = {}) {
   return products.map(mapProductSummary);
 }
 
+function resolveVariantPrice(variant, product) {
+  if (typeof variant?.price === 'number') return variant.price;
+  if (typeof variant?.price?.discountPrice === 'number') return variant.price.discountPrice;
+  if (typeof variant?.price?.currentPrice === 'number') return variant.price.currentPrice;
+  return product?.price?.discountPrice || product?.price?.currentPrice;
+}
+
+function getProductAvailability(product, size, color) {
+  const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
+  let variants = hasVariants ? product.variants : [];
+  let simpleProductSizeAvailable = true;
+
+  if (size) {
+    const lowerSize = size.toLowerCase();
+    const hasVariantSize = variants.some((v) => typeof v.size === 'string' && v.size.length > 0);
+    if (hasVariantSize) {
+      variants = variants.filter((v) => v.size?.toLowerCase() === lowerSize);
+    } else if (!hasVariants) {
+      simpleProductSizeAvailable =
+        Array.isArray(product.sizes) &&
+        product.sizes.some((s) => String(s).toLowerCase() === lowerSize);
+    } else if (Array.isArray(product.sizes) && product.sizes.length > 0) {
+      const sizeSupported = product.sizes.some((s) => String(s).toLowerCase() === lowerSize);
+      if (!sizeSupported) variants = [];
+    }
+  }
+  if (color) variants = variants.filter((v) => v.color?.toLowerCase() === color.toLowerCase());
+
+  const availableVariants = variants.filter((v) => v.stock > 0);
+  const simpleProductAvailable =
+    !hasVariants && product.stock > 0 && simpleProductSizeAvailable && !color;
+  const totalStock = hasVariants
+    ? availableVariants.reduce((sum, v) => sum + v.stock, 0)
+    : simpleProductAvailable
+      ? product.stock
+      : 0;
+  const available = availableVariants.length > 0 || simpleProductAvailable;
+
+  const selectedVariant = availableVariants[0];
+  const variantParam = selectedVariant?._id ? `&variant=${selectedVariant._id}` : '';
+  const effectiveSize = selectedVariant?.size || size;
+  const sizeParam = effectiveSize ? `&size=${encodeURIComponent(effectiveSize)}` : '';
+
+  return {
+    available,
+    variants: availableVariants,
+    totalStock,
+    checkoutUrl: available
+      ? `/checkout?product=${product._id}${variantParam}${sizeParam}`
+      : null,
+  };
+}
+
 async function findProduct(productId) {
   const isValidId = mongoose.Types.ObjectId.isValid(productId);
 
   if (isValidId) {
-    const product = await Product.findById(productId).populate('category', 'name').lean();
+    const product = await Product.findOne({ _id: productId, status: 'published' })
+      .populate('category', 'name')
+      .lean();
     if (product) return product;
   }
 
-  return await Product.findOne({ slug: productId }).populate('category', 'name').lean();
+  return await Product.findOne({ slug: productId, status: 'published' })
+    .populate('category', 'name')
+    .lean();
 }
 
 /**
@@ -250,12 +337,12 @@ async function findProductsBatch(productIds = []) {
 
   const [byIds, bySlugs] = await Promise.all([
     objectIds.length
-      ? Product.find({ _id: { $in: objectIds } })
+      ? Product.find({ _id: { $in: objectIds }, status: 'published' })
           .populate('category', 'name')
           .lean()
       : Promise.resolve([]),
     slugs.length
-      ? Product.find({ slug: { $in: slugs } })
+      ? Product.find({ slug: { $in: slugs }, status: 'published' })
           .populate('category', 'name')
           .lean()
       : Promise.resolve([]),
@@ -387,6 +474,8 @@ const toolHandlers = {
   async get_discounted_products({
     keyword,
     category,
+    minPrice,
+    maxPrice,
     minDiscountPercent = 5,
     inStockOnly = true,
     limit = 5,
@@ -395,6 +484,8 @@ const toolHandlers = {
       const rawProducts = await searchProductsByQuery({
         keyword,
         category,
+        minPrice,
+        maxPrice,
         inStockOnly,
         onlyDiscounted: true,
         sortBy: 'bestselling',
@@ -413,6 +504,75 @@ const toolHandlers = {
         error: 'Không thể lấy danh sách sản phẩm giảm giá',
         details: error.message,
       };
+    }
+  },
+
+  async semantic_search_products({ query, limit = 5, filters = {}, minScore } = {}) {
+    try {
+      if (!query || typeof query !== 'string') return { error: 'Thiếu nội dung tìm kiếm' };
+      const embeddingService = require('../services/embedding.service');
+      const result = embeddingService.searchHybridProducts
+        ? await embeddingService.searchHybridProducts(query, {
+            limit: normalizeLimit(limit),
+            filter: filters && typeof filters === 'object' ? filters : {},
+            ...(Number.isFinite(Number(minScore)) ? { minScore: Number(minScore) } : {}),
+          })
+        : {
+            items: await embeddingService.searchSimilarProducts(query, {
+              limit: normalizeLimit(limit),
+              filter: filters && typeof filters === 'object' ? filters : {},
+            }),
+            strategy: 'vector_search',
+          };
+      const metrics = require('../monitoring/chatbot.metrics');
+      metrics.chatbotRetrievalTotal.inc({
+        mode: (Array.isArray(result) ? null : result?.strategy) || 'vector_search',
+      });
+      const items = Array.isArray(result) ? result : result.items || [];
+      return await hydrateProductSummaries(items);
+    } catch (error) {
+      logger.error('[Tool] semantic_search_products error:', { error: error.message });
+      return { error: 'Không thể tìm kiếm ngữ nghĩa' };
+    }
+  },
+
+  async get_available_vouchers({ shopId, limit = 10 } = {}) {
+    try {
+      if (shopId && !mongoose.Types.ObjectId.isValid(shopId)) {
+        return { error: 'shopId không hợp lệ' };
+      }
+      const now = new Date();
+      const [platform, shop] = await Promise.all([
+        Voucher.findAvailablePlatform(now),
+        shopId ? Voucher.findAvailableShop(shopId, now) : Promise.resolve([]),
+      ]);
+      return [...platform, ...shop].slice(0, normalizeLimit(limit, 10)).map((voucher) => ({
+        id: String(voucher._id),
+        code: voucher.code,
+        name: voucher.name,
+        description: voucher.description || null,
+        type: voucher.type,
+        value: voucher.value,
+        maxValue: voucher.maxValue ?? null,
+        scope: voucher.scope,
+        shopId: voucher.shopId ? String(voucher.shopId) : null,
+        minOrderValue: voucher.minOrderValue || 0,
+        endDate: voucher.endDate,
+      }));
+    } catch (error) {
+      logger.error('[Tool] get_available_vouchers error:', { error: error.message });
+      return { error: 'Không thể lấy voucher khả dụng' };
+    }
+  },
+
+  async search_store_policies({ query, type, limit = 5 } = {}) {
+    try {
+      if (!query || typeof query !== 'string') return { error: 'Thiếu câu hỏi chính sách' };
+      const { searchKnowledge } = require('../services/knowledge.service');
+      return await searchKnowledge(query, { type, limit: normalizeLimit(limit) });
+    } catch (error) {
+      logger.error('[Tool] search_store_policies error:', { error: error.message });
+      return { error: 'Không tìm thấy chính sách đã được phê duyệt phù hợp' };
     }
   },
 
@@ -589,12 +749,13 @@ const toolHandlers = {
           product.price?.discountPrice && product.price.discountPrice < product.price.currentPrice,
         brand: product.brand,
         category: product.category?.name,
+        sizes: product.sizes || [],
         variants: product.variants?.map((v) => ({
           id: v._id,
           size: v.size,
           color: v.color,
           stock: v.stock,
-          price: v.price?.discountPrice || v.price?.currentPrice,
+          price: resolveVariantPrice(v, product),
           image: v.images?.[0],
         })),
         checkoutUrl: `/checkout?product=${product._id}`,
@@ -700,33 +861,24 @@ const toolHandlers = {
       const product = await findProduct(productId);
       if (!product) return { error: 'Không tìm thấy sản phẩm' };
 
-      let variants = product.variants || [];
-
-      if (size) variants = variants.filter((v) => v.size?.toLowerCase() === size.toLowerCase());
-      if (color) variants = variants.filter((v) => v.color?.toLowerCase() === color.toLowerCase());
-
-      const available = variants.filter((v) => v.stock > 0);
+      const availability = getProductAvailability(product, size, color);
 
       return {
         productName: product.name,
         productSlug: product.slug,
-        available: available.length > 0,
-        variants: available.map((v) => ({
+        sizes: product.sizes || [],
+        available: availability.available,
+        variants: availability.variants.map((v) => ({
           id: v._id,
           size: v.size,
           color: v.color,
           stock: v.stock,
-          price: v.price?.discountPrice || v.price?.currentPrice,
+          price: resolveVariantPrice(v, product),
         })),
-        totalStock: available.reduce((sum, v) => sum + v.stock, 0),
+        totalStock: availability.totalStock,
         message:
-          available.length > 0
-            ? `Còn ${available.reduce((sum, v) => sum + v.stock, 0)} sản phẩm`
-            : 'Hết hàng',
-        checkoutUrl:
-          available.length > 0
-            ? `/checkout?product=${product._id}&variant=${available[0]._id}`
-            : null,
+          availability.available ? `Còn ${availability.totalStock} sản phẩm` : 'Hết hàng',
+        checkoutUrl: availability.checkoutUrl,
         productUrl: `/products/${product.slug}`,
       };
     } catch (error) {
@@ -737,29 +889,31 @@ const toolHandlers = {
     }
   },
 
-  async generate_checkout_link({ productId, variantId, quantity = 1 }) {
+  async generate_checkout_link({ productId, variantId, size, quantity = 1 }) {
     try {
       const product = await findProduct(productId);
       if (!product) return { error: 'Không tìm thấy sản phẩm' };
 
-      let checkoutUrl = `/checkout?product=${product._id}&quantity=${quantity}`;
-      if (variantId) checkoutUrl += `&variant=${variantId}`;
-
       const variant = variantId
         ? product.variants?.find((v) => v._id.toString() === variantId)
         : product.variants?.[0];
+      const effectiveSize = size || variant?.size;
+
+      let checkoutUrl = `/checkout?product=${product._id}&quantity=${quantity}`;
+      if (variantId) checkoutUrl += `&variant=${variantId}`;
+      if (effectiveSize) checkoutUrl += `&size=${encodeURIComponent(effectiveSize)}`;
+
+      let addToCartUrl = `/cart/add?product=${product._id}${variantId ? `&variant=${variantId}` : ''}&quantity=${quantity}`;
+      if (effectiveSize) addToCartUrl += `&size=${encodeURIComponent(effectiveSize)}`;
 
       return {
         checkoutUrl,
-        addToCartUrl: `/cart/add?product=${product._id}${variantId ? `&variant=${variantId}` : ''}&quantity=${quantity}`,
+        addToCartUrl,
         productUrl: `/products/${product.slug}`,
         product: {
           name: product.name,
           slug: product.slug,
-          price:
-            variant?.price?.discountPrice ||
-            variant?.price?.currentPrice ||
-            product.price?.currentPrice,
+          price: resolveVariantPrice(variant, product),
           variant: variant ? { size: variant.size, color: variant.color } : null,
           quantity,
         },
@@ -786,7 +940,10 @@ const toolHandlers = {
         brand: p.brand,
         category: p.category?.name,
         variantCount: p.variants?.length || 0,
-        sizes: [...new Set(p.variants?.map((v) => v.size).filter(Boolean))],
+        sizes:
+          Array.isArray(p.sizes) && p.sizes.length > 0
+            ? p.sizes
+            : [...new Set(p.variants?.map((v) => v.size).filter(Boolean))],
         colors: [...new Set(p.variants?.map((v) => v.color).filter(Boolean))],
         checkoutUrl: `/checkout?product=${p._id}`,
         productUrl: `/products/${p.slug}`,
@@ -798,4 +955,9 @@ const toolHandlers = {
   },
 };
 
-module.exports = { toolHandlers };
+module.exports = {
+  toolHandlers,
+  getProductAvailability,
+  mapProductSummary,
+  hydrateProductSummaries,
+};

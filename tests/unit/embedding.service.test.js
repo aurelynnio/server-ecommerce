@@ -1,162 +1,187 @@
 /**
- * Unit Tests: Embedding Service Pure Logic
- * Tests createProductTextContent and createProductMetadata
+ * Unit tests cho embedding.service — import code thật (không copy stub).
+ * Module an toàn khi import vì model Mistral được khởi tạo lazy.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { createRequire } from 'module';
 
-// Can't import the full module (MistralAI constructor runs), so test logic directly
+const require = createRequire(import.meta.url);
+const {
+  createProductTextContent,
+  createProductSearchText,
+  getVietnameseKeywords,
+  computeContentHash,
+  createProductMetadata,
+  mergeHybridResults,
+  fallbackTextSearch,
+} = require('../../src/services/embedding.service');
+const Product = require('../../src/repositories/product.repository');
 
-describe('Embedding Service Logic', () => {
-  // Re-implement pure function from embedding.service.js
-  const createProductTextContent = (product) => {
-    const parts = [];
-
-    if (product.name) {
-      parts.push(`Tên sản phẩm: ${product.name}`);
-    }
-    if (product.brand) {
-      parts.push(`Thương hiệu: ${product.brand}`);
-    }
-    if (product.category?.name) {
-      parts.push(`Danh mục: ${product.category.name}`);
-    }
-    if (product.tags && product.tags.length > 0) {
-      parts.push(`Tags: ${product.tags.join(', ')}`);
-    }
-    if (product.sizes && product.sizes.length > 0) {
-      parts.push(`Kích cỡ: ${product.sizes.join(', ')}`);
-    }
-
-    const colors = [...new Set(product.variants?.map((v) => v.color).filter(Boolean))];
-    if (colors.length > 0) {
-      parts.push(`Màu sắc: ${colors.join(', ')}`);
-    }
-
-    const price = product.price?.discountPrice || product.price?.currentPrice;
-    if (price) {
-      parts.push(`Giá: ${price.toLocaleString('vi-VN')}đ`);
-    }
-
-    if (product.description) {
-      const truncatedDesc = product.description.substring(0, 500);
-      parts.push(`Mô tả: ${truncatedDesc}`);
-    }
-
-    return parts.join('. ');
-  };
-
-  const createProductMetadata = (product) => {
-    return {
-      productId: product._id.toString(),
-      name: product.name,
-      slug: product.slug,
-      brand: product.brand || null,
-      category: product.category?.name || null,
-      categoryId: product.category?._id?.toString() || null,
-      price: product.price?.discountPrice || product.price?.currentPrice,
-      originalPrice: product.price?.currentPrice,
-      hasDiscount: !!(
-        product.price?.discountPrice && product.price.discountPrice < product.price.currentPrice
-      ),
-      status: product.status,
-      isFeatured: product.isFeatured || false,
-      isNewArrival: product.isNewArrival || false,
-      stock: product.stock || 0,
-      soldCount: product.soldCount || 0,
-      ratingAverage: product.ratingAverage || 0,
-      image: product.variants?.[0]?.images?.[0] || null,
-      productUrl: `/products/${product.slug}`,
-      checkoutUrl: `/checkout?product=${product._id}`,
-      updatedAt: product.updatedAt || expect.any(Date),
-    };
-  };
-
+describe('embedding.service (real module)', () => {
   describe('createProductTextContent()', () => {
-    it('should include product name', () => {
-      const result = createProductTextContent({ name: 'Áo khoác nam' });
-      expect(result).toContain('Tên sản phẩm: Áo khoác nam');
-    });
-
-    it('should include brand', () => {
+    it('includes core product fields', () => {
       const result = createProductTextContent({
-        name: 'Test',
+        name: 'Áo khoác nam',
         brand: 'Nike',
-      });
-      expect(result).toContain('Thương hiệu: Nike');
-    });
-
-    it('should include category name', () => {
-      const result = createProductTextContent({
-        name: 'Test',
         category: { name: 'Thời trang' },
-      });
-      expect(result).toContain('Danh mục: Thời trang');
-    });
-
-    it('should include tags', () => {
-      const result = createProductTextContent({
-        name: 'Test',
-        tags: ['hot', 'new', 'sale'],
-      });
-      expect(result).toContain('Tags: hot, new, sale');
-    });
-
-    it('should include sizes', () => {
-      const result = createProductTextContent({
-        name: 'Test',
-        sizes: ['S', 'M', 'L'],
-      });
-      expect(result).toContain('Kích cỡ: S, M, L');
-    });
-
-    it('should extract unique colors from variants', () => {
-      const result = createProductTextContent({
-        name: 'Test',
-        variants: [{ color: 'Red' }, { color: 'Blue' }, { color: 'Red' }],
-      });
-      expect(result).toContain('Màu sắc: Red, Blue');
-      // Should be deduped
-      expect(result.match(/Red/g)).toHaveLength(1);
-    });
-
-    it('should prefer discountPrice over currentPrice', () => {
-      const result = createProductTextContent({
-        name: 'Test',
+        tags: ['hot', 'new'],
+        sizes: ['M', 'L'],
+        variants: [{ color: 'Đen' }, { color: 'Trắng' }, { color: 'Đen' }],
         price: { currentPrice: 200000, discountPrice: 150000 },
       });
+
+      expect(result).toContain('Tên sản phẩm: Áo khoác nam');
+      expect(result).toContain('Thương hiệu: Nike');
+      expect(result).toContain('Danh mục: Thời trang');
+      expect(result).toContain('Tags: hot, new');
+      expect(result).toContain('Kích cỡ: M, L');
+      expect(result).toContain('Màu sắc: Đen, Trắng');
+      expect(result.match(/Đen/g)).toHaveLength(1);
       expect(result).toContain('150');
     });
 
-    it('should use currentPrice when no discount', () => {
+    it('includes attributes spec block', () => {
       const result = createProductTextContent({
-        name: 'Test',
-        price: { currentPrice: 200000 },
+        name: 'Áo thun',
+        attributes: [
+          { name: 'Chất liệu', value: 'Cotton' },
+          { name: 'Xuất xứ', value: 'Việt Nam' },
+          { name: '' },
+          null,
+        ],
       });
-      expect(result).toContain('200');
+
+      expect(result).toContain('Thông số: Chất liệu: Cotton, Xuất xứ: Việt Nam');
     });
 
-    it('should truncate description to 500 chars', () => {
-      const longDesc = 'A'.repeat(600);
+    it('includes flash-sale price when the campaign is active', () => {
+      const now = Date.now();
+      const result = createProductTextContent({
+        name: 'Giày chạy bộ',
+        price: { currentPrice: 500000, discountPrice: 450000 },
+        flashSale: {
+          isActive: true,
+          salePrice: 299000,
+          stock: 10,
+          soldCount: 1,
+          startTime: new Date(now - 60_000),
+          endTime: new Date(now + 3600_000),
+        },
+      });
+
+      expect(result).toContain('Giá flash sale');
+      expect(result).toContain('299.000');
+    });
+
+    it('truncates description to 500 chars', () => {
       const result = createProductTextContent({
         name: 'Test',
-        description: longDesc,
+        description: 'A'.repeat(600),
       });
-      // Should have exactly 500 As + prefix
-      expect(result).toContain('Mô tả: ' + 'A'.repeat(500));
+
+      expect(result).toContain(`Mô tả: ${'A'.repeat(500)}`);
       expect(result).not.toContain('A'.repeat(501));
     });
 
-    it('should handle minimal product', () => {
-      const result = createProductTextContent({ name: 'Simple' });
-      expect(result).toBe('Tên sản phẩm: Simple');
+    it('handles a minimal product', () => {
+      expect(createProductTextContent({ name: 'Simple' })).toBe('Tên sản phẩm: Simple');
+    });
+  });
+
+  describe('createProductSearchText()', () => {
+    it('keeps real values and drops static labels used by the embedding text', () => {
+      const searchText = createProductSearchText({
+        name: 'Áo thun nam',
+        brand: 'Nike',
+        category: { name: 'Thời trang' },
+        tags: ['cotton'],
+        attributes: [{ name: 'Chất liệu', value: 'Cotton' }],
+        description: 'Áo thun thoáng mát',
+      });
+
+      expect(searchText).toContain('Áo thun nam');
+      expect(searchText).toContain('Nike');
+      expect(searchText).toContain('Cotton');
+      expect(searchText).not.toContain('Tên sản phẩm:');
+      expect(searchText).not.toContain('Thương hiệu:');
+      expect(searchText).not.toContain('Mô tả:');
+    });
+  });
+
+  describe('mergeHybridResults() text score floor', () => {
+    it('drops BM25 noise below minTextScore before RRF', () => {
+      const merged = mergeHybridResults(
+        [{ productId: 'p1', score: 0.9, metadata: { stock: 1 } }],
+        [
+          { productId: 'noise', score: 0.1, metadata: { stock: 5 } },
+          { productId: 'p2', score: 3, metadata: { stock: 2 } },
+        ],
+        { minScore: 0.25, minTextScore: 0.5, limit: 5 },
+      );
+
+      const ids = merged.map((item) => item.productId);
+      expect(ids).toContain('p1');
+      expect(ids).toContain('p2');
+      expect(ids).not.toContain('noise');
+    });
+  });
+
+  describe('fallbackTextSearch() filter pass-through', () => {
+    it('forwards brand/price/discount/stock filters to the repository', async () => {
+      const spy = vi.spyOn(Product, 'findFallbackTextSearch').mockResolvedValue([]);
+
+      await fallbackTextSearch('áo thun', {
+        limit: 5,
+        filter: {
+          brand: 'Nike',
+          minPrice: 0,
+          maxPrice: 300000,
+          hasDiscount: true,
+          minStock: 2,
+        },
+      });
+
+      expect(spy).toHaveBeenCalledWith(
+        'áo thun',
+        expect.objectContaining({
+          brand: 'Nike',
+          minPrice: 0,
+          maxPrice: 300000,
+          hasDiscount: true,
+          minStock: 2,
+        }),
+      );
+      spy.mockRestore();
+    });
+  });
+
+  describe('getVietnameseKeywords()', () => {
+    it.each([
+      ['iPhone 15 Pro', 'điện thoại'],
+      ['Áo thun cotton', 'áo thun'],
+      ['Kem chống nắng SPF50', 'kem chống nắng'],
+      ['Nồi chống dính 28cm', 'nồi chảo'],
+      ['Laptop văn phòng 14 inch', 'laptop'],
+      ['Bóng đá size 5', 'bóng đá'],
+      ['Cà phê rang xay', 'cà phê'],
+    ])('maps "%s" to industry keywords', (name, expected) => {
+      expect(getVietnameseKeywords({ name })).toContain(expected);
     });
 
-    it('should join parts with . separator', () => {
-      const result = createProductTextContent({
-        name: 'Test',
-        brand: 'Nike',
-      });
-      expect(result).toBe('Tên sản phẩm: Test. Thương hiệu: Nike');
+    it('does not match "top" inside "laptop"', () => {
+      const keywords = getVietnameseKeywords({ name: 'Laptop gaming' });
+      expect(keywords).not.toContain('áo thun');
+      expect(keywords).toContain('laptop');
+    });
+  });
+
+  describe('computeContentHash()', () => {
+    it('is deterministic and sha256-sized', () => {
+      const hash = computeContentHash('Tên sản phẩm: A');
+      expect(hash).toHaveLength(64);
+      expect(hash).toMatch(/^[a-f0-9]{64}$/);
+      expect(hash).toBe(computeContentHash('Tên sản phẩm: A'));
+      expect(hash).not.toBe(computeContentHash('Tên sản phẩm: B'));
     });
   });
 
@@ -166,87 +191,44 @@ describe('Embedding Service Logic', () => {
       name: 'Test Product',
       slug: 'test-product',
       brand: 'TestBrand',
-      category: {
-        name: 'Category',
-        _id: { toString: () => 'cat456' },
-      },
+      category: { name: 'Category', _id: { toString: () => 'cat456' } },
       price: { currentPrice: 200000, discountPrice: 150000 },
       status: 'published',
       isFeatured: true,
-      isNewArrival: false,
       stock: 50,
       soldCount: 100,
       ratingAverage: 4.5,
-      variants: [{ images: ['img1.jpg', 'img2.jpg'] }],
+      variants: [{ images: ['img1.jpg'] }],
+      shop: { status: 'active' },
     };
 
-    it('should map all fields correctly', () => {
+    it('maps core fields and discount price', () => {
       const meta = createProductMetadata(baseProduct);
       expect(meta.productId).toBe('abc123');
-      expect(meta.name).toBe('Test Product');
-      expect(meta.slug).toBe('test-product');
-      expect(meta.brand).toBe('TestBrand');
-      expect(meta.category).toBe('Category');
       expect(meta.categoryId).toBe('cat456');
-    });
-
-    it('should prefer discountPrice', () => {
-      const meta = createProductMetadata(baseProduct);
       expect(meta.price).toBe(150000);
       expect(meta.originalPrice).toBe(200000);
-    });
-
-    it('should compute hasDiscount correctly', () => {
-      const meta = createProductMetadata(baseProduct);
       expect(meta.hasDiscount).toBe(true);
-    });
-
-    it('should detect no discount', () => {
-      const noDiscount = {
-        ...baseProduct,
-        price: { currentPrice: 100000 },
-      };
-      const meta = createProductMetadata(noDiscount);
-      expect(meta.hasDiscount).toBe(false);
-    });
-
-    it('should build productUrl from slug', () => {
-      const meta = createProductMetadata(baseProduct);
       expect(meta.productUrl).toBe('/products/test-product');
-    });
-
-    it('should build checkoutUrl from _id', () => {
-      const meta = createProductMetadata(baseProduct);
       expect(meta.checkoutUrl).toBe('/checkout?product=abc123');
-    });
-
-    it('should get first variant image', () => {
-      const meta = createProductMetadata(baseProduct);
       expect(meta.image).toBe('img1.jpg');
+      expect(meta.shopStatus).toBe('active');
     });
 
-    it('should handle missing variants', () => {
-      const noVariants = { ...baseProduct, variants: [] };
-      const meta = createProductMetadata(noVariants);
-      expect(meta.image).toBeNull();
-    });
-
-    it('should default nullable fields', () => {
-      const minimal = {
+    it('defaults nullable fields', () => {
+      const meta = createProductMetadata({
         _id: { toString: () => 'min1' },
         name: 'Minimal',
         slug: 'minimal',
         price: { currentPrice: 0 },
         status: 'draft',
-      };
-      const meta = createProductMetadata(minimal);
+      });
+
       expect(meta.brand).toBeNull();
       expect(meta.category).toBeNull();
       expect(meta.categoryId).toBeNull();
       expect(meta.isFeatured).toBe(false);
       expect(meta.stock).toBe(0);
-      expect(meta.soldCount).toBe(0);
-      expect(meta.ratingAverage).toBe(0);
       expect(meta.image).toBeNull();
     });
   });

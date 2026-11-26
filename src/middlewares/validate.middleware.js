@@ -27,6 +27,15 @@ const validate = (schemaParam) => (req, res, next) => {
       if (error) {
         const errors = error.details.map((detail) => detail.message);
         validationErrors.push(...errors);
+      } else if (key === 'query') {
+        // Express 5 định nghĩa req.query là getter-only trên prototype:
+        // `req.query = value` là no-op, khiến toàn bộ trim/default của Joi bị mất.
+        Object.defineProperty(req, 'query', {
+          value,
+          writable: true,
+          configurable: true,
+          enumerable: true,
+        });
       } else {
         req[key] = value;
       }

@@ -7,6 +7,7 @@ const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../utils/ApiError');
 const { ensureFound } = require('../utils/serviceAssertions');
 const { getOwnedShopOrThrow } = require('../utils/shopAssertions');
+const embeddingSyncService = require('./embedding-sync.service');
 
 const REVIEW_SORT_MAP = {
   newest: { createdAt: -1 },
@@ -264,6 +265,9 @@ class ReviewService {
         product.reviewCount = 0;
       }
       await product.save();
+      await embeddingSyncService.scheduleProductSync(productId, {
+        reason: 'product_rating_updated',
+      });
     }
 
     return stats.length > 0

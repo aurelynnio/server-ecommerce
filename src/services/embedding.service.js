@@ -5,9 +5,11 @@ const Product = require('../repositories/product.repository');
 const Category = require('../repositories/category.repository');
 const logger = require('../utils/logger');
 const redisService = require('./redis.service');
+const { getProductFlashSale } = require('../utils/flashSale.util');
 
 const QUERY_VECTOR_CACHE_PREFIX = 'embed:q:';
 const QUERY_VECTOR_TTL_SECONDS = Number(process.env.EMBEDDING_QUERY_CACHE_TTL) || 3600;
+const EMBEDDING_MODEL = 'mistral-embed';
 
 // Singleton embedding model
 let embeddingModel = null;
@@ -20,7 +22,7 @@ function getEmbeddingModel() {
   if (!embeddingModel) {
     embeddingModel = new MistralAIEmbeddings({
       apiKey: process.env.MISTRAL_API_KEY,
-      model: 'mistral-embed', // Mistral's embedding model
+      model: EMBEDDING_MODEL,
       maxRetries: 2,
       ...(process.env.MISTRAL_TIMEOUT_MS
         ? { timeout: Number(process.env.MISTRAL_TIMEOUT_MS) }
@@ -37,6 +39,14 @@ function getEmbeddingModel() {
 function getEmbeddingsCollection() {
   const client = mongoose.connection.getClient();
   return client.db().collection('product_embeddings');
+}
+
+function isProductEmbeddingEligible(product) {
+  return product?.status === 'published' && product?.shop?.status === 'active';
+}
+
+function computeContentHash(textContent) {
+  return crypto.createHash('sha256').update(String(textContent)).digest('hex');
 }
 
 /**
@@ -67,43 +77,229 @@ async function getQueryVector(query) {
   return vector;
 }
 
+// Phủ đủ 7 ngành hàng của storefront, khớp cả từ tiếng Anh lẫn tiếng Việt.
+// Dùng Unicode letter boundary thay \b: \b không hiểu chữ có dấu (ê, ồ...)
+// nên sẽ fail với "cà phê", đồng thời tránh khớp nhầm "top" trong "laptop".
+const keywordTerm = (words) =>
+  new RegExp(`(?<!\\p{L})(?:${words.join('|')})(?!\\p{L})`, 'iu');
+
+const INDUSTRY_KEYWORD_RULES = [
+  // 1. Điện thoại & Phụ kiện
+  {
+    pattern: keywordTerm([
+      'phone',
+      'smartphone',
+      'mobile',
+      'tablet',
+      'iphone',
+      'samsung',
+      'charger',
+      'cable',
+      'headphone',
+      'earbud',
+      'powerbank',
+      'case',
+      'protector',
+      'điện thoại',
+      'máy tính bảng',
+      'ốp lưng',
+      'sạc dự phòng',
+      'tai nghe',
+      'cáp sạc',
+    ]),
+    synonyms:
+      'điện thoại, smartphone, máy tính bảng, ốp lưng, sạc dự phòng, tai nghe, cáp sạc, dán màn hình',
+  },
+  // 2. Thời trang
+  {
+    pattern: keywordTerm([
+      'shirt',
+      't-shirt',
+      'tee',
+      'polo',
+      'top',
+      'tank',
+      'jacket',
+      'hoodie',
+      'áo',
+      'áo thun',
+      'áo phông',
+      'áo sơ mi',
+      'quần',
+      'quần short',
+      'quần dài',
+      'quần jean',
+      'legging',
+      'jogger',
+      'váy',
+      'đầm',
+      'giày',
+      'sneaker',
+      'dép',
+      'sandal',
+      'mũ',
+      'nón',
+      'khăn',
+      'túi xách',
+      'balo',
+      'ví',
+      'đồng hồ',
+      'kính mát',
+      'kính râm',
+      'găng tay',
+      'đồ bơi',
+      'áo tắm',
+      'bikini',
+    ]),
+    synonyms:
+      'áo thun, áo phông, áo polo, áo sơ mi, quần short, quần dài, quần jean, váy đầm, giày dép, mũ nón, túi xách, balo, ví, đồng hồ, kính mát',
+  },
+  // 3. Làm đẹp
+  {
+    pattern: keywordTerm([
+      'cosmetic',
+      'skincare',
+      'serum',
+      'cream',
+      'lotion',
+      'lipstick',
+      'makeup',
+      'perfume',
+      'fragrance',
+      'sunscreen',
+      'cleanser',
+      'mask',
+      'mỹ phẩm',
+      'kem dưỡng',
+      'sữa rửa mặt',
+      'son môi',
+      'nước hoa',
+      'kem chống nắng',
+      'mặt nạ',
+      'dưỡng da',
+    ]),
+    synonyms:
+      'mỹ phẩm, kem dưỡng da, serum, sữa rửa mặt, son môi, nước hoa, kem chống nắng, mặt nạ dưỡng da',
+  },
+  // 4. Nhà cửa & Đời sống
+  {
+    pattern: keywordTerm([
+      'furniture',
+      'kitchen',
+      'cookware',
+      'pot',
+      'pan',
+      'blanket',
+      'pillow',
+      'mattress',
+      'lamp',
+      'chair',
+      'table',
+      'storage',
+      'cleaning',
+      'detergent',
+      'nồi',
+      'chảo',
+      'chăn',
+      'gối',
+      'đệm',
+      'đèn',
+      'bàn',
+      'ghế',
+      'kệ',
+      'tủ',
+      'nước giặt',
+      'đồ gia dụng',
+    ]),
+    synonyms:
+      'đồ gia dụng, nồi chảo, chăn ga gối, đèn ngủ, bàn ghế, kệ tủ, nước giặt, đồ vệ sinh nhà cửa',
+  },
+  // 5. Máy tính & Thiết bị
+  {
+    pattern: keywordTerm([
+      'laptop',
+      'computer',
+      'keyboard',
+      'mouse',
+      'monitor',
+      'printer',
+      'router',
+      'ssd',
+      'ram',
+      'cpu',
+      'webcam',
+      'speaker',
+      'máy tính',
+      'bàn phím',
+      'chuột',
+      'màn hình',
+      'máy in',
+      'ổ cứng',
+    ]),
+    synonyms:
+      'laptop, máy tính, bàn phím, chuột máy tính, màn hình, máy in, router wifi, ổ cứng ssd, loa máy tính',
+  },
+  // 6. Thể thao & Du lịch
+  {
+    pattern: keywordTerm([
+      'sport',
+      'gym',
+      'yoga',
+      'running',
+      'ball',
+      'tent',
+      'travel',
+      'suitcase',
+      'bicycle',
+      'cycling',
+      'camping',
+      'thể thao',
+      'chạy bộ',
+      'bóng đá',
+      'lều',
+      'vali',
+      'du lịch',
+      'xe đạp',
+      'cắm trại',
+    ]),
+    synonyms:
+      'đồ thể thao, quần áo gym, thảm yoga, giày chạy bộ, bóng đá, lều cắm trại, vali, balo du lịch, xe đạp',
+  },
+  // 7. Thực phẩm & Đồ uống
+  {
+    pattern: keywordTerm([
+      'coffee',
+      'tea',
+      'snack',
+      'milk',
+      'rice',
+      'food',
+      'beverage',
+      'chocolate',
+      'juice',
+      'nut',
+      'grain',
+      'cà phê',
+      'trà',
+      'bánh kẹo',
+      'sữa',
+      'gạo',
+      'thực phẩm',
+      'nước uống',
+      'hạt dinh dưỡng',
+    ]),
+    synonyms:
+      'cà phê, trà, bánh kẹo, sữa, gạo, thực phẩm khô, nước uống, sô-cô-la, hạt dinh dưỡng',
+  },
+];
+
 function getVietnameseKeywords(product) {
   const combined =
     `${product.name || ''} ${product.brand || ''} ${product.category?.name || ''} ${(product.tags || []).join(' ')}`.toLowerCase();
-  const synonyms = [];
 
-  if (/shirt|tee|polo|top|tank/i.test(combined)) {
-    synonyms.push('áo thun, áo phông, áo polo, áo ngắn tay, áo sơ mi, áo thể thao nam nữ');
-  }
-  if (/short|pant|trouser|legging|jean|jogger/i.test(combined)) {
-    synonyms.push('quần short, quần đùi, quần thun, quần dài, quần legging, quần thể thao');
-  }
-  if (/swim|beach|trunk|bikini|bathing|wetsuit/i.test(combined)) {
-    synonyms.push('đồ bơi, áo tắm, bikini, đồ đi biển, quần bơi, váy bơi, lặn biển');
-  }
-  if (/dress|skirt/i.test(combined)) {
-    synonyms.push('váy, đầm, chân váy, đầm liền');
-  }
-  if (/shoe|sneaker|boot|sandal|slipper|footwear/i.test(combined)) {
-    synonyms.push('giày thể thao, giày chạy bộ, giày sneaker, dép, giày da');
-  }
-  if (/glove/i.test(combined)) {
-    synonyms.push('găng tay, bao tay, găng tay xe máy, găng tay thể thao');
-  }
-  if (/scarf|hat|cap|beanie/i.test(combined)) {
-    synonyms.push('khăn quàng, khăn rằn, mũ, nón');
-  }
-  if (/bag|backpack|handbag|wallet/i.test(combined)) {
-    synonyms.push('balo, túi xách, ví, túi đeo chéo');
-  }
-  if (/watch/i.test(combined)) {
-    synonyms.push('đồng hồ');
-  }
-  if (/glass|sunglass/i.test(combined)) {
-    synonyms.push('kính mát, kính râm, kính thời trang, mắt kính');
-  }
-
-  return synonyms.join('. ');
+  return INDUSTRY_KEYWORD_RULES.filter(({ pattern }) => pattern.test(combined))
+    .map(({ synonyms }) => synonyms)
+    .join('. ');
 }
 
 /**
@@ -171,7 +367,8 @@ function createProductTextContent(product) {
     parts.push(`Màu sắc: ${colors.join(', ')}`);
   }
 
-  const price = product.price?.discountPrice || product.price?.currentPrice;
+  const { isFlashSale, salePrice } = getProductFlashSale(product);
+  const price = salePrice ?? product.price?.discountPrice ?? product.price?.currentPrice;
   /**
    * If
    * @param {number} price
@@ -179,6 +376,17 @@ function createProductTextContent(product) {
    */
   if (price) {
     parts.push(`Giá: ${price.toLocaleString('vi-VN')}đ`);
+  }
+  if (isFlashSale && Number.isFinite(salePrice)) {
+    parts.push(`Giá flash sale: ${salePrice.toLocaleString('vi-VN')}đ`);
+  }
+
+  const attributes = (product.attributes || [])
+    .filter((attribute) => attribute?.name && attribute?.value)
+    .slice(0, 10)
+    .map((attribute) => `${attribute.name}: ${attribute.value}`);
+  if (attributes.length > 0) {
+    parts.push(`Thông số: ${attributes.join(', ')}`);
   }
 
   /**
@@ -195,11 +403,44 @@ function createProductTextContent(product) {
 }
 
 /**
+ * Text riêng cho BM25: chỉ chứa giá trị thực, KHÔNG chứa nhãn tĩnh
+ * ("Tên sản phẩm:", "Giá:"...) để tránh mọi document khớp mọi truy vấn.
+ * @param {Object} product
+ * @returns {string}
+ */
+function createProductSearchText(product) {
+  const colors = [...new Set((product.variants || []).map((v) => v.color).filter(Boolean))];
+  const attributes = (product.attributes || [])
+    .filter((attribute) => attribute?.name && attribute?.value)
+    .slice(0, 10)
+    .flatMap((attribute) => [attribute.name, attribute.value]);
+
+  return [
+    product.name,
+    product.brand,
+    product.category?.name,
+    ...(product.tags || []),
+    ...(product.sizes || []),
+    ...colors,
+    ...attributes,
+    product.description ? String(product.description).slice(0, 500) : '',
+  ]
+    .filter((part) => typeof part === 'string' && part.trim().length > 0)
+    .join(' ')
+    .slice(0, 3000);
+}
+
+/**
  * Create metadata for vector store
  * @param {Object} product - Product document
  * @returns {Object}
  */
-function createProductMetadata(product) {
+function createProductMetadata(product, now = new Date()) {
+  const { isFlashSale, salePrice } = getProductFlashSale(product, now);
+  const regularPrice = product.price?.discountPrice || product.price?.currentPrice;
+  const effectivePrice = salePrice ?? regularPrice;
+  const originalPrice = product.price?.currentPrice;
+
   return {
     productId: product._id.toString(),
     name: product.name,
@@ -207,12 +448,14 @@ function createProductMetadata(product) {
     brand: product.brand || null,
     category: product.category?.name || null,
     categoryId: product.category?._id?.toString() || null,
-    price: product.price?.discountPrice || product.price?.currentPrice,
-    originalPrice: product.price?.currentPrice,
-    hasDiscount: !!(
-      product.price?.discountPrice && product.price.discountPrice < product.price.currentPrice
+    price: effectivePrice,
+    originalPrice,
+    hasDiscount: Boolean(
+      isFlashSale ||
+        (product.price?.discountPrice && product.price.discountPrice < product.price.currentPrice),
     ),
     status: product.status,
+    shopStatus: product.shop?.status || null,
     isFeatured: product.isFeatured || false,
     isNewArrival: product.isNewArrival || false,
     stock: product.stock || 0,
@@ -247,6 +490,9 @@ async function embedProduct(product) {
           productId: product._id.toString(),
           embedding: vector,
           text: textContent,
+          searchText: createProductSearchText(product),
+          contentHash: computeContentHash(textContent),
+          embeddingModel: EMBEDDING_MODEL,
           metadata,
           updatedAt: new Date(),
         },
@@ -279,7 +525,7 @@ async function embedAllProducts({ batchSize = 50, force = false } = {}) {
     const embeddings = getEmbeddingModel();
     const collection = getEmbeddingsCollection();
 
-    const products = await Product.findPublishedForEmbedding();
+    const products = (await Product.findPublishedForEmbedding()).filter(isProductEmbeddingEligible);
 
     logger.info(`[Embeddings] Starting to embed ${products.length} products...`);
 
@@ -287,9 +533,12 @@ async function embedAllProducts({ batchSize = 50, force = false } = {}) {
     const existingMap = new Map();
     if (!force) {
       const existing = await collection
-        .find({}, { projection: { productId: 1, 'metadata.updatedAt': 1 } })
+        .find({}, { projection: { productId: 1, 'metadata.updatedAt': 1, searchText: 1 } })
         .toArray();
       existing.forEach((e) => {
+        // Document cũ chưa có searchText phải re-embed để BM25 chuyển sang
+        // trường mới (tránh index text cũ chỉ toàn nhãn tĩnh).
+        if (!e.searchText) return;
         existingMap.set(e.productId, new Date(e.metadata?.updatedAt || 0).getTime());
       });
     }
@@ -338,6 +587,9 @@ async function embedAllProducts({ batchSize = 50, force = false } = {}) {
                       productId: item.product._id.toString(),
                       embedding: vectors[idx],
                       text: item.textContent,
+                      searchText: createProductSearchText(item.product),
+                      contentHash: computeContentHash(item.textContent),
+                      embeddingModel: EMBEDDING_MODEL,
                       metadata: createProductMetadata(item.product),
                       updatedAt: new Date(),
                     },
@@ -389,76 +641,237 @@ async function deleteProductEmbedding(productId) {
   }
 }
 
-/**
- * Search for similar products using vector similarity
- * @param {string} query - User query text
- * @param {Object} options - Search options
- * @param {number} options.limit - Maximum number of results (default 5)
- * @param {Object} options.filter - Additional metadata filters
- * @returns {Promise<Array>}
- */
-async function searchSimilarProducts(query, { limit = 5, filter = {} } = {}) {
-  try {
-    const collection = getEmbeddingsCollection();
-    const queryVector = await getQueryVector(query);
+function buildEmbeddingFilter(filter = {}) {
+  const result = {
+    'metadata.status': filter.status || 'published',
+  };
+  if (filter.categoryId) result['metadata.categoryId'] = String(filter.categoryId);
+  if (filter.brand) result['metadata.brand'] = String(filter.brand);
 
-    // Note: Atlas Vector Search index 'product_vector_index'
-    const vectorSearchStage = {
-      index: 'product_vector_index',
-      path: 'embedding',
-      queryVector: queryVector,
-      numCandidates: limit * 10,
-      limit: limit,
+  const price = {};
+  if (Number.isFinite(filter.minPrice)) price.$gte = filter.minPrice;
+  if (Number.isFinite(filter.maxPrice)) price.$lte = filter.maxPrice;
+  if (Object.keys(price).length > 0) result['metadata.price'] = price;
+
+  if (filter.inStockOnly || filter.stock === true) {
+    result['metadata.stock'] = { $gt: 0 };
+  } else if (Number.isFinite(filter.minStock)) {
+    result['metadata.stock'] = { $gte: filter.minStock };
+  }
+  if (typeof filter.hasDiscount === 'boolean') {
+    result['metadata.hasDiscount'] = filter.hasDiscount;
+  }
+  return result;
+}
+
+// Vector search là tín hiệu chính (đã qua ngưỡng minScore); BM25 chỉ bổ trợ cho
+// các truy vấn từ khóa nên được hạ trọng số để không lấn át kết quả ngữ nghĩa.
+const RRF_WEIGHTS = { vector: 1, text: 0.5 };
+const DEFAULT_MIN_TEXT_SCORE = Number(process.env.EMBEDDING_MIN_TEXT_SCORE) || 0.5;
+
+function mergeHybridResults(
+  vectorResults = [],
+  textResults = [],
+  { limit = 5, minScore = 0.25, minTextScore = 0, rrfK = 60 } = {},
+) {
+  const byId = new Map();
+  const addRank = (result, rank, kind) => {
+    const productId = String(result.productId || result.metadata?.productId || '');
+    if (!productId) return;
+    const current = byId.get(productId) || {
+      ...result,
+      productId,
+      score: 0,
+      scores: { vector: null, text: null, rrf: 0, rerank: 0 },
     };
+    current.scores[kind] = result.score;
+    current.scores.rrf += RRF_WEIGHTS[kind] / (rrfK + rank + 1);
+    current.score = current.scores.rrf;
+    if (!current.metadata && result.metadata) current.metadata = result.metadata;
+    byId.set(productId, current);
+  };
 
-    if (filter && Object.keys(filter).length > 0) {
-      vectorSearchStage.filter = filter;
-    }
+  vectorResults
+    .filter((result) => Number(result.score) >= minScore)
+    .forEach((result, rank) => addRank(result, rank, 'vector'));
+  textResults
+    .filter((result) => Number(result.score) >= minTextScore)
+    .forEach((result, rank) => addRank(result, rank, 'text'));
 
-    const pipeline = [
-      {
-        $vectorSearch: vectorSearchStage,
-      },
+  for (const item of byId.values()) {
+    const metadata = item.metadata || {};
+    const availabilityBonus = Number(metadata.stock) > 0 ? 0.001 : 0;
+    const discountBonus = metadata.hasDiscount ? 0.0005 : 0;
+    const ratingBonus = Math.max(0, Number(metadata.ratingAverage) || 0) * 0.0001;
+    item.scores.rerank = availabilityBonus + discountBonus + ratingBonus;
+    item.score = item.scores.rrf + item.scores.rerank;
+  }
+
+  return [...byId.values()]
+    .sort((a, b) => b.score - a.score || a.productId.localeCompare(b.productId))
+    .slice(0, limit);
+}
+
+const SEARCH_TEXT_INDEX_NAME = 'idx_embedding_search_text_bm25';
+const LEGACY_TEXT_INDEX_NAME = 'idx_embedding_text_bm25';
+
+/**
+ * MongoDB chỉ cho phép 1 text index/collection. Chuyển index sang `searchText`
+ * (giá trị thực, không nhãn tĩnh) và drop index cũ nếu còn.
+ */
+async function ensureSearchTextIndex(collection = getEmbeddingsCollection()) {
+  const existing = await collection.indexes().catch(() => []);
+  if (existing.some((index) => index.name === LEGACY_TEXT_INDEX_NAME)) {
+    await collection.dropIndex(LEGACY_TEXT_INDEX_NAME).catch((error) => {
+      logger.warn('[Embeddings] Could not drop legacy BM25 text index', {
+        error: error.message,
+      });
+    });
+  }
+  if (!existing.some((index) => index.name === SEARCH_TEXT_INDEX_NAME)) {
+    await collection.createIndex({ searchText: 'text' }, { name: SEARCH_TEXT_INDEX_NAME });
+  }
+}
+
+// Index text được tạo ngoài Mongoose (raw driver) nên phải đảm bảo tồn tại trước
+// truy vấn BM25 đầu tiên; createIndex là idempotent và chỉ chạy 1 lần/process.
+let textIndexEnsured = false;
+async function ensureTextIndexOnce() {
+  if (textIndexEnsured) return;
+  try {
+    await ensureSearchTextIndex();
+    textIndexEnsured = true;
+  } catch (error) {
+    logger.warn('[Embeddings] Could not ensure BM25 text index', { error: error.message });
+  }
+}
+
+function formatEmbeddingResult(result) {
+  const metadata = result.metadata || {};
+  return {
+    id: metadata.productId || result.productId,
+    name: metadata.name,
+    slug: metadata.slug,
+    price: metadata.price,
+    originalPrice: metadata.originalPrice,
+    hasDiscount: metadata.hasDiscount,
+    brand: metadata.brand,
+    category: metadata.category,
+    image: metadata.image,
+    productUrl: metadata.productUrl,
+    checkoutUrl: metadata.checkoutUrl,
+    stock: metadata.stock,
+    isFeatured: metadata.isFeatured,
+    score: result.score,
+    scores: result.scores,
+  };
+}
+
+async function searchHybridProducts(
+  query,
+  {
+    limit = 5,
+    filter = {},
+    minScore = Number(process.env.EMBEDDING_MIN_SCORE) || 0.25,
+    minTextScore = DEFAULT_MIN_TEXT_SCORE,
+  } = {},
+) {
+  const collection = getEmbeddingsCollection();
+  const safeLimit = Math.min(Math.max(Number(limit) || 5, 1), 50);
+  const preFilter = buildEmbeddingFilter(filter);
+  const candidateLimit = Math.max(safeLimit * 10, 50);
+
+  await ensureTextIndexOnce();
+
+  const vectorPromise = getQueryVector(query).then((queryVector) =>
+    collection
+      .aggregate([
+        {
+          $vectorSearch: {
+            index: 'product_vector_index',
+            path: 'embedding',
+            queryVector,
+            numCandidates: candidateLimit,
+            limit: candidateLimit,
+            filter: preFilter,
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            productId: 1,
+            metadata: 1,
+            score: { $meta: 'vectorSearchScore' },
+          },
+        },
+      ])
+      .toArray(),
+  );
+  const textPromise = collection
+    .aggregate([
+      { $match: { $text: { $search: String(query).slice(0, 500) }, ...preFilter } },
+      { $sort: { score: { $meta: 'textScore' } } },
+      { $limit: candidateLimit },
       {
         $project: {
           _id: 0,
           productId: 1,
-          text: 1,
           metadata: 1,
-          score: { $meta: 'vectorSearchScore' },
+          score: { $meta: 'textScore' },
         },
       },
-    ];
+    ])
+    .toArray();
 
-    const results = await collection.aggregate(pipeline).toArray();
+  const [vectorResult, textResult] = await Promise.allSettled([vectorPromise, textPromise]);
+  const vectorItems = vectorResult.status === 'fulfilled' ? vectorResult.value : [];
+  const textItems = textResult.status === 'fulfilled' ? textResult.value : [];
 
-    // Format results for chatbot consumption
-    return results
-      .filter((r) => !r.metadata?.status || r.metadata?.status === 'published')
-      .map((r) => ({
-        id: r.metadata?.productId || r.productId,
-        name: r.metadata?.name,
-        slug: r.metadata?.slug,
-        price: r.metadata?.price,
-        originalPrice: r.metadata?.originalPrice,
-        hasDiscount: r.metadata?.hasDiscount,
-        brand: r.metadata?.brand,
-        category: r.metadata?.category,
-        image: r.metadata?.image,
-        productUrl: r.metadata?.productUrl,
-        checkoutUrl: r.metadata?.checkoutUrl,
-        stock: r.metadata?.stock,
-        isFeatured: r.metadata?.isFeatured,
-        score: r.score,
-      }));
-  } catch (error) {
-    logger.error('[Embeddings] Vector search error:', error.message);
-
-    // Fallback to text search if vector search fails
-    // This handles the case where Atlas Vector Search is not configured
-    logger.info('[Embeddings] Falling back to text search...');
-    return await fallbackTextSearch(query, { limit, filter });
+  if (vectorResult.status === 'rejected') {
+    logger.warn('[Embeddings] Vector search unavailable', { error: vectorResult.reason?.message });
   }
+  if (textResult.status === 'rejected') {
+    logger.warn('[Embeddings] BM25 text search unavailable', { error: textResult.reason?.message });
+  }
+
+  // Đếm ứng viên SAU khi áp ngưỡng, nếu không strategy có thể báo 'hybrid'
+  // dù toàn bộ kết quả vector đã bị minScore loại.
+  const qualifiedVectorCount = vectorItems.filter(
+    (result) => Number(result.score) >= minScore,
+  ).length;
+  const qualifiedTextCount = textItems.filter(
+    (result) => Number(result.score) >= minTextScore,
+  ).length;
+
+  const merged = mergeHybridResults(vectorItems, textItems, {
+    limit: safeLimit,
+    minScore,
+    minTextScore,
+  });
+  if (merged.length > 0) {
+    return {
+      items: merged.map(formatEmbeddingResult),
+      strategy:
+        qualifiedVectorCount > 0 && qualifiedTextCount > 0
+          ? 'hybrid'
+          : qualifiedVectorCount > 0
+            ? 'vector_search'
+            : 'bm25_text_search',
+      candidates: { vector: qualifiedVectorCount, text: qualifiedTextCount },
+    };
+  }
+
+  const fallbackItems = await fallbackTextSearch(query, { limit: safeLimit, filter });
+  return {
+    items: fallbackItems,
+    strategy: 'fallback_text_search',
+    candidates: { vector: qualifiedVectorCount, text: qualifiedTextCount },
+  };
+}
+
+async function searchSimilarProducts(query, options = {}) {
+  const result = await searchHybridProducts(query, options);
+  return result.items;
 }
 
 /**
@@ -470,7 +883,9 @@ async function searchSimilarProducts(query, { limit = 5, filter = {} } = {}) {
 async function fallbackTextSearch(query, { limit = 5, filter = {} } = {}) {
   try {
     let categoryId = null;
-    if (filter.category) {
+    if (mongoose.Types.ObjectId.isValid(filter.categoryId)) {
+      categoryId = new mongoose.Types.ObjectId(filter.categoryId);
+    } else if (filter.category) {
       const cat = await Category.findByNameRegex(filter.category);
       if (cat) {
         categoryId = cat._id;
@@ -480,6 +895,12 @@ async function fallbackTextSearch(query, { limit = 5, filter = {} } = {}) {
     const products = await Product.findFallbackTextSearch(query, {
       isFeatured: filter.isFeatured,
       categoryId,
+      brand: filter.brand,
+      minPrice: filter.minPrice,
+      maxPrice: filter.maxPrice,
+      inStockOnly: filter.inStockOnly || filter.stock === true,
+      minStock: filter.minStock,
+      hasDiscount: filter.hasDiscount,
       limit,
     });
 
@@ -543,6 +964,94 @@ async function getFeaturedProducts({ type = 'featured', limit = 5 } = {}) {
   }
 }
 
+async function ensureEmbeddingIndexes() {
+  const collection = getEmbeddingsCollection();
+  const duplicateGroups = await collection
+    .aggregate([
+      { $sort: { updatedAt: -1, _id: -1 } },
+      { $group: { _id: '$productId', ids: { $push: '$_id' }, count: { $sum: 1 } } },
+      { $match: { _id: { $ne: null }, count: { $gt: 1 } } },
+    ])
+    .toArray();
+
+  const duplicateIds = duplicateGroups.flatMap((group) => group.ids.slice(1));
+  if (duplicateIds.length > 0) {
+    await collection.deleteMany({ _id: { $in: duplicateIds } });
+    logger.warn('[Embeddings] Removed duplicate product embeddings before unique index', {
+      removed: duplicateIds.length,
+    });
+  }
+
+  await collection.createIndex(
+    { productId: 1 },
+    { unique: true, name: 'idx_productId_unique' },
+  );
+  await ensureSearchTextIndex(collection);
+  textIndexEnsured = true;
+  return true;
+}
+
+/**
+ * Reconcile embeddings against published products:
+ * 1. Re-embed missing or stale published products.
+ * 2. Delete orphaned embeddings whose product is no longer published or deleted.
+ * @param {Object} [options]
+ * @returns {Promise<{embedded: number, skipped: number, failed: number, purged: number}>}
+ */
+async function reconcileProductEmbeddings({ batchSize = 50 } = {}) {
+  await ensureEmbeddingIndexes();
+  const collection = getEmbeddingsCollection();
+  const publishedProducts = (await Product.findPublishedForEmbedding()).filter(
+    isProductEmbeddingEligible,
+  );
+  const publishedIdSet = new Set(publishedProducts.map((p) => p._id.toString()));
+
+  // Purge orphaned or unpublished embeddings
+  const existingDocs = await collection.find({}, { projection: { productId: 1 } }).toArray();
+  const orphanIds = existingDocs
+    .map((doc) => doc.productId)
+    .filter((id) => id && !publishedIdSet.has(String(id)));
+
+  let purged = 0;
+  if (orphanIds.length > 0) {
+    const delResult = await collection.deleteMany({ productId: { $in: orphanIds } });
+    purged = delResult.deletedCount || 0;
+  }
+
+  const embedStats = await embedAllProducts({ batchSize, force: false });
+  return {
+    embedded: embedStats.success,
+    skipped: embedStats.skipped,
+    failed: embedStats.failed,
+    purged,
+  };
+}
+
+function getVectorSearchDefinition() {
+  return {
+    name: 'product_vector_index',
+    type: 'vectorSearch',
+    definition: {
+      fields: [
+        {
+          type: 'vector',
+          path: 'embedding',
+          numDimensions: 1024,
+          similarity: 'cosine',
+        },
+        ...[
+          'metadata.status',
+          'metadata.categoryId',
+          'metadata.brand',
+          'metadata.price',
+          'metadata.stock',
+          'metadata.hasDiscount',
+        ].map((path) => ({ type: 'filter', path })),
+      ],
+    },
+  };
+}
+
 /**
  * Create the MongoDB Atlas Vector Search index
  * This needs to be run once to set up the index
@@ -554,64 +1063,47 @@ async function createVectorSearchIndex() {
     const db = client.db();
 
     const indexes = await db.collection('product_embeddings').listSearchIndexes().toArray();
-    const existingIndex = indexes.find((idx) => idx.name === 'product_vector_index');
+    const indexDefinition = getVectorSearchDefinition();
+    const existingIndex = indexes.find((idx) => idx.name === indexDefinition.name);
 
-    if (existingIndex) {
+    if (existingIndex?.type === 'vectorSearch') {
       logger.info('[Embeddings] Vector search index already exists');
       return true;
     }
 
-    // Create the vector search index
-    // Note: This requires MongoDB Atlas M10+ or serverless
-    await db.collection('product_embeddings').createSearchIndex({
-      name: 'product_vector_index',
-      definition: {
-        mappings: {
-          dynamic: true,
-          fields: {
-            embedding: {
-              type: 'knnVector',
-              dimensions: 1024, // Mistral embed dimensions
-              similarity: 'cosine',
-            },
-            'metadata.status': {
-              type: 'string',
-            },
-            'metadata.isFeatured': {
-              type: 'boolean',
-            },
-            'metadata.category': {
-              type: 'string',
-            },
-          },
-        },
-      },
-    });
+    if (existingIndex) {
+      await db.collection('product_embeddings').dropSearchIndex(indexDefinition.name);
+    }
+    await db.collection('product_embeddings').createSearchIndex(indexDefinition);
 
     logger.info('[Embeddings] Vector search index created successfully');
     return true;
   } catch (error) {
     logger.error('[Embeddings] Error creating vector search index:', error.message);
     logger.info('[Embeddings] You may need to create the index manually via Atlas UI');
-    logger.info(`
-    Index configuration for Atlas UI:
-    - Collection: product_embeddings
-    - Index name: product_vector_index
-    - Field mappings:
-      - embedding: knnVector, 1024 dimensions, cosine similarity
-      - metadata.status: string
-      - metadata.isFeatured: boolean
-      - metadata.category: string
-    `);
+    logger.info('[Embeddings] Atlas vectorSearch definition', getVectorSearchDefinition());
     return false;
   }
 }
 
 module.exports = {
+  EMBEDDING_MODEL,
   getEmbeddingModel,
+  createProductTextContent,
+  createProductSearchText,
+  getVietnameseKeywords,
+  computeContentHash,
   embedProduct,
   embedAllProducts,
   deleteProductEmbedding,
+  ensureEmbeddingIndexes,
+  reconcileProductEmbeddings,
+  buildEmbeddingFilter,
+  createProductMetadata,
+  isProductEmbeddingEligible,
+  mergeHybridResults,
+  getVectorSearchDefinition,
+  searchHybridProducts,
   searchSimilarProducts,
   getFeaturedProducts,
   createVectorSearchIndex,

@@ -6,7 +6,7 @@ const { getIO } = require('../socket/index');
 const redisService = require('./redis.service');
 const logger = require('../utils/logger');
 const { buildHashedCacheKey } = require('../utils/cacheKey');
-const { embedProduct, deleteProductEmbedding } = require('./embedding.service');
+const embeddingSyncService = require('./embedding-sync.service');
 const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../utils/ApiError');
 const { isValidObjectId } = require('../utils/query.utils');
@@ -391,12 +391,9 @@ class ProductService {
       });
     }
 
-    // Generate embedding for the new product (async, don't wait)
+    // Schedule reliable embedding sync via Outbox/RabbitMQ worker
     if (product.status === 'published') {
-      const populatedProduct = await Product.findByIdWithCategoryNameLean(product._id);
-      embedProduct(populatedProduct).catch((err) => {
-        logger.error('[ProductService] Error embedding new product:', err.message);
-      });
+      await embeddingSyncService.scheduleProductSync(product._id, { reason: 'product_created' });
     }
 
     return product;
@@ -497,13 +494,10 @@ class ProductService {
       clearL1CatalogCache();
 
       if (product.status === 'published') {
-        const populatedProduct = await Product.findByIdWithCategoryNameLean(product._id);
-        embedProduct(populatedProduct).catch((err) => {
-          logger.error('[ProductService] Error updating product embedding:', err.message);
-        });
+        await embeddingSyncService.scheduleProductSync(product._id, { reason: 'product_updated' });
       } else {
-        deleteProductEmbedding(product._id).catch((err) => {
-          logger.error('[ProductService] Error deleting product embedding:', err.message);
+        await embeddingSyncService.scheduleProductDelete(product._id, {
+          reason: 'product_unpublished',
         });
       }
 
@@ -529,9 +523,7 @@ class ProductService {
     await redisService.delByPattern('products:*');
     clearL1CatalogCache();
 
-    deleteProductEmbedding(id).catch((err) => {
-      logger.error('[ProductService] Error deleting product embedding:', err.message);
-    });
+    await embeddingSyncService.scheduleProductDelete(id, { reason: 'product_soft_deleted' });
 
     return product;
   }
@@ -550,6 +542,10 @@ class ProductService {
 
     await redisService.delByPattern('products:*');
     clearL1CatalogCache();
+
+    await embeddingSyncService.scheduleProductDelete(id, {
+      reason: 'product_permanently_deleted',
+    });
 
     return product;
   }
@@ -583,6 +579,8 @@ class ProductService {
     if (!product) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
     }
+
+    await embeddingSyncService.scheduleProductSync(productId, { reason: 'variant_added' });
 
     return product;
   }
@@ -620,6 +618,8 @@ class ProductService {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Product or variant not found');
     }
 
+    await embeddingSyncService.scheduleProductSync(productId, { reason: 'variant_updated' });
+
     return product;
   }
 
@@ -635,6 +635,8 @@ class ProductService {
     if (!product) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Product not found');
     }
+
+    await embeddingSyncService.scheduleProductSync(productId, { reason: 'variant_deleted' });
 
     return product;
   }
@@ -889,8 +891,8 @@ class ProductService {
     await redisService.delByPattern('products:*');
     clearL1CatalogCache();
 
-    deleteProductEmbedding(productId).catch((err) => {
-      logger.error('[ProductService] Error deleting product embedding:', err.message);
+    await embeddingSyncService.scheduleProductDelete(productId, {
+      reason: 'seller_deleted_product',
     });
 
     return product;

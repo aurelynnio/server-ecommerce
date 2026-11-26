@@ -241,10 +241,20 @@ class CartService {
     cart.totalAmount = this.calculateTotal(cart.items);
     await cart.save();
 
-    await cart.populate({
-      path: 'items.productId',
-      select: 'name slug images price status',
-    });
+    await cart.populate([
+      {
+        path: 'items.productId',
+        select: 'name slug images price status tierVariations models shop variants sizes weight descriptionImages',
+        populate: [
+          { path: 'category', select: 'name slug' },
+          { path: 'shop', select: 'name logo' },
+        ],
+      },
+      {
+        path: 'items.shopId',
+        select: 'name logo',
+      },
+    ]);
 
     return cart;
   }
@@ -316,10 +326,20 @@ class CartService {
 
     await cart.save();
 
-    await cart.populate({
-      path: 'items.productId',
-      select: 'name slug images price status',
-    });
+    await cart.populate([
+      {
+        path: 'items.productId',
+        select: 'name slug images price status tierVariations models shop variants sizes weight descriptionImages',
+        populate: [
+          { path: 'category', select: 'name slug' },
+          { path: 'shop', select: 'name logo' },
+        ],
+      },
+      {
+        path: 'items.shopId',
+        select: 'name logo',
+      },
+    ]);
 
     return cart;
   }
@@ -343,10 +363,20 @@ class CartService {
 
     await cart.save();
 
-    await cart.populate({
-      path: 'items.productId',
-      select: 'name slug images price status',
-    });
+    await cart.populate([
+      {
+        path: 'items.productId',
+        select: 'name slug images price status tierVariations models shop variants sizes weight descriptionImages',
+        populate: [
+          { path: 'category', select: 'name slug' },
+          { path: 'shop', select: 'name logo' },
+        ],
+      },
+      {
+        path: 'items.shopId',
+        select: 'name logo',
+      },
+    ]);
 
     return cart;
   }

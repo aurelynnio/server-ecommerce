@@ -10,7 +10,11 @@
 
 require('dotenv').config();
 const mongoose = require('mongoose');
-const { embedAllProducts, createVectorSearchIndex } = require('../services/embedding.service');
+const {
+  embedAllProducts,
+  ensureEmbeddingIndexes,
+  createVectorSearchIndex,
+} = require('../services/embedding.service');
 
 async function main() {
   const force = process.argv.includes('--force');
@@ -24,6 +28,9 @@ async function main() {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('Connected to MongoDB');
     console.log('');
+
+    console.log('Ensuring product embedding indexes...');
+    await ensureEmbeddingIndexes();
 
     // Try to create vector search index (may fail if not Atlas M10+)
     console.log('Checking/Creating vector search index...');

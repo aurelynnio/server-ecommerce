@@ -17,17 +17,19 @@ class SearchService {
    * @returns {Promise<Object>} Search suggestions grouped by type
    */
   async getSuggestions(keyword, limit = 10) {
-    if (!keyword || keyword.length < 2) {
+    const normalizedKeyword = String(keyword || '').trim();
+    if (normalizedKeyword.length < 2) {
       return { products: [], categories: [], shops: [] };
     }
 
-    // PERFORMANCE FIX: Re-enable cache
-    const cacheKey = `search:suggestions:${keyword.toLowerCase()}`;
+    // PERFORMANCE FIX: Re-enable cache. limit phải nằm trong key, nếu không
+    // request limit=5 và limit=10 sẽ dùng chung một kết quả sai.
+    const cacheKey = `search:suggestions:${limit}:${normalizedKeyword.toLowerCase()}`;
     const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
     // Search products - Note: images are in variants[].images, not root level
-    const products = await Product.findPublishedAutocomplete(keyword, limit);
+    const products = await Product.findPublishedAutocomplete(normalizedKeyword, limit);
 
     // Map products to include first variant image for display in 'images' array
     const productsWithImages = products.map((product) => {
@@ -39,9 +41,9 @@ class SearchService {
       };
     });
 
-    const categories = await Category.findActiveByNameRegex(keyword, 5);
+    const categories = await Category.findActiveByNameRegex(normalizedKeyword, 5);
 
-    const shops = await Shop.findActiveByNameRegex(keyword, 5);
+    const shops = await Shop.findActiveByNameRegex(normalizedKeyword, 5);
 
     const result = { products: productsWithImages, categories, shops };
     // PERFORMANCE FIX: Cache for 5 minutes
@@ -56,7 +58,7 @@ class SearchService {
    * @returns {Promise<Array>} Trending search terms
    */
   async getTrendingSearches(limit = 10) {
-    const cacheKey = 'search:trending';
+    const cacheKey = `search:trending:${limit}`;
     const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
@@ -78,7 +80,7 @@ class SearchService {
    * @returns {Promise<Array>} Hot keywords
    */
   async getHotKeywords(limit = 20) {
-    const cacheKey = 'search:hot-keywords';
+    const cacheKey = `search:hot-keywords:${limit}`;
     const cached = await redisService.get(cacheKey);
     if (cached) return cached;
 
@@ -117,14 +119,21 @@ class SearchService {
 
     if (category) {
       const cat = await Category.findBySlug(category);
-      if (cat) {
-        const subcats = await Category.findSubcategoryIds(cat._id);
-        categoryIds = [cat._id, ...subcats.map((s) => s._id)];
+      if (!cat) {
+        // Slug không tồn tại: trả rỗng thay vì bỏ filter và trả toàn bộ sản phẩm.
+        const emptyPagination = getPaginationParams(page, limit, 0);
+        return {
+          ...buildPaginationResponse([], emptyPagination),
+          facets: { priceRanges: [], categories: [], ratings: [] },
+        };
       }
+      const subcats = await Category.findSubcategoryIds(cat._id);
+      categoryIds = [cat._id, ...subcats.map((s) => s._id)];
     }
 
+    const normalizedKeyword = typeof keyword === 'string' ? keyword.trim() : keyword;
     const searchParams = {
-      keyword,
+      keyword: normalizedKeyword || undefined,
       categoryIds,
       minPrice,
       maxPrice,

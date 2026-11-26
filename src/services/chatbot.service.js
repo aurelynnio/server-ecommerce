@@ -1,7 +1,6 @@
 const { ChatMistralAI } = require('@langchain/mistralai');
 const { MongoDBChatMessageHistory } = require('@langchain/mongodb');
 const { ChatPromptTemplate, MessagesPlaceholder } = require('@langchain/core/prompts');
-const { RunnableWithMessageHistory } = require('@langchain/core/runnables');
 const { StringOutputParser } = require('@langchain/core/output_parsers');
 const {
   HumanMessage,
@@ -11,7 +10,7 @@ const {
 const mongoose = require('mongoose');
 
 const { searchSimilarProducts, getFeaturedProducts } = require('./embedding.service');
-const { toolHandlers } = require('../chatbot/chatbot.tools');
+const { toolHandlers, hydrateProductSummaries } = require('../chatbot/chatbot.tools');
 const { SYSTEM_PROMPT } = require('../configs/chatbot.config');
 const { redact } = require('../utils/redact');
 const { truncateHistory } = require('../chatbot/tokenBudget');
@@ -24,6 +23,7 @@ const {
   escapePromptText,
   normalizePriceInText,
   formatProducts,
+  validateResponse: validateGroundingResponse,
 } = require('../chatbot/chatbotHelpers');
 const ChatbotAgent = require('../chatbot/chatAgent');
 const logger = require('../utils/logger');
@@ -37,26 +37,36 @@ const HISTORY_FETCH_LIMIT = Number(process.env.CHATBOT_HISTORY_FETCH_LIMIT) || 5
 
 class ChatbotService {
   constructor() {
-    this.model = new ChatMistralAI({
-      model: process.env.MISTRAL_MODEL || 'open-mistral-nemo',
-      apiKey: process.env.MISTRAL_API_KEY,
-      temperature: 0.3,
-      streaming: true,
-      maxTokens: Number(process.env.MISTRAL_MAX_TOKENS) || 1024,
-      maxRetries: 2,
-      // hard timeout cho mỗi request LLM (ms)
-      ...(process.env.MISTRAL_TIMEOUT_MS
-        ? { timeout: Number(process.env.MISTRAL_TIMEOUT_MS) }
-        : {}),
-    });
-
+    this.model = null;
+    this.chain = null;
     this.prompt = ChatPromptTemplate.fromMessages([
       ['system', SYSTEM_PROMPT],
       new MessagesPlaceholder('chat_history'),
       ['human', '{input}'],
     ]);
+  }
 
-    this.chain = this.prompt.pipe(this.model).pipe(new StringOutputParser());
+  _ensureModel() {
+    if (!this.model) {
+      if (!process.env.MISTRAL_API_KEY) {
+        throw new Error('MISTRAL_API_KEY is required to use the chatbot');
+      }
+
+      this.model = new ChatMistralAI({
+        model: process.env.MISTRAL_MODEL || 'open-mistral-nemo',
+        apiKey: process.env.MISTRAL_API_KEY,
+        temperature: 0.3,
+        streaming: true,
+        maxTokens: Number(process.env.MISTRAL_MAX_TOKENS) || 1024,
+        maxRetries: 2,
+        ...(process.env.MISTRAL_TIMEOUT_MS
+          ? { timeout: Number(process.env.MISTRAL_TIMEOUT_MS) }
+          : {}),
+      });
+      this.chain = this.prompt.pipe(this.model).pipe(new StringOutputParser());
+    }
+
+    return this.model;
   }
 
   /**
@@ -84,15 +94,19 @@ class ChatbotService {
       return truncateHistory(mapStoredMessagesToChatMessages(stored));
     };
 
-    // Inject createdAt cho messages mới (cần cho TTL index hoạt động đúng).
+    // Inject createdAt + updatedAt cho messages mới (cần cho TTL index và admin session sorting).
     const originalAddMessage = baseHistory.addMessage.bind(baseHistory);
     baseHistory.addMessage = async (message) => {
       await originalAddMessage(message);
-      // Set createdAt cho document vừa insert (LangChain không tự set)
+      const now = new Date();
       try {
         await collection.updateMany(
+          { sessionId },
+          { $set: { updatedAt: now }, $setOnInsert: { createdAt: now } },
+        );
+        await collection.updateMany(
           { sessionId, createdAt: { $exists: false } },
-          { $set: { createdAt: new Date() } },
+          { $set: { createdAt: now } },
         );
       } catch (_e) {
         /* best-effort — TTL fallback qua backfill script */
@@ -115,7 +129,7 @@ class ChatbotService {
    */
   getAgent() {
     if (!this.agent) {
-      this.agent = new ChatbotAgent(this.model, (sid) => this.getMessageHistory(sid));
+      this.agent = new ChatbotAgent(this._ensureModel(), (sid) => this.getMessageHistory(sid));
     }
     return this.agent;
   }
@@ -129,7 +143,7 @@ class ChatbotService {
    */
   async chatAgent(sessionId, userMessage) {
     if (!this.agent) {
-      this.agent = new ChatbotAgent(this.model, (sid) => this.getMessageHistory(sid));
+      this.agent = new ChatbotAgent(this._ensureModel(), (sid) => this.getMessageHistory(sid));
     }
     return await this.agent.invoke(sessionId, userMessage);
   }
@@ -151,7 +165,12 @@ class ChatbotService {
   async getLatestAssistantMessageId(sessionId) {
     const collection = this._getCollection();
     const doc = await collection.find({ sessionId }).sort({ _id: -1 }).limit(1).toArray();
-    return doc[0]?._id ? doc[0]._id.toString() : null;
+    if (!doc[0]?._id) return null;
+    const baseId = doc[0]._id.toString();
+    if (Array.isArray(doc[0].messages) && doc[0].messages.length > 0) {
+      return `${baseId}:${doc[0].messages.length - 1}`;
+    }
+    return baseId;
   }
 
   /**
@@ -163,9 +182,14 @@ class ChatbotService {
     const collection = this._getCollection();
     const messages = await collection.find({ sessionId }).sort({ _id: 1 }).toArray();
 
-    const formattedMessages = messages.flatMap((msg) =>
-      extractConversationMessages(msg, msg._id.getTimestamp(), msg._id.toString()),
-    );
+    const formattedMessages = messages.flatMap((msg) => {
+      const baseId = msg._id.toString();
+      const extracted = extractConversationMessages(msg, msg._id.getTimestamp(), baseId);
+      if (Array.isArray(msg.messages)) {
+        return extracted.map((item, idx) => ({ ...item, messageId: `${baseId}:${idx}` }));
+      }
+      return extracted;
+    });
 
     return { sessionId, messages: formattedMessages };
   }
@@ -199,11 +223,15 @@ class ChatbotService {
         {
           $group: {
             _id: '$sessionId',
-            lastMessageAt: { $max: '$_id' },
+            lastMessageAt: { $max: { $ifNull: ['$updatedAt', '$_id'] } },
             firstMessageAt: { $min: '$_id' },
             firstMessage: { $first: '$$ROOT' },
             lastMessage: { $last: '$$ROOT' },
-            messageCount: { $sum: 1 },
+            messageCount: {
+              $sum: {
+                $cond: [{ $isArray: '$messages' }, { $size: '$messages' }, 1],
+              },
+            },
           },
         },
         { $sort: { lastMessageAt: -1 } },
@@ -235,7 +263,13 @@ class ChatbotService {
         lastMessage: lastMessage?.content || '[Không đọc được nội dung tin nhắn]',
         messageCount: s.messageCount,
         createdAt: (firstMessage?.timestamp || s.firstMessageAt.getTimestamp()).toISOString(),
-        updatedAt: (lastMessage?.timestamp || s.lastMessageAt.getTimestamp()).toISOString(),
+        updatedAt: (
+          (s.lastMessageAt instanceof Date
+            ? s.lastMessageAt
+            : s.lastMessageAt?.getTimestamp?.()) ||
+          lastMessage?.timestamp ||
+          s.firstMessageAt.getTimestamp()
+        ).toISOString(),
       };
     });
 
@@ -285,6 +319,55 @@ class ChatbotService {
     return { saved: true };
   }
 
+  async getFeedbackStats(limit = 10) {
+    const collection = mongoose.connection.collection('chatbot_feedback');
+    const [summaryRows, recent, recentComments] = await Promise.all([
+      collection
+        .aggregate([
+          {
+            $group: {
+              _id: null,
+              total: { $sum: 1 },
+              up: { $sum: { $cond: [{ $eq: ['$rating', 'up'] }, 1, 0] } },
+              down: { $sum: { $cond: [{ $eq: ['$rating', 'down'] }, 1, 0] } },
+              withComment: {
+                $sum: {
+                  $cond: [{ $gt: [{ $strLenCP: { $ifNull: ['$comment', ''] } }, 0] }, 1, 0],
+                },
+              },
+            },
+          },
+        ])
+        .toArray(),
+      collection
+        .find({}, { projection: { userId: 0 } })
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .toArray(),
+      // Lấy riêng feedback có comment: nếu chỉ lọc client trên `recent`,
+      // 10 feedback mới nhất không có comment sẽ làm mục nhận xét trống
+      // dù withComment > 0.
+      collection
+        .find(
+          { comment: { $exists: true, $nin: [null, ''] } },
+          { projection: { userId: 0 } },
+        )
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .toArray(),
+    ]);
+    const summary = summaryRows[0] || { total: 0, up: 0, down: 0, withComment: 0 };
+    return {
+      total: summary.total,
+      up: summary.up,
+      down: summary.down,
+      withComment: summary.withComment,
+      positiveRate: summary.total > 0 ? summary.up / summary.total : 0,
+      recent,
+      recentComments,
+    };
+  }
+
   /**
    * Admin: xoá toàn bộ message của 1 session (GDPR / cleanup)
    * @param {string} sessionId
@@ -304,6 +387,29 @@ class ChatbotService {
     return { sessionId, deletedCount: result.deletedCount };
   }
 
+  async _loadChatHistoryMessages(sessionId) {
+    const history = this.getMessageHistory(sessionId);
+    const rawHistory = await history.getMessages();
+    const chatHistory = (rawHistory || []).map((m) => {
+      if (m instanceof HumanMessage || m instanceof AIMessage) return m;
+      const content = typeof m?.content === 'string' ? m.content : '';
+      const role = m?.role || m?.type;
+      return role === 'ai' || role === 'assistant'
+        ? new AIMessage(content)
+        : new HumanMessage(content);
+    });
+    return { history, chatHistory };
+  }
+
+  async _persistTurn(history, userMessage, assistantMessage) {
+    try {
+      await history.addMessage(new HumanMessage(userMessage));
+      await history.addMessage(new AIMessage(assistantMessage));
+    } catch (histErr) {
+      logger.warn('[Chatbot] Failed to save turn history:', histErr.message);
+    }
+  }
+
   /**
    * Stream chat response using RAG
    * @param {string} sessionId
@@ -312,6 +418,7 @@ class ChatbotService {
    * @returns {Promise<{success: boolean, message: string, sessionId: string}>}
    */
   async chatStream(sessionId, userMessage, onToken) {
+    let partialResponse = '';
     try {
       // Check cache trước (greeting/FAQ, không phải followup)
       const cached = await getCachedResponse(userMessage);
@@ -320,14 +427,23 @@ class ChatbotService {
         for (const word of cached.message.split(/(\s+)/)) {
           if (word) onToken?.(word);
         }
-        return { ...cached, sessionId, isCacheHit: true };
+        const history = this.getMessageHistory(sessionId);
+        await this._persistTurn(history, userMessage, cached.message);
+        return {
+          ...cached,
+          sessionId,
+          messageId: await this.getLatestAssistantMessageId(sessionId),
+          isCacheHit: true,
+        };
       }
 
       logger.info('[Chatbot] Starting RAG stream chat with sessionId:', sessionId);
       logger.info('[Chatbot] User message:', redact(userMessage));
       metrics.chatbotTokensTotal.inc({ direction: 'in' }, metrics.estimateTokens(userMessage));
 
-      const products = await this.retrieveProducts(userMessage, sessionId);
+      let products = await this.retrieveProducts(userMessage, sessionId);
+      products = await this.toChatProducts(products);
+      const usedSessionContext = Boolean(products?._fromSessionContext);
 
       logger.info(
         '[Chatbot] RAG retrieved:',
@@ -335,23 +451,19 @@ class ChatbotService {
       );
 
       const contextMessage = this.buildContextMessage(userMessage, products);
-
-      const chainWithHistory = new RunnableWithMessageHistory({
-        runnable: this.chain,
-        getMessageHistory: (sessionId) => this.getMessageHistory(sessionId),
-        inputMessagesKey: 'input',
-        historyMessagesKey: 'chat_history',
-      });
+      const { history, chatHistory } = await this._loadChatHistoryMessages(sessionId);
 
       let fullResponse = '';
       try {
-        const stream = await chainWithHistory.stream(
-          { input: contextMessage },
-          { configurable: { sessionId } },
-        );
+        this._ensureModel();
+        const stream = await this.chain.stream({
+          input: contextMessage,
+          chat_history: chatHistory,
+        });
 
         for await (const chunk of stream) {
           fullResponse += chunk;
+          partialResponse = fullResponse;
           if (onToken) {
             onToken(chunk);
           }
@@ -380,18 +492,13 @@ class ChatbotService {
             if (word && onToken) onToken(word);
           }
 
-          try {
-            const history = this.getMessageHistory(sessionId);
-            await history.addMessage(new HumanMessage(userMessage));
-            await history.addMessage(new AIMessage(fallbackMessage));
-          } catch (histErr) {
-            logger.warn('[Chatbot] Failed to save fallback history:', histErr.message);
-          }
+          await this._persistTurn(history, userMessage, fallbackMessage);
 
           return {
             success: true,
             message: fallbackMessage,
             sessionId,
+            products,
             messageId: await this.getLatestAssistantMessageId(sessionId),
           };
         }
@@ -408,14 +515,18 @@ class ChatbotService {
       }
       metrics.chatbotTokensTotal.inc({ direction: 'out' }, metrics.estimateTokens(fullResponse));
 
-      // Ghi cache cho nhánh stream (đường đi chính). Trước đây chỉ nhánh non-stream
-      // ghi cache nên hầu như không có lượt hit nào trên production.
-      await setCachedResponse(userMessage, { success: true, message: validatedResponse });
+      // Chỉ lưu userMessage sạch + assistant response đã qua validateResponse vào DB
+      await this._persistTurn(history, userMessage, validatedResponse);
+
+      if (!usedSessionContext) {
+        await setCachedResponse(userMessage, { success: true, message: validatedResponse });
+      }
 
       return {
         success: true,
         message: validatedResponse,
         sessionId,
+        products,
         messageId: await this.getLatestAssistantMessageId(sessionId),
         // Nếu validation đã thay thế response → gửi correctedMessage
         // để controller stream correction event cho frontend
@@ -425,7 +536,7 @@ class ChatbotService {
       logger.error('[Chatbot] Stream error:', error.message);
       metrics.chatbotErrorsTotal.inc({ stage: 'stream' });
       const fallbackMsg = 'Xin lỗi, hệ thống đang bận. Anh/chị vui lòng thử lại sau nhé!';
-      if (onToken) {
+      if (!partialResponse && onToken) {
         for (const word of fallbackMsg.split(/(\s+)/)) {
           if (word) onToken(word);
         }
@@ -450,8 +561,15 @@ class ChatbotService {
     try {
       const cached = await getCachedResponse(userMessage);
       if (cached) {
+        const history = this.getMessageHistory(sessionId);
+        await this._persistTurn(history, userMessage, cached.message);
         stopTimer({ status: 'cache_hit' });
-        return { ...cached, sessionId, isCacheHit: true };
+        return {
+          ...cached,
+          sessionId,
+          messageId: await this.getLatestAssistantMessageId(sessionId),
+          isCacheHit: true,
+        };
       }
 
       logger.info('[Chatbot] Starting RAG chat with sessionId:', sessionId);
@@ -460,6 +578,8 @@ class ChatbotService {
 
       // Use RAG to retrieve relevant products
       products = await this.retrieveProducts(userMessage, sessionId);
+      products = await this.toChatProducts(products);
+      const usedSessionContext = Boolean(products?._fromSessionContext);
 
       logger.info(
         '[Chatbot] RAG retrieved:',
@@ -467,18 +587,13 @@ class ChatbotService {
       );
 
       const contextMessage = this.buildContextMessage(userMessage, products);
+      const { history, chatHistory } = await this._loadChatHistoryMessages(sessionId);
 
-      const chainWithHistory = new RunnableWithMessageHistory({
-        runnable: this.chain,
-        getMessageHistory: (sessionId) => this.getMessageHistory(sessionId),
-        inputMessagesKey: 'input',
-        historyMessagesKey: 'chat_history',
+      this._ensureModel();
+      const result = await this.chain.invoke({
+        input: contextMessage,
+        chat_history: chatHistory,
       });
-
-      const result = await chainWithHistory.invoke(
-        { input: contextMessage },
-        { configurable: { sessionId } },
-      );
 
       logger.info('[Chatbot] Response generated successfully');
 
@@ -488,13 +603,19 @@ class ChatbotService {
       }
       metrics.chatbotTokensTotal.inc({ direction: 'out' }, metrics.estimateTokens(result));
 
+      await this._persistTurn(history, userMessage, validatedResponse);
+
       stopTimer({ status: 'success' });
       const final = {
         success: true,
         message: validatedResponse,
         sessionId,
+        products,
+        messageId: await this.getLatestAssistantMessageId(sessionId),
       };
-      await setCachedResponse(userMessage, final);
+      if (!usedSessionContext) {
+        await setCachedResponse(userMessage, { success: true, message: validatedResponse });
+      }
       return final;
     } catch (error) {
       logger.error('[Chatbot] Error:', error.message);
@@ -515,6 +636,7 @@ class ChatbotService {
           success: true,
           message: fallbackMsg,
           sessionId,
+          products,
         };
       }
       return {
@@ -538,7 +660,19 @@ class ChatbotService {
   }
 
   normalizeProductList(result) {
-    return Array.isArray(result) ? result : [];
+    return Array.isArray(result) ? result : Array.isArray(result?.items) ? result.items : [];
+  }
+
+  async toChatProducts(items) {
+    if (!Array.isArray(items) || items.length === 0) return items || [];
+    const productLike = items.filter(
+      (item) => item?.productUrl && (item?.productId || item?.id || item?._id),
+    );
+    if (productLike.length !== items.length) return items;
+    const hydrated = await hydrateProductSummaries(items);
+    const products = hydrated.length > 0 ? hydrated : items;
+    if (items._fromSessionContext) products._fromSessionContext = true;
+    return products;
   }
 
   /**
@@ -565,20 +699,34 @@ class ChatbotService {
             const Product = mongoose.model('Product');
             const foundProducts = await Product.find({
               slug: { $in: slugs },
+              status: 'published',
             })
+              .populate('category', 'name')
               .limit(5)
               .lean();
             if (foundProducts.length > 0) {
-              return foundProducts.map((p) => ({
-                name: p.name,
-                price: p.price,
-                originalPrice: p.originalPrice,
-                brand: p.brand || 'N/A',
-                category: p.category?.name || 'Thời trang',
-                stock: p.stock,
-                productUrl: `/products/${p.slug || p._id}`,
-                checkoutUrl: `/checkout?product=${p._id}`,
-              }));
+              return foundProducts.map((p) => {
+                const currentPrice = p.price?.currentPrice;
+                const discountPrice = p.price?.discountPrice;
+                const effectivePrice =
+                  typeof discountPrice === 'number' && discountPrice > 0
+                    ? discountPrice
+                    : currentPrice;
+                return {
+                  id: p._id,
+                  name: p.name,
+                  price: effectivePrice,
+                  originalPrice: currentPrice,
+                  brand: p.brand || 'N/A',
+                  category: p.category?.name || 'Thời trang',
+                  stock: p.stock,
+                  sizes: p.sizes || [],
+                  colors: [...new Set((p.variants || []).map((v) => v.color).filter(Boolean))],
+                  image: p.variants?.[0]?.images?.[0] || null,
+                  productUrl: `/products/${p.slug || p._id}`,
+                  checkoutUrl: `/checkout?product=${p._id}`,
+                };
+              });
             }
           }
         }
@@ -627,7 +775,8 @@ class ChatbotService {
       'chiều cao cân nặng',
     ];
 
-    const greetingKeywords = ['xin chào', 'hello', 'hi', 'chào', 'hey'];
+    const standaloneGreetingPattern =
+      /^(?:xin\s+chào|chào(?:\s+(?:shop|bạn|em|anh|chị|ad|admin))?|hello|hi|hey|alo|hế\s*lô)(?:[\s!.,?]*)$/i;
     const categoryKeywords = ['danh mục', 'loại', 'category', 'thể loại', 'phân loại'];
     const featuredKeywords = [
       'hot',
@@ -648,7 +797,10 @@ class ChatbotService {
       if (sessionId && followUpKeywords.some((keyword) => lowerMessage.includes(keyword))) {
         logger.info('[Chatbot] Detected: follow-up reference to previous products');
         const prev = await this.getPreviousProducts(sessionId);
-        if (prev.length > 0) return prev;
+        if (prev.length > 0) {
+          prev._fromSessionContext = true;
+          return prev;
+        }
       }
 
       // 2. Kiểm tra nếu là câu hỏi về size
@@ -656,10 +808,13 @@ class ChatbotService {
         logger.info('[Chatbot] Detected: size consultation request');
         if (sessionId) {
           const prev = await this.getPreviousProducts(sessionId);
-          if (prev.length > 0) return prev;
+          if (prev.length > 0) {
+            prev._fromSessionContext = true;
+            return prev;
+          }
         }
       }
-      if (greetingKeywords.some((keyword) => lowerMessage.includes(keyword))) {
+      if (standaloneGreetingPattern.test(lowerMessage.trim())) {
         logger.info('[Chatbot] Detected: greeting - fetching featured products');
         return await getFeaturedProducts({ type: 'featured', limit: 3 });
       }
@@ -724,8 +879,7 @@ class ChatbotService {
         logger.info('[Chatbot] Using advanced product search tools');
         const advancedResults = this.normalizeProductList(
           await toolHandlers.search_products_advanced({
-            keyword:
-              signals.brand || signals.category || signals.hasPriceFilter ? undefined : message,
+            keyword: undefined,
             category: signals.category,
             brand: signals.brand,
             minPrice: signals.minPrice,
@@ -747,8 +901,26 @@ class ChatbotService {
       }
 
       if (message.length > 2) {
-        logger.info('[Chatbot] Using semantic search for:', message);
-        const results = await searchSimilarProducts(message, { limit: signals.limit });
+        logger.info('[Chatbot] Using semantic search for:', redact(message));
+        const embeddingService = require('./embedding.service');
+        const retrieval = embeddingService.searchHybridProducts
+          ? await embeddingService.searchHybridProducts(message, {
+              limit: signals.limit,
+              category: signals.category,
+              brand: signals.brand,
+              minPrice: signals.minPrice,
+              maxPrice: signals.maxPrice,
+              hasDiscount: signals.onlyDiscounted || undefined,
+              minStock: signals.inStockOnly ? 1 : undefined,
+            })
+          : {
+              items: await searchSimilarProducts(message, { limit: signals.limit }),
+              strategy: 'vector_search',
+            };
+        const results = this.normalizeProductList(retrieval);
+        metrics.chatbotRetrievalTotal.inc({
+          mode: retrieval?.strategy || 'vector_search',
+        });
         if (results.length > 0) return results;
 
         logger.info('[Chatbot] No semantic results, fallback to bestsellers');
@@ -841,76 +1013,7 @@ ${formattedData}
    * @returns {string} - Validated/corrected response
    */
   validateResponse(response, products) {
-    if (!response) return response;
-
-    // Nếu không có product trong context, cảnh báo nếu response chứa giá cụ thể
-    if (!products || products.length === 0) {
-      const pricePattern = /\d{2,3}[.,]?\d{3}[.,]?\d{0,3}\s*đ/g;
-      if (pricePattern.test(response)) {
-        logger.warn(
-          '[Chatbot] Potential hallucination detected - prices in response but no products in context',
-        );
-        return 'Em xin lỗi, hiện tại em chưa tìm thấy sản phẩm phù hợp với yêu cầu của anh/chị. Anh/chị có thể cho em biết cụ thể hơn muốn tìm loại sản phẩm gì không ạ? Ví dụ: áo, quần, giày, túi xách...';
-      }
-      return response;
-    }
-
-    // Grounding check: mọi link internal trong response phải nằm trong whitelist
-    const allowedUrls = new Set();
-    for (const p of products) {
-      if (p.productUrl) allowedUrls.add(p.productUrl);
-      if (p.checkoutUrl) allowedUrls.add(p.checkoutUrl);
-      if (p.image) allowedUrls.add(p.image);
-    }
-
-    const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
-    let match;
-    let hallucinated = false;
-    while ((match = linkPattern.exec(response)) !== null) {
-      const url = match[2];
-      // Chặn cả link tuyệt đối ngoài whitelist lẫn link nội bộ không hợp lệ
-      const isInternal = url.startsWith('/');
-      const isAllowedAbsolute = /^https?:\/\//i.test(url) && allowedUrls.has(url);
-      if (isInternal && !allowedUrls.has(url)) {
-        logger.warn('[Chatbot] Hallucinated link detected', {
-          url,
-          allowedSample: Array.from(allowedUrls).slice(0, 3),
-        });
-        hallucinated = true;
-        break;
-      }
-      if (/^https?:\/\//i.test(url) && !isAllowedAbsolute) {
-        logger.warn('[Chatbot] Hallucinated absolute link detected', { url });
-        hallucinated = true;
-        break;
-      }
-    }
-
-    if (hallucinated) {
-      return 'Xin lỗi, em không thể truy cập sản phẩm này. Anh/chị có thể thử từ khoá khác không ạ?';
-    }
-
-    // Grounding check giỏi hơn: mọi mức giá xuất hiện phải khớp với dữ liệu thực
-    const allowedPrices = new Set();
-    for (const p of products) {
-      if (typeof p.price === 'number') allowedPrices.add(p.price);
-      if (typeof p.originalPrice === 'number') allowedPrices.add(p.originalPrice);
-    }
-    const priceInTextPattern = /(\d{1,3}(?:[.,]\d{3})+|[1-9]\d{0,4})\s*đ/g;
-    let priceMatch;
-    while ((priceMatch = priceInTextPattern.exec(response)) !== null) {
-      const raw = priceMatch[1];
-      const parsed = this.normalizePriceInText(raw);
-      if (parsed !== null && allowedPrices.size > 0 && !allowedPrices.has(parsed)) {
-        logger.warn('[Chatbot] Hallucinated price detected', {
-          parsed,
-          allowedSample: Array.from(allowedPrices).slice(0, 5),
-        });
-        return 'Xin lỗi, hiện tại em chưa thể xác nhận mức giá đó. Anh/chị có thể thử lại với sản phẩm khác không ạ?';
-      }
-    }
-
-    return response;
+    return validateGroundingResponse(response, products, logger);
   }
 
   /**

@@ -1,6 +1,6 @@
 process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || '64';
 require('dotenv').config();
-const { server } = require('./app');
+const { app, server } = require('./app');
 const connectDB = require('./db/connect.db');
 const cluster = require('cluster');
 const mongoose = require('mongoose');
@@ -76,9 +76,11 @@ const startServer = async () => {
 };
 
 let isShuttingDown = false;
+app.locals.isShuttingDown = false;
 const shutdown = async (signal) => {
   if (isShuttingDown) return;
   isShuttingDown = true;
+  app.locals.isShuttingDown = true;
   logger.info(`Received ${signal}. Shutting down gracefully...`);
 
   schedulerService.stopScheduler();

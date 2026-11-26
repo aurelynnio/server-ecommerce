@@ -14,11 +14,14 @@
  */
 
 const { AIMessage, HumanMessage, SystemMessage, ToolMessage } = require('@langchain/core/messages');
-const { DynamicTool } = require('@langchain/core/tools');
 
 const { toolHandlers } = require('./chatbot.tools');
 const { toolDefinitions, SYSTEM_PROMPT } = require('../configs/chatbot.config');
-const { validateResponse } = require('./chatbotHelpers');
+const {
+  escapePromptText,
+  validateResponse,
+  collectGroundedAmounts,
+} = require('./chatbotHelpers');
 const logger = require('../utils/logger');
 const metrics = require('../monitoring/chatbot.metrics');
 
@@ -27,47 +30,121 @@ const MAX_OUTPUT_CHARS = Number(process.env.CHATBOT_AGENT_MAX_TOOL_OUTPUT) || 40
 const MAX_ITERATIONS_FALLBACK =
   'Xin lỗi, em chưa thể xử lý yêu cầu phức tạp này. Anh/chị vui lòng thử lại nhé!';
 
-const buildTools = () =>
-  toolDefinitions.map((td) => {
-    const def = td.function || td;
-    return new DynamicTool({
-      name: def.name,
-      description: def.description || def.name,
-      func: async (input) => {
-        const t0 = Date.now();
-        let args = {};
-        try {
-          args = typeof input === 'string' ? JSON.parse(input) : input || {};
-        } catch (_e) {
-          logger.warn(`[Agent] tool ${def.name} bad JSON args`, { input });
-          return JSON.stringify({ error: 'Invalid JSON arguments' });
-        }
-        const handler = toolHandlers[def.name];
-        if (!handler) {
-          metrics.chatbotErrorsTotal.inc({ stage: `tool_missing:${def.name}` });
-          return JSON.stringify({ error: `Tool ${def.name} not found` });
-        }
-        try {
-          const result = await handler(args);
-          metrics.chatbotTokensTotal.inc(
-            { direction: 'in' },
-            metrics.estimateTokens(JSON.stringify(result)),
-          );
-          const truncated = JSON.stringify(result).slice(0, MAX_OUTPUT_CHARS);
-          logger.debug('[Agent] tool ok', {
-            tool: def.name,
-            durationMs: Date.now() - t0,
-            resultLen: truncated.length,
-          });
-          return truncated;
-        } catch (err) {
-          logger.error(`[Agent] tool ${def.name} error:`, err.message);
-          metrics.chatbotErrorsTotal.inc({ stage: `tool_error:${def.name}` });
-          return JSON.stringify({ error: err.message });
-        }
-      },
+// Tool trả về mức tiền hợp lệ (không phải sản phẩm): policy, freeship, voucher.
+const GROUNDING_AMOUNT_TOOL_NAMES = new Set([
+  'search_store_policies',
+  'get_available_vouchers',
+]);
+
+const PRODUCT_TOOL_NAMES = new Set([
+  'search_products',
+  'search_products_advanced',
+  'search_products_by_brand',
+  'search_products_by_price_range',
+  'semantic_search_products',
+  'get_discounted_products',
+  'get_bestseller_products',
+  'get_new_arrival_products',
+  'get_related_products',
+  'get_featured_products',
+  'compare_products',
+]);
+
+// Tool trả về 1 object sản phẩm/biến thể/link mua đơn lẻ (không phải mảng).
+const SINGLE_PRODUCT_TOOL_NAMES = new Set([
+  'get_product_details',
+  'check_product_availability',
+  'generate_checkout_link',
+]);
+
+const normalizeToolArgs = (rawArgs) => {
+  if (!rawArgs) return {};
+  if (typeof rawArgs === 'string') {
+    return JSON.parse(rawArgs);
+  }
+  return rawArgs;
+};
+
+const serializeToolResultForLLM = (result) => {
+  const full = JSON.stringify(result);
+  if (full.length <= MAX_OUTPUT_CHARS) return full;
+
+  if (Array.isArray(result)) {
+    const kept = [];
+    let size = 2;
+    for (const item of result) {
+      const compact =
+        item && typeof item === 'object' && typeof item.description === 'string'
+          ? { ...item, description: item.description.slice(0, 160) }
+          : item;
+      const serialized = JSON.stringify(compact);
+      if (size + serialized.length + 1 > MAX_OUTPUT_CHARS) break;
+      kept.push(compact);
+      size += serialized.length + 1;
+    }
+    return JSON.stringify(kept);
+  }
+
+  if (result && typeof result === 'object') {
+    const compact = { ...result };
+    if (typeof compact.description === 'string') {
+      compact.description = compact.description.slice(0, 200);
+    }
+    if (compact.product && typeof compact.product.description === 'string') {
+      compact.product = {
+        ...compact.product,
+        description: compact.product.description.slice(0, 200),
+      };
+    }
+    const compactJson = JSON.stringify(compact);
+    if (compactJson.length <= MAX_OUTPUT_CHARS) return compactJson;
+  }
+
+  return full.slice(0, MAX_OUTPUT_CHARS);
+};
+
+const executeToolHandler = async (name, rawArgs) => {
+  const t0 = Date.now();
+  let args = {};
+  try {
+    args = normalizeToolArgs(rawArgs);
+  } catch (_e) {
+    logger.warn(`[Agent] tool ${name} bad JSON args`, { rawArgs });
+    return {
+      rawResult: null,
+      content: JSON.stringify({ error: 'Invalid JSON arguments' }),
+    };
+  }
+
+  const handler = toolHandlers[name];
+  if (!handler) {
+    metrics.chatbotErrorsTotal.inc({ stage: `tool_missing:${name}` });
+    return {
+      rawResult: null,
+      content: JSON.stringify({ error: `Tool ${name} not found` }),
+    };
+  }
+
+  try {
+    const result = await handler(args);
+    const fullStr = JSON.stringify(result);
+    metrics.chatbotTokensTotal.inc({ direction: 'in' }, metrics.estimateTokens(fullStr));
+    const content = serializeToolResultForLLM(result);
+    logger.debug('[Agent] tool ok', {
+      tool: name,
+      durationMs: Date.now() - t0,
+      resultLen: content.length,
     });
-  });
+    return { rawResult: result, content };
+  } catch (err) {
+    logger.error(`[Agent] tool ${name} error:`, err.message);
+    metrics.chatbotErrorsTotal.inc({ stage: `tool_error:${name}` });
+    return {
+      rawResult: null,
+      content: JSON.stringify({ error: err.message }),
+    };
+  }
+};
 
 class ChatbotAgent {
   /**
@@ -78,7 +155,8 @@ class ChatbotAgent {
    */
   constructor(model, getMessageHistory) {
     this.model = model;
-    this.tools = buildTools();
+    // Bind OpenAI-format tool definitions directly so Mistral receives full JSON Schemas.
+    this.tools = toolDefinitions;
     this.getMessageHistory = getMessageHistory;
   }
 
@@ -105,7 +183,7 @@ class ChatbotAgent {
       messages: [
         new SystemMessage(SYSTEM_PROMPT),
         ...historyMessages,
-        new HumanMessage(userMessage),
+        new HumanMessage(escapePromptText(userMessage)),
       ],
     };
   }
@@ -128,40 +206,42 @@ class ChatbotAgent {
   /**
    * Thực thi tool calls của 1 lượt LLM, push ToolMessage vào messages.
    * Yield event tool_call/tool_result để phía SSE hiển thị tiến trình.
-   * Đồng thời thu thập các products từ tool results để dùng cho grounding check.
+   * Đồng thời thu thập các products từ raw tool results (trước khi truncate) để dùng cho grounding check.
    * @param {Array} messages - Message list đang build (mutate in-place)
    * @param {Array} calls - Tool calls từ response của LLM
    * @param {Array} [collectedProducts=[]] - Mảng tích lũy sản phẩm để validate
+   * @param {Array} [collectedAmounts=[]] - Mức tiền hợp lệ từ tool policy/voucher
    */
-  async *_runToolCalls(messages, calls, collectedProducts = []) {
+  async *_runToolCalls(messages, calls, collectedProducts = [], collectedAmounts = []) {
     for (const call of calls) {
       yield { type: 'tool_call', name: call.name, args: call.args };
 
-      const tool = this.tools.find((t) => t.name === call.name);
-      let result;
-      try {
-        result = await tool.func(JSON.stringify(call.args));
-      } catch (e) {
-        result = JSON.stringify({ error: e.message });
-        metrics.chatbotErrorsTotal.inc({ stage: `tool_error:${call.name}` });
+      const { rawResult, content } = await executeToolHandler(call.name, call.args);
+
+      if (PRODUCT_TOOL_NAMES.has(call.name) && Array.isArray(rawResult)) {
+        const products = rawResult.filter((item) => item && item.id && item.name);
+        collectedProducts.push(...products);
+        if (products.length > 0) {
+          yield { type: 'products', products };
+        }
+      } else if (
+        SINGLE_PRODUCT_TOOL_NAMES.has(call.name) &&
+        rawResult &&
+        typeof rawResult === 'object' &&
+        !Array.isArray(rawResult) &&
+        !rawResult.error
+      ) {
+        collectedProducts.push(rawResult);
       }
 
-      // Thu thập sản phẩm cho grounding check
-      if (typeof result === 'string') {
-        try {
-          const parsed = JSON.parse(result);
-          if (Array.isArray(parsed)) {
-            collectedProducts.push(...parsed);
-          } else if (parsed && typeof parsed === 'object' && !parsed.error) {
-            collectedProducts.push(parsed);
-          }
-        } catch (_e) {}
+      if (GROUNDING_AMOUNT_TOOL_NAMES.has(call.name) && rawResult) {
+        collectedAmounts.push(...collectGroundedAmounts(rawResult));
       }
 
       yield { type: 'tool_result', name: call.name };
       messages.push(
         new ToolMessage({
-          content: typeof result === 'string' ? result : JSON.stringify(result),
+          content,
           tool_call_id: call.id,
         }),
       );
@@ -187,6 +267,7 @@ class ChatbotAgent {
       let output = '';
       const toolCalls = [];
       const collectedProducts = [];
+      const collectedAmounts = [];
 
       for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
         const response = await this.model.bindTools(this.tools).invoke(messages);
@@ -198,7 +279,12 @@ class ChatbotAgent {
         }
 
         messages.push(response);
-        for await (const event of this._runToolCalls(messages, calls, collectedProducts)) {
+        for await (const event of this._runToolCalls(
+          messages,
+          calls,
+          collectedProducts,
+          collectedAmounts,
+        )) {
           if (event.type === 'tool_call') toolCalls.push(event.name);
         }
       }
@@ -209,7 +295,9 @@ class ChatbotAgent {
       }
 
       // Grounding validation cho agent mode
-      const validated = validateResponse(output, collectedProducts, logger);
+      const validated = validateResponse(output, collectedProducts, logger, {
+        allowedAmounts: collectedAmounts,
+      });
       if (validated !== output) {
         metrics.chatbotHallucinationTotal.inc({ kind: 'replaced_agent' });
         output = validated;
@@ -224,6 +312,7 @@ class ChatbotAgent {
         success: true,
         message: output,
         toolCalls,
+        products: collectedProducts,
       };
     } catch (err) {
       logger.error('[Agent] invoke error:', err.message);
@@ -258,6 +347,7 @@ class ChatbotAgent {
     let finalContent = '';
     const boundModel = this.model.bindTools(this.tools);
     const collectedProducts = [];
+    const collectedAmounts = [];
 
     for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
       // Dùng .stream() để token ra client ngay khi LLM sinh (không gom cả câu
@@ -266,6 +356,7 @@ class ChatbotAgent {
 
       let aggregated = null;
       let sawToolCalls = false;
+      const pendingTokens = [];
 
       for await (const chunk of stream) {
         aggregated = aggregated ? aggregated.concat(chunk) : chunk;
@@ -278,20 +369,23 @@ class ChatbotAgent {
 
         const text = typeof chunk.content === 'string' ? chunk.content : '';
         if (text && !sawToolCalls) {
-          yield { type: 'token', content: text };
+          pendingTokens.push(text);
         }
       }
 
       const toolCalls = aggregated?.tool_calls || [];
 
       if (toolCalls.length === 0) {
+        for (const content of pendingTokens) {
+          yield { type: 'token', content };
+        }
         finalContent = typeof aggregated?.content === 'string' ? aggregated.content : '';
         break;
       }
 
       // Có tool call → thêm AI message + execute tools
       messages.push(aggregated);
-      yield* this._runToolCalls(messages, toolCalls, collectedProducts);
+      yield* this._runToolCalls(messages, toolCalls, collectedProducts, collectedAmounts);
     }
 
     // Vượt max iterations → fallback
@@ -301,7 +395,9 @@ class ChatbotAgent {
     }
 
     // Grounding check cho Agent mode: kiểm tra giá và link
-    const validated = validateResponse(finalContent, collectedProducts, logger);
+    const validated = validateResponse(finalContent, collectedProducts, logger, {
+      allowedAmounts: collectedAmounts,
+    });
     if (validated !== finalContent) {
       metrics.chatbotHallucinationTotal.inc({ kind: 'replaced_agent' });
       yield { type: 'correction', content: validated };

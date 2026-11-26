@@ -6,8 +6,10 @@ class SchedulerService {
   constructor() {
     this._orderExpiryTimer = null;
     this._outboxDispatchTimer = null;
+    this._embeddingReconcileTimer = null;
     this._isCleaningUpOrders = false;
     this._isDispatchingOutbox = false;
+    this._isReconcilingEmbeddings = false;
     this._isRunning = false;
   }
 
@@ -120,6 +122,43 @@ class SchedulerService {
   }
 
   /**
+   * Run periodic embedding reconciliation (re-embed stale/missing published products
+   * and purge orphaned/unpublished embeddings).
+   * Skips cleanly if MISTRAL_API_KEY is not configured.
+   */
+  async runEmbeddingReconciliation() {
+    if (this._isReconcilingEmbeddings) {
+      return { skipped: true };
+    }
+    if (!process.env.MISTRAL_API_KEY) {
+      return { skipped: true, reason: 'MISTRAL_API_KEY not set' };
+    }
+
+    this._isReconcilingEmbeddings = true;
+    const lockKey = 'lock:scheduler:embedding-reconcile';
+    let lockAcquired = false;
+    try {
+      lockAcquired = await this._acquireLock(lockKey, 600);
+      if (!lockAcquired) {
+        return { skipped: true };
+      }
+
+      const { reconcileProductEmbeddings } = require('./embedding.service');
+      const result = await reconcileProductEmbeddings();
+      logger.info('[Scheduler] Embedding reconciliation finished', result);
+      return result;
+    } catch (error) {
+      logger.error('[Scheduler] Error during embedding reconciliation', {
+        error: error.message,
+      });
+      return { error: error.message };
+    } finally {
+      this._isReconcilingEmbeddings = false;
+      if (lockAcquired) await this._releaseLock(lockKey);
+    }
+  }
+
+  /**
    * Start background scheduler jobs.
    * @param {Object} [options]
    * @param {number} [options.orderExpiryIntervalMs] - Interval for order cleanup (default: 5 mins)
@@ -171,6 +210,20 @@ class SchedulerService {
       });
     }, outboxDispatchIntervalMs);
     this._outboxDispatchTimer.unref();
+
+    // Schedule periodic embedding reconciliation (default every 60 minutes)
+    const embeddingReconcileIntervalMs =
+      options.embeddingReconcileIntervalMs ||
+      Number(process.env.EMBEDDING_RECONCILE_INTERVAL_MS) ||
+      60 * 60 * 1000;
+    this._embeddingReconcileTimer = setInterval(() => {
+      this.runEmbeddingReconciliation().catch((err) => {
+        logger.error('[Scheduler] Unexpected error in embedding reconciliation interval', {
+          error: err.message,
+        });
+      });
+    }, embeddingReconcileIntervalMs);
+    this._embeddingReconcileTimer.unref();
   }
 
   /**
@@ -189,6 +242,11 @@ class SchedulerService {
     if (this._outboxDispatchTimer) {
       clearInterval(this._outboxDispatchTimer);
       this._outboxDispatchTimer = null;
+    }
+
+    if (this._embeddingReconcileTimer) {
+      clearInterval(this._embeddingReconcileTimer);
+      this._embeddingReconcileTimer = null;
     }
 
     this._isRunning = false;

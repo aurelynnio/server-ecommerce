@@ -3,7 +3,7 @@ const { objectId } = require('./common.validator');
 
 const addToCartValidator = Joi.object({
   productId: objectId.required(),
-  shopId: objectId,
+  shopId: objectId.allow('', null),
   modelId: objectId.allow('', null),
   variantId: objectId.allow('', null),
   size: Joi.string().max(20).allow('', null),

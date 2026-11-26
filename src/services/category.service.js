@@ -5,6 +5,7 @@ const { getPaginationParams, buildPaginationResponse } = require('../utils/pagin
 const redisService = require('./redis.service');
 const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../utils/ApiError');
+const embeddingSyncService = require('./embedding-sync.service');
 
 /**
  * Service handling category operations
@@ -175,10 +176,14 @@ class CategoryService {
       }
     }
 
+    const previousName = category.name;
     Object.assign(category, updateData);
     await category.save();
 
     await redisService.delByPattern('categories:*');
+    if (updateData.name && updateData.name !== previousName) {
+      await embeddingSyncService.scheduleCategorySync(categoryId, { reason: 'category_renamed' });
+    }
 
     return category;
   }

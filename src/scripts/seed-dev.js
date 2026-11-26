@@ -23,6 +23,7 @@ const { faker } = require('@faker-js/faker');
 // Caches
 const redisService = require('../services/redis.service');
 const redis = require('../configs/redis.config');
+const { reconcileProductEmbeddings } = require('../services/embedding.service');
 
 // Models
 const Banner = require('../models/banner.model');
@@ -791,6 +792,10 @@ async function main() {
     await seedWishlists({ buyerUsers });
 
     await clearCaches();
+    const embeddingStats = await reconcileProductEmbeddings();
+    console.log(
+      `seed-dev: embeddings reconciled (${embeddingStats.embedded} updated, ${embeddingStats.purged} purged, ${embeddingStats.failed} failed)`,
+    );
 
     console.log('seed-dev: done');
   } finally {

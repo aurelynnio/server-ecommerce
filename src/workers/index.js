@@ -1,5 +1,6 @@
 const consumerNotificationQueue = require('./notification.worker');
 const consumerOrderQueue = require('./order.worker');
+const consumerEmbeddingQueue = require('./embedding.worker');
 const logger = require('../utils/logger');
 
 let workersStarted = false;
@@ -11,8 +12,12 @@ const startQueueWorkers = async () => {
 
   workersStarted = true;
 
-  const workerNames = ['notification', 'order'];
-  const results = await Promise.allSettled([consumerNotificationQueue(), consumerOrderQueue()]);
+  const workerNames = ['notification', 'order', 'embedding'];
+  const results = await Promise.allSettled([
+    consumerNotificationQueue(),
+    consumerOrderQueue(),
+    consumerEmbeddingQueue(),
+  ]);
 
   results.forEach((result, index) => {
     if (result.status === 'rejected') {

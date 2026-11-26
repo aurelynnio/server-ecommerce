@@ -25,6 +25,7 @@ const Shop = require('../models/shop.model');
 const Category = require('../models/category.model');
 const ShopCategory = require('../models/shop.category.model');
 const User = require('../models/user.model');
+const { reconcileProductEmbeddings } = require('../services/embedding.service');
 
 // Real product dataset
 const realProducts = require('./data/real-products.json');
@@ -298,6 +299,10 @@ async function seedData() {
       console.log(`✅ Shop ${shopName}: ${toInsert.length} real products`);
     }
 
+    const embeddingStats = await reconcileProductEmbeddings();
+    console.log(
+      `🔎 Embeddings reconciled: ${embeddingStats.embedded} updated, ${embeddingStats.purged} purged, ${embeddingStats.failed} failed`,
+    );
     console.log(`\n🎉 DONE! Created ${totalProducts} REAL products across ${shopIndex} shops.`);
   } catch (error) {
     console.error('\n❌ Error seeding:', error);

@@ -3,6 +3,13 @@ const searchService = require('../services/search.service');
 const { sendSuccess } = require('../shared/res/formatResponse');
 const { parseLimit, parsePagination } = require('../utils/pagination');
 
+// Giữ minPrice=0 (0 là falsy) nhưng bỏ qua giá trị rỗng/không hợp lệ.
+const toNumberOrUndefined = (value) => {
+  if (value === undefined || value === null || value === '') return undefined;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
+};
+
 const SearchController = {
   /**
    * Get suggestions
@@ -60,9 +67,9 @@ const SearchController = {
     const results = await searchService.advancedSearch({
       keyword,
       category,
-      minPrice: minPrice ? parseFloat(minPrice) : undefined,
-      maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
-      rating: rating ? parseFloat(rating) : undefined,
+      minPrice: toNumberOrUndefined(minPrice),
+      maxPrice: toNumberOrUndefined(maxPrice),
+      rating: toNumberOrUndefined(rating),
       sortBy: sort,
       page,
       limit,

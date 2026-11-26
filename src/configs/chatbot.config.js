@@ -160,6 +160,68 @@ const toolDefinitions = [
   {
     type: 'function',
     function: {
+      name: 'semantic_search_products',
+      description:
+        'Tìm sản phẩm bằng hybrid semantic + keyword search. Dùng khi câu hỏi mô tả nhu cầu, ngữ cảnh sử dụng hoặc ý nghĩa thay vì tên chính xác.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Nhu cầu tìm kiếm của khách' },
+          limit: { type: 'number', default: 5 },
+          minScore: { type: 'number', description: 'Ngưỡng điểm tối thiểu 0-1' },
+          filters: {
+            type: 'object',
+            properties: {
+              categoryId: { type: 'string' },
+              brand: { type: 'string' },
+              minPrice: { type: 'number' },
+              maxPrice: { type: 'number' },
+              inStockOnly: { type: 'boolean' },
+              hasDiscount: { type: 'boolean' },
+            },
+          },
+        },
+        required: ['query'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_available_vouchers',
+      description: 'Lấy voucher đang hoạt động và còn lượt dùng; có thể lọc thêm voucher theo shop.',
+      parameters: {
+        type: 'object',
+        properties: {
+          shopId: { type: 'string', description: 'MongoDB ObjectId của shop nếu cần' },
+          limit: { type: 'number', default: 10 },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_store_policies',
+      description:
+        'Tra cứu nguồn chính sách/FAQ đã được phê duyệt về giao hàng, đổi trả, bảo hành hoặc freeship. Không tự suy diễn khi công cụ không có dữ liệu.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Câu hỏi chính sách của khách' },
+          type: {
+            type: 'string',
+            enum: ['shipping', 'return', 'warranty', 'freeship', 'faq'],
+          },
+          limit: { type: 'number', default: 5 },
+        },
+        required: ['query'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'search_products_by_brand',
       description:
         'Tìm kiếm nhanh sản phẩm theo thương hiệu, có thể kết hợp từ khóa và khoảng giá.',
@@ -214,6 +276,8 @@ const toolDefinitions = [
         properties: {
           keyword: { type: 'string', description: 'Từ khóa sản phẩm' },
           category: { type: 'string', description: 'Tên/slug danh mục' },
+          minPrice: { type: 'number', description: 'Giá tối thiểu' },
+          maxPrice: { type: 'number', description: 'Giá tối đa' },
           minDiscountPercent: {
             type: 'number',
             description: 'Phần trăm giảm tối thiểu',

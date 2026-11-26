@@ -16,6 +16,7 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const Product = require('../models/product.model');
 const Voucher = require('../models/voucher.model');
+const { reconcileProductEmbeddings } = require('../services/embedding.service');
 
 function parseArgInt(flag, fallback) {
   const idx = process.argv.indexOf(flag);
@@ -345,11 +346,15 @@ async function main() {
   const voucherInserted = await seedVouchers();
   const statsUpdated = await updateProductStats();
   await clearRedisCache();
+  const embeddingStats = await reconcileProductEmbeddings();
 
   console.log('\n=== Summary ===');
   console.log(`  Flash Sale activated: ${flashUpdated} products`);
   console.log(`  Platform vouchers: ${voucherInserted} inserted`);
   console.log(`  Product stats updated: ${statsUpdated} products`);
+  console.log(
+    `  Embeddings reconciled: ${embeddingStats.embedded} updated, ${embeddingStats.purged} purged, ${embeddingStats.failed} failed`,
+  );
   console.log('\nDone! Refresh http://localhost:3000 to see updates.');
 
   await mongoose.disconnect();

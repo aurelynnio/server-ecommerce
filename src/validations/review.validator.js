@@ -20,6 +20,7 @@ const shopIdParamValidator = Joi.object({ shopId: objectId.required() });
 const getReviewsQueryValidator = Joi.object({
   ...pagination,
   rating: Joi.number().integer().min(1).max(5),
+  replyStatus: Joi.string().valid('replied', 'unreplied'),
   sort: Joi.string().valid('newest', 'oldest', 'highest', 'lowest').default('newest'),
 });
 module.exports = {

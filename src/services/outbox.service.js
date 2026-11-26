@@ -64,13 +64,20 @@ class OutboxService {
         return { processed: 0, published: 0, failed: 0 };
       }
 
-      // Lazy-load orderService to avoid circular require
+      // Lazy-load services to avoid circular require
       const orderService = require('./order.service');
+      const embeddingSyncService = require('./embedding-sync.service');
 
       for (const event of pendingEvents) {
         try {
           // Publish with strict=true to ensure broker confirms receipt
-          await orderService.publishOrder(event.payload, event.routingKey, { strict: true });
+          if (String(event.routingKey || event.eventType || '').startsWith('embedding.')) {
+            await embeddingSyncService.publishEmbeddingEvent(event.payload, event.routingKey, {
+              strict: true,
+            });
+          } else {
+            await orderService.publishOrder(event.payload, event.routingKey, { strict: true });
+          }
           await outboxRepository.markPublished(event._id);
           published++;
         } catch (pubErr) {

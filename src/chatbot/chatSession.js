@@ -33,14 +33,24 @@ const verifyChatSession = (token) => {
   }
 };
 
+const COOKIE_OPTIONS = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict',
+  path: '/',
+});
+
 const setChatSessionCookie = (res, sessionId) => {
   res.cookie(COOKIE_NAME, signChatSession(sessionId), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    path: '/',
+    ...COOKIE_OPTIONS(),
     maxAge: TOKEN_MAX_AGE_MS,
   });
+};
+
+const clearChatSessionCookie = (res) => {
+  if (typeof res.clearCookie === 'function') {
+    res.clearCookie(COOKIE_NAME, COOKIE_OPTIONS());
+  }
 };
 
 const resolveChatSession = (req, res, requestedSessionId) => {
@@ -56,7 +66,19 @@ const resolveChatSession = (req, res, requestedSessionId) => {
     return sessionId;
   }
 
-  const sessionId = verifyChatSession(token);
+  let sessionId;
+  try {
+    sessionId = verifyChatSession(token);
+  } catch (err) {
+    clearChatSessionCookie(res);
+    if (requestedSessionId) {
+      throw err;
+    }
+    const freshSessionId = createSessionId();
+    setChatSessionCookie(res, freshSessionId);
+    return freshSessionId;
+  }
+
   if (requestedSessionId && requestedSessionId !== sessionId) {
     throw new ApiError(StatusCodes.FORBIDDEN, 'Chat session ownership could not be verified');
   }
@@ -69,5 +91,6 @@ module.exports = {
   signChatSession,
   verifyChatSession,
   setChatSessionCookie,
+  clearChatSessionCookie,
   resolveChatSession,
 };

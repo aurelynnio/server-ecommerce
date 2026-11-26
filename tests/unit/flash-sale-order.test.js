@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 const Product = require('../../src/repositories/product.repository');
 const inventoryService = require('../../src/services/inventory.service');
+const embeddingSyncService = require('../../src/services/embedding-sync.service');
 const orderService = require('../../src/services/order.service');
 const ProductModel = require('../../src/models/product.model');
 const { StatusCodes } = require('http-status-codes');
@@ -151,6 +152,9 @@ describe('Flash Sale Ordering & Stock Deduction Logic', () => {
       const decrementSpy = vi
         .spyOn(Product, 'decrementStockForBaseFlashSale')
         .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
+      const embedSyncSpy = vi
+        .spyOn(embeddingSyncService, 'scheduleProductsSync')
+        .mockResolvedValue(true);
 
       await inventoryService.deductStock(
         [{ productId: 'prod123', modelId: null, quantity: 2, isFlashSale: true }],
@@ -159,12 +163,16 @@ describe('Flash Sale Ordering & Stock Deduction Logic', () => {
 
       expect(decrementSpy).toHaveBeenCalledWith('prod123', 2, {});
       decrementSpy.mockRestore();
+      embedSyncSpy.mockRestore();
     });
 
     it('restoreStock() should invoke restoreStockForBaseFlashSale for flash sale items', async () => {
       const restoreSpy = vi
         .spyOn(Product, 'restoreStockForBaseFlashSale')
         .mockResolvedValue({ matchedCount: 1 });
+      const embedSyncSpy = vi
+        .spyOn(embeddingSyncService, 'scheduleProductsSync')
+        .mockResolvedValue(true);
 
       await inventoryService.restoreStock(
         [{ productId: 'prod123', modelId: null, quantity: 2, isFlashSale: true }],
@@ -173,6 +181,7 @@ describe('Flash Sale Ordering & Stock Deduction Logic', () => {
 
       expect(restoreSpy).toHaveBeenCalledWith('prod123', 2, {});
       restoreSpy.mockRestore();
+      embedSyncSpy.mockRestore();
     });
   });
 

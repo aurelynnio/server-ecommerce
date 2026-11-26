@@ -4,6 +4,7 @@ const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../utils/ApiError');
 
 const { getPaginationParams, buildPaginationResponse } = require('../utils/pagination');
+const embeddingSyncService = require('./embedding-sync.service');
 
 /**
  * Service handling flash sale operations
@@ -166,6 +167,7 @@ class FlashSaleService {
     }
 
     await redisService.delByPattern('flash-sale:*');
+    await embeddingSyncService.scheduleProductSync(productId, { reason: 'flash_sale_added' });
 
     return product;
   }
@@ -183,6 +185,7 @@ class FlashSaleService {
     }
 
     await redisService.delByPattern('flash-sale:*');
+    await embeddingSyncService.scheduleProductSync(productId, { reason: 'flash_sale_removed' });
     return product;
   }
 

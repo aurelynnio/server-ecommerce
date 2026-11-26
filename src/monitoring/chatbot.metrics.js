@@ -36,6 +36,13 @@ const chatbotHallucinationTotal = new client.Counter({
   registers: [register],
 });
 
+const chatbotRetrievalTotal = new client.Counter({
+  name: 'chatbot_retrieval_total',
+  help: 'Total chatbot retrievals by search strategy',
+  labelNames: ['mode'],
+  registers: [register],
+});
+
 // Helper: ước lượng token từ content (xem utils/tokenBudget.js)
 const CHARS_PER_TOKEN = 3;
 const estimateTokens = (text = '') => Math.ceil(String(text).length / CHARS_PER_TOKEN);
@@ -49,6 +56,7 @@ const metrics = {
   chatbotTokensTotal,
   chatbotErrorsTotal,
   chatbotHallucinationTotal,
+  chatbotRetrievalTotal,
   estimateTokens,
 };
 

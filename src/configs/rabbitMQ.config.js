@@ -49,6 +49,24 @@ const config_rabbitMQ = {
       retryDelayMs: Number(process.env.ORDER_RETRY_DELAY_MS) || 5000,
       maxRetries: Number(process.env.ORDER_MAX_RETRIES) || 3,
     },
+    embedding: {
+      name: 'embedding_queue',
+      routingKey: [
+        'embedding.sync',
+        'embedding.delete',
+        'embedding.sync_category',
+        'embedding.sync_shop',
+        'embedding.reconcile',
+        'embedding.retry',
+      ],
+      dlq: 'embedding_queue_dlq',
+      dlRoutingKey: 'embedding.dlq',
+      retryQueue: 'embedding_queue_retry',
+      retryRoutingKey: 'embedding.retry',
+      failedQueue: 'embedding_queue_failed',
+      retryDelayMs: Number(process.env.EMBEDDING_RETRY_DELAY_MS) || 5000,
+      maxRetries: Number(process.env.EMBEDDING_MAX_RETRIES) || 3,
+    },
   },
 };
 

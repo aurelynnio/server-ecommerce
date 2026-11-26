@@ -84,9 +84,17 @@ function extractSearchSignals(message) {
           .trim()
       : null;
 
-  const brandMatch = message.match(/(?:thương hiệu|hãng|brand)\s+([a-zA-ZÀ-ỹ0-9\s-]{2,40})/i);
-  const categoryMatch = message.match(/(?:danh mục|loại|category)\s+([a-zA-ZÀ-ỹ0-9\s-]{2,40})/i);
-  const colorMatch = message.match(/(?:màu|color)\s+([a-zA-ZÀ-ỹ0-9\s-]{2,30})/i);
+  const signalBoundary =
+    '(?=\\s+(?:thương hiệu|hãng|brand|danh mục|loại|category|màu|color|size|kích cỡ|cỡ|giá|dưới|trên|từ|còn hàng|sắp xếp)\\b|[,.;!?]|$)';
+  const brandMatch = message.match(
+    new RegExp(`(?:thương hiệu|hãng|brand)\\s+([a-zA-ZÀ-ỹ0-9 -]{2,40}?)${signalBoundary}`, 'i'),
+  );
+  const categoryMatch = message.match(
+    new RegExp(`(?:danh mục|loại|category)\\s+([a-zA-ZÀ-ỹ0-9 -]{2,40}?)${signalBoundary}`, 'i'),
+  );
+  const colorMatch = message.match(
+    new RegExp(`(?:màu|color)\\s+([a-zA-ZÀ-ỹ0-9 -]{2,30}?)${signalBoundary}`, 'i'),
+  );
   const sizeMatch = message.match(/(?:size|kích cỡ|cỡ)\s*([a-zA-Z0-9]{1,8})/i);
 
   const limitMatch =
@@ -178,7 +186,7 @@ function formatProducts(products) {
 Tên: ${item.name}
 Giá: ${item.price?.toLocaleString('vi-VN')}đ${discount}
 Thương hiệu: ${item.brand || 'N/A'}
-Danh mục: ${item.category || 'N/A'}
+  Danh mục: ${item.category?.name || item.category || 'N/A'}
 Còn hàng: ${item.stock > 0 ? 'Có' : 'Hết hàng'}
 ${sizes}${colors}${image}Link xem: ${item.productUrl}
 Link mua: ${item.checkoutUrl}`;
@@ -190,24 +198,92 @@ Link mua: ${item.checkoutUrl}`;
     .join('\n\n');
 }
 
+const MONEY_FIELD_NAMES = new Set([
+  'value',
+  'maxValue',
+  'minOrderValue',
+  'price',
+  'salePrice',
+  'currentPrice',
+  'discountPrice',
+]);
+
+/**
+ * Thu thập các mức tiền hợp lệ từ output tool không phải sản phẩm
+ * (policy/FAQ/voucher) để grounding check không xoá câu trả lời đúng.
+ * @param {any} rawResult
+ * @returns {number[]}
+ */
+function collectGroundedAmounts(rawResult) {
+  const amounts = new Set();
+  const moneyPattern = /(?<!\d)(\d{1,3}(?:[.,]\d{3})+|\d{4,})\s*đ/gu;
+
+  const visit = (node, key) => {
+    if (node === null || node === undefined) return;
+
+    if (typeof node === 'number') {
+      if (MONEY_FIELD_NAMES.has(key) && Number.isFinite(node)) amounts.add(node);
+      return;
+    }
+
+    if (typeof node === 'string') {
+      if (MONEY_FIELD_NAMES.has(key)) {
+        const parsed = normalizePriceInText(node);
+        if (parsed !== null) amounts.add(parsed);
+      }
+      for (const match of node.matchAll(moneyPattern)) {
+        const parsed = normalizePriceInText(match[1]);
+        if (parsed !== null) amounts.add(parsed);
+      }
+      return;
+    }
+
+    if (Array.isArray(node)) {
+      node.forEach((item) => visit(item, key));
+      return;
+    }
+
+    if (typeof node === 'object') {
+      Object.entries(node).forEach(([childKey, childValue]) => visit(childValue, childKey));
+    }
+  };
+
+  visit(rawResult, '');
+  return [...amounts];
+}
+
 /**
  * Validate LLM response to prevent hallucination
  * Check if mentioned links actually exist in the context, and verify price grounding.
  * @param {string} response - LLM response
  * @param {Array} products - Products from RAG or tool calls
  * @param {Object} [logger] - Optional logger instance
+ * @param {Object} [options]
+ * @param {number[]} [options.allowedAmounts] - Mức tiền hợp lệ từ tool policy/voucher
  * @returns {string} - Validated/corrected response
  */
-function validateResponse(response, products, logger = null) {
+function validateResponse(response, products, logger = null, options = {}) {
   if (!response) return response;
 
-  // Nếu không có product trong context, cảnh báo nếu response chứa giá cụ thể
+  const allowedAmounts = new Set(
+    (Array.isArray(options.allowedAmounts) ? options.allowedAmounts : [])
+      .map((amount) => Number(amount))
+      .filter((amount) => Number.isFinite(amount)),
+  );
+
+  // Nếu không có product trong context, chỉ chặn khi có mức tiền KHÔNG đến từ tool.
   if (!products || products.length === 0) {
-    const pricePattern = /\d{2,3}[.,]?\d{3}[.,]?\d{0,3}\s*đ/g;
-    if (pricePattern.test(response)) {
+    const pricePattern = /(?<!\d)(\d{1,3}(?:[.,]\d{3})+|\d{4,})\s*đ(?![\p{L}\d])/gu;
+    const foundAmounts = [...response.matchAll(pricePattern)]
+      .map((match) => normalizePriceInText(match[1]))
+      .filter((amount) => amount !== null);
+    const hasUngroundedAmount = foundAmounts.some((amount) => !allowedAmounts.has(amount));
+
+    if (hasUngroundedAmount) {
       if (logger?.warn) {
         logger.warn(
           '[Chatbot] Potential hallucination detected - prices in response but no products in context',
+          { foundAmounts, allowedAmounts: [...allowedAmounts] },
         );
       }
       return 'Em xin lỗi, hiện tại em chưa tìm thấy sản phẩm phù hợp với yêu cầu của anh/chị. Anh/chị có thể cho em biết cụ thể hơn muốn tìm loại sản phẩm gì không ạ? Ví dụ: áo, quần, giày, túi xách...';
@@ -215,35 +291,32 @@ function validateResponse(response, products, logger = null) {
     return response;
   }
 
-  // Grounding check: mọi link internal trong response phải nằm trong whitelist
+  // Grounding check: mọi link trong response (mọi scheme) phải nằm trong whitelist
   const allowedUrls = new Set();
   for (const p of products) {
     if (p.productUrl) allowedUrls.add(p.productUrl);
     if (p.checkoutUrl) allowedUrls.add(p.checkoutUrl);
+    if (p.addToCartUrl) allowedUrls.add(p.addToCartUrl);
+    if (p.url) allowedUrls.add(p.url);
     if (p.image) allowedUrls.add(p.image);
+    if (Array.isArray(p.variants)) {
+      for (const v of p.variants) {
+        if (v?.image) allowedUrls.add(v.image);
+      }
+    }
   }
 
   const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
   let match;
   let hallucinated = false;
   while ((match = linkPattern.exec(response)) !== null) {
-    const url = match[2];
-    // Chặn cả link tuyệt đối ngoài whitelist lẫn link nội bộ không hợp lệ
-    const isInternal = url.startsWith('/');
-    const isAllowedAbsolute = /^https?:\/\//i.test(url) && allowedUrls.has(url);
-    if (isInternal && !allowedUrls.has(url)) {
+    const url = match[2].trim();
+    if (!allowedUrls.has(url)) {
       if (logger?.warn) {
-        logger.warn('[Chatbot] Hallucinated link detected', {
+        logger.warn('[Chatbot] Hallucinated or disallowed link detected', {
           url,
           allowedSample: Array.from(allowedUrls).slice(0, 3),
         });
-      }
-      hallucinated = true;
-      break;
-    }
-    if (/^https?:\/\//i.test(url) && !isAllowedAbsolute) {
-      if (logger?.warn) {
-        logger.warn('[Chatbot] Hallucinated absolute link detected', { url });
       }
       hallucinated = true;
       break;
@@ -255,12 +328,19 @@ function validateResponse(response, products, logger = null) {
   }
 
   // Grounding check: mọi mức giá xuất hiện phải khớp với dữ liệu thực
-  const allowedPrices = new Set();
+  // (products + mức tiền hợp lệ từ tool policy/voucher).
+  const allowedPrices = new Set(allowedAmounts);
   for (const p of products) {
     if (typeof p.price === 'number') allowedPrices.add(p.price);
     if (typeof p.originalPrice === 'number') allowedPrices.add(p.originalPrice);
+    if (typeof p.product?.price === 'number') allowedPrices.add(p.product.price);
+    if (Array.isArray(p.variants)) {
+      for (const v of p.variants) {
+        if (typeof v?.price === 'number') allowedPrices.add(v.price);
+      }
+    }
   }
-  const priceInTextPattern = /(\d{1,3}(?:[.,]\d{3})+|[1-9]\d{0,4})\s*đ/g;
+  const priceInTextPattern = /(?<!\d)(\d{1,3}(?:[.,]\d{3})+|\d+)\s*đ(?![\p{L}\d])/gu;
   let priceMatch;
   while ((priceMatch = priceInTextPattern.exec(response)) !== null) {
     const raw = priceMatch[1];
@@ -285,6 +365,7 @@ module.exports = {
   extractSearchSignals,
   escapePromptText,
   normalizePriceInText,
+  collectGroundedAmounts,
   formatProducts,
   validateResponse,
 };

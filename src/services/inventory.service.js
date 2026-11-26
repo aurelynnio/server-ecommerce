@@ -2,6 +2,7 @@ const Product = require('../repositories/product.repository');
 const { StatusCodes } = require('http-status-codes');
 const ApiError = require('../utils/ApiError');
 const { isFlashSaleTimeWindowActive } = require('../utils/flashSale.util');
+const embeddingSyncService = require('./embedding-sync.service');
 
 /**
  * Service handling inventory operations
@@ -157,6 +158,11 @@ class InventoryService {
         }
       }
     }
+
+    await embeddingSyncService.scheduleProductsSync(
+      aggregatedItems.map((i) => i.productId),
+      { reason: 'stock_deducted', session },
+    );
   }
 
   /**
@@ -188,6 +194,11 @@ class InventoryService {
         await Product.restoreStockForBaseProduct(item.productId, quantity, options);
       }
     }
+
+    await embeddingSyncService.scheduleProductsSync(
+      aggregatedItems.map((i) => i.productId),
+      { reason: 'stock_restored', session },
+    );
   }
 }
 

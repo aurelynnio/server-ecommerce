@@ -4,13 +4,20 @@ const router = express.Router();
 
 const chatbotController = require('../controllers/chatbot.controller');
 
-const { verifyAccessToken, requireRole } = require('../middlewares/auth.middleware');
+const {
+  verifyAccessToken,
+  optionalAuth,
+  requireRole,
+} = require('../middlewares/auth.middleware');
 const validate = require('../middlewares/validate.middleware');
 const { chatbotRateLimiter } = require('../middlewares/rateLimit.middleware');
 const {
   chatMessageValidator,
+  feedbackValidator,
   sessionIdParamValidator,
 } = require('../validations/chatbot.validator');
+
+router.use(optionalAuth);
 
 router.post(
   '/message',
@@ -72,12 +79,36 @@ router.get(
   chatbotController.getAllSessions,
 );
 
+router.get(
+  '/admin/feedback/stats',
+  verifyAccessToken,
+  requireRole('admin'),
+  chatbotController.getFeedbackStats,
+);
+
+/**
+ * @desc    Get chat history of any session (Admin)
+ * @access  Private (Admin)
+ */
+router.get(
+  '/admin/sessions/:sessionId',
+  verifyAccessToken,
+  requireRole('admin'),
+  validate({ params: sessionIdParamValidator }),
+  chatbotController.getAdminSessionHistory,
+);
+
 /**
  * @desc    Lưu feedback cho 1 message chatbot
  * @access  Public
  * @body    { sessionId, messageId, rating: 'up'|'down', comment? }
  */
-router.post('/feedback', chatbotRateLimiter, chatbotController.feedback);
+router.post(
+  '/feedback',
+  chatbotRateLimiter,
+  validate({ body: feedbackValidator }),
+  chatbotController.feedback,
+);
 
 /**
  * @desc    GDPR: xoá toàn bộ message của 1 session (Admin)

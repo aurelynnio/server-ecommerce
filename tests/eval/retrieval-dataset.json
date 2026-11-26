@@ -1,0 +1,172 @@
+[
+  {
+    "id": "ao-thun-nam",
+    "query": "áo thun nam cotton thoáng mát",
+    "relevantIds": ["ao-thun-1", "ao-thun-2"],
+    "noiseIds": ["noise-ao-1", "noise-ao-2"],
+    "vectorResults": [
+      { "productId": "ao-thun-1", "score": 0.88, "metadata": { "stock": 5, "hasDiscount": true } },
+      { "productId": "ao-thun-2", "score": 0.8, "metadata": { "stock": 3 } },
+      { "productId": "ao-polo-1", "score": 0.6, "metadata": { "stock": 4 } },
+      { "productId": "quan-jean-1", "score": 0.55, "metadata": { "stock": 2 } },
+      { "productId": "noise-ao-1", "score": 0.2, "metadata": { "stock": 9 } },
+      { "productId": "noise-ao-2", "score": 0.1, "metadata": { "stock": 9 } }
+    ],
+    "textResults": [
+      { "productId": "ao-thun-2", "score": 5, "metadata": { "stock": 3 } },
+      { "productId": "quan-jean-1", "score": 3, "metadata": { "stock": 2 } },
+      { "productId": "noise-ao-1", "score": 0.1, "metadata": { "stock": 9 } }
+    ]
+  },
+  {
+    "id": "giay-chay-bo",
+    "query": "giày chạy bộ êm chân",
+    "relevantIds": ["giay-run-1", "giay-run-2"],
+    "noiseIds": ["noise-giay-1"],
+    "vectorResults": [
+      { "productId": "giay-run-2", "score": 0.9, "metadata": { "stock": 6 } },
+      { "productId": "giay-run-1", "score": 0.7, "metadata": { "stock": 0 } },
+      { "productId": "dep-1", "score": 0.5, "metadata": { "stock": 9 } },
+      { "productId": "sneaker-1", "score": 0.45, "metadata": { "stock": 4 } },
+      { "productId": "ao-the-thao-1", "score": 0.4, "metadata": { "stock": 5 } },
+      { "productId": "noise-giay-1", "score": 0.15, "metadata": { "stock": 9 } }
+    ],
+    "textResults": [
+      { "productId": "giay-run-1", "score": 4, "metadata": { "stock": 0 } },
+      { "productId": "noise-giay-1", "score": 0.1, "metadata": { "stock": 9 } }
+    ]
+  },
+  {
+    "id": "laptop-van-phong",
+    "query": "laptop văn phòng mỏng nhẹ",
+    "relevantIds": ["laptop-1", "laptop-2"],
+    "noiseIds": ["noise-laptop-1"],
+    "vectorResults": [
+      { "productId": "laptop-1", "score": 0.86, "metadata": { "stock": 3 } },
+      { "productId": "laptop-2", "score": 0.72, "metadata": { "stock": 2 } },
+      { "productId": "chuot-1", "score": 0.6, "metadata": { "stock": 10 } },
+      { "productId": "ban-phim-1", "score": 0.5, "metadata": { "stock": 8 } },
+      { "productId": "man-hinh-1", "score": 0.45, "metadata": { "stock": 6 } },
+      { "productId": "noise-laptop-1", "score": 0.12, "metadata": { "stock": 9 } }
+    ],
+    "textResults": [
+      { "productId": "laptop-2", "score": 4.5, "metadata": { "stock": 2 } },
+      { "productId": "ban-phim-1", "score": 3, "metadata": { "stock": 8 } },
+      { "productId": "noise-laptop-1", "score": 0.1, "metadata": { "stock": 9 } }
+    ]
+  },
+  {
+    "id": "dien-thoai-pin-trau",
+    "query": "điện thoại pin trâu giá tốt",
+    "relevantIds": ["phone-1", "phone-2"],
+    "noiseIds": ["noise-phone-1"],
+    "vectorResults": [
+      { "productId": "phone-1", "score": 0.9, "metadata": { "stock": 7 } },
+      { "productId": "op-lung-1", "score": 0.65, "metadata": { "stock": 20 } },
+      { "productId": "phone-2", "score": 0.6, "metadata": { "stock": 4 } },
+      { "productId": "sac-du-phong-1", "score": 0.5, "metadata": { "stock": 12 } },
+      { "productId": "tai-nghe-1", "score": 0.4, "metadata": { "stock": 15 } },
+      { "productId": "noise-phone-1", "score": 0.18, "metadata": { "stock": 9 } }
+    ],
+    "textResults": [
+      { "productId": "phone-2", "score": 4, "metadata": { "stock": 4 } },
+      { "productId": "sac-du-phong-1", "score": 3, "metadata": { "stock": 12 } },
+      { "productId": "noise-phone-1", "score": 0.1, "metadata": { "stock": 9 } }
+    ]
+  },
+  {
+    "id": "kem-chong-nang",
+    "query": "kem chống nắng cho da dầu",
+    "relevantIds": ["sunscreen-1", "sunscreen-2"],
+    "noiseIds": ["noise-beauty-1"],
+    "vectorResults": [
+      { "productId": "sunscreen-1", "score": 0.84, "metadata": { "stock": 15 } },
+      { "productId": "serum-1", "score": 0.7, "metadata": { "stock": 9 } },
+      { "productId": "sunscreen-2", "score": 0.62, "metadata": { "stock": 6 } },
+      { "productId": "sua-rua-mat-1", "score": 0.55, "metadata": { "stock": 11 } },
+      { "productId": "son-moi-1", "score": 0.4, "metadata": { "stock": 20 } },
+      { "productId": "noise-beauty-1", "score": 0.2, "metadata": { "stock": 9 } }
+    ],
+    "textResults": [
+      { "productId": "sunscreen-2", "score": 4.2, "metadata": { "stock": 6 } },
+      { "productId": "noise-beauty-1", "score": 0.1, "metadata": { "stock": 9 } }
+    ]
+  },
+  {
+    "id": "noi-chong-dinh",
+    "query": "nồi chống dính dùng bếp từ",
+    "relevantIds": ["noi-1", "noi-2"],
+    "noiseIds": ["noise-home-1"],
+    "vectorResults": [
+      { "productId": "noi-2", "score": 0.83, "metadata": { "stock": 5 } },
+      { "productId": "noi-1", "score": 0.78, "metadata": { "stock": 3 } },
+      { "productId": "chao-1", "score": 0.5, "metadata": { "stock": 7 } },
+      { "productId": "chen-1", "score": 0.42, "metadata": { "stock": 20 } },
+      { "productId": "dao-1", "score": 0.38, "metadata": { "stock": 14 } },
+      { "productId": "noise-home-1", "score": 0.1, "metadata": { "stock": 9 } }
+    ],
+    "textResults": [
+      { "productId": "noi-1", "score": 3.5, "metadata": { "stock": 3 } },
+      { "productId": "chao-1", "score": 2.5, "metadata": { "stock": 7 } },
+      { "productId": "noise-home-1", "score": 0.1, "metadata": { "stock": 9 } }
+    ]
+  },
+  {
+    "id": "ca-phe-rang-xay",
+    "query": "cà phê rang xay nguyên chất",
+    "relevantIds": ["cf-1", "cf-2"],
+    "noiseIds": ["noise-food-1"],
+    "vectorResults": [
+      { "productId": "cf-1", "score": 0.79, "metadata": { "stock": 30 } },
+      { "productId": "tra-1", "score": 0.66, "metadata": { "stock": 25 } },
+      { "productId": "cf-2", "score": 0.58, "metadata": { "stock": 18 } },
+      { "productId": "banh-1", "score": 0.45, "metadata": { "stock": 40 } },
+      { "productId": "sua-1", "score": 0.4, "metadata": { "stock": 50 } },
+      { "productId": "noise-food-1", "score": 0.2, "metadata": { "stock": 9 } }
+    ],
+    "textResults": [
+      { "productId": "cf-2", "score": 4.8, "metadata": { "stock": 18 } },
+      { "productId": "tra-1", "score": 4.2, "metadata": { "stock": 25 } },
+      { "productId": "noise-food-1", "score": 0.1, "metadata": { "stock": 9 } }
+    ]
+  },
+  {
+    "id": "vali-du-lich",
+    "query": "vali du lịch size 24 inch",
+    "relevantIds": ["vali-1", "vali-2"],
+    "noiseIds": ["noise-travel-1"],
+    "vectorResults": [
+      { "productId": "balo-1", "score": 0.88, "metadata": { "stock": 10 } },
+      { "productId": "vali-2", "score": 0.7, "metadata": { "stock": 4 } },
+      { "productId": "vali-1", "score": 0.55, "metadata": { "stock": 2 } },
+      { "productId": "tui-deo-cheo-1", "score": 0.5, "metadata": { "stock": 8 } },
+      { "productId": "tui-xach-1", "score": 0.4, "metadata": { "stock": 6 } },
+      { "productId": "noise-travel-1", "score": 0.1, "metadata": { "stock": 9 } }
+    ],
+    "textResults": [
+      { "productId": "balo-1", "score": 5, "metadata": { "stock": 10 } },
+      { "productId": "vali-1", "score": 4.4, "metadata": { "stock": 2 } },
+      { "productId": "noise-travel-1", "score": 0.1, "metadata": { "stock": 9 } }
+    ]
+  },
+  {
+    "id": "hard-recall-ao-khoac",
+    "query": "áo khoác gió chống nước",
+    "relevantIds": ["ao-khoac-1", "ao-khoac-2", "ao-khoac-3"],
+    "noiseIds": ["noise-ao-khoac-3"],
+    "vectorResults": [
+      { "productId": "ao-khoac-1", "score": 0.8, "metadata": { "stock": 4 } },
+      { "productId": "ao-khoac-2", "score": 0.6, "metadata": { "stock": 2 } },
+      { "productId": "noise-ao-khoac-1", "score": 0.55, "metadata": { "stock": 9 } },
+      { "productId": "noise-ao-khoac-2", "score": 0.5, "metadata": { "stock": 9 } },
+      { "productId": "ao-mua-1", "score": 0.45, "metadata": { "stock": 3 } },
+      { "productId": "ao-khoac-3", "score": 0.1, "metadata": { "stock": 1 } },
+      { "productId": "noise-ao-khoac-3", "score": 0.1, "metadata": { "stock": 9 } }
+    ],
+    "textResults": [
+      { "productId": "ao-khoac-2", "score": 4, "metadata": { "stock": 2 } },
+      { "productId": "ao-khoac-3", "score": 0.2, "metadata": { "stock": 1 } },
+      { "productId": "noise-ao-khoac-3", "score": 0.1, "metadata": { "stock": 9 } }
+    ]
+  }
+]
